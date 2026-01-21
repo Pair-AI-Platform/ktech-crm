@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="16" fill="#2d3a6d"/>
+  <!-- Vertical bar of K -->
+  <rect x="22" y="22" width="16" height="56" fill="white"/>
+  <!-- Inner triangles (white) -->
+  <polygon points="38,50 38,35 53,50" fill="white"/>
+  <polygon points="38,50 38,65 53,50" fill="white"/>
+  <!-- Outer diagonal arms (light blue) -->
+  <polygon points="53,50 78,22 62,22" fill="#8b9dc3"/>
+  <polygon points="53,50 78,78 62,78" fill="#8b9dc3"/>
+</svg>

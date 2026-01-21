@@ -1,0 +1,5 @@
+export { WhatsAppComposer } from './whatsapp-composer'
+export { WhatsAppHistory } from './whatsapp-history'
+export { WhatsAppTemplateManager } from './whatsapp-template-manager'
+export { WhatsAppChat } from './whatsapp-chat'
+export { WhatsAppTemplateSelector } from './whatsapp-template-selector'
