@@ -95,7 +95,7 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
           <div className="flex-1 min-w-0">
             <p className="text-xs text-slate-400 font-medium mb-1">Say:</p>
             <p className="text-sm text-slate-600 leading-relaxed">
-              "{truncatedMessage}"
+              &quot;{truncatedMessage}&quot;
             </p>
           </div>
         </div>

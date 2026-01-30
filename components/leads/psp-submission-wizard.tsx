@@ -36,6 +36,12 @@ import {
   ExternalLink,
   LogIn,
   UserPlus,
+  Search,
+  Building2,
+  Loader2,
+  CheckCircle2,
+  Receipt,
+  RefreshCw,
 } from "lucide-react"
 import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, SubmissionBlockedReason, LostReason } from "@/types"
 import { SUBMISSION_BLOCKED_REASONS } from "@/types"
@@ -138,6 +144,8 @@ export function PSPSubmissionWizard({
   const [error, setError] = useState<string | null>(null)
   const [schools, setSchools] = useState<SchoolEntity[]>([])
   const [loadingSchools, setLoadingSchools] = useState(false)
+  const [schoolSearch, setSchoolSearch] = useState("")
+  const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
 
   const { updateLead } = useLeadMutations()
 
@@ -162,7 +170,7 @@ export function PSPSubmissionWizard({
 
   // Form state - Documents
   const [documents, setDocuments] = useState<DocumentItem[]>([])
-  const [graduateType, setGraduateType] = useState<GraduateType>("gov")
+  const [graduateType, setGraduateType] = useState<GraduateType | null>(null)
 
   // Form state - Payment
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "knet" | "online_link" | null>(null)
@@ -172,6 +180,30 @@ export function PSPSubmissionWizard({
     application: true,
     test: true,
   })
+
+  // Payment status state
+  const [paymentStatus, setPaymentStatus] = useState<{
+    hasPaid: boolean
+    hasTransaction: boolean
+    isPending?: boolean
+    transaction?: {
+      id: string
+      status: string
+      amount: number
+      invoiceUrl?: string
+      completedAt?: string
+      receiptNumber?: string
+    }
+    receiptDocument?: {
+      id: string
+      url: string
+      fileName: string
+    }
+  } | null>(null)
+  const [loadingPaymentStatus, setLoadingPaymentStatus] = useState(false)
+  const [sendingPaymentLink, setSendingPaymentLink] = useState(false)
+  const [paymentLinkSent, setPaymentLinkSent] = useState(false)
+  const [currentTransactionId, setCurrentTransactionId] = useState<string | null>(null)
 
   // Fee amounts
   const FEES = {
@@ -189,6 +221,7 @@ export function PSPSubmissionWizard({
   // Form state - Submission Action
   const [submissionAction, setSubmissionAction] = useState<"submit" | "blocked" | "lost" | null>(null)
   const [blockedReason, setBlockedReason] = useState<SubmissionBlockedReason | "">("")
+  const [blockedReasonNotes, setBlockedReasonNotes] = useState("")
   const [lostReasonId, setLostReasonId] = useState("")
   const [lostReasons, setLostReasons] = useState<LostReason[]>([])
   const [loadingLostReasons, setLoadingLostReasons] = useState(false)
@@ -215,9 +248,9 @@ export function PSPSubmissionWizard({
       setIntendedMajor(lead.intended_major || "")
       setSeatNumber(lead.seat_number || "")
 
-      // Set documents based on graduate type (default to gov)
-      setGraduateType("gov")
-      setDocuments(DOCUMENTS_BY_TYPE.gov.map(d => ({ ...d })))
+      // Set graduate type to null (no default selection)
+      setGraduateType(null)
+      setDocuments([])
 
       setCurrentStep("info")
       setError(null)
@@ -227,7 +260,13 @@ export function PSPSubmissionWizard({
       setSelectedFees({ puc: true, application: true, test: true })
       setSubmissionAction(null)
       setBlockedReason("")
+      setBlockedReasonNotes("")
       setLostReasonId("")
+
+      // Reset payment status states
+      setPaymentStatus(null)
+      setPaymentLinkSent(false)
+      setCurrentTransactionId(null)
     }
   }, [isOpen, lead])
 
@@ -241,7 +280,7 @@ export function PSPSubmissionWizard({
           .from("schools")
           .select("id, name_en, name_ar")
           .eq("is_active", true)
-          .order("name_en")
+          .order("name_ar")
         if (data) setSchools(data)
       } catch (err) {
         console.error("Error fetching schools:", err)
@@ -254,6 +293,12 @@ export function PSPSubmissionWizard({
       fetchSchools()
     }
   }, [isOpen])
+
+  // Filter schools based on search (supports Arabic)
+  const filteredSchools = schools.filter(school =>
+    school.name_ar.includes(schoolSearch) ||
+    school.name_en.toLowerCase().includes(schoolSearch.toLowerCase())
+  )
 
   // Fetch lost reasons
   useEffect(() => {
@@ -279,10 +324,145 @@ export function PSPSubmissionWizard({
     }
   }, [isOpen])
 
-  // Update documents when graduate type changes
+  // Update documents when graduate type changes and update substage to "documents"
   useEffect(() => {
-    setDocuments(DOCUMENTS_BY_TYPE[graduateType].map(d => ({ ...d })))
-  }, [graduateType])
+    if (graduateType) {
+      setDocuments(DOCUMENTS_BY_TYPE[graduateType].map(d => ({ ...d })))
+
+      // Update substage to "documents" when a graduate type is selected
+      if (lead?.id && lead.submission_substage === "pending") {
+        updateLead(lead.id, { submission_substage: "documents" })
+      }
+    } else {
+      setDocuments([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graduateType, lead?.id, lead?.submission_substage])
+
+  // Fetch payment status when wizard opens
+  useEffect(() => {
+    async function fetchPaymentStatus() {
+      if (!lead?.id) return
+
+      setLoadingPaymentStatus(true)
+      try {
+        const response = await fetch(`/api/payments/psp/status?leadId=${lead.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setPaymentStatus(data)
+
+          // If already paid, set the payment method to online_link
+          if (data.hasPaid) {
+            setPaymentMethod("online_link")
+            if (data.transaction?.receiptNumber) {
+              setReceiptNumber(data.transaction.receiptNumber)
+            }
+          }
+
+          // Store transaction ID if exists
+          if (data.transaction?.id) {
+            setCurrentTransactionId(data.transaction.id)
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching payment status:", err)
+      } finally {
+        setLoadingPaymentStatus(false)
+      }
+    }
+
+    if (isOpen && lead?.id) {
+      fetchPaymentStatus()
+    }
+  }, [isOpen, lead?.id])
+
+  // Handle sending payment link
+  const handleSendPaymentLink = async () => {
+    if (!lead?.id) return
+
+    setSendingPaymentLink(true)
+    setError(null)
+
+    try {
+      // First, create the payment link if we don't have a transaction yet
+      let transactionId = currentTransactionId
+
+      if (!transactionId || !paymentStatus?.hasTransaction) {
+        // Create payment link
+        const createResponse = await fetch("/api/payments/psp/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: lead.id,
+            amount: calculateTotal(),
+            fees: Object.entries(selectedFees)
+              .filter(([, selected]) => selected)
+              .map(([key]) => ({
+                label: FEES[key as keyof typeof FEES].label,
+                amount: FEES[key as keyof typeof FEES].amount,
+              })),
+            civilId: civilId,
+          }),
+        })
+
+        if (!createResponse.ok) {
+          const errorData = await createResponse.json()
+          throw new Error(errorData.error || "Failed to create payment link")
+        }
+
+        const createData = await createResponse.json()
+        transactionId = createData.transactionId
+        setCurrentTransactionId(transactionId)
+      }
+
+      // Now send the payment link via WhatsApp
+      const sendResponse = await fetch("/api/payments/psp/send-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId }),
+      })
+
+      if (!sendResponse.ok) {
+        const errorData = await sendResponse.json()
+        throw new Error(errorData.error || "Failed to send payment link")
+      }
+
+      setPaymentLinkSent(true)
+
+      // Refresh payment status
+      const statusResponse = await fetch(`/api/payments/psp/status?leadId=${lead.id}`)
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        setPaymentStatus(statusData)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send payment link")
+    } finally {
+      setSendingPaymentLink(false)
+    }
+  }
+
+  // Refresh payment status
+  const refreshPaymentStatus = async () => {
+    if (!lead?.id) return
+
+    setLoadingPaymentStatus(true)
+    try {
+      const response = await fetch(`/api/payments/psp/status?leadId=${lead.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setPaymentStatus(data)
+
+        if (data.hasPaid) {
+          setPaymentMethod("online_link")
+        }
+      }
+    } catch (err) {
+      console.error("Error refreshing payment status:", err)
+    } finally {
+      setLoadingPaymentStatus(false)
+    }
+  }
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep)
 
@@ -302,8 +482,46 @@ export function PSPSubmissionWizard({
   }
 
   const validateDocuments = (): boolean => {
-    // For now, just warn but don't block
-    // Future: Could check if all required documents are uploaded
+    // Check if graduate type is selected
+    if (!graduateType) {
+      setError("Please select a graduate type")
+      setValidationErrors({
+        graduateType: "Please select a graduate type before continuing"
+      })
+      return false
+    }
+
+    // Check if all required documents are uploaded
+    const requiredDocs = documents.filter(d => d.required)
+    const uploadedRequiredDocs = requiredDocs.filter(d => d.file || d.uploaded)
+    const missingDocs = requiredDocs.filter(d => !d.file && !d.uploaded)
+
+    if (missingDocs.length > 0) {
+      const missingNames = missingDocs.map(d => d.name).join(', ')
+      setError(`Missing required documents: ${missingNames}`)
+      setValidationErrors({
+        documents: `Please upload all required documents. Missing: ${missingNames}`
+      })
+      return false
+    }
+
+    // Check for expired documents
+    const expiredDocs = documents.filter(d => {
+      if (!d.file) return false
+      const file = d.file as unknown as { is_expired?: boolean; expiration_date?: string }
+      return file.is_expired === true
+    })
+
+    if (expiredDocs.length > 0) {
+      const expiredNames = expiredDocs.map(d => d.name).join(', ')
+      // Warn but allow to proceed
+      if (!confirm(`Warning: The following documents appear to be expired: ${expiredNames}. Do you want to continue anyway?`)) {
+        return false
+      }
+    }
+
+    setError(null)
+    setValidationErrors({})
     return true
   }
 
@@ -321,8 +539,12 @@ export function PSPSubmissionWizard({
       case "info":
         return !!firstName && !!lastName && !!civilId && !!phone
       case "documents":
-        return true
+        // Must select a graduate type to proceed
+        return graduateType !== null
       case "payments":
+        // Can proceed if: already paid OR payment method selected with receipt OR online link sent
+        if (paymentStatus?.hasPaid) return true
+        if (paymentMethod === "online_link" && (paymentLinkSent || paymentStatus?.isPending)) return true
         return paymentMethod !== null && (paymentMethod === "online_link" || !!receiptNumber)
       case "submission":
         return true
@@ -376,6 +598,11 @@ export function PSPSubmissionWizard({
       return
     }
 
+    if (submissionAction === "blocked" && blockedReason === "other" && !blockedReasonNotes.trim()) {
+      setError("Please provide notes for the blocked reason")
+      return
+    }
+
     if (submissionAction === "lost" && !lostReasonId) {
       setError("Please select a lost reason")
       return
@@ -387,7 +614,7 @@ export function PSPSubmissionWizard({
     try {
       // Determine substage and pipeline stage based on action
       let newSubstage: SubmissionSubstage = "pending"
-      let newPipelineStage: "submission" | "lost" = "submission"
+      let newPipelineStage: "applicant" | "lost" = "applicant"
 
       if (submissionAction === "submit") {
         newSubstage = "submitted"
@@ -417,6 +644,7 @@ export function PSPSubmissionWizard({
         pipeline_stage: newPipelineStage,
         submission_substage: newSubstage,
         submission_blocked_reason: submissionAction === "blocked" ? (blockedReason as SubmissionBlockedReason) : undefined,
+        submission_blocked_reason_notes: submissionAction === "blocked" && blockedReason === "other" ? blockedReasonNotes.trim() : undefined,
         submission_lost_reason_id: submissionAction === "lost" ? lostReasonId : undefined,
       }
 
@@ -654,24 +882,74 @@ export function PSPSubmissionWizard({
                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                       School
                     </label>
-                    <Select value={schoolId} onValueChange={setSchoolId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select school..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {loadingSchools ? (
-                          <div className="p-4 text-center text-sm text-[var(--text-muted)]">
-                            Loading schools...
-                          </div>
-                        ) : (
-                          schools.map((school) => (
-                            <SelectItem key={school.id} value={school.id}>
-                              {school.name_en}
-                            </SelectItem>
-                          ))
+                    <div className="relative">
+                      <div
+                        onClick={() => setIsSchoolDropdownOpen(!isSchoolDropdownOpen)}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all h-10",
+                          isSchoolDropdownOpen
+                            ? "border-[var(--primary)] ring-2 ring-[var(--primary)]/20"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50"
                         )}
-                      </SelectContent>
-                    </Select>
+                      >
+                        <Building2 className="w-4 h-4 text-[var(--text-muted)]" />
+                        <span className={cn(
+                          "text-sm flex-1 text-right",
+                          schoolId ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                        )} dir="rtl">
+                          {schoolId ? schools.find(s => s.id === schoolId)?.name_ar : "اختر المدرسة..."}
+                        </span>
+                      </div>
+
+                      {isSchoolDropdownOpen && (
+                        <div className="absolute z-50 w-full mt-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                          <div className="p-2 border-b border-[var(--border)]">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                              <input
+                                type="text"
+                                value={schoolSearch}
+                                onChange={(e) => setSchoolSearch(e.target.value)}
+                                placeholder="ابحث عن المدرسة..."
+                                className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-depth-2)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] text-right"
+                                dir="rtl"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {loadingSchools ? (
+                              <div className="p-4 text-center text-sm text-[var(--text-muted)]">
+                                جاري التحميل...
+                              </div>
+                            ) : filteredSchools.length > 0 ? (
+                              filteredSchools.map((school) => (
+                                <button
+                                  key={school.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSchoolId(school.id)
+                                    setIsSchoolDropdownOpen(false)
+                                    setSchoolSearch("")
+                                  }}
+                                  className={cn(
+                                    "w-full px-3 py-2 text-right text-sm transition-colors hover:bg-[var(--bg-hover)]",
+                                    schoolId === school.id && "bg-[var(--primary-muted)] text-[var(--primary)]"
+                                  )}
+                                  dir="rtl"
+                                >
+                                  {school.name_ar}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-sm text-center text-[var(--text-muted)]">
+                                لا توجد مدارس
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
@@ -762,8 +1040,8 @@ export function PSPSubmissionWizard({
                   ))}
                 </div>
 
-                {/* Document Manager with File Upload */}
-                {lead && (
+                {/* Document Manager with File Upload - Only show when graduate type is selected */}
+                {lead && graduateType && (
                   <PSPDocumentManager
                     leadId={lead.id}
                     documents={documents.map(d => ({
@@ -781,6 +1059,16 @@ export function PSPSubmissionWizard({
                     graduateType={graduateType}
                   />
                 )}
+
+                {/* Prompt to select graduate type */}
+                {!graduateType && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <GraduationCap className="w-12 h-12 text-[var(--text-muted)] mb-3" />
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Please select a graduate type above to view required documents
+                    </p>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -793,125 +1081,183 @@ export function PSPSubmissionWizard({
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-5"
               >
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                    Payment Details
-                  </h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    Select fees and payment method
-                  </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Payment Details
+                    </h3>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      Select fees and payment method
+                    </p>
+                  </div>
+                  {/* Payment Status Badge */}
+                  {loadingPaymentStatus ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full">
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                      <span className="text-xs text-gray-500">Checking...</span>
+                    </div>
+                  ) : paymentStatus?.hasPaid ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 rounded-full">
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      <span className="text-xs font-medium text-green-700">Paid</span>
+                    </div>
+                  ) : paymentStatus?.isPending ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 rounded-full">
+                      <RefreshCw className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-medium text-amber-700">Pending</span>
+                    </div>
+                  ) : null}
                 </div>
 
-                {/* Fee Breakdown */}
-                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl space-y-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    Fee Breakdown
-                  </h4>
-                  {Object.entries(FEES).map(([key, fee]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setSelectedFees(prev => ({ ...prev, [key]: !prev[key] }))}
-                      className={cn(
-                        "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
-                        selectedFees[key]
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-surface)]"
+                {/* Payment Confirmed Banner */}
+                {paymentStatus?.hasPaid && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-green-800">Payment Confirmed</h4>
+                        <p className="text-sm text-green-700 mt-0.5">
+                          {paymentStatus.transaction?.amount} KD paid on{" "}
+                          {paymentStatus.transaction?.completedAt
+                            ? new Date(paymentStatus.transaction.completedAt).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "N/A"}
+                        </p>
+                      </div>
+                      {paymentStatus.receiptDocument?.url && (
+                        <a
+                          href={paymentStatus.receiptDocument.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          View Invoice
+                        </a>
                       )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-5 h-5 rounded flex items-center justify-center border-2 transition-all",
+                    </div>
+                  </div>
+                )}
+
+                {/* Fee Breakdown - Only show if not paid */}
+                {!paymentStatus?.hasPaid && (
+                  <div className="p-4 bg-[var(--bg-sunken)] rounded-xl space-y-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      Fee Breakdown
+                    </h4>
+                    {Object.entries(FEES).map(([key, fee]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelectedFees(prev => ({ ...prev, [key]: !prev[key] }))}
+                        className={cn(
+                          "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
                           selectedFees[key]
-                            ? "border-[var(--primary)] bg-[var(--primary)]"
-                            : "border-[var(--border)]"
-                        )}>
-                          {selectedFees[key] && <Check className="w-3 h-3 text-white" />}
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                            : "border-[var(--border)] bg-[var(--bg-surface)]"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center border-2 transition-all",
+                            selectedFees[key]
+                              ? "border-[var(--primary)] bg-[var(--primary)]"
+                              : "border-[var(--border)]"
+                          )}>
+                            {selectedFees[key] && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className={cn(
+                            "text-sm font-medium",
+                            selectedFees[key] ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                          )}>
+                            {fee.label}
+                          </span>
                         </div>
                         <span className={cn(
-                          "text-sm font-medium",
-                          selectedFees[key] ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                          "text-sm font-semibold",
+                          selectedFees[key] ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
                         )}>
-                          {fee.label}
+                          {fee.amount} KD
                         </span>
-                      </div>
-                      <span className={cn(
-                        "text-sm font-semibold",
-                        selectedFees[key] ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
-                      )}>
-                        {fee.amount} KD
-                      </span>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
 
-                  {/* Total */}
-                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
-                    <span className="text-sm font-semibold text-[var(--text-primary)]">Total</span>
-                    <span className="text-lg font-bold text-[var(--primary)]">{calculateTotal()} KD</span>
+                    {/* Total */}
+                    <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
+                      <span className="text-sm font-semibold text-[var(--text-primary)]">Total</span>
+                      <span className="text-lg font-bold text-[var(--primary)]">{calculateTotal()} KD</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Payment Methods */}
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
-                    Payment Method
-                  </h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod("cash")}
-                      className={cn(
-                        "p-4 rounded-xl border text-center transition-all",
-                        paymentMethod === "cash"
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50"
-                      )}
-                    >
-                      <Banknote className={cn(
-                        "w-7 h-7 mx-auto mb-2",
-                        paymentMethod === "cash" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
-                      )} />
-                      <h4 className="font-medium text-sm text-[var(--text-primary)]">Cash</h4>
-                    </button>
+                {/* Payment Methods - Only show if not paid */}
+                {!paymentStatus?.hasPaid && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
+                      Payment Method
+                    </h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("cash")}
+                        className={cn(
+                          "p-4 rounded-xl border text-center transition-all",
+                          paymentMethod === "cash"
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                            : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50"
+                        )}
+                      >
+                        <Banknote className={cn(
+                          "w-7 h-7 mx-auto mb-2",
+                          paymentMethod === "cash" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                        )} />
+                        <h4 className="font-medium text-sm text-[var(--text-primary)]">Cash</h4>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod("knet")}
-                      className={cn(
-                        "p-4 rounded-xl border text-center transition-all",
-                        paymentMethod === "knet"
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50"
-                      )}
-                    >
-                      <CreditCard className={cn(
-                        "w-7 h-7 mx-auto mb-2",
-                        paymentMethod === "knet" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
-                      )} />
-                      <h4 className="font-medium text-sm text-[var(--text-primary)]">KNET</h4>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("knet")}
+                        className={cn(
+                          "p-4 rounded-xl border text-center transition-all",
+                          paymentMethod === "knet"
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                            : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50"
+                        )}
+                      >
+                        <CreditCard className={cn(
+                          "w-7 h-7 mx-auto mb-2",
+                          paymentMethod === "knet" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                        )} />
+                        <h4 className="font-medium text-sm text-[var(--text-primary)]">KNET</h4>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod("online_link")}
-                      className={cn(
-                        "p-4 rounded-xl border text-center transition-all",
-                        paymentMethod === "online_link"
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50"
-                      )}
-                    >
-                      <Send className={cn(
-                        "w-7 h-7 mx-auto mb-2",
-                        paymentMethod === "online_link" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
-                      )} />
-                      <h4 className="font-medium text-sm text-[var(--text-primary)]">Online Link</h4>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("online_link")}
+                        className={cn(
+                          "p-4 rounded-xl border text-center transition-all",
+                          paymentMethod === "online_link"
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                            : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50"
+                        )}
+                      >
+                        <Send className={cn(
+                          "w-7 h-7 mx-auto mb-2",
+                          paymentMethod === "online_link" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                        )} />
+                        <h4 className="font-medium text-sm text-[var(--text-primary)]">Online Link</h4>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Receipt Number for Cash/KNET */}
-                {(paymentMethod === "cash" || paymentMethod === "knet") && (
+                {!paymentStatus?.hasPaid && (paymentMethod === "cash" || paymentMethod === "knet") && (
                   <div className="space-y-4 pt-2">
                     <div>
                       <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
@@ -936,24 +1282,95 @@ export function PSPSubmissionWizard({
                 )}
 
                 {/* Send Payment Link Button for Online */}
-                {paymentMethod === "online_link" && (
+                {!paymentStatus?.hasPaid && paymentMethod === "online_link" && (
                   <div className="space-y-4 pt-2">
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700">
-                        A payment link for <strong>{calculateTotal()} KD</strong> will be generated and can be sent to <strong>{phone}</strong>.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      className="w-full rounded-xl"
-                      onClick={() => {
-                        // TODO: Implement send payment link functionality
-                        console.log("Sending payment link for", calculateTotal(), "KD to", phone)
-                      }}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Payment Link
-                    </Button>
+                    {/* Payment Link Sent Success */}
+                    {(paymentLinkSent || paymentStatus?.isPending) && (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                            <Send className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-blue-800">Payment Link Sent</h4>
+                            <p className="text-sm text-blue-700 mt-0.5">
+                              Waiting for customer to complete payment...
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={refreshPaymentStatus}
+                            disabled={loadingPaymentStatus}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw className={cn("w-3.5 h-3.5", loadingPaymentStatus && "animate-spin")} />
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Info Banner */}
+                    {!paymentLinkSent && !paymentStatus?.isPending && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                          A payment link for <strong>{calculateTotal()} KD</strong> will be generated and can be sent to <strong>{phone}</strong>.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Send Button */}
+                    {!paymentLinkSent && !paymentStatus?.isPending && (
+                      <Button
+                        type="button"
+                        className="w-full rounded-xl"
+                        onClick={handleSendPaymentLink}
+                        disabled={sendingPaymentLink}
+                      >
+                        {sendingPaymentLink ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Payment Link
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {/* Resend Option */}
+                    {(paymentLinkSent || paymentStatus?.isPending) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full rounded-xl"
+                        onClick={handleSendPaymentLink}
+                        disabled={sendingPaymentLink}
+                      >
+                        {sendingPaymentLink ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Resend Payment Link
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* Error Display */}
+                {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    {error}
                   </div>
                 )}
               </motion.div>
@@ -1038,7 +1455,7 @@ export function PSPSubmissionWizard({
                   {/* Documents Summary */}
                   <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
                     <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
-                      Documents ({GRADUATE_TYPE_OPTIONS.find(g => g.value === graduateType)?.label})
+                      Documents ({graduateType ? GRADUATE_TYPE_OPTIONS.find(g => g.value === graduateType)?.label : "Not Selected"})
                     </h4>
                     <div className="flex items-center gap-2">
                       <div className={cn(
@@ -1060,13 +1477,26 @@ export function PSPSubmissionWizard({
                   </div>
 
                   {/* Payment Summary */}
-                  <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
-                      Payment ({calculateTotal()} KD)
+                  <div className={cn(
+                    "p-4 rounded-xl",
+                    paymentStatus?.hasPaid
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-[var(--bg-sunken)]"
+                  )}>
+                    <h4 className={cn(
+                      "text-xs font-semibold uppercase tracking-wide mb-3",
+                      paymentStatus?.hasPaid ? "text-green-700" : "text-[var(--text-muted)]"
+                    )}>
+                      Payment ({paymentStatus?.hasPaid ? paymentStatus.transaction?.amount : calculateTotal()} KD)
                     </h4>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--primary)]">
-                        {paymentMethod === "cash" ? (
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                        paymentStatus?.hasPaid ? "bg-green-500" : "bg-[var(--primary)]"
+                      )}>
+                        {paymentStatus?.hasPaid ? (
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        ) : paymentMethod === "cash" ? (
                           <Banknote className="w-4 h-4 text-white" />
                         ) : paymentMethod === "knet" ? (
                           <CreditCard className="w-4 h-4 text-white" />
@@ -1074,14 +1504,32 @@ export function PSPSubmissionWizard({
                           <Send className="w-4 h-4 text-white" />
                         )}
                       </div>
-                      <span className="text-sm text-[var(--text-primary)]">
-                        {paymentMethod === "cash"
+                      <span className={cn(
+                        "text-sm",
+                        paymentStatus?.hasPaid ? "text-green-700 font-medium" : "text-[var(--text-primary)]"
+                      )}>
+                        {paymentStatus?.hasPaid
+                          ? "Payment Confirmed - Online Payment"
+                          : paymentMethod === "cash"
                           ? `Cash payment - Receipt #${receiptNumber}`
                           : paymentMethod === "knet"
                           ? `KNET payment - Receipt #${receiptNumber}`
+                          : paymentStatus?.isPending
+                          ? "Payment link sent - Waiting for payment"
                           : "Online payment link will be sent"}
                       </span>
                     </div>
+                    {paymentStatus?.hasPaid && paymentStatus.transaction?.completedAt && (
+                      <p className="text-xs text-green-600 mt-2 ml-10">
+                        Paid on {new Date(paymentStatus.transaction.completedAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
                   </div>
 
                   {/* PUC Actions */}
@@ -1192,22 +1640,45 @@ export function PSPSubmissionWizard({
 
                   {/* Blocked Reason Dropdown */}
                   {submissionAction === "blocked" && (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
-                        Blocked Reason <span className="text-red-500">*</span>
-                      </label>
-                      <Select value={blockedReason} onValueChange={(value) => setBlockedReason(value as SubmissionBlockedReason)}>
-                        <SelectTrigger className="bg-white border-amber-300">
-                          <SelectValue placeholder="Select blocked reason..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUBMISSION_BLOCKED_REASONS.map((reason) => (
-                            <SelectItem key={reason.value} value={reason.value}>
-                              {reason.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+                          Blocked Reason <span className="text-red-500">*</span>
+                        </label>
+                        <Select value={blockedReason} onValueChange={(value) => {
+                          setBlockedReason(value as SubmissionBlockedReason)
+                          if (value !== "other") {
+                            setBlockedReasonNotes("")
+                          }
+                        }}>
+                          <SelectTrigger className="bg-white border-amber-300">
+                            <SelectValue placeholder="Select blocked reason..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUBMISSION_BLOCKED_REASONS.map((reason) => (
+                              <SelectItem key={reason.value} value={reason.value}>
+                                {reason.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Notes field when "Other" is selected */}
+                      {blockedReason === "other" && (
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+                            Notes <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={blockedReasonNotes}
+                            onChange={(e) => setBlockedReasonNotes(e.target.value)}
+                            placeholder="Please describe the reason..."
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm bg-white border border-amber-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 

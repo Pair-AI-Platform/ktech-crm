@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -23,7 +24,7 @@ import {
   ChevronRight,
   Loader2,
   AlertTriangle,
-  ThumbsDown,
+  XCircle,
   PhoneCall,
 } from "lucide-react"
 import type { Appointment } from "@/types"
@@ -39,13 +40,13 @@ interface NoUpdatedAppointmentsProps {
   onAppointmentClick?: (appointment: Appointment) => void
 }
 
-const STATUS_ACTIONS = [
+const STATUS_ACTIONS: Array<{ value: string; label: string; icon: React.ElementType; color: string; isLeadAction?: boolean }> = [
   { value: "confirmed", label: "Confirmed", icon: CheckCircle, color: "bg-[var(--success)] hover:bg-[var(--success)]/90" },
   { value: "on_the_way", label: "On The Way", icon: Car, color: "bg-[var(--info)] hover:bg-[var(--info)]/90" },
   { value: "postponed", label: "Postponed", icon: Calendar, color: "bg-[var(--primary)] hover:bg-[var(--primary)]/90" },
   { value: "no_answer", label: "No Answer", icon: PhoneMissed, color: "bg-[var(--warning)] hover:bg-[var(--warning)]/90" },
   { value: "cant_reach", label: "Can't Reach", icon: PhoneOff, color: "bg-[var(--error)] hover:bg-[var(--error)]/90" },
-  { value: "not_interested", label: "Not Interested", icon: ThumbsDown, color: "bg-red-500 hover:bg-red-500/90", isLeadAction: true },
+  { value: "not_interested", label: "Canceled", icon: XCircle, color: "bg-red-500 hover:bg-red-500/90", isLeadAction: true },
   { value: "callback", label: "Callback", icon: PhoneCall, color: "bg-[var(--accent)] hover:bg-[var(--accent)]/90", isLeadAction: true },
 ]
 
@@ -58,6 +59,8 @@ export function NoUpdatedAppointments({
 }: NoUpdatedAppointmentsProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const [cancelAppointment, setCancelAppointment] = useState<Appointment | null>(null)
+  const [cancelNotes, setCancelNotes] = useState("")
 
   const {
     markNA,
@@ -98,21 +101,20 @@ export function NoUpdatedAppointments({
           await markCantReach(appointment.id)
           break
         case "not_interested":
-          // Mark lead as Not Interested
-          if (appointment.lead_id) {
-            await supabase
-              .from("leads")
-              .update({ status: "not_interested" })
-              .eq("id", appointment.lead_id)
-          }
-          break
+          // Open cancel popup instead of direct action
+          setCancelAppointment(appointment)
+          setLoadingId(null)
+          setLoadingAction(null)
+          return
         case "callback":
-          // Mark lead as Callback
-          if (appointment.lead_id) {
+          // Mark all leads as Callback
+          const cbLeadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
+            (appointment.lead_id ? [appointment.lead_id] : [])
+          for (const lid of cbLeadIds) {
             await supabase
               .from("leads")
               .update({ status: "callback", contact_status: "callback" })
-              .eq("id", appointment.lead_id)
+              .eq("id", lid)
           }
           break
       }
@@ -122,6 +124,32 @@ export function NoUpdatedAppointments({
     } finally {
       setLoadingId(null)
       setLoadingAction(null)
+    }
+  }
+
+  const handleCancelConfirm = async () => {
+    if (!cancelAppointment) return
+    const cancelLeadIds = cancelAppointment.appointment_leads?.map(al => al.lead_id) ||
+      (cancelAppointment.lead_id ? [cancelAppointment.lead_id] : [])
+    if (cancelLeadIds.length === 0) return
+    setLoadingId(cancelAppointment.id)
+    setLoadingAction("not_interested")
+    try {
+      const supabase = createClient()
+      for (const lid of cancelLeadIds) {
+        await supabase
+          .from("leads")
+          .update({ status: "not_interested", notes: cancelNotes || undefined })
+          .eq("id", lid)
+      }
+      onUpdate?.()
+    } catch (error) {
+      console.error("Error canceling:", error)
+    } finally {
+      setLoadingId(null)
+      setLoadingAction(null)
+      setCancelAppointment(null)
+      setCancelNotes("")
     }
   }
 
@@ -216,12 +244,17 @@ export function NoUpdatedAppointments({
                   <div className="space-y-2">
                     {groupedAppointments[date].map((apt, index) => {
                       const typeInfo = APPOINTMENT_TYPES.find(t => apt.appointment_type.includes(t.value))
-                      const personName = apt.lead
+                      const aptLeads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
+                      const personName = aptLeads.length > 0
+                        ? aptLeads.length === 1
+                          ? `${aptLeads[0]!.first_name} ${aptLeads[0]!.last_name}`
+                          : `${aptLeads[0]!.first_name} ${aptLeads[0]!.last_name} +${aptLeads.length - 1}`
+                        : apt.lead
                         ? `${apt.lead.first_name} ${apt.lead.last_name}`
                         : apt.student
                         ? `${apt.student.first_name} ${apt.student.last_name}`
                         : "Unknown"
-                      const personPhone = apt.lead?.phone || ""
+                      const personPhone = aptLeads[0]?.phone || apt.lead?.phone || ""
                       const isLoading = loadingId === apt.id
 
                       return (
@@ -244,7 +277,7 @@ export function NoUpdatedAppointments({
                             <div className="flex items-center gap-3">
                               <div className={cn(
                                 "w-10 h-10 rounded-lg flex items-center justify-center text-white font-medium",
-                                getTypeColor(apt.appointment_type[0])
+                                getTypeColor(apt.appointment_type?.[0] || "new_appointment")
                               )}>
                                 {apt.scheduled_time?.slice(0, 2)}
                               </div>
@@ -279,8 +312,8 @@ export function NoUpdatedAppointments({
                             {STATUS_ACTIONS
                               .filter((action) => {
                                 // Only show lead actions (Not Interested, Callback) if appointment has a lead
-                                if ((action as any).isLeadAction) {
-                                  return !!apt.lead_id
+                                if (action.isLeadAction) {
+                                  return (apt.appointment_leads?.length || 0) > 0 || !!apt.lead_id
                                 }
                                 return true
                               })
@@ -322,6 +355,44 @@ export function NoUpdatedAppointments({
           )}
         </div>
       </SheetContent>
+
+      {/* Cancel Notes Dialog */}
+      <Dialog open={!!cancelAppointment} onOpenChange={() => { setCancelAppointment(null); setCancelNotes("") }}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500">
+              <XCircle className="w-5 h-5" />
+              Cancel — Add Notes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <textarea
+              value={cancelNotes}
+              onChange={(e) => setCancelNotes(e.target.value)}
+              placeholder="Enter cancellation reason or notes..."
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-red-500/30 min-h-[100px] resize-none"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setCancelAppointment(null); setCancelNotes("") }}
+                className="rounded-lg"
+              >
+                Back
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCancelConfirm}
+                disabled={loadingId === cancelAppointment?.id}
+                className="rounded-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                {loadingId === cancelAppointment?.id ? "Saving..." : "Confirm Cancel"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   )
 }

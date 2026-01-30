@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -46,8 +46,10 @@ interface CalendarViewProps {
 }
 
 const TIME_SLOTS = [
-  "08:00", "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00"
+  "00:00", "01:00", "02:00", "03:00", "04:00", "05:00",
+  "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+  "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
+  "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
 ]
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -84,10 +86,10 @@ const APPOINTMENT_COLORS: Record<AppointmentType, { bg: string; border: string; 
     gradient: "from-[var(--info)]/20 to-[var(--info)]/5"
   },
   sf_retest: {
-    bg: "bg-[var(--info)]/10",
-    border: "border-[var(--info)]/30",
-    text: "text-[var(--info)]",
-    gradient: "from-[var(--info)]/20 to-[var(--info)]/5"
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/30",
+    text: "text-emerald-600",
+    gradient: "from-emerald-500/20 to-emerald-500/5"
   },
 }
 
@@ -127,9 +129,8 @@ export function CalendarView({
   const getCurrentTimePosition = () => {
     const hour = currentTime.getHours()
     const minutes = currentTime.getMinutes()
-    const startHour = 8 // 08:00
-    const endHour = 17 // 17:00
-    if (hour < startHour || hour > endHour) return -1
+    const startHour = 0 // 00:00
+    const endHour = 24 // 24:00
     return ((hour - startHour) * 60 + minutes) / ((endHour - startHour) * 60) * 100
   }
 
@@ -205,6 +206,14 @@ export function CalendarView({
   }
 
   const getAppointmentName = (apt: Appointment) => {
+    const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
+    if (leads.length > 0) {
+      if (leads.length === 1) {
+        return `${leads[0]!.first_name} ${leads[0]!.last_name}`
+      }
+      return `${leads[0]!.first_name} ${leads[0]!.last_name} +${leads.length - 1}`
+    }
+    // Legacy fallback
     if (apt.lead) return `${apt.lead.first_name} ${apt.lead.last_name}`
     if (apt.student) return `${apt.student.first_name} ${apt.student.last_name}`
     return "Unknown"
@@ -238,50 +247,55 @@ export function CalendarView({
   // Appointment card component
   const AppointmentCard = ({ appointment, compact = false }: { appointment: Appointment; compact?: boolean }) => {
     // Use first type for colors (or default to new_appointment)
-    const primaryType = appointment.appointment_type[0] || "new_appointment"
-    const colors = APPOINTMENT_COLORS[primaryType]
+    const primaryType = appointment.appointment_type?.[0] || "new_appointment"
+    const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
     const agentName = getAgentName(appointment)
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 5 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        whileHover={{ scale: 1.02 }}
-        onClick={() => onAppointmentClick(appointment)}
+        initial={{ opacity: 0, y: 3 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -3 }}
+        whileHover={{ scale: compact ? 1.01 : 1.02 }}
+        onClick={(e) => { e.stopPropagation(); onAppointmentClick(appointment) }}
         className={cn(
-          "relative p-2.5 rounded-xl border cursor-pointer transition-all duration-200 group",
-          "bg-gradient-to-br hover:shadow-lg hover:shadow-[var(--shadow-color)]/10",
+          "relative border cursor-pointer transition-all duration-200 group overflow-hidden",
+          "bg-gradient-to-br",
+          compact
+            ? "p-1.5 rounded-lg hover:shadow-md"
+            : "p-2.5 rounded-xl hover:shadow-lg hover:shadow-[var(--shadow-color)]/10",
           colors.gradient,
-          colors.border,
-          "overflow-hidden"
+          colors.border
         )}
       >
         {/* Left accent bar */}
         <div className={cn(
-          "absolute left-0 top-2 bottom-2 w-1 rounded-full transition-all",
+          "absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-all",
           colors.text.replace("text-", "bg-"),
-          "opacity-60 group-hover:opacity-100"
+          "opacity-70 group-hover:opacity-100"
         )} />
 
-        <div className="pl-2">
-          <div className="flex items-center gap-1.5 mb-1">
-            {getStatusIcon(appointment.status)}
-            <span className={cn("text-xs font-semibold truncate", colors.text)}>
+        <div className="pl-2 min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="flex-shrink-0">{getStatusIcon(appointment.status)}</span>
+            <span className={cn(
+              "font-semibold truncate block leading-tight",
+              compact ? "text-[11px]" : "text-xs",
+              colors.text
+            )}>
               {getAppointmentName(appointment)}
             </span>
           </div>
-          {/* Always show employee name */}
           {agentName && (
-            <div className="flex items-center gap-1 mb-1">
-              <UserCircle className="w-2.5 h-2.5 text-[var(--text-muted)]" />
-              <span className="text-[10px] text-[var(--text-secondary)] truncate font-medium">
+            <div className="flex items-center gap-1 mt-0.5 min-w-0">
+              <UserCircle className="w-2.5 h-2.5 text-[var(--text-muted)] flex-shrink-0" />
+              <span className="text-[10px] text-[var(--text-secondary)] truncate font-medium leading-tight">
                 {agentName}
               </span>
             </div>
           )}
           {!compact && (
             <>
-              <p className="text-[10px] text-[var(--text-secondary)] truncate font-medium">
+              <p className="text-[10px] text-[var(--text-secondary)] truncate font-medium mt-0.5">
                 {appointment.appointment_type.map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
               </p>
               <div className="flex items-center gap-2 mt-1.5">
@@ -462,8 +476,8 @@ export function CalendarView({
                         return (a.scheduled_time || "").localeCompare(b.scheduled_time || "")
                       })
                       .map((apt, idx) => {
-                        const primaryType = apt.appointment_type[0] || "new_appointment"
-                        const colors = APPOINTMENT_COLORS[primaryType]
+                        const primaryType = apt.appointment_type?.[0] || "new_appointment"
+                        const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
                         const agentName = getAgentName(apt)
                         const statusConfig = {
                           scheduled: { label: "Scheduled", color: "bg-[var(--secondary)]" },
@@ -473,7 +487,7 @@ export function CalendarView({
                           no_answer: { label: "No Answer", color: "bg-[var(--warning)]" },
                           cant_reach: { label: "Can't Reach", color: "bg-[var(--error)]" },
                           cancelled: { label: "Cancelled", color: "bg-[var(--error)]" },
-                          not_interested: { label: "Not Interested", color: "bg-[var(--text-muted)]" },
+                          not_interested: { label: "Canceled", color: "bg-[var(--text-muted)]" },
                           callback: { label: "Callback", color: "bg-[var(--info)]" },
                         }
                         const status = statusConfig[apt.status as keyof typeof statusConfig] || { label: apt.status, color: "bg-[var(--secondary)]" }
@@ -504,8 +518,8 @@ export function CalendarView({
                             </td>
                             <td className="p-3">
                               <div className="flex flex-wrap gap-1">
-                                {apt.appointment_type.map((type, i) => {
-                                  const typeColors = APPOINTMENT_COLORS[type]
+                                {(apt.appointment_type || []).map((type, i) => {
+                                  const typeColors = APPOINTMENT_COLORS[type] || APPOINTMENT_COLORS.new_appointment
                                   return (
                                     <Badge
                                       key={type}
@@ -539,13 +553,16 @@ export function CalendarView({
                               </div>
                             </td>
                             <td className="p-3">
-                              {apt.lead?.phone ? (
-                                <span className="text-sm font-mono text-[var(--text-secondary)]">{apt.lead.phone}</span>
-                              ) : apt.student?.phone ? (
-                                <span className="text-sm font-mono text-[var(--text-secondary)]">{apt.student.phone}</span>
-                              ) : (
-                                <span className="text-sm text-[var(--text-muted)]">-</span>
-                              )}
+                              {(() => {
+                                const firstLead = apt.appointment_leads?.[0]?.lead || apt.lead
+                                if (firstLead?.phone) {
+                                  return <span className="text-sm font-mono text-[var(--text-secondary)]">{firstLead.phone}</span>
+                                }
+                                if (apt.student?.phone) {
+                                  return <span className="text-sm font-mono text-[var(--text-secondary)]">{apt.student.phone}</span>
+                                }
+                                return <span className="text-sm text-[var(--text-muted)]">-</span>
+                              })()}
                             </td>
                           </motion.tr>
                         )
@@ -643,29 +660,62 @@ export function CalendarView({
                     {weekDates.map((date, dayIdx) => {
                       const slotAppointments = getAppointmentsForSlot(date, time)
                       const isToday = date.toDateString() === new Date().toDateString()
+                      const hasMultiple = slotAppointments.length > 1
                       return (
                         <div
                           key={dayIdx}
-                          onClick={() => slotAppointments.length === 0 && onSlotClick?.(date, time)}
+                          onClick={() => onSlotClick?.(date, time)}
                           className={cn(
                             "border-l border-[var(--border)]/30 p-1.5 min-h-[90px] transition-all duration-200 group/slot",
                             "hover:bg-[var(--bg-hover)]/50 cursor-pointer relative",
                             isToday && "bg-[var(--primary)]/[0.03]"
                           )}
                         >
-                          <AnimatePresence mode="popLayout">
-                            {slotAppointments.map((apt) => (
-                              <AppointmentCard key={apt.id} appointment={apt} compact />
-                            ))}
-                          </AnimatePresence>
-                          {slotAppointments.length === 0 && (
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/slot:opacity-100 transition-opacity">
-                              <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
-                                <Plus className="w-3 h-3" />
-                                <span>Book</span>
-                              </div>
+                          {/* Multi-appointment count badge */}
+                          {hasMultiple && (
+                            <div className="absolute top-0.5 right-0.5 z-10">
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[var(--primary)] text-white text-[8px] font-bold shadow-sm"
+                              >
+                                <CalendarIcon className="w-2 h-2" />
+                                {slotAppointments.length}
+                              </motion.div>
                             </div>
                           )}
+
+                          <div className="flex flex-col gap-1">
+                            {slotAppointments.slice(0, 2).map((apt) => (
+                              <AppointmentCard key={apt.id} appointment={apt} compact />
+                            ))}
+                            {slotAppointments.length > 2 && (
+                              <div className="text-center py-0.5">
+                                <span className="text-[9px] font-semibold text-[var(--text-muted)] bg-[var(--bg-sunken)] px-2 py-0.5 rounded-full border border-[var(--border)]/50 inline-flex items-center gap-0.5">
+                                  <CalendarIcon className="w-2.5 h-2.5" />
+                                  +{slotAppointments.length - 2} more
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Add button — always visible on hover */}
+                          <motion.div
+                            className={cn(
+                              "absolute bottom-1 right-1 z-20 opacity-0 group-hover/slot:opacity-100 transition-all duration-200",
+                            )}
+                          >
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onSlotClick?.(date, time)
+                              }}
+                              className="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)] shadow-sm hover:border-[var(--primary)]/50 hover:bg-[var(--primary-muted)] transition-all text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span className="font-medium">Book</span>
+                            </div>
+                          </motion.div>
                         </div>
                       )
                     })}
@@ -740,9 +790,9 @@ export function CalendarView({
                     <div
                       onClick={() => !hasAppointments && onSlotClick?.(currentDate, time)}
                       className={cn(
-                        "flex-1 min-h-[90px] rounded-xl border p-3 transition-all duration-200 relative",
+                        "flex-1 min-h-[90px] rounded-xl border p-3 transition-all duration-200 relative group/dayslot",
                         hasAppointments
-                          ? "border-[var(--border)] bg-[var(--bg-sunken)]/50"
+                          ? "border-[var(--border)] bg-[var(--bg-sunken)]/50 cursor-default"
                           : "border-dashed border-[var(--border)]/50 hover:border-[var(--primary)]/50 hover:bg-[var(--primary)]/5 cursor-pointer"
                       )}
                     >
@@ -751,11 +801,35 @@ export function CalendarView({
                         <div className="absolute left-0 top-3 bottom-3 w-1 rounded-full bg-[var(--primary)]/30" />
                       )}
 
+                      {/* Slot header with count + book another button */}
+                      {hasAppointments && (
+                        <div className="flex items-center justify-between mb-3 pl-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] text-[11px] font-bold">
+                              <CalendarIcon className="w-3 h-3" />
+                              {slotAppointments.length} appointment{slotAppointments.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onSlotClick?.(currentDate, time)
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--primary)]/50 hover:text-[var(--primary)] hover:bg-[var(--primary-muted)] transition-all shadow-sm cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Book Another
+                          </motion.button>
+                        </div>
+                      )}
+
                       {hasAppointments ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pl-2">
                           {slotAppointments.map((apt, aptIdx) => {
-                            const primaryType = apt.appointment_type[0] || "new_appointment"
-                            const colors = APPOINTMENT_COLORS[primaryType]
+                            const primaryType = apt.appointment_type?.[0] || "new_appointment"
+                            const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
                             return (
                               <motion.div
                                 key={apt.id}
@@ -803,10 +877,10 @@ export function CalendarView({
                                       <Clock className="w-3 h-3" />
                                       {apt.duration_minutes}min
                                     </span>
-                                    {apt.lead?.phone && (
+                                    {(apt.appointment_leads?.[0]?.lead?.phone || apt.lead?.phone) && (
                                       <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-surface)]/80">
                                         <Phone className="w-3 h-3" />
-                                        {apt.lead.phone}
+                                        {apt.appointment_leads?.[0]?.lead?.phone || apt.lead?.phone}
                                       </span>
                                     )}
                                     {getAgentName(apt) && (
@@ -903,22 +977,22 @@ export function CalendarView({
                             {date.getDate()}
                           </div>
                           {hasAppointments && isCurrentMonth && (
-                            <div className="flex items-center gap-0.5">
-                              {dayAppointments.slice(0, 3).map((_, i) => (
-                                <div
-                                  key={i}
-                                  className="w-1.5 h-1.5 rounded-full bg-[var(--primary)]/60"
-                                />
-                              ))}
-                            </div>
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--primary)]/10 text-[var(--primary)]"
+                            >
+                              <CalendarIcon className="w-2.5 h-2.5" />
+                              <span className="text-[9px] font-bold">{dayAppointments.length}</span>
+                            </motion.div>
                           )}
                         </div>
 
                         {/* Appointments */}
                         <div className="space-y-1">
                           {dayAppointments.slice(0, 2).map((apt) => {
-                            const primaryType = apt.appointment_type[0] || "new_appointment"
-                            const colors = APPOINTMENT_COLORS[primaryType]
+                            const primaryType = apt.appointment_type?.[0] || "new_appointment"
+                            const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
                             const employeeName = getAgentName(apt)
                             return (
                               <div
@@ -957,11 +1031,19 @@ export function CalendarView({
                         </div>
 
                         {/* Hover overlay */}
-                        {isCurrentMonth && !hasAppointments && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-surface)]/80 rounded-xl">
-                            <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                        {isCurrentMonth && (
+                          <div className={cn(
+                            "absolute inset-0 flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl",
+                            !hasAppointments && "items-center pb-0 bg-[var(--bg-surface)]/80"
+                          )}>
+                            <div className={cn(
+                              "flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg transition-all",
+                              hasAppointments
+                                ? "bg-[var(--primary)]/10 text-[var(--primary)] font-semibold border border-[var(--primary)]/20"
+                                : "text-[var(--text-muted)]"
+                            )}>
                               <Plus className="w-3 h-3" />
-                              <span>Add</span>
+                              <span>{hasAppointments ? "Add More" : "Add"}</span>
                             </div>
                           </div>
                         )}

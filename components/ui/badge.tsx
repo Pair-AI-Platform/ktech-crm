@@ -52,12 +52,14 @@ const badgeVariants = cva(
           "bg-gradient-to-r from-[rgba(244,63,94,0.15)] to-[rgba(244,63,94,0.08)] text-[var(--stage-tested)] border border-[rgba(244,63,94,0.25)]",
         application:
           "bg-gradient-to-r from-[rgba(249,115,22,0.15)] to-[rgba(249,115,22,0.08)] text-[var(--stage-application)] border border-[rgba(249,115,22,0.25)]",
-        submission:
-          "bg-gradient-to-r from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.08)] text-blue-600 dark:text-blue-400 border border-[rgba(59,130,246,0.25)]",
+        applicant:
+          "bg-gradient-to-r from-[rgba(99,102,241,0.15)] to-[rgba(99,102,241,0.08)] text-indigo-600 dark:text-indigo-400 border border-[rgba(99,102,241,0.25)]",
         payment:
           "bg-gradient-to-r from-[rgba(16,185,129,0.15)] to-[rgba(16,185,129,0.08)] text-[var(--stage-payment)] border border-[rgba(16,185,129,0.25)]",
         enrolled:
           "bg-gradient-to-r from-[rgba(5,150,105,0.15)] to-[rgba(5,150,105,0.08)] text-[var(--stage-enrolled)] border border-[rgba(5,150,105,0.25)]",
+        withdraw:
+          "bg-gradient-to-r from-[rgba(239,68,68,0.15)] to-[rgba(239,68,68,0.08)] text-red-600 dark:text-red-400 border border-[rgba(239,68,68,0.25)]",
         lost:
           "bg-gradient-to-r from-[rgba(113,113,122,0.15)] to-[rgba(113,113,122,0.08)] text-[var(--stage-lost)] border border-[rgba(113,113,122,0.25)]",
       },
@@ -251,7 +253,7 @@ function CounterBadge({
 
 // Pipeline Stage Badge - specialized for CRM pipeline
 export interface PipelineBadgeProps extends Omit<BadgeProps, 'variant'> {
-  stage: "new" | "contacted" | "visit" | "appointment" | "test" | "application" | "submission" | "enrolled" | "lost"
+  stage: "new" | "contacted" | "visit" | "appointment" | "test" | "application" | "applicant" | "enrolled" | "lost"
 }
 
 function PipelineBadge({ stage, className, children, ...props }: PipelineBadgeProps) {
@@ -262,7 +264,7 @@ function PipelineBadge({ stage, className, children, ...props }: PipelineBadgePr
     appointment: "Appointment",
     test: "Test",
     application: "Application",
-    submission: "Submission",
+    applicant: "Applicant",
     enrolled: "Enrolled",
     lost: "Lost",
   }

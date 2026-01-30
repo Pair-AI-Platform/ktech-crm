@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { convertLeadToStudent, canEnrollLead } from "@/lib/enrollment/convert-lead"
+import { convertLeadToStudent, promoteSFLeadToApplicant, canEnrollLead } from "@/lib/enrollment/convert-lead"
 import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
 
 export async function POST(request: NextRequest) {
@@ -70,7 +70,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Convert lead to student
+    // Check if lead is SF (self-funded) and in 'application' stage
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("funding_type, pipeline_stage")
+      .eq("id", leadId)
+      .single()
+
+    const isSFInApplication =
+      lead?.funding_type === "self_funded" &&
+      lead?.pipeline_stage === "application"
+
+    if (isSFInApplication) {
+      // SF lead: promote to 'applicant' instead of enrolling
+      const sfResult = await promoteSFLeadToApplicant(supabase, {
+        leadId,
+        transactionId: transaction.id,
+        amountPaid: ENROLLMENT_PAYMENT_AMOUNT,
+        userId: user.id,
+      })
+
+      if (!sfResult.success) {
+        await supabase
+          .from("payment_transactions")
+          .update({ status: "failed", notes: sfResult.error })
+          .eq("id", transaction.id)
+
+        return NextResponse.json(
+          { error: sfResult.error },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        transactionId: transaction.id,
+        message: "Cash payment processed — SF lead moved to Applicant",
+      })
+    }
+
+    // Non-SF: convert lead to student (existing behavior)
     const result = await convertLeadToStudent(supabase, {
       leadId,
       transactionId: transaction.id,

@@ -14,7 +14,6 @@ import {
   GraduationCap,
   SendHorizontal,
   BookOpen,
-  ClipboardList,
 } from "lucide-react"
 import { type PipelineStage, type Lead } from "@/types"
 import { useLeads, useLeadStats, useLeadMutations } from "@/lib/hooks/use-leads"
@@ -25,8 +24,8 @@ import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/l
 import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { CSVImportModal } from "@/components/leads/csv-import-modal"
 import { PUCImportDialog } from "@/components/leads/puc-import-dialog"
+import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
-import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { cn } from "@/lib/utils"
@@ -35,6 +34,7 @@ import { ErrorState } from "@/components/ui/error-state"
 const defaultFilters: LeadFilters = {
   searchQuery: "",
   stages: [],
+  lostAtStages: [],
   statuses: [],
   sources: [],
   schools: [],
@@ -49,6 +49,7 @@ const defaultFilters: LeadFilters = {
   gpaMin: null,
   gpaMax: null,
   ministryBlocked: "all",
+  hasNotes: "all",
 }
 
 export default function LeadsPage() {
@@ -66,16 +67,15 @@ export default function LeadsPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showPUCImportModal, setShowPUCImportModal] = useState(false)
   const [showPSPTransferModal, setShowPSPTransferModal] = useState(false)
-  const [showPSPSubmissionWizard, setShowPSPSubmissionWizard] = useState(false)
-  const [submissionWizardLead, setSubmissionWizardLead] = useState<Lead | null>(null)
-  const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
+const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
+  const [showMinistryImportModal, setShowMinistryImportModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
   const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
   const initialCheckDone = useRef(false)
 
-  // Check URL params for opening the form and stage filter (only once on mount)
+  // Check URL params for opening the form (only once on mount)
   useEffect(() => {
     if (!initialCheckDone.current) {
       initialCheckDone.current = true
@@ -85,12 +85,14 @@ export default function LeadsPage() {
         // Use setTimeout to schedule the state update after the current render cycle
         setTimeout(() => setShowAddForm(true), 0)
       }
+    }
+  }, [searchParams])
 
-      // Check for stage filter from URL (for back navigation from lead detail)
-      const stageParam = searchParams.get("stage") as PipelineStage | null
-      if (stageParam) {
-        setStageFilter(stageParam)
-      }
+  // Sync stage filter from URL params (for sidebar sub-tab navigation)
+  useEffect(() => {
+    const stageParam = searchParams.get("stage") as PipelineStage | null
+    if (stageParam) {
+      setStageFilter(stageParam)
     }
   }, [searchParams])
 
@@ -150,9 +152,9 @@ export default function LeadsPage() {
     }
     // Appointment type filter
     if (filters.appointmentTypes.length > 0) {
-      const leadAppointments = (lead as any).appointments || []
-      const hasMatchingAppointment = leadAppointments.some((apt: any) =>
-        filters.appointmentTypes.includes(apt.appointment_type)
+      const leadAppointments = lead.appointments || []
+      const hasMatchingAppointment = leadAppointments.some(apt =>
+        apt.appointment_type.some(type => filters.appointmentTypes.includes(type))
       )
       if (!hasMatchingAppointment) return false
     }
@@ -167,6 +169,13 @@ export default function LeadsPage() {
     if (filters.submissionStatuses.length > 0) {
       if (!lead.submission_status || !filters.submissionStatuses.includes(lead.submission_status)) return false
     }
+    // Lost at stage filter - filter lost leads by the stage they were in before being marked lost
+    if (filters.lostAtStages.length > 0) {
+      if (!lead.lost_at_stage || !filters.lostAtStages.includes(lead.lost_at_stage)) return false
+    }
+    // Has notes filter
+    if (filters.hasNotes === "with_notes" && (!lead.notes || lead.notes.trim() === "")) return false
+    if (filters.hasNotes === "without_notes" && lead.notes && lead.notes.trim() !== "") return false
     return true
   })
 
@@ -199,14 +208,46 @@ export default function LeadsPage() {
     setShowAssignModal(true)
   }
 
-  const handleBulkAssignConfirm = async (agentId: string) => {
-    const result = await bulkAssignLeads(selectedLeads, agentId)
-    if (!result.error) {
-      setShowAssignModal(false)
-      setSelectedLeads([])
-      setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} assigned successfully`)
-      setShowSuccessToast(true)
-      refetch()
+  const handleBulkAssignConfirm = async (agentIds: string[]) => {
+    if (agentIds.length === 1) {
+      const result = await bulkAssignLeads(selectedLeads, agentIds[0])
+      if (!result.error) {
+        setShowAssignModal(false)
+        setSelectedLeads([])
+        setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} assigned successfully`)
+        setShowSuccessToast(true)
+        refetch()
+      }
+    } else {
+      // Split leads evenly across agents
+      const base = Math.floor(selectedLeads.length / agentIds.length)
+      const remainder = selectedLeads.length % agentIds.length
+      let offset = 0
+      let totalAssigned = 0
+      let hasError = false
+
+      for (let i = 0; i < agentIds.length; i++) {
+        const count = base + (i < remainder ? 1 : 0)
+        const chunk = selectedLeads.slice(offset, offset + count)
+        offset += count
+
+        if (chunk.length > 0) {
+          const result = await bulkAssignLeads(chunk, agentIds[i])
+          if (result.error) {
+            hasError = true
+            break
+          }
+          totalAssigned += result.count
+        }
+      }
+
+      if (!hasError) {
+        setShowAssignModal(false)
+        setSelectedLeads([])
+        setSuccessMessage(`${totalAssigned} lead${totalAssigned !== 1 ? "s" : ""} assigned to ${agentIds.length} agents`)
+        setShowSuccessToast(true)
+        refetch()
+      }
     }
   }
 
@@ -259,6 +300,15 @@ export default function LeadsPage() {
     refetch()
   }
 
+  const handleMinistryImportSuccess = (updatedCount: number, createdCount: number) => {
+    const messages = []
+    if (updatedCount > 0) messages.push(`${updatedCount} lead${updatedCount !== 1 ? "s" : ""} updated`)
+    if (createdCount > 0) messages.push(`${createdCount} lead${createdCount !== 1 ? "s" : ""} created`)
+    setSuccessMessage(`Ministry import: ${messages.join(", ")}`)
+    setShowSuccessToast(true)
+    refetch()
+  }
+
   // Get the selected lead objects for the MOE dialog
   const selectedLeadObjects = filteredLeads.filter((lead) =>
     selectedLeads.includes(lead.id)
@@ -302,27 +352,6 @@ export default function LeadsPage() {
               ))}
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2"
-            >
-              <div className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-              <span className="text-sm text-[var(--text-secondary)]">
-                <span className="font-semibold text-[var(--text-primary)]">{stats.thisMonth}</span> leads this month
-              </span>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-[var(--primary)]" />
-              <span className="text-sm text-[var(--text-secondary)]">
-                <span className="font-semibold text-[var(--primary)]">{stats.conversionRate}%</span> conversion rate
-              </span>
-            </motion.div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -355,6 +384,15 @@ export default function LeadsPage() {
             >
               <GraduationCap className="w-4 h-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-[var(--text-muted)]"
+              onClick={() => setShowMinistryImportModal(true)}
+              title="Import Ministry GPA List"
+            >
+              <BookOpen className="w-4 h-4" />
+            </Button>
             {profile?.role === "admin" && (
               <>
                 <Button
@@ -365,19 +403,6 @@ export default function LeadsPage() {
                   title="PSP Transfer (Move PUC leads to Submission)"
                 >
                   <SendHorizontal className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "text-[var(--text-muted)]",
-                    selectedLeads.length === 1 && "text-[var(--primary)]"
-                  )}
-                  onClick={() => setShowPSPSubmissionWizard(true)}
-                  disabled={selectedLeads.length !== 1}
-                  title={selectedLeads.length === 1 ? "PSP Submission Wizard" : "Select exactly one lead"}
-                >
-                  <ClipboardList className="w-4 h-4" />
                 </Button>
               </>
             )}
@@ -541,6 +566,13 @@ export default function LeadsPage() {
         onSuccess={handlePUCImportSuccess}
       />
 
+      {/* Ministry GPA Import Modal */}
+      <MinistryImportDialog
+        isOpen={showMinistryImportModal}
+        onClose={() => setShowMinistryImportModal(false)}
+        onSuccess={handleMinistryImportSuccess}
+      />
+
       {/* PSP Transfer Modal */}
       <PSPTransferModal
         isOpen={showPSPTransferModal}
@@ -560,23 +592,6 @@ export default function LeadsPage() {
         onSuccess={handleMOEFetchSuccess}
       />
 
-      {/* PSP Submission Wizard */}
-      <PSPSubmissionWizard
-        isOpen={showPSPSubmissionWizard || !!submissionWizardLead}
-        onClose={() => {
-          setShowPSPSubmissionWizard(false)
-          setSubmissionWizardLead(null)
-        }}
-        lead={submissionWizardLead || (selectedLeads.length === 1 ? filteredLeads.find(l => l.id === selectedLeads[0]) || null : null)}
-        onSuccess={() => {
-          setShowPSPSubmissionWizard(false)
-          setSubmissionWizardLead(null)
-          setSelectedLeads([])
-          setSuccessMessage("Lead submission updated successfully")
-          setShowSuccessToast(true)
-          refetch()
-        }}
-      />
     </div>
   )
 }

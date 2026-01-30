@@ -12,7 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "__tests__/**",
   ]),
+  {
+    rules: {
+      // Catch accidental `any` usage — helps enforce type safety
+      "@typescript-eslint/no-explicit-any": "warn",
+      // Warn on console.log left in code (allow warn/error)
+      "no-console": ["warn", { allow: ["warn", "error", "debug"] }],
+    },
+  },
 ]);
 
 export default eslintConfig;

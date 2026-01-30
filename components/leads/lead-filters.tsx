@@ -27,7 +27,8 @@ import {
   Sparkles,
   SlidersHorizontal,
   GraduationCap,
-  Ban
+  Ban,
+  MessageSquareText
 } from "lucide-react"
 import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, MAJORS, LEAD_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus } from "@/types"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils"
 export interface LeadFilters {
   searchQuery: string
   stages: PipelineStage[]
+  lostAtStages: PipelineStage[]
   statuses: LeadStatus[]
   sources: LeadSource[]
   schools: School[]
@@ -49,6 +51,7 @@ export interface LeadFilters {
   gpaMin: number | null
   gpaMax: number | null
   ministryBlocked: "all" | "blocked" | "not_blocked"
+  hasNotes: "all" | "with_notes" | "without_notes"
 }
 
 interface LeadFiltersProps {
@@ -61,6 +64,7 @@ interface LeadFiltersProps {
 const defaultFilters: LeadFilters = {
   searchQuery: "",
   stages: [],
+  lostAtStages: [],
   statuses: [],
   sources: [],
   schools: [],
@@ -75,7 +79,11 @@ const defaultFilters: LeadFilters = {
   gpaMin: null,
   gpaMax: null,
   ministryBlocked: "all",
+  hasNotes: "all",
 }
+
+// Stages that leads can be lost at (excludes 'lost' and 'enrolled')
+const LOST_AT_STAGES = PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value !== 'enrolled')
 
 export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFiltersProps) {
   const [localFilters, setLocalFilters] = useState<LeadFilters>(filters)
@@ -99,6 +107,15 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
       stages: prev.stages.includes(stage)
         ? prev.stages.filter(s => s !== stage)
         : [...prev.stages, stage]
+    }))
+  }
+
+  const toggleLostAtStage = (stage: PipelineStage) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      lostAtStages: prev.lostAtStages.includes(stage)
+        ? prev.lostAtStages.filter(s => s !== stage)
+        : [...prev.lostAtStages, stage]
     }))
   }
 
@@ -168,6 +185,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
 
   const activeFiltersCount =
     localFilters.stages.length +
+    localFilters.lostAtStages.length +
     localFilters.statuses.length +
     localFilters.sources.length +
     localFilters.schools.length +
@@ -176,7 +194,8 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     localFilters.submissionStatuses.length +
     (localFilters.fundingType !== "all" ? 1 : 0) +
     (localFilters.dateRange !== "all" ? 1 : 0) +
-    (localFilters.assignedTo ? 1 : 0)
+    (localFilters.assignedTo ? 1 : 0) +
+    (localFilters.hasNotes !== "all" ? 1 : 0)
 
   return (
     <AnimatePresence>
@@ -257,6 +276,47 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                     </button>
                   ))}
                 </div>
+              </FilterSection>
+
+              {/* Lost At Stage - Filter lost leads by the stage they were lost at */}
+              <FilterSection
+                title="Lost At Stage"
+                icon={<Ban className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("lostAtStage")}
+                onToggle={() => toggleSection("lostAtStage")}
+                count={localFilters.lostAtStages.length}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {LOST_AT_STAGES.map((stage) => (
+                    <button
+                      key={stage.value}
+                      onClick={() => toggleLostAtStage(stage.value)}
+                      className={cn(
+                        "flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                        localFilters.lostAtStages.includes(stage.value)
+                          ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400"
+                          : "border-[var(--border)] hover:border-red-500/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                        localFilters.lostAtStages.includes(stage.value)
+                          ? "border-red-500 bg-red-500"
+                          : "border-[var(--border)]"
+                      )}>
+                        {localFilters.lostAtStages.includes(stage.value) && (
+                          <Check className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                      <Badge variant={stage.value} size="sm">
+                        {stage.label}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-2">
+                  Filter lost leads by which stage they were in before being marked as lost
+                </p>
               </FilterSection>
 
               {/* Lead Status */}
@@ -528,6 +588,36 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                           ? option.value === "blocked"
                             ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
                             : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+
+              {/* Has Notes Filter */}
+              <FilterSection
+                title="Notes"
+                icon={<MessageSquareText className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("hasNotes")}
+                onToggle={() => toggleSection("hasNotes")}
+                count={localFilters.hasNotes !== "all" ? 1 : 0}
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "with_notes", label: "Has Notes" },
+                    { value: "without_notes", label: "No Notes" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setLocalFilters(prev => ({ ...prev, hasNotes: option.value as LeadFilters["hasNotes"] }))}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-sm text-center transition-all",
+                        localFilters.hasNotes === option.value
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
                           : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
                       )}
                     >

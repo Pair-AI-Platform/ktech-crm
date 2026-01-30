@@ -283,7 +283,7 @@ export default function CampaignDetailsPage() {
       <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Campaign not found</h2>
-          <p className="text-[var(--text-muted)] mb-4">The campaign you're looking for doesn't exist.</p>
+          <p className="text-[var(--text-muted)] mb-4">The campaign you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push("/campaigns")}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Campaigns

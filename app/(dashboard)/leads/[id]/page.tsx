@@ -45,6 +45,7 @@ import {
   ArrowRightLeft,
   CircleDot,
   Ban,
+  ClipboardList,
 } from "lucide-react"
 import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, MAJORS, MINISTRY_BLOCK_REASONS, type PipelineStage, type AppointmentStatus } from "@/types"
 import { formatKuwaitPhone, formatCivilId, formatDate, cn } from "@/lib/utils"
@@ -63,11 +64,12 @@ import { WhatsAppTemplateSelector, WhatsAppHistory } from "@/components/whatsapp
 import { FollowUpReminders } from "@/components/leads/follow-up-reminders"
 import { LeadDocuments } from "@/components/leads/lead-documents"
 import { CallHistory } from "@/components/leads/call-history"
+import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { useCallHistory } from "@/lib/hooks/use-calls"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 
 // Simplified stage order for the pipeline
-const STAGE_ORDER = ["new", "contacted", "visit", "appointment", "test", "application", "submission", "enrolled", "lost"] as const
+const STAGE_ORDER = ["new", "contacted", "visit", "appointment", "test", "application", "applicant", "enrolled", "withdraw", "lost"] as const
 
 // Lead Heat Configuration
 type LeadHeat = "hot" | "warm" | "cold"
@@ -114,6 +116,7 @@ interface ParsedNote {
   type: NoteType
   isPinned: boolean
   originalIndex: number
+  createdByName?: string
 }
 
 const NOTE_TYPE_CONFIG: Record<NoteType, { label: string; icon: typeof Phone; color: string }> = {
@@ -136,23 +139,33 @@ function detectNoteType(content: string): NoteType {
   return 'note'
 }
 
-function parseNotes(notesString: string | undefined, pinnedIds: Set<string>): ParsedNote[] {
+function parseNotes(notesString: string | undefined, pinnedIds: Set<string>, fallbackAgentName?: string): ParsedNote[] {
   if (!notesString) return []
 
   return notesString.split('\n\n').filter(Boolean).map((note, index) => {
     const match = note.match(/^\[([^\]]+)\]\s*([\s\S]*)$/)
-    const timestamp = match ? match[1] : 'Unknown'
+    const bracketContent = match ? match[1] : 'Unknown'
     const content = match ? match[2] : note
-    const id = `note-${index}-${timestamp.replace(/\s/g, '')}`
+
+    // Parse agent name from "timestamp | AgentName" format
+    let timestamp = bracketContent
+    let createdByName: string | undefined
+    const pipeIndex = bracketContent.indexOf('|')
+    if (pipeIndex !== -1) {
+      timestamp = bracketContent.slice(0, pipeIndex).trim()
+      createdByName = bracketContent.slice(pipeIndex + 1).trim()
+    }
+
+    const id = `note-${index}-${bracketContent.replace(/\s/g, '')}`
 
     let rawTimestamp: Date | null = null
     if (match) {
-      const parsed = new Date(match[1])
+      const parsed = new Date(timestamp)
       if (!isNaN(parsed.getTime())) {
         rawTimestamp = parsed
       } else {
         const currentYear = new Date().getFullYear()
-        const dateStr = `${match[1]}, ${currentYear}`
+        const dateStr = `${timestamp}, ${currentYear}`
         const parsed2 = new Date(dateStr)
         if (!isNaN(parsed2.getTime())) {
           rawTimestamp = parsed2
@@ -168,6 +181,7 @@ function parseNotes(notesString: string | undefined, pinnedIds: Set<string>): Pa
       type: detectNoteType(content),
       isPinned: pinnedIds.has(id),
       originalIndex: index,
+      createdByName: createdByName || fallbackAgentName,
     }
   })
 }
@@ -225,7 +239,6 @@ const STAGE_GRADIENT: Record<string, { from: string; to: string; text: string }>
   visit: { from: '#06B6D4', to: '#0EA5E9', text: 'white' },
   test: { from: '#10B981', to: '#14B8A6', text: 'white' },
   application: { from: '#22C55E', to: '#10B981', text: 'white' },
-  submission: { from: '#16A34A', to: '#15803D', text: 'white' },
   enrolled: { from: '#059669', to: '#047857', text: 'white' },
   lost: { from: '#64748B', to: '#475569', text: 'white' },
 }
@@ -261,10 +274,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [newNote, setNewNote] = useState("")
   const [copiedPhone, setCopiedPhone] = useState(false)
   const [showLostDialog, setShowLostDialog] = useState(false)
+  const [showReactivateMenu, setShowReactivateMenu] = useState(false)
+  const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
   const [noteFilter, setNoteFilter] = useState<NoteType>('all')
   const [pinnedNoteIds, setPinnedNoteIds] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'calls' | 'activity'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'calls' | 'activity' | 'psp'>('details')
   const messagingMenuRef = useRef<HTMLDivElement>(null)
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -279,6 +294,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     function handleClickOutside(event: MouseEvent) {
       if (messagingMenuRef.current && !messagingMenuRef.current.contains(event.target as Node)) {
         setShowMessagingMenu(false)
+      }
+      if (reactivateMenuRef.current && !reactivateMenuRef.current.contains(event.target as Node)) {
+        setShowReactivateMenu(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -377,26 +395,37 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     setShowLostDialog(true)
   }
 
-  const handleReactivateLead = async () => {
+  // Allowed stages for reactivating a lost lead
+  const LOST_LEAD_REACTIVATE_STAGES: { value: PipelineStage; label: string }[] = [
+    { value: 'application', label: 'Application' },
+    { value: 'contacted', label: 'Contacted' },
+  ]
+
+  const handleReactivateLead = async (targetStage?: PipelineStage) => {
     if (!lead) return
 
-    const completedStages = lead.completed_stages || []
-    let lastCompletedStage: PipelineStage = 'new'
+    // Use provided target stage, or fall back to last completed stage
+    let reactivateToStage: PipelineStage = targetStage || 'contacted'
 
-    for (let i = STAGE_ORDER.length - 2; i >= 0; i--) {
-      const stage = STAGE_ORDER[i]
-      if (completedStages.includes(stage as PipelineStage)) {
-        lastCompletedStage = stage as PipelineStage
-        break
+    if (!targetStage) {
+      const completedStages = lead.completed_stages || []
+      for (let i = STAGE_ORDER.length - 2; i >= 0; i--) {
+        const stage = STAGE_ORDER[i]
+        if (completedStages.includes(stage as PipelineStage)) {
+          reactivateToStage = stage as PipelineStage
+          break
+        }
       }
     }
 
     const result = await updateLead(lead.id, {
-      pipeline_stage: lastCompletedStage,
-      lost_reason_id: undefined,
-      lost_reason_notes: undefined,
+      pipeline_stage: reactivateToStage,
+      lost_reason_id: null,
+      lost_reason_notes: null,
+      lost_at_stage: null,
     })
     if (!result.error) {
+      setShowReactivateMenu(false)
       await refetchLead()
     }
   }
@@ -411,7 +440,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       minute: "2-digit",
       hour12: true,
     })
-    const formattedNote = `[${timestamp}] ${newNote.trim()}`
+    const agentName = profile?.full_name
+    const formattedNote = agentName
+      ? `[${timestamp} | ${agentName}] ${newNote.trim()}`
+      : `[${timestamp}] ${newNote.trim()}`
     const updatedNotes = lead.notes
       ? `${formattedNote}\n\n${lead.notes}`
       : formattedNote
@@ -486,7 +518,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const daysInStage = calculateDaysInStage(lead.updated_at)
   const HeatIcon = LEAD_HEAT_CONFIG[leadHeat].icon
 
-  const parsedNotes = parseNotes(lead.notes, pinnedNoteIds)
+  const parsedNotes = parseNotes(lead.notes, pinnedNoteIds, lead.assigned_agent?.full_name)
 
   // Convert activities to ParsedNote format
   const activityNotes: ParsedNote[] = activities.map((activity, index) => ({
@@ -497,6 +529,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     type: activity.activity_type as NoteType,
     isPinned: false,
     originalIndex: -1 - index, // Negative to distinguish from notes
+    createdByName: activity.created_by_profile?.full_name,
   }))
 
   // Combine notes and activities, then sort by date
@@ -800,17 +833,53 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             >
               {/* Primary CTA */}
               {lead.pipeline_stage === 'lost' ? (
-                <motion.button
-                  onClick={handleReactivateLead}
-                  whileHover={{ scale: 1.015, y: -1 }}
-                  whileTap={{ scale: 0.985 }}
-                  className="flex-1 relative flex items-center justify-center gap-3 px-6 py-4 rounded-2xl overflow-hidden font-semibold text-white shadow-xl transition-all duration-300"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                  <RotateCcw className="relative w-5 h-5" />
-                  <span className="relative">Reactivate Lead</span>
-                </motion.button>
+                <div className="relative flex-1" ref={reactivateMenuRef}>
+                  <motion.button
+                    onClick={() => setShowReactivateMenu(!showReactivateMenu)}
+                    whileHover={{ scale: 1.015, y: -1 }}
+                    whileTap={{ scale: 0.985 }}
+                    className="w-full relative flex items-center justify-center gap-3 px-6 py-4 rounded-2xl overflow-hidden font-semibold text-white shadow-xl transition-all duration-300"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                    <RotateCcw className="relative w-5 h-5" />
+                    <span className="relative">Reactivate To</span>
+                    <ChevronDown className={cn(
+                      "relative w-4 h-4 transition-transform",
+                      showReactivateMenu && "rotate-180"
+                    )} />
+                  </motion.button>
+
+                  <AnimatePresence>
+                    {showReactivateMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-xl shadow-2xl shadow-black/20 ring-1 ring-[var(--border)] overflow-hidden z-50"
+                      >
+                        <div className="p-1.5">
+                          {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
+                            <button
+                              key={stage.value}
+                              onClick={() => handleReactivateLead(stage.value)}
+                              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                            >
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                style={{ background: `linear-gradient(135deg, ${STAGE_GRADIENT[stage.value].from}, ${STAGE_GRADIENT[stage.value].to})` }}
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-white" />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-primary)]">{stage.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               ) : (
                 <Link
                   href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name} ${lead.last_name}`)}`}
@@ -1118,6 +1187,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               { id: 'documents' as const, label: 'Documents', icon: FileText },
               { id: 'calls' as const, label: `Calls (${calls.length})`, icon: Phone },
               { id: 'activity' as const, label: `Activity (${allNotes.length})`, icon: Activity },
+              ...(lead.funding_type === 'puc' ? [{ id: 'psp' as const, label: 'PUC SRJ', icon: ClipboardList }] : []),
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1241,6 +1311,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                                     {config.label}
                                   </span>
                                   <span className="text-xs text-[var(--text-muted)]">{note.timestamp}</span>
+                                  {note.createdByName && (
+                                    <>
+                                      <span className="text-xs text-[var(--text-muted)]">·</span>
+                                      <span className="inline-flex items-center gap-1 text-xs text-[var(--text-primary)] font-bold">
+                                        <UserCircle className="w-3 h-3" />
+                                        {note.createdByName}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                                 <p className="text-sm text-[var(--text-primary)]">{note.content}</p>
                               </div>
@@ -1285,6 +1364,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               </motion.div>
             )}
+
+            {activeTab === 'psp' && lead.funding_type === 'puc' && (
+              <motion.div
+                key="psp"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="p-5"
+              >
+                <PSPTrackingSection lead={lead} />
+              </motion.div>
+            )}
           </AnimatePresence>
         </motion.div>
       </motion.div>
@@ -1309,11 +1400,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         onOpenChange={setShowLostDialog}
         leadName={`${lead.first_name} ${lead.last_name}`}
         onConfirm={async (reasonId, notes) => {
-          await updateLead(lead.id, {
-            pipeline_stage: 'lost',
-            lost_reason_id: reasonId,
-            lost_reason_notes: notes,
-          })
+          await updateLeadStage(lead.id, 'lost', reasonId, notes)
           await refetchLead()
         }}
       />

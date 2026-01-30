@@ -1,6 +1,8 @@
 // MyFatoorah Payment Gateway Client
 // Documentation: https://myfatoorah.readme.io/
 
+import crypto from 'crypto'
+
 export interface MyFatoorahConfig {
   apiKey: string
   baseUrl: string // https://api.myfatoorah.com (production) or https://apitest.myfatoorah.com (test)
@@ -197,30 +199,37 @@ export async function getPaymentStatus(
   }
 }
 
-// Verify webhook signature (if MyFatoorah provides one)
+// Verify webhook signature using HMAC-SHA256
 export function verifyWebhookSignature(
   payload: string,
-  signature: string,
-  secret: string
+  signature: string | null,
+  secret: string | undefined
 ): boolean {
-  // MyFatoorah uses a simple comparison with shared secret
-  // The exact implementation depends on MyFatoorah's documentation
-  // For now, we'll do a basic check
   if (!secret) {
-    console.warn('[MyFatoorah] No webhook secret configured')
-    return true // Allow if no secret configured
+    console.error('[MyFatoorah] MYFATOORAH_WEBHOOK_SECRET is not configured — rejecting webhook')
+    return false
   }
 
-  // MyFatoorah typically sends a signature in headers
-  // This is a placeholder - adjust based on actual MyFatoorah webhook format
+  if (!signature) {
+    console.error('[MyFatoorah] No signature header in webhook request')
+    return false
+  }
+
   try {
-    const crypto = require('crypto')
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(payload)
       .digest('hex')
 
-    return signature === expectedSignature
+    // Use timing-safe comparison to prevent timing attacks
+    const sigBuffer = Buffer.from(signature, 'hex')
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex')
+
+    if (sigBuffer.length !== expectedBuffer.length) {
+      return false
+    }
+
+    return crypto.timingSafeEqual(sigBuffer, expectedBuffer)
   } catch {
     return false
   }

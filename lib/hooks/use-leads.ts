@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads, getDemoLeadStats, saveDemoLeadUpdate, getDemoLeadById } from "@/lib/demo-data"
 import type { Lead, PipelineStage, LeadStatus } from "@/types"
 import { PIPELINE_STAGES, LEAD_STATUSES } from "@/types"
+import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 
 interface UseLeadsOptions {
   stage?: PipelineStage | "all"
@@ -56,6 +57,7 @@ export function useLeads(options: UseLeadsOptions = {}) {
           assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
           appointments(id, appointment_type, status, scheduled_date)
         `)
+        .order("position_in_stage", { ascending: true })
         .order("created_at", { ascending: false })
         .limit(limit)
 
@@ -178,15 +180,13 @@ export function useLead(id: string) {
 
 // Helper function to check if lead should be automatically set to self-funded based on GPA
 function shouldBeAutoSelfFunded(leadData: Partial<Lead>): boolean {
-  const gpaThreshold = 70
   const gpa10 = leadData.gpa_grade_10
   const gpa11 = leadData.gpa_grade_11
   const gpa12 = leadData.gpa_grade_12_expected
 
-  // Check if any GPA value is below 70
-  if (gpa10 !== undefined && gpa10 !== null && gpa10 < gpaThreshold) return true
-  if (gpa11 !== undefined && gpa11 !== null && gpa11 < gpaThreshold) return true
-  if (gpa12 !== undefined && gpa12 !== null && gpa12 < gpaThreshold) return true
+  if (gpa10 !== undefined && gpa10 !== null && gpa10 < GPA_SELF_FUNDED_THRESHOLD) return true
+  if (gpa11 !== undefined && gpa11 !== null && gpa11 < GPA_SELF_FUNDED_THRESHOLD) return true
+  if (gpa12 !== undefined && gpa12 !== null && gpa12 < GPA_SELF_FUNDED_THRESHOLD) return true
 
   return false
 }
@@ -194,6 +194,17 @@ function shouldBeAutoSelfFunded(leadData: Partial<Lead>): boolean {
 export function useLeadMutations() {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
+
+  const getNextPosition = async (stage: PipelineStage): Promise<number> => {
+    const { data } = await supabase
+      .from("leads")
+      .select("position_in_stage")
+      .eq("pipeline_stage", stage)
+      .order("position_in_stage", { ascending: false })
+      .limit(1)
+      .single()
+    return (data?.position_in_stage ?? 0) + 1
+  }
 
   const createLead = async (leadData: Partial<Lead>) => {
     // Demo mode - simulate success
@@ -286,6 +297,11 @@ export function useLeadMutations() {
         updates.gpa_overridden_at = new Date().toISOString()
       }
 
+      // Assign next position when moving to a different stage
+      if (updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage) {
+        updates.position_in_stage = await getNextPosition(updates.pipeline_stage)
+      }
+
       const { data, error } = await supabase
         .from("leads")
         .update(updates)
@@ -357,13 +373,13 @@ export function useLeadMutations() {
       // Log activity for automatic funding type change due to low GPA
       if (wasAutoSF && oldLead) {
         const lowGpaValues = []
-        if (mergedGpaData.gpa_grade_10 !== undefined && mergedGpaData.gpa_grade_10 !== null && mergedGpaData.gpa_grade_10 < 70) {
+        if (mergedGpaData.gpa_grade_10 !== undefined && mergedGpaData.gpa_grade_10 !== null && mergedGpaData.gpa_grade_10 < GPA_SELF_FUNDED_THRESHOLD) {
           lowGpaValues.push(`Grade 10: ${mergedGpaData.gpa_grade_10}`)
         }
-        if (mergedGpaData.gpa_grade_11 !== undefined && mergedGpaData.gpa_grade_11 !== null && mergedGpaData.gpa_grade_11 < 70) {
+        if (mergedGpaData.gpa_grade_11 !== undefined && mergedGpaData.gpa_grade_11 !== null && mergedGpaData.gpa_grade_11 < GPA_SELF_FUNDED_THRESHOLD) {
           lowGpaValues.push(`Grade 11: ${mergedGpaData.gpa_grade_11}`)
         }
-        if (mergedGpaData.gpa_grade_12_expected !== undefined && mergedGpaData.gpa_grade_12_expected !== null && mergedGpaData.gpa_grade_12_expected < 70) {
+        if (mergedGpaData.gpa_grade_12_expected !== undefined && mergedGpaData.gpa_grade_12_expected !== null && mergedGpaData.gpa_grade_12_expected < GPA_SELF_FUNDED_THRESHOLD) {
           lowGpaValues.push(`Grade 12 Expected: ${mergedGpaData.gpa_grade_12_expected}`)
         }
 
@@ -371,7 +387,7 @@ export function useLeadMutations() {
           lead_id: id,
           activity_type: 'funding_type_change',
           title: 'Auto Self-Funded (Low GPA)',
-          description: `${oldLead.first_name} ${oldLead.last_name} automatically set to Self-Funded due to GPA below 70 (${lowGpaValues.join(', ')})`,
+          description: `${oldLead.first_name} ${oldLead.last_name} automatically set to Self-Funded due to GPA below ${GPA_SELF_FUNDED_THRESHOLD} (${lowGpaValues.join(', ')})`,
           metadata: {
             old_funding_type: oldLead.funding_type,
             new_funding_type: 'self_funded',
@@ -404,6 +420,7 @@ export function useLeadMutations() {
     updates.last_contacted_at = new Date().toISOString()
 
     // Get old stage before update to check for test → application transition
+    // and to track lost_at_stage when marking as lost
     let oldStage: PipelineStage | null = null
     if (!isDemoMode()) {
       const { data: oldLead } = await supabase
@@ -414,22 +431,27 @@ export function useLeadMutations() {
       oldStage = oldLead?.pipeline_stage || null
     }
 
+    // Track which stage the lead was lost at
+    if (stage === "lost" && oldStage && oldStage !== "lost") {
+      updates.lost_at_stage = oldStage
+    }
+
     const result = await updateLead(id, updates)
 
     // Trigger LMS sync when moving from 'test' to 'application'
     if (result.data && oldStage === "test" && stage === "application") {
       try {
-        // Call LMS sync API in background (don't block the stage change)
-        fetch("/api/lms/sync", {
+        const lmsResponse = await fetch("/api/lms/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ leadId: id }),
-        }).catch(err => {
-          console.error("LMS sync failed:", err)
         })
+        if (!lmsResponse.ok) {
+          console.error("LMS sync returned error:", lmsResponse.status)
+        }
       } catch (err) {
         // Log but don't fail the stage change
-        console.error("Error triggering LMS sync:", err)
+        console.error("LMS sync failed:", err)
       }
     }
 
@@ -554,17 +576,29 @@ export function useLeadMutations() {
 
     setLoading(true)
     try {
-      const updates: Partial<Lead> = {
-        pipeline_stage: stage,
-        last_contacted_at: new Date().toISOString()
+      // Get current max position in target stage
+      let nextPos = await getNextPosition(stage)
+
+      // Update each lead individually with sequential positions
+      const errors: string[] = []
+      for (const id of leadIds) {
+        const { error } = await supabase
+          .from("leads")
+          .update({
+            pipeline_stage: stage,
+            position_in_stage: nextPos,
+            last_contacted_at: new Date().toISOString()
+          })
+          .eq("id", id)
+
+        if (error) {
+          errors.push(error.message)
+        } else {
+          nextPos++
+        }
       }
 
-      const { error } = await supabase
-        .from("leads")
-        .update(updates)
-        .in("id", leadIds)
-
-      if (error) throw error
+      if (errors.length > 0) throw new Error(errors.join("; "))
       return { error: null, count: leadIds.length }
     } catch (err) {
       console.error("Error bulk updating stage:", err)
@@ -618,7 +652,7 @@ export function useLeadStats() {
         const byStage: Record<string, number> = {}
         // Initialize all pipeline stages to 0
         const stages: PipelineStage[] = [
-          "new", "contacted", "visit", "appointment", "test", "application", "submission", "enrolled", "lost"
+          "new", "contacted", "visit", "appointment", "test", "application", "applicant", "enrolled", "lost"
         ]
 
         stages.forEach(stage => {

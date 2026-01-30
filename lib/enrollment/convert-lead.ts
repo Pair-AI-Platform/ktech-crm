@@ -176,6 +176,111 @@ export async function convertLeadToStudent(
   }
 }
 
+// Promote an SF lead from 'application' to 'applicant' after payment
+export async function promoteSFLeadToApplicant(
+  supabase: SupabaseClient,
+  params: ConversionParams
+): Promise<{ success: boolean; error?: string }> {
+  const { leadId, transactionId, amountPaid, userId } = params
+
+  try {
+    // 1. Fetch the lead
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('id', leadId)
+      .single()
+
+    if (leadError || !lead) {
+      return { success: false, error: leadError?.message || 'Lead not found' }
+    }
+
+    // 2. Validate: must be SF and in 'application' stage
+    if (lead.funding_type !== 'self_funded') {
+      return { success: false, error: 'Lead is not self-funded' }
+    }
+
+    if (lead.pipeline_stage !== 'application') {
+      return {
+        success: false,
+        error: `Lead must be in 'application' stage. Current stage: ${lead.pipeline_stage}`,
+      }
+    }
+
+    // 3. Move lead to 'applicant' stage
+    const completedStages: PipelineStage[] = [
+      ...(lead.completed_stages || []),
+      'applicant' as PipelineStage,
+    ]
+
+    const { error: updateError } = await supabase
+      .from('leads')
+      .update({
+        pipeline_stage: 'applicant',
+        completed_stages: completedStages,
+        last_contacted_at: new Date().toISOString(),
+      })
+      .eq('id', leadId)
+
+    if (updateError) {
+      console.error('[SF Promotion] Failed to update lead stage:', updateError)
+      return { success: false, error: `Failed to update lead: ${updateError.message}` }
+    }
+
+    // 4. Update the payment transaction
+    const { error: txError } = await supabase
+      .from('payment_transactions')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        processed_by: userId,
+      })
+      .eq('id', transactionId)
+
+    if (txError) {
+      console.error('[SF Promotion] Failed to update transaction:', txError)
+    }
+
+    // 5. Log payment activity
+    await supabase.from('activities').insert({
+      lead_id: leadId,
+      activity_type: 'payment_received',
+      title: 'Payment Received (SF)',
+      description: `${lead.first_name} ${lead.last_name} paid ${amountPaid} KWD — moved to Applicant`,
+      metadata: {
+        transaction_id: transactionId,
+        amount_paid: amountPaid,
+        funding_type: 'self_funded',
+      },
+      created_by: userId,
+    })
+
+    // 6. Log stage change activity
+    await supabase.from('activities').insert({
+      lead_id: leadId,
+      activity_type: 'stage_change',
+      title: 'Stage Changed',
+      description: `${lead.first_name} ${lead.last_name}: Application → Applicant (SF payment)`,
+      metadata: {
+        old_stage: 'application',
+        new_stage: 'applicant',
+        old_stage_label: 'Application',
+        new_stage_label: 'Applicant',
+        reason: 'sf_payment',
+      },
+      created_by: userId,
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('[SF Promotion] Unexpected error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to promote SF lead',
+    }
+  }
+}
+
 // Check if a lead can be enrolled (validation helper)
 export async function canEnrollLead(
   supabase: SupabaseClient,

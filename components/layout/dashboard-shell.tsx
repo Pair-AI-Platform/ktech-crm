@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, createContext, useContext } from "react"
+import { useState, createContext, useContext, useSyncExternalStore, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNav, QuickActions } from "@/components/layout/mobile-nav"
@@ -16,8 +16,8 @@ const DEMO_USER: Profile = {
   avatar_url: undefined,
   is_active: true,
   monthly_target: 50,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  created_at: "2024-01-01T00:00:00.000Z",
+  updated_at: "2024-01-01T00:00:00.000Z",
 }
 
 // Context for sidebar state
@@ -28,6 +28,26 @@ const SidebarContext = createContext<{
 
 export const useSidebar = () => useContext(SidebarContext)
 
+// Hook to check demo mode using useSyncExternalStore
+// In production, demo mode is disabled unless NEXT_PUBLIC_ENABLE_DEMO=true
+function useDemoMode() {
+  const subscribe = useCallback((callback: () => void) => {
+    window.addEventListener("storage", callback)
+    return () => window.removeEventListener("storage", callback)
+  }, [])
+
+  const getSnapshot = useCallback(() => {
+    const isProduction = process.env.NODE_ENV === 'production'
+    const demoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true'
+    if (isProduction && !demoEnabled) return false
+    return localStorage.getItem("ktech-demo-mode") === "true"
+  }, [])
+
+  const getServerSnapshot = useCallback(() => false, [])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
+
 interface DashboardShellProps {
   user: Profile | null
   children: React.ReactNode
@@ -36,15 +56,11 @@ interface DashboardShellProps {
 export function DashboardShell({ user, children }: DashboardShellProps) {
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeUser] = useState<Profile | null>(() => {
-    if (user) return user
-    if (typeof window !== "undefined") {
-      const isDemoMode = localStorage.getItem("ktech-demo-mode") === "true"
-      if (isDemoMode) return DEMO_USER
-    }
-    return null
-  })
   const router = useRouter()
+  const isDemoMode = useDemoMode()
+
+  // Compute active user based on props and demo mode
+  const activeUser = user || (isDemoMode ? DEMO_USER : null)
 
   const handleQuickAction = (action: string) => {
     switch (action) {

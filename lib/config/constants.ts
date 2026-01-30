@@ -1,0 +1,51 @@
+// =============================================
+// Business Configuration Constants
+// =============================================
+// Centralized location for all magic numbers and
+// business rules used across the application.
+
+export const BUSINESS_CONFIG = {
+  // -- Payments --
+  /** Enrollment fee amount in KWD */
+  ENROLLMENT_PAYMENT_AMOUNT: 150,
+  /** PUC (Pre-University Course) fee amount in KWD */
+  PUC_FEE_AMOUNT: 10,
+  /** Default currency */
+  CURRENCY: 'KWD' as const,
+
+  // -- GPA & Academic --
+  /** GPA threshold below which a lead is auto-set to self-funded */
+  GPA_SELF_FUNDED_THRESHOLD: 70,
+  /** Passing threshold for Moodle placement tests */
+  PLACEMENT_TEST_PASSING_THRESHOLD: 60,
+
+  // -- SMS Reminders --
+  /** Time window for 24-hour reminders (hours before appointment) */
+  REMINDER_24H: {
+    START_HOURS: 23,
+    END_HOURS: 25,
+  },
+  /** Time window for 2-hour reminders (hours before appointment) */
+  REMINDER_2H: {
+    START_HOURS: 1.5,
+    END_HOURS: 2.5,
+  },
+  /** Number of SMS messages to send concurrently */
+  SMS_BATCH_SIZE: 10,
+
+  // -- Pipeline --
+  /** All pipeline stages in order */
+  PIPELINE_STAGES: [
+    'new', 'contacted', 'visit', 'appointment', 'test',
+    'application', 'applicant', 'enrolled', 'lost', 'withdraw',
+  ] as const,
+} as const
+
+// Re-export individual values for convenience
+export const {
+  ENROLLMENT_PAYMENT_AMOUNT,
+  PUC_FEE_AMOUNT,
+  GPA_SELF_FUNDED_THRESHOLD,
+  PLACEMENT_TEST_PASSING_THRESHOLD,
+  SMS_BATCH_SIZE,
+} = BUSINESS_CONFIG

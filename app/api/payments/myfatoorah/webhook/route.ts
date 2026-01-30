@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { convertLeadToStudent } from "@/lib/enrollment/convert-lead"
-import { getPaymentStatus } from "@/lib/myfatoorah/client"
+import { convertLeadToStudent, promoteSFLeadToApplicant } from "@/lib/enrollment/convert-lead"
+import { getPaymentStatus, verifyWebhookSignature } from "@/lib/myfatoorah/client"
 import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
 
 // Use service role for webhook (no user session)
@@ -14,7 +14,21 @@ function createServiceClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const rawBody = await request.text()
+
+    // Verify webhook signature
+    const signature = request.headers.get('x-myfatoorah-signature')
+    const webhookSecret = process.env.MYFATOORAH_WEBHOOK_SECRET
+
+    if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
+      console.error("[MyFatoorah Webhook] Invalid signature")
+      return NextResponse.json(
+        { error: "Invalid webhook signature" },
+        { status: 401 }
+      )
+    }
+
+    const body = JSON.parse(rawBody)
 
     console.log("[MyFatoorah Webhook] Received:", JSON.stringify(body))
 
@@ -78,7 +92,69 @@ export async function POST(request: NextRequest) {
 
     // Handle based on payment status
     if (statusResult.invoiceStatus === "Paid") {
-      // Payment successful - enroll the student
+      // Check if lead is SF (self-funded) and in 'application' stage
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("funding_type, pipeline_stage")
+        .eq("id", transaction.lead_id)
+        .single()
+
+      const isSFInApplication =
+        lead?.funding_type === "self_funded" &&
+        lead?.pipeline_stage === "application"
+
+      if (isSFInApplication) {
+        // SF lead: promote to 'applicant' instead of enrolling
+        const sfResult = await promoteSFLeadToApplicant(supabase, {
+          leadId: transaction.lead_id,
+          transactionId: transaction.id,
+          amountPaid: ENROLLMENT_PAYMENT_AMOUNT,
+        })
+
+        if (!sfResult.success) {
+          console.error("[MyFatoorah Webhook] CRITICAL: SF promotion failed:", sfResult.error)
+
+          await supabase
+            .from("payment_transactions")
+            .update({
+              status: "completed",
+              notes: `SF_PROMOTION_FAILED: Payment successful but SF promotion failed: ${sfResult.error}`,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", transaction.id)
+
+          // Log critical activity for admin visibility
+          await supabase.from("activities").insert({
+            lead_id: transaction.lead_id,
+            activity_type: "enrollment_failed",
+            title: "SF Promotion Failed After Payment",
+            description: `CRITICAL: Payment of ${ENROLLMENT_PAYMENT_AMOUNT} KWD succeeded but SF lead promotion failed: ${sfResult.error}. Manual intervention required.`,
+            metadata: {
+              transaction_id: transaction.id,
+              payment_method: "myfatoorah",
+              amount: ENROLLMENT_PAYMENT_AMOUNT,
+              invoice_id: invoiceId,
+              error: sfResult.error,
+              requires_manual_intervention: true,
+            },
+          })
+
+          return NextResponse.json({
+            success: true,
+            message: "Payment recorded but SF promotion failed — flagged for admin review",
+            error: sfResult.error,
+          })
+        }
+
+        console.log("[MyFatoorah Webhook] SF lead promoted to applicant:", transaction.lead_id)
+
+        return NextResponse.json({
+          success: true,
+          message: "Payment processed — SF lead moved to Applicant",
+        })
+      }
+
+      // Non-SF: enroll the student as before
       const result = await convertLeadToStudent(supabase, {
         leadId: transaction.lead_id,
         transactionId: transaction.id,
@@ -86,21 +162,37 @@ export async function POST(request: NextRequest) {
       })
 
       if (!result.success) {
-        console.error("[MyFatoorah Webhook] Failed to enroll:", result.error)
+        console.error("[MyFatoorah Webhook] CRITICAL: Failed to enroll:", result.error)
 
-        // Mark transaction with error but don't fail webhook
+        // Mark transaction as needing attention
         await supabase
           .from("payment_transactions")
           .update({
             status: "completed",
-            notes: `Payment successful but enrollment failed: ${result.error}`,
+            notes: `ENROLLMENT_FAILED: Payment successful but enrollment failed: ${result.error}`,
             completed_at: new Date().toISOString(),
           })
           .eq("id", transaction.id)
 
+        // Log a critical activity for admin visibility
+        await supabase.from("activities").insert({
+          lead_id: transaction.lead_id,
+          activity_type: "enrollment_failed",
+          title: "Enrollment Failed After Payment",
+          description: `CRITICAL: Payment of ${ENROLLMENT_PAYMENT_AMOUNT} KWD succeeded but enrollment conversion failed: ${result.error}. Manual intervention required.`,
+          metadata: {
+            transaction_id: transaction.id,
+            payment_method: "myfatoorah",
+            amount: ENROLLMENT_PAYMENT_AMOUNT,
+            invoice_id: invoiceId,
+            error: result.error,
+            requires_manual_intervention: true,
+          },
+        })
+
         return NextResponse.json({
           success: true,
-          message: "Payment recorded but enrollment failed",
+          message: "Payment recorded but enrollment failed — flagged for admin review",
           error: result.error,
         })
       }

@@ -14,6 +14,7 @@ import { SMSTemplatesManager } from "@/components/settings/sms-templates-manager
 import { LeadAssignmentRules } from "@/components/settings/lead-assignment-rules"
 import { StageSettings } from "@/components/settings/stage-settings"
 import { TargetSettings } from "@/components/settings/target-settings"
+import { SchoolManagement } from "@/components/settings/school-management"
 import {
   Select,
   SelectContent,
@@ -46,13 +47,14 @@ import {
   Zap,
   ExternalLink,
   GitBranch,
-  Target
+  Target,
+  School
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets" | "schools"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -61,6 +63,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "security", label: "Security", icon: Shield },
   { id: "pipeline", label: "Pipeline", icon: GitBranch, adminOnly: true },
   { id: "targets", label: "Targets", icon: Target, adminOnly: true },
+  { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "sms", label: "SMS", icon: MessageSquare, adminOnly: true },
   { id: "team", label: "Team", icon: Users, adminOnly: true },
 ]
@@ -748,6 +751,19 @@ export default function SettingsPage() {
                     className="space-y-6"
                   >
                     <TargetSettings />
+                  </motion.div>
+                )}
+
+                {/* Schools Tab */}
+                {activeTab === "schools" && isAdmin && (
+                  <motion.div
+                    key="schools"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <SchoolManagement />
                   </motion.div>
                 )}
 

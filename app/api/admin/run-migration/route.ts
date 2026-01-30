@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 // This endpoint runs the payment_transactions migration
-// Only accessible by admins
+// Only accessible by admins when ENABLE_MIGRATION_API=true
 export async function POST(request: NextRequest) {
+  // Gate behind environment variable — must never be enabled in production
+  if (process.env.ENABLE_MIGRATION_API !== 'true') {
+    return NextResponse.json(
+      { error: 'Migration API is disabled. Set ENABLE_MIGRATION_API=true to enable.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const supabase = await createServerSupabaseClient()
 
@@ -166,8 +174,16 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  if (process.env.ENABLE_MIGRATION_API !== 'true') {
+    return NextResponse.json(
+      { error: 'Migration API is disabled' },
+      { status: 403 }
+    )
+  }
+
   return NextResponse.json({
     message: "POST to this endpoint to run the payment_transactions migration",
     requiresAdmin: true,
+    gatedBy: "ENABLE_MIGRATION_API=true",
   })
 }

@@ -77,7 +77,7 @@ export function TargetSettings() {
         setAgents(profilesData)
 
         // Initialize agent targets
-        const targets: Record<string, any> = {}
+        const targets: Record<string, { monthly_target: number; target_male: number; target_female: number; target_puc: number; target_sf: number }> = {}
         profilesData.forEach(agent => {
           targets[agent.id] = {
             monthly_target: agent.monthly_target || 0,

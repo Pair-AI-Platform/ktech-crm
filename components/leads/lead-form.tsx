@@ -29,7 +29,6 @@ import {
   Globe,
   Search,
   School as SchoolIcon,
-  MessageCircleQuestion,
   Building2,
   ClipboardCheck,
   RefreshCw,
@@ -38,10 +37,11 @@ import {
   Ban,
   Trophy,
   Briefcase,
-  Users
+  Users,
+  Percent
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
-import { SCHOOLS, LEAD_SOURCES, MAJORS, PIPELINE_STAGES, PLACEMENT_LEVELS, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type Lead, type School, type IntendedMajor, type LeadSourceCategory, type LeadSource, type FundingType, type PipelineStage, type PlacementLevel, type LeadStatus, type MinistryBlockReason } from "@/types"
+import { SCHOOLS, LEAD_SOURCES, MAJORS, PIPELINE_STAGES, PLACEMENT_LEVELS, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, NATIONALITIES, EDUCATION_TYPES, DISCOUNT_TYPES, type Lead, type School, type IntendedMajor, type LeadSourceCategory, type LeadSource, type FundingType, type PipelineStage, type PlacementLevel, type LeadStatus, type MinistryBlockReason, type EducationType, type AcademicTrack, type DiscountType } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 
@@ -59,52 +59,43 @@ const SOURCE_CATEGORIES = [
   { value: "outreach", label: "Outreach", icon: "📣" },
 ]
 
-const HOW_DID_YOU_KNOW_OPTIONS = [
-  { value: "social_media", label: "Social Media", icon: "📱" },
-  { value: "friend_family", label: "Friend / Family", icon: "👨‍👩‍👧" },
-  { value: "school_visit", label: "School Visit", icon: "🏫" },
-  { value: "exhibition", label: "Exhibition / Event", icon: "🎪" },
-  { value: "search_engine", label: "Google Search", icon: "🔍" },
-  { value: "advertisement", label: "Advertisement", icon: "📺" },
-  { value: "current_student", label: "Current Student", icon: "🎓" },
-  { value: "other", label: "Other", icon: "💬" },
-]
-
 export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const { createLead, updateLead, loading } = useLeadMutations()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [schoolSearch, setSchoolSearch] = useState("")
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
+  const [nationalitySearch, setNationalitySearch] = useState("")
+  const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const isEditing = !!lead
 
   const [formData, setFormData] = useState({
     first_name: lead?.first_name || "",
     last_name: lead?.last_name || "",
+    gender: lead?.gender || "",
     phone: lead?.phone || "",
     phone_secondary: lead?.phone_secondary || "",
     civil_id: lead?.civil_id || "",
     date_of_birth: lead?.date_of_birth || "",
     email: lead?.email || "",
+    nationality: lead?.nationality || "Kuwaiti",
     school: lead?.school || "",
+    education_type: lead?.education_type || "",
+    education_type_custom: lead?.education_type_custom || "",
     source_category: "digital",
     source: lead?.source || "website_form",
-    how_did_you_know: "",
     funding_type: lead?.funding_type || "self_funded",
     intended_major: lead?.intended_major || "",
+    preferred_major: lead?.preferred_major || "",
     pipeline_stage: lead?.pipeline_stage || "new",
     status: lead?.status || "",
     graduation_year: lead?.graduation_year?.toString() || "",
-    gpa_grade_10: lead?.gpa_grade_10?.toString() || "",
-    gpa_grade_11: lead?.gpa_grade_11?.toString() || "",
-    gpa_grade_12_expected: lead?.gpa_grade_12_expected?.toString() || "",
-    // GPA Override fields
-    gpa_grade_10_override: lead?.gpa_grade_10_override || false,
-    gpa_grade_11_override: lead?.gpa_grade_11_override || false,
-    gpa_grade_12_expected_override: lead?.gpa_grade_12_expected_override || false,
     expected_gpa: lead?.expected_gpa?.toString() || "",
+    actual_gpa: lead?.actual_gpa?.toString() || "",
+    academic_track: lead?.academic_track || "",
     actual_lead: lead?.actual_lead || false,
     seat_number: lead?.seat_number || "",
     notes: lead?.notes || "",
+    source_detail: lead?.source_detail || "",
     is_transfer_student: lead?.is_transfer_student || false,
     is_special_needs: lead?.is_special_needs || false,
     is_diplomatic: lead?.is_diplomatic || false,
@@ -127,6 +118,10 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     // Ministry blocked
     ministry_blocked: lead?.ministry_blocked || false,
     ministry_block_reasons: lead?.ministry_block_reasons || [],
+    // Discount
+    discount_type: lead?.discount_type || "",
+    discount_percentage: lead?.discount_percentage?.toString() || "",
+    discount_notes: lead?.discount_notes || "",
   })
 
   // Filter schools based on search (supports Arabic)
@@ -134,6 +129,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     school.label.includes(schoolSearch) ||
     school.labelAr.includes(schoolSearch) ||
     school.value.toLowerCase().includes(schoolSearch.toLowerCase())
+  )
+
+  // Filter nationalities based on search (supports Arabic)
+  const filteredNationalities = NATIONALITIES.filter(n =>
+    n.label.toLowerCase().includes(nationalitySearch.toLowerCase()) ||
+    n.labelAr.includes(nationalitySearch) ||
+    n.value.toLowerCase().includes(nationalitySearch.toLowerCase())
   )
 
   // Extract date of birth from Kuwait civil ID
@@ -169,13 +171,16 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   // Check if lead is at test stage (placement test not completed yet)
   const isAtTestStage = formData.pipeline_stage === 'test'
 
-  // Check if lead is at a stage where status should be disabled
-  // Status is disabled for 'new' (fresh leads), 'test' (placement test not completed yet), and 'appointment'
-  const isStatusDisabled = formData.pipeline_stage === 'new' || formData.pipeline_stage === 'test' || formData.pipeline_stage === 'appointment'
+  // Status is always editable in the edit form so agents can update it freely
+  const isStatusDisabled = false
 
-  // Filter statuses based on stage - visit stage only has specific statuses
-  const availableStatuses = formData.pipeline_stage === 'visit'
-    ? LEAD_STATUSES.filter(s => s.value === 'no_answer' || s.value === 'not_interested' || s.value === 'switched_off' || s.value === 'callback')
+  // Filter statuses based on stage
+  const contactedStatuses: LeadStatus[] = ['no_answer', 'switched_off', 'callback', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done']
+  const visitStatuses: LeadStatus[] = ['no_answer', 'not_interested', 'switched_off', 'callback']
+  const availableStatuses = formData.pipeline_stage === 'contacted'
+    ? LEAD_STATUSES.filter(s => contactedStatuses.includes(s.value))
+    : formData.pipeline_stage === 'visit'
+    ? LEAD_STATUSES.filter(s => visitStatuses.includes(s.value))
     : LEAD_STATUSES
 
   // Check if source is walk-in
@@ -186,7 +191,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   // Submission stage is only for PUC leads
   const availablePipelineStages = isWalkIn
     ? PIPELINE_STAGES.filter(s => s.value === 'test' || s.value === 'application')
-    : PIPELINE_STAGES.filter(s => formData.funding_type === 'puc' || s.value !== 'submission')
+    : PIPELINE_STAGES
 
   // Calculate placement level based on passed subjects
   const calculatePlacementLevel = () => {
@@ -247,39 +252,29 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       phone: formData.phone.replace(/\D/g, ""),
       phone_secondary: formData.phone_secondary.trim() ? formData.phone_secondary.replace(/\D/g, "") : undefined,
       email: formData.email,
+      gender: formData.gender || undefined,
       civil_id: formData.civil_id ? formData.civil_id.replace(/\D/g, "") : undefined,
       date_of_birth: formData.date_of_birth || undefined,
       school: (formData.school || undefined) as School | undefined,
+      education_type: (formData.education_type || undefined) as EducationType | undefined,
+      education_type_custom: formData.education_type === 'other' ? formData.education_type_custom.trim() || undefined : undefined,
       source_category: formData.source_category as LeadSourceCategory,
       source: formData.source as LeadSource,
+      source_detail: formData.source === "exhibitions" && formData.source_detail.trim() ? formData.source_detail.trim() : undefined,
       funding_type: formData.funding_type as FundingType,
       intended_major: (formData.intended_major || undefined) as IntendedMajor | undefined,
-      gpa_grade_10: formData.gpa_grade_10 ? parseFloat(formData.gpa_grade_10) : undefined,
-      gpa_grade_11: formData.gpa_grade_11 ? parseFloat(formData.gpa_grade_11) : undefined,
-      gpa_grade_12_expected: formData.gpa_grade_12_expected ? parseFloat(formData.gpa_grade_12_expected) : undefined,
-      // GPA Override fields
-      gpa_grade_10_override: formData.gpa_grade_10_override,
-      gpa_grade_11_override: formData.gpa_grade_11_override,
-      gpa_grade_12_expected_override: formData.gpa_grade_12_expected_override,
-      // Store original values when first enabling override
-      gpa_grade_10_original: formData.gpa_grade_10_override && !lead?.gpa_grade_10_override
-        ? lead?.gpa_grade_10
-        : lead?.gpa_grade_10_original,
-      gpa_grade_11_original: formData.gpa_grade_11_override && !lead?.gpa_grade_11_override
-        ? lead?.gpa_grade_11
-        : lead?.gpa_grade_11_original,
-      gpa_grade_12_expected_original: formData.gpa_grade_12_expected_override && !lead?.gpa_grade_12_expected_override
-        ? lead?.gpa_grade_12_expected
-        : lead?.gpa_grade_12_expected_original,
+      preferred_major: formData.preferred_major.trim() || undefined,
       expected_gpa: formData.expected_gpa ? parseFloat(formData.expected_gpa) : undefined,
+      actual_gpa: formData.actual_gpa ? parseFloat(formData.actual_gpa) : undefined,
+      academic_track: (formData.academic_track || undefined) as AcademicTrack | undefined,
       actual_lead: formData.actual_lead,
       seat_number: formData.seat_number.trim() || undefined,
       pipeline_stage: formData.pipeline_stage as PipelineStage,
       status: (formData.status || undefined) as LeadStatus | undefined,
       graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : undefined,
       notes: formData.notes,
-      is_kuwaiti: true,
-      nationality: "Kuwaiti",
+      is_kuwaiti: formData.nationality === "Kuwaiti",
+      nationality: formData.nationality,
       is_transfer_student: formData.is_transfer_student,
       is_special_needs: formData.is_special_needs,
       is_diplomatic: formData.is_diplomatic,
@@ -302,6 +297,10 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       // Ministry blocked
       ministry_blocked: formData.ministry_blocked,
       ministry_block_reasons: formData.ministry_blocked ? formData.ministry_block_reasons as MinistryBlockReason[] : [],
+      // Discount (SF only)
+      discount_type: formData.funding_type === 'self_funded' && formData.discount_type ? formData.discount_type as DiscountType : undefined,
+      discount_percentage: formData.funding_type === 'self_funded' && formData.discount_percentage ? parseFloat(formData.discount_percentage) : undefined,
+      discount_notes: formData.funding_type === 'self_funded' && formData.discount_notes.trim() ? formData.discount_notes.trim() : undefined,
     }
 
     let result
@@ -365,31 +364,6 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
           pipeline_stage: needsReset ? 'test' : prev.pipeline_stage,
         }
       })
-    // Auto-PUC: If GPA >= 70, automatically set funding type to PUC
-    // BUT skip this if any GPA override is enabled (agent manually controls funding type)
-    } else if (field === 'gpa_grade_10' || field === 'gpa_grade_11' || field === 'gpa_grade_12_expected') {
-      const gpaValue = parseFloat(value)
-      setFormData(prev => {
-        const newData = { ...prev, [field]: value }
-
-        // Check if any GPA override is enabled - skip auto-PUC if so
-        const hasOverride = prev.gpa_grade_10_override ||
-                            prev.gpa_grade_11_override ||
-                            prev.gpa_grade_12_expected_override
-
-        if (!hasOverride) {
-          // Check if any GPA is >= 70 to auto-set PUC
-          const gpa10 = field === 'gpa_grade_10' ? gpaValue : parseFloat(prev.gpa_grade_10) || 0
-          const gpa11 = field === 'gpa_grade_11' ? gpaValue : parseFloat(prev.gpa_grade_11) || 0
-          const gpa12 = field === 'gpa_grade_12_expected' ? gpaValue : parseFloat(prev.gpa_grade_12_expected) || 0
-          const highestGpa = Math.max(gpa10, gpa11, gpa12)
-
-          if (highestGpa >= 70 && prev.funding_type !== 'puc') {
-            newData.funding_type = 'puc'
-          }
-        }
-        return newData
-      })
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
@@ -402,7 +376,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const filteredSources = LEAD_SOURCES.filter(source => {
     const categoryMap: Record<string, string[]> = {
       direct: ["walk_in", "call_center", "whatsapp", "email"],
-      events: ["school_visit", "expo", "exhibitions"],
+      events: ["school_visit", "expo", "exhibitions", "karnival"],
       digital: ["website_form", "facebook", "instagram", "snapchat"],
       referrals: ["current_student_referral", "staff_referral", "friend_referral"],
       outreach: ["old_contacts", "paaet_rejected", "gpa_lists"],
@@ -477,6 +451,99 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                   />
                   {errors.last_name && (
                     <p className="text-xs text-[var(--error)]">{errors.last_name}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Gender */}
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <div className="flex gap-3">
+                  {[
+                    { value: "male", label: "Male", labelAr: "ذكر" },
+                    { value: "female", label: "Female", labelAr: "أنثى" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleChange("gender", formData.gender === option.value ? "" : option.value)}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                        formData.gender === option.value
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50"
+                      )}
+                    >
+                      <Users className="w-4 h-4" />
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nationality */}
+              <div className={cn("space-y-2", isNationalityDropdownOpen && "relative z-20")}>
+                <Label>Nationality</Label>
+                <div className="relative">
+                  <div
+                    onClick={() => setIsNationalityDropdownOpen(!isNationalityDropdownOpen)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all",
+                      isNationalityDropdownOpen
+                        ? "border-[var(--primary)] ring-2 ring-[var(--primary)]/20"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                    )}
+                  >
+                    <Globe className="w-4 h-4 text-[var(--text-muted)]" />
+                    <span className={formData.nationality ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}>
+                      {formData.nationality ? NATIONALITIES.find(n => n.value === formData.nationality)?.label || formData.nationality : "Select nationality"}
+                    </span>
+                  </div>
+
+                  {isNationalityDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => { setIsNationalityDropdownOpen(false); setNationalitySearch("") }} />
+                      <div className="absolute z-50 w-full mt-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
+                        <div className="p-2 border-b border-[var(--border)]">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                            <input
+                              type="text"
+                              value={nationalitySearch}
+                              onChange={(e) => setNationalitySearch(e.target.value)}
+                              placeholder="Search nationalities..."
+                              className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-depth-2)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          {filteredNationalities.length > 0 ? (
+                            filteredNationalities.map((nationality) => (
+                              <button
+                                key={nationality.value}
+                                type="button"
+                                onClick={() => {
+                                  handleChange("nationality", nationality.value)
+                                  setIsNationalityDropdownOpen(false)
+                                  setNationalitySearch("")
+                                }}
+                                className={cn(
+                                  "w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
+                                  formData.nationality === nationality.value && "bg-[var(--primary-muted)] text-[var(--primary)]"
+                                )}
+                              >
+                                {nationality.label}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-4 text-sm text-center text-[var(--text-muted)]">
+                              No nationalities found
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -748,42 +815,6 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
             </div>
           </div>
 
-          {/* Section 3: How Did You Know About Us */}
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-                <MessageCircleQuestion className="w-4 h-4 text-[var(--primary)]" />
-              </div>
-              <h3 className="font-semibold text-[var(--text-primary)]">How Did You Know About Us?</h3>
-            </div>
-
-            <div className="space-y-4 pl-10">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {HOW_DID_YOU_KNOW_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleChange("how_did_you_know", option.value)}
-                    className={cn(
-                      "flex flex-col items-center gap-2 p-3 rounded-xl border text-center transition-all",
-                      formData.how_did_you_know === option.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)] ring-2 ring-[var(--primary)]/20"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                    )}
-                  >
-                    <span className="text-xl">{option.icon}</span>
-                    <span className={cn(
-                      "text-xs font-medium",
-                      formData.how_did_you_know === option.value
-                        ? "text-[var(--primary)]"
-                        : "text-[var(--text-primary)]"
-                    )}>{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Section 4: Lead Source */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
@@ -856,6 +887,18 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                   ))}
                 </div>
               </div>
+
+              {/* Exhibition Notes - Only shown when exhibitions source is selected */}
+              {formData.source === "exhibitions" && (
+                <div className="space-y-2">
+                  <Label>Exhibition Name</Label>
+                  <Input
+                    placeholder="Which exhibition? e.g. Kuwait Education Fair 2025"
+                    value={formData.source_detail}
+                    onChange={(e) => handleChange("source_detail", e.target.value)}
+                  />
+                </div>
+              )}
 
               {/* Walk-in Stage Selector - Only shown when walk_in source is selected */}
               {isWalkIn && (
@@ -987,6 +1030,57 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Education Type */}
+              <div className="space-y-2">
+                <Label>Education Type</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {EDUCATION_TYPES.map((type) => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          education_type: prev.education_type === type.value ? "" : type.value,
+                          education_type_custom: type.value !== 'other' ? "" : prev.education_type_custom,
+                        }))
+                      }}
+                      className={cn(
+                        "flex flex-col items-center gap-1 p-3 rounded-xl border transition-all text-center",
+                        formData.education_type === type.value
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                      )}
+                    >
+                      <span className={cn(
+                        "text-sm font-bold",
+                        formData.education_type === type.value
+                          ? "text-[var(--primary)]"
+                          : "text-[var(--text-primary)]"
+                      )}>
+                        {type.label}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)] leading-tight">{type.description}</span>
+                    </button>
+                  ))}
+                </div>
+                {formData.education_type === 'other' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-2"
+                  >
+                    <Input
+                      placeholder="Enter education type..."
+                      value={formData.education_type_custom}
+                      onChange={(e) => setFormData(prev => ({ ...prev, education_type_custom: e.target.value }))}
+                      className="w-full"
+                    />
+                  </motion.div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1130,174 +1224,61 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="preferred_major">Preferred Major</Label>
+                  <Input
+                    id="preferred_major"
+                    value={formData.preferred_major}
+                    onChange={(e) => handleChange("preferred_major", e.target.value)}
+                    placeholder="Enter preferred major"
+                  />
+                </div>
               </div>
 
               {/* GPA Section */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide">GPA Scores (0-100%)</Label>
-                  <div className="flex items-center gap-2">
-                    {(formData.gpa_grade_10_override || formData.gpa_grade_11_override || formData.gpa_grade_12_expected_override) && (
-                      <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> Override Active
-                      </span>
-                    )}
-                    {!(formData.gpa_grade_10_override || formData.gpa_grade_11_override || formData.gpa_grade_12_expected_override) &&
-                     (parseFloat(formData.gpa_grade_10) >= 70 || parseFloat(formData.gpa_grade_11) >= 70 || parseFloat(formData.gpa_grade_12_expected) >= 70) && (
-                      <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Auto-PUC Eligible
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
+                <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide">GPA Scores (0-100%)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="gpa_grade_10" className="text-xs">Grade 10</Label>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-[var(--text-muted)]">Override</span>
-                        <Switch
-                          checked={formData.gpa_grade_10_override}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, gpa_grade_10_override: checked }))}
-                          className="scale-75"
-                        />
-                      </div>
-                    </div>
+                    <Label htmlFor="expected_gpa" className="text-xs">Expected GPA</Label>
                     <Input
-                      id="gpa_grade_10"
+                      id="expected_gpa"
                       type="number"
                       step="0.01"
                       min="0"
                       max="100"
-                      value={formData.gpa_grade_10}
-                      onChange={(e) => handleChange("gpa_grade_10", e.target.value)}
-                      placeholder="e.g. 75"
-                      className={cn(
-                        parseFloat(formData.gpa_grade_10) >= 70 && !formData.gpa_grade_10_override && "border-green-500 bg-green-50/50 dark:bg-green-950/20",
-                        formData.gpa_grade_10_override && "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20"
-                      )}
+                      value={formData.expected_gpa}
+                      onChange={(e) => handleChange("expected_gpa", e.target.value)}
+                      placeholder="e.g. 85"
                     />
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="gpa_grade_11" className="text-xs">Grade 11</Label>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-[var(--text-muted)]">Override</span>
-                        <Switch
-                          checked={formData.gpa_grade_11_override}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, gpa_grade_11_override: checked }))}
-                          className="scale-75"
-                        />
-                      </div>
-                    </div>
+                    <Label htmlFor="actual_gpa" className="text-xs">Actual Cumulative GPA</Label>
                     <Input
-                      id="gpa_grade_11"
+                      id="actual_gpa"
                       type="number"
                       step="0.01"
                       min="0"
                       max="100"
-                      value={formData.gpa_grade_11}
-                      onChange={(e) => handleChange("gpa_grade_11", e.target.value)}
-                      placeholder="e.g. 78"
-                      className={cn(
-                        parseFloat(formData.gpa_grade_11) >= 70 && !formData.gpa_grade_11_override && "border-green-500 bg-green-50/50 dark:bg-green-950/20",
-                        formData.gpa_grade_11_override && "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20"
-                      )}
+                      value={formData.actual_gpa}
+                      onChange={(e) => handleChange("actual_gpa", e.target.value)}
+                      placeholder="e.g. 82"
                     />
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="gpa_grade_12_expected" className="text-xs">Grade 12</Label>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-[var(--text-muted)]">Override</span>
-                        <Switch
-                          checked={formData.gpa_grade_12_expected_override}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, gpa_grade_12_expected_override: checked }))}
-                          className="scale-75"
-                        />
-                      </div>
-                    </div>
-                    <Input
-                      id="gpa_grade_12_expected"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={formData.gpa_grade_12_expected}
-                      onChange={(e) => handleChange("gpa_grade_12_expected", e.target.value)}
-                      placeholder="e.g. 80"
-                      className={cn(
-                        parseFloat(formData.gpa_grade_12_expected) >= 70 && !formData.gpa_grade_12_expected_override && "border-green-500 bg-green-50/50 dark:bg-green-950/20",
-                        formData.gpa_grade_12_expected_override && "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20"
-                      )}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {(formData.gpa_grade_10_override || formData.gpa_grade_11_override || formData.gpa_grade_12_expected_override)
-                    ? "Override enabled - Auto-PUC bypassed. Agent controls funding type manually."
-                    : "Leads with GPA \u2265 70% are automatically marked as PUC eligible"}
-                </p>
-                {/* GPA Override Audit Info */}
-                {lead?.gpa_overridden_by && (
-                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      <span className="font-medium">GPA Override History</span>
-                      <br />
-                      Overridden: {lead.gpa_overridden_at ? new Date(lead.gpa_overridden_at).toLocaleDateString() : 'Unknown'}
-                      {lead.gpa_grade_10_original !== undefined && lead.gpa_grade_10_original !== null && (
-                        <><br />Original Grade 10: {lead.gpa_grade_10_original}%</>
-                      )}
-                      {lead.gpa_grade_11_original !== undefined && lead.gpa_grade_11_original !== null && (
-                        <><br />Original Grade 11: {lead.gpa_grade_11_original}%</>
-                      )}
-                      {lead.gpa_grade_12_expected_original !== undefined && lead.gpa_grade_12_expected_original !== null && (
-                        <><br />Original Grade 12: {lead.gpa_grade_12_expected_original}%</>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Expected GPA and Actual Lead */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expected_gpa" className="text-xs">Expected GPA</Label>
-                  <Input
-                    id="expected_gpa"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.expected_gpa}
-                    onChange={(e) => handleChange("expected_gpa", e.target.value)}
-                    placeholder="e.g. 85"
-                  />
-                  <p className="text-xs text-[var(--text-muted)]">Overall expected GPA percentage</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Lead Verification</Label>
-                  <div
-                    onClick={() => setFormData(prev => ({ ...prev, actual_lead: !prev.actual_lead }))}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                      formData.actual_lead
-                        ? "border-green-500 bg-green-50 dark:bg-green-950/30"
-                        : "border-[var(--border)] hover:border-green-300"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                      formData.actual_lead
-                        ? "bg-green-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
-                    )}>
-                      <CheckCircle2 className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)]">Actual Lead</p>
-                      <p className="text-xs text-[var(--text-muted)]">Confirmed, real lead</p>
-                    </div>
+                    <Label htmlFor="academic_track" className="text-xs">Type</Label>
+                    <Select
+                      value={formData.academic_track}
+                      onValueChange={(value) => handleChange("academic_track", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="science">Science</SelectItem>
+                        <SelectItem value="arts">Art</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -1346,32 +1327,103 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  {isStatusDisabled ? (
-                    <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-depth-2)] rounded-lg border border-[var(--border)] text-[var(--text-muted)]">
-                      <span className="text-sm">—</span>
-                      <span className="text-xs ml-auto">(Disabled at {formData.pipeline_stage === 'new' ? 'New' : 'Test'} stage)</span>
-                    </div>
-                  ) : (
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value) => handleChange("status", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableStatuses.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => handleChange("status", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStatuses.map((status) => (
+                        <SelectItem key={status.value} value={status.value}>
+                          {status.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Section: Discount (SF leads only) */}
+          {formData.funding_type === 'self_funded' && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center">
+                  <Percent className="w-4 h-4 text-emerald-600" />
+                </div>
+                <h3 className="font-semibold text-[var(--text-primary)]">Discount</h3>
+              </div>
+
+              <div className="space-y-4 pl-10">
+                <div className="space-y-2">
+                  <Label>Discount Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {DISCOUNT_TYPES.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => {
+                          const isSelected = formData.discount_type === type.value
+                          setFormData(prev => ({
+                            ...prev,
+                            discount_type: isSelected ? "" : type.value,
+                            discount_percentage: isSelected ? "" : (type.percentage?.toString() || prev.discount_percentage),
+                          }))
+                        }}
+                        className={cn(
+                          "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
+                          formData.discount_type === type.value
+                            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
+                            : "border-[var(--border)] hover:border-emerald-300 text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                          formData.discount_type === type.value
+                            ? "border-emerald-500 bg-emerald-500"
+                            : "border-[var(--border)]"
+                        )}>
+                          {formData.discount_type === type.value && (
+                            <Check className="w-2.5 h-2.5 text-white" />
+                          )}
+                        </div>
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="discount_percentage">Discount Percentage (%)</Label>
+                    <Input
+                      id="discount_percentage"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.discount_percentage}
+                      onChange={(e) => setFormData(prev => ({ ...prev, discount_percentage: e.target.value }))}
+                      placeholder="e.g. 50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="discount_notes">Discount Notes</Label>
+                  <Textarea
+                    id="discount_notes"
+                    value={formData.discount_notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, discount_notes: e.target.value }))}
+                    placeholder="Notes about the discount..."
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Section 6: Placement Test */}
           <div className="mb-8">

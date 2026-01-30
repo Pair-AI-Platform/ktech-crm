@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import crypto from "crypto"
 
 // Avaya PBX Webhook Endpoint
 // Receives missed call events from Avaya PBX system
@@ -49,7 +50,6 @@ function validateAvayaSignature(request: NextRequest, body: string): boolean {
   // Validate HMAC signature
   // Note: Actual implementation depends on Avaya system version
   // Most use HMAC-SHA256 or similar
-  const crypto = require("crypto")
   const expectedSignature = crypto
     .createHmac("sha256", webhookSecret)
     .update(body)

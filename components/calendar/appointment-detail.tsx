@@ -18,11 +18,13 @@ import {
   Car,
   User,
   UserCheck,
-  ThumbsDown,
-  PhoneCall
+  XCircle,
+  PhoneCall,
+  Eye
 } from "lucide-react"
-import type { Appointment } from "@/types"
-import { APPOINTMENT_TYPES } from "@/types"
+import type { Appointment, PipelineStage } from "@/types"
+import { APPOINTMENT_TYPES, PIPELINE_STAGES } from "@/types"
+import { stageColors } from "@/lib/utils"
 import { useAppointmentMutations, useRescheduleHistory } from "@/lib/hooks/use-appointments"
 import { createClient } from "@/lib/supabase/client"
 
@@ -63,6 +65,11 @@ const STATUS_CONFIG: Record<string, {
     color: "bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/30",
     icon: PhoneOff
   },
+  will_see: {
+    label: "Will See",
+    color: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/30",
+    icon: Eye
+  },
 }
 
 export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: AppointmentDetailProps) {
@@ -70,11 +77,15 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const [postponedDate, setPostponedDate] = useState("")
   const [postponedTime, setPostponedTime] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showCancelForm, setShowCancelForm] = useState(false)
+  const [cancelNotes, setCancelNotes] = useState("")
+  const [stageLoading, setStageLoading] = useState(false)
 
   const {
     markNA,
     markCantReach,
     markOnTheWay,
+    markWillSee,
     confirmAppointment,
     postponeAppointment
   } = useAppointmentMutations()
@@ -88,13 +99,24 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const statusConfig = STATUS_CONFIG[appointment.status] || STATUS_CONFIG.na
   const StatusIcon = statusConfig.icon
 
-  const personName = appointment.lead
-    ? `${appointment.lead.first_name} ${appointment.lead.last_name}`
+  // Derive leads list from junction table with legacy fallback
+  const appointmentLeads = appointment.appointment_leads?.map(al => al.lead).filter(Boolean) ||
+    (appointment.lead ? [appointment.lead] : [])
+  const hasLeads = appointmentLeads.length > 0
+
+  const personName = hasLeads
+    ? appointmentLeads.length === 1
+      ? `${appointmentLeads[0]!.first_name} ${appointmentLeads[0]!.last_name}`
+      : `${appointmentLeads[0]!.first_name} ${appointmentLeads[0]!.last_name} +${appointmentLeads.length - 1}`
     : appointment.student
     ? `${appointment.student.first_name} ${appointment.student.last_name}`
     : "Unknown"
 
-  const personPhone = appointment.lead?.phone || ""
+  const personPhone = appointmentLeads[0]?.phone || ""
+
+  // Get all lead IDs for bulk operations
+  const allLeadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
+    (appointment.lead_id ? [appointment.lead_id] : [])
 
   const handleAction = async (action: () => Promise<unknown>) => {
     setIsLoading(true)
@@ -108,40 +130,62 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const handleMarkNA = () => handleAction(() => markNA(appointment.id))
   const handleMarkCantReach = () => handleAction(() => markCantReach(appointment.id))
   const handleMarkOnTheWay = () => handleAction(() => markOnTheWay(appointment.id))
+  const handleMarkWillSee = () => handleAction(() => markWillSee(appointment.id))
 
-  // Mark lead as Not Interested (NI)
-  const handleMarkNI = async () => {
-    if (!appointment.lead_id) return
+  // Mark all leads as Canceled with notes
+  const handleMarkCanceled = async () => {
+    if (allLeadIds.length === 0) return
     setIsLoading(true)
     const supabase = createClient()
-    await supabase
-      .from("leads")
-      .update({ status: "not_interested" })
-      .eq("id", appointment.lead_id)
+    for (const lid of allLeadIds) {
+      await supabase
+        .from("leads")
+        .update({ status: "not_interested", notes: cancelNotes || undefined })
+        .eq("id", lid)
+    }
     setIsLoading(false)
+    setShowCancelForm(false)
+    setCancelNotes("")
     onUpdate?.()
     onClose()
   }
 
-  // Mark lead as Callback (CB)
+  // Mark all leads as Callback (CB)
   const handleMarkCB = async () => {
-    if (!appointment.lead_id) return
+    if (allLeadIds.length === 0) return
     setIsLoading(true)
     const supabase = createClient()
-    await supabase
-      .from("leads")
-      .update({ status: "callback", contact_status: "callback" })
-      .eq("id", appointment.lead_id)
+    for (const lid of allLeadIds) {
+      await supabase
+        .from("leads")
+        .update({ status: "callback", contact_status: "callback" })
+        .eq("id", lid)
+    }
     setIsLoading(false)
     onUpdate?.()
     onClose()
   }
+  // Change lead pipeline stage for all leads
+  const handleChangeStage = async (stage: PipelineStage) => {
+    if (allLeadIds.length === 0) return
+    setStageLoading(true)
+    const supabase = createClient()
+    for (const lid of allLeadIds) {
+      await supabase
+        .from("leads")
+        .update({ pipeline_stage: stage })
+        .eq("id", lid)
+    }
+    setStageLoading(false)
+    onUpdate?.()
+  }
+
   const handlePostpone = () => handleAction(() =>
     postponeAppointment(appointment.id, postponedDate, postponedTime)
   )
 
   const getTypeGradient = () => {
-    const primaryType = appointment.appointment_type[0]
+    const primaryType = appointment.appointment_type?.[0]
     switch (primaryType) {
       case "new_appointment": return "from-[var(--primary)]/15 to-[var(--primary)]/5"
       case "puc_documents": return "from-[var(--accent)]/15 to-[var(--accent)]/5"
@@ -153,7 +197,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   }
 
   const getTypeColor = () => {
-    const primaryType = appointment.appointment_type[0]
+    const primaryType = appointment.appointment_type?.[0]
     switch (primaryType) {
       case "new_appointment": return "bg-[var(--primary)]"
       case "puc_documents": return "bg-[var(--accent)]"
@@ -283,7 +327,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                 <span className="text-[10px] font-bold uppercase tracking-widest">Assigned To</span>
               </div>
               <p className="font-semibold text-[var(--text-primary)]">
-                {(appointment as any).assigned_agent_profile?.full_name || "Unassigned"}
+                {appointment.assigned_agent_profile?.full_name || "Unassigned"}
               </p>
             </div>
 
@@ -293,10 +337,41 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                 <span className="text-[10px] font-bold uppercase tracking-widest">Created By</span>
               </div>
               <p className="font-semibold text-[var(--text-primary)]">
-                {(appointment as any).created_by_profile?.full_name || "System"}
+                {appointment.created_by_profile?.full_name || "System"}
               </p>
             </div>
           </div>
+
+          {/* Lead Pipeline Stage */}
+          {hasLeads && (
+            <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+                Lead Stage {appointmentLeads.length > 1 ? `(${appointmentLeads.length} leads)` : ''}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {PIPELINE_STAGES.map((stage) => {
+                  const isActive = appointmentLeads[0]?.pipeline_stage === stage.value
+                  const colors = stageColors[stage.value] || 'bg-gray-100 text-gray-700 border-gray-200'
+                  return (
+                    <button
+                      key={stage.value}
+                      onClick={() => handleChangeStage(stage.value)}
+                      disabled={stageLoading || isActive}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+                        isActive
+                          ? cn(colors, "ring-2 ring-offset-1 ring-current/30 scale-105")
+                          : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                        stageLoading && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {stage.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           {appointment.notes && (
@@ -304,6 +379,45 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">Notes</p>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{appointment.notes}</p>
             </div>
+          )}
+
+          {/* Cancel Form */}
+          {showCancelForm && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="p-4 rounded-xl border border-red-500/30 bg-red-500/5"
+            >
+              <p className="text-sm font-semibold text-red-500 mb-3 flex items-center gap-2">
+                <XCircle className="w-4 h-4" />
+                Cancel — Add Notes
+              </p>
+              <textarea
+                value={cancelNotes}
+                onChange={(e) => setCancelNotes(e.target.value)}
+                placeholder="Enter cancellation reason or notes..."
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-red-500/30 min-h-[80px] resize-none"
+              />
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowCancelForm(false); setCancelNotes("") }}
+                  className="rounded-lg"
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleMarkCanceled}
+                  disabled={isLoading}
+                  className="rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                >
+                  {isLoading ? "Saving..." : "Confirm Cancel"}
+                </Button>
+              </div>
+            </motion.div>
           )}
 
           {/* Postponed Form */}
@@ -391,7 +505,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               {appointment.cant_reach_at && (
                 <div className="flex items-center gap-3 text-sm relative">
                   <div className="w-2.5 h-2.5 rounded-full bg-[var(--error)] z-10" />
-                  <span className="text-[var(--text-muted)] font-medium">Can't Reach</span>
+                  <span className="text-[var(--text-muted)] font-medium">Can&apos;t Reach</span>
                   <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
                     {new Date(appointment.cant_reach_at).toLocaleString()}
                   </span>
@@ -447,7 +561,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         </div>
 
         {/* Footer Actions - Status Action Buttons */}
-        {isActionable && !showPostponedForm && (
+        {isActionable && !showPostponedForm && !showCancelForm && (
           <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
             {/* Status Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
@@ -507,21 +621,33 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                   className="rounded-xl border-[var(--error)]/30 text-[var(--error)] hover:bg-[var(--error)]/10"
                 >
                   <PhoneOff className="w-5 h-5 mr-2" />
-                  Can't Reach
+                  Can&apos;t Reach
                 </Button>
               )}
 
-              {/* Lead Status Actions - Not Interested and Callback */}
-              {appointment.lead_id && (
+              {appointment.status !== "will_see" && (
+                <Button
+                  variant="outline"
+                  onClick={handleMarkWillSee}
+                  disabled={isLoading}
+                  className="rounded-xl border-[var(--info)]/30 text-[var(--info)] hover:bg-[var(--info)]/10"
+                >
+                  <Eye className="w-5 h-5 mr-2" />
+                  Will See
+                </Button>
+              )}
+
+              {/* Lead Status Actions - Canceled and Callback */}
+              {hasLeads && (
                 <>
                   <Button
                     variant="outline"
-                    onClick={handleMarkNI}
+                    onClick={() => setShowCancelForm(true)}
                     disabled={isLoading}
                     className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10"
                   >
-                    <ThumbsDown className="w-5 h-5 mr-2" />
-                    Not Interested
+                    <XCircle className="w-5 h-5 mr-2" />
+                    Canceled
                   </Button>
 
                   <Button

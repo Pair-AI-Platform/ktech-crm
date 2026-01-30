@@ -57,10 +57,15 @@ export function QuickActionsBar({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { activeStages } = useStageSettings()
 
-  // Filter stages to only show active ones (excluding 'lost')
-  const availableStages = PIPELINE_STAGES.filter(s =>
-    s.value !== 'lost' && (activeStages.length === 0 || activeStages.includes(s.value))
-  )
+  // For lost leads, only show submission, application, contacted
+  // For active leads, show all active stages except 'lost'
+  const LOST_LEAD_ALLOWED_STAGES = ['application', 'contacted']
+
+  const availableStages = isLost
+    ? PIPELINE_STAGES.filter(s => LOST_LEAD_ALLOWED_STAGES.includes(s.value))
+    : PIPELINE_STAGES.filter(s =>
+        s.value !== 'lost' && (activeStages.length === 0 || activeStages.includes(s.value))
+      )
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -151,48 +156,46 @@ export function QuickActionsBar({
       </Button>
 
       {/* Change Status Dropdown */}
-      {!isLost && (
-        <div className="relative" ref={dropdownRef}>
-          <Button
-            variant="outline"
-            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-            className="gap-2"
-            disabled={updatingStatus}
-          >
-            Status
-            <ChevronDown className={cn(
-              "w-3.5 h-3.5 transition-transform",
-              showStatusDropdown && "rotate-180"
-            )} />
-          </Button>
+      <div className="relative" ref={dropdownRef}>
+        <Button
+          variant="outline"
+          onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+          className="gap-2"
+          disabled={updatingStatus}
+        >
+          {isLost ? "Reactivate To" : "Status"}
+          <ChevronDown className={cn(
+            "w-3.5 h-3.5 transition-transform",
+            showStatusDropdown && "rotate-180"
+          )} />
+        </Button>
 
-          <AnimatePresence>
-            {showStatusDropdown && (
-              <motion.div
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.15 }}
-                className="absolute top-full mt-1 right-0 w-48 bg-[var(--bg-surface)] rounded-xl shadow-lg border border-[var(--border)] z-50 overflow-hidden py-1"
-              >
-                {availableStages.map((stage) => (
-                  <button
-                    key={stage.value}
-                    onClick={() => handleStatusChange(stage.value)}
-                    disabled={updatingStatus}
-                    className={cn(
-                      "w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-elevated)] transition-colors",
-                      lead.pipeline_stage === stage.value && "bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
-                    )}
-                  >
-                    {stage.label}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+        <AnimatePresence>
+          {showStatusDropdown && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-full mt-1 right-0 w-48 bg-[var(--bg-surface)] rounded-xl shadow-lg border border-[var(--border)] z-50 overflow-hidden py-1"
+            >
+              {availableStages.map((stage) => (
+                <button
+                  key={stage.value}
+                  onClick={() => handleStatusChange(stage.value)}
+                  disabled={updatingStatus}
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-elevated)] transition-colors",
+                    lead.pipeline_stage === stage.value && "bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
+                  )}
+                >
+                  {stage.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

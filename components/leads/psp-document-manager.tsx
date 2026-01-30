@@ -15,11 +15,48 @@ import {
   GripVertical,
   AlertCircle,
   X,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Calendar,
+  Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { PDFViewer } from "@/components/ui/pdf-viewer"
+import {
+  type GraduateType,
+  type DocumentTypeId,
+  getGraduateTypeConfig,
+  validateFile,
+  checkDocumentExpiration,
+  getDocumentCompletionStatus,
+} from "@/lib/psp/document-rules"
+
+interface PSPDocumentFromDB {
+  id: string
+  lead_id: string
+  document_type: string
+  graduate_type: string
+  file_name: string
+  file_type: string | null
+  file_size: number | null
+  storage_path: string
+  public_url: string | null
+  is_verified: boolean
+  verified_by: string | null
+  verified_at: string | null
+  verification_notes: string | null
+  expiration_date: string | null
+  is_expired: boolean
+  uploaded_by: string | null
+  uploaded_at: string
+  updated_at: string
+  verified_by_profile?: { id: string; full_name: string; email: string } | null
+  uploaded_by_profile?: { id: string; full_name: string; email: string } | null
+}
 
 interface UploadedFile {
   id: string
@@ -29,6 +66,11 @@ interface UploadedFile {
   url: string
   uploaded_at: string
   storage_path: string
+  is_verified?: boolean
+  verified_by?: string | null
+  verified_at?: string | null
+  expiration_date?: string | null
+  is_expired?: boolean
 }
 
 interface DocumentRequirement {
@@ -36,6 +78,7 @@ interface DocumentRequirement {
   name: string
   required: boolean
   file?: UploadedFile
+  hasExpiration?: boolean
 }
 
 interface PSPDocumentManagerProps {
@@ -44,6 +87,7 @@ interface PSPDocumentManagerProps {
   onDocumentsChange: (documents: DocumentRequirement[]) => void
   graduateType: string
   className?: string
+  isAdmin?: boolean
 }
 
 const FILE_ICONS: Record<string, typeof FileText> = {
@@ -70,48 +114,115 @@ export function PSPDocumentManager({
   onDocumentsChange,
   graduateType,
   className,
+  isAdmin = false,
 }: PSPDocumentManagerProps) {
   const [uploading, setUploading] = useState<string | null>(null)
   const [draggedDoc, setDraggedDoc] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
+  const [verifying, setVerifying] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [expirationDates, setExpirationDates] = useState<Record<string, string>>({})
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  // Load saved documents from localStorage on mount
+  // Load documents from database on mount
   useEffect(() => {
-    const storageKey = `psp-documents-${leadId}-${graduateType}`
-    const stored = localStorage.getItem(storageKey)
-    if (stored) {
-      try {
-        const savedDocs = JSON.parse(stored) as DocumentRequirement[]
-        // Merge saved files with current document requirements
-        const merged = documents.map(doc => {
-          const saved = savedDocs.find(s => s.id === doc.id)
-          return saved?.file ? { ...doc, file: saved.file } : doc
-        })
-        onDocumentsChange(merged)
-      } catch (e) {
-        console.error('Failed to load saved documents:', e)
-      }
-    }
+    loadDocuments()
   }, [leadId, graduateType]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Save documents to localStorage when they change
-  const saveDocuments = useCallback((docs: DocumentRequirement[]) => {
-    const storageKey = `psp-documents-${leadId}-${graduateType}`
-    localStorage.setItem(storageKey, JSON.stringify(docs))
-    onDocumentsChange(docs)
-  }, [leadId, graduateType, onDocumentsChange])
+  const loadDocuments = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/psp/documents?lead_id=${leadId}&graduate_type=${graduateType}`
+      )
+
+      if (!response.ok) {
+        throw new Error("Failed to load documents")
+      }
+
+      const { documents: dbDocs } = await response.json() as { documents: PSPDocumentFromDB[] }
+
+      // Merge database documents with document requirements
+      const merged = documents.map((doc) => {
+        const dbDoc = dbDocs.find(
+          (d: PSPDocumentFromDB) => d.document_type === doc.id
+        )
+        if (dbDoc) {
+          return {
+            ...doc,
+            file: {
+              id: dbDoc.id,
+              name: dbDoc.file_name,
+              type: dbDoc.file_type || "",
+              size: dbDoc.file_size || 0,
+              url: dbDoc.public_url || "",
+              uploaded_at: dbDoc.uploaded_at,
+              storage_path: dbDoc.storage_path,
+              is_verified: dbDoc.is_verified,
+              verified_by: dbDoc.verified_by_profile?.full_name || null,
+              verified_at: dbDoc.verified_at,
+              expiration_date: dbDoc.expiration_date,
+              is_expired: dbDoc.is_expired,
+            },
+          }
+        }
+        return doc
+      })
+
+      // Set expiration dates from loaded documents
+      const expDates: Record<string, string> = {}
+      dbDocs.forEach((d: PSPDocumentFromDB) => {
+        if (d.expiration_date) {
+          expDates[d.document_type] = d.expiration_date
+        }
+      })
+      setExpirationDates(expDates)
+
+      onDocumentsChange(merged)
+    } catch (err) {
+      console.error("Failed to load documents:", err)
+      // Fall back to localStorage for offline support
+      const storageKey = `psp-documents-${leadId}-${graduateType}`
+      const stored = localStorage.getItem(storageKey)
+      if (stored) {
+        try {
+          const savedDocs = JSON.parse(stored) as DocumentRequirement[]
+          const merged = documents.map((doc) => {
+            const saved = savedDocs.find((s) => s.id === doc.id)
+            return saved?.file ? { ...doc, file: saved.file } : doc
+          })
+          onDocumentsChange(merged)
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleUpload = async (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
 
     const file = files[0]
+    const graduateTypeConfig = getGraduateTypeConfig(graduateType as GraduateType)
+    const docRule = graduateTypeConfig?.documents.find((d) => d.id === docId)
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert(`File is too large. Maximum size is 10MB.`)
-      return
+    // Validate file using rules
+    if (docRule) {
+      const validation = validateFile(file, docRule)
+      if (!validation.valid) {
+        alert(validation.errors.join("\n"))
+        return
+      }
+    } else {
+      // Fallback validation
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File is too large. Maximum size is 10MB.")
+        return
+      }
     }
 
     setUploading(docId)
@@ -119,111 +230,230 @@ export function PSPDocumentManager({
 
     try {
       const timestamp = Date.now()
-      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const storagePath = `leads/${leadId}/psp/${graduateType}/${docId}/${timestamp}-${safeName}`
 
-      const { error } = await supabase.storage
-        .from('documents')
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
         .upload(storagePath, file, {
-          cacheControl: '3600',
-          upsert: false
+          cacheControl: "3600",
+          upsert: false,
         })
 
-      if (error) {
-        console.error('Upload error:', error)
-        if (error.message.includes('Bucket not found')) {
-          alert('Document storage is not configured. Saving locally instead.')
+      if (uploadError) {
+        console.error("Upload error:", uploadError)
+        if (uploadError.message.includes("Bucket not found")) {
+          alert("Document storage is not configured. Please contact support.")
+          return
         }
-        // Save file reference locally even if storage fails
+        throw uploadError
       }
 
-      // Get public URL (or create blob URL as fallback)
+      // Get public URL
       const { data: urlData } = supabase.storage
-        .from('documents')
+        .from("documents")
         .getPublicUrl(storagePath)
 
+      // Save to database
+      const response = await fetch("/api/psp/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          document_type: docId,
+          graduate_type: graduateType,
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          storage_path: storagePath,
+          public_url: urlData?.publicUrl,
+          expiration_date: expirationDates[docId] || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save document record")
+      }
+
+      const { document: savedDoc } = await response.json()
+
+      // Update local state
       const uploadedFile: UploadedFile = {
-        id: `file-${timestamp}`,
+        id: savedDoc.id,
         name: file.name,
         type: file.type,
         size: file.size,
         url: urlData?.publicUrl || URL.createObjectURL(file),
         uploaded_at: new Date().toISOString(),
-        storage_path: storagePath
+        storage_path: storagePath,
+        is_verified: false,
+        expiration_date: expirationDates[docId] || null,
+        is_expired: false,
       }
 
-      const updatedDocs = documents.map(doc =>
+      const updatedDocs = documents.map((doc) =>
         doc.id === docId ? { ...doc, file: uploadedFile } : doc
       )
-      saveDocuments(updatedDocs)
+      onDocumentsChange(updatedDocs)
+
+      // Also save to localStorage as backup
+      const storageKey = `psp-documents-${leadId}-${graduateType}`
+      localStorage.setItem(storageKey, JSON.stringify(updatedDocs))
     } catch (err) {
-      console.error('Upload failed:', err)
-      alert('Failed to upload file. Please try again.')
+      console.error("Upload failed:", err)
+      alert("Failed to upload file. Please try again.")
     } finally {
       setUploading(null)
       if (fileInputRefs.current[docId]) {
-        fileInputRefs.current[docId]!.value = ''
+        fileInputRefs.current[docId]!.value = ""
       }
     }
   }
 
   const handleDelete = async (docId: string) => {
-    const doc = documents.find(d => d.id === docId)
+    const doc = documents.find((d) => d.id === docId)
     if (!doc?.file) return
 
     if (!confirm(`Delete "${doc.file.name}"?`)) return
 
-    const supabase = createClient()
+    try {
+      const response = await fetch(`/api/psp/documents?id=${doc.file.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete document")
+      }
+
+      const updatedDocs = documents.map((d) =>
+        d.id === docId ? { ...d, file: undefined } : d
+      )
+      onDocumentsChange(updatedDocs)
+
+      // Update localStorage
+      const storageKey = `psp-documents-${leadId}-${graduateType}`
+      localStorage.setItem(storageKey, JSON.stringify(updatedDocs))
+    } catch (err) {
+      console.error("Delete failed:", err)
+      alert("Failed to delete document. Please try again.")
+    }
+  }
+
+  const handleVerify = async (docId: string, currentlyVerified: boolean) => {
+    const doc = documents.find((d) => d.id === docId)
+    if (!doc?.file) return
+
+    setVerifying(docId)
 
     try {
-      await supabase.storage
-        .from('documents')
-        .remove([doc.file.storage_path])
-    } catch (err) {
-      console.error('Delete from storage failed:', err)
-    }
+      const response = await fetch("/api/psp/documents/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document_id: doc.file.id,
+          is_verified: !currentlyVerified,
+        }),
+      })
 
-    const updatedDocs = documents.map(d =>
-      d.id === docId ? { ...d, file: undefined } : d
-    )
-    saveDocuments(updatedDocs)
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to verify document")
+      }
+
+      // Update local state
+      const updatedDocs = documents.map((d) =>
+        d.id === docId && d.file
+          ? {
+              ...d,
+              file: {
+                ...d.file,
+                is_verified: !currentlyVerified,
+                verified_at: !currentlyVerified ? new Date().toISOString() : null,
+              },
+            }
+          : d
+      )
+      onDocumentsChange(updatedDocs)
+    } catch (err) {
+      console.error("Verification failed:", err)
+      alert(err instanceof Error ? err.message : "Failed to verify document")
+    } finally {
+      setVerifying(null)
+    }
+  }
+
+  const handleExpirationChange = async (docId: string, date: string) => {
+    setExpirationDates((prev) => ({ ...prev, [docId]: date }))
+
+    const doc = documents.find((d) => d.id === docId)
+    if (!doc?.file) return
+
+    // Update in database
+    try {
+      await fetch("/api/psp/documents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: doc.file.id,
+          expiration_date: date || null,
+        }),
+      })
+
+      // Update local state
+      const updatedDocs = documents.map((d) =>
+        d.id === docId && d.file
+          ? {
+              ...d,
+              file: {
+                ...d.file,
+                expiration_date: date || null,
+                is_expired: date ? new Date(date) < new Date() : false,
+              },
+            }
+          : d
+      )
+      onDocumentsChange(updatedDocs)
+    } catch (err) {
+      console.error("Failed to update expiration date:", err)
+    }
   }
 
   const handleDownload = (file: UploadedFile) => {
-    const link = document.createElement('a')
+    const link = document.createElement("a")
     link.href = file.url
     link.download = file.name
-    link.target = '_blank'
+    link.target = "_blank"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  const handlePreview = (file: UploadedFile) => {
+    if (file.type === "application/pdf") {
+      setPdfPreview({ url: file.url, name: file.name })
+    } else if (file.type.startsWith("image/")) {
+      setPreviewUrl(file.url)
+    }
+  }
+
   // Native HTML5 drag start - enables dragging to external websites
   const handleDragStart = (e: React.DragEvent, file: UploadedFile) => {
     setDraggedDoc(file.id)
-
-    // Set multiple data formats for maximum compatibility
-    e.dataTransfer.effectAllowed = 'copy'
-
-    // For external drag-and-drop, use DownloadURL format
-    // Format: "mime-type:filename:url"
+    e.dataTransfer.effectAllowed = "copy"
     const downloadUrl = `${file.type}:${file.name}:${file.url}`
-    e.dataTransfer.setData('DownloadURL', downloadUrl)
+    e.dataTransfer.setData("DownloadURL", downloadUrl)
+    e.dataTransfer.setData("text/uri-list", file.url)
+    e.dataTransfer.setData("text/plain", file.url)
 
-    // Also set as plain URL for browsers that support it
-    e.dataTransfer.setData('text/uri-list', file.url)
-    e.dataTransfer.setData('text/plain', file.url)
-
-    // Set a custom drag image
-    const dragIcon = document.createElement('div')
-    dragIcon.className = 'bg-white p-2 rounded-lg shadow-lg border flex items-center gap-2'
+    const dragIcon = document.createElement("div")
+    dragIcon.className =
+      "bg-white p-2 rounded-lg shadow-lg border flex items-center gap-2"
     dragIcon.innerHTML = `<span style="font-size: 12px;">📄 ${file.name}</span>`
-    dragIcon.style.position = 'absolute'
-    dragIcon.style.top = '-1000px'
+    dragIcon.style.position = "absolute"
+    dragIcon.style.top = "-1000px"
     document.body.appendChild(dragIcon)
     e.dataTransfer.setDragImage(dragIcon, 0, 0)
-
     setTimeout(() => document.body.removeChild(dragIcon), 0)
   }
 
@@ -231,8 +461,31 @@ export function PSPDocumentManager({
     setDraggedDoc(null)
   }
 
-  const getUploadedCount = () => documents.filter(d => d.file).length
-  const getRequiredCount = () => documents.filter(d => d.required).length
+  // Get document completion status
+  const uploadedDocIds = documents
+    .filter((d) => d.file)
+    .map((d) => d.id as DocumentTypeId)
+  const completionStatus = getDocumentCompletionStatus(
+    graduateType as GraduateType,
+    uploadedDocIds
+  )
+
+  // Get expiration warnings
+  const getExpirationStatus = (file: UploadedFile, docId: string) => {
+    const expDate = file.expiration_date || expirationDates[docId]
+    if (!expDate) return null
+
+    const status = checkDocumentExpiration(new Date(expDate), 90)
+    return status
+  }
+
+  if (loading) {
+    return (
+      <div className={cn("flex items-center justify-center py-12", className)}>
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
+      </div>
+    )
+  }
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -243,23 +496,34 @@ export function PSPDocumentManager({
             Documents Uploaded
           </span>
           <span className="text-sm text-[var(--primary)] font-semibold">
-            {getUploadedCount()} / {getRequiredCount()} required
+            {completionStatus.uploaded} / {completionStatus.total} required
           </span>
         </div>
         <div className="w-full bg-[var(--border)] rounded-full h-2">
           <div
-            className="bg-[var(--primary)] h-2 rounded-full transition-all duration-300"
-            style={{
-              width: `${getRequiredCount() > 0 ? (getUploadedCount() / getRequiredCount()) * 100 : 0}%`
-            }}
+            className={cn(
+              "h-2 rounded-full transition-all duration-300",
+              completionStatus.isComplete
+                ? "bg-[var(--success)]"
+                : "bg-[var(--primary)]"
+            )}
+            style={{ width: `${completionStatus.percentage}%` }}
           />
         </div>
+        {completionStatus.isComplete && (
+          <p className="text-xs text-[var(--success)] mt-2 flex items-center gap-1">
+            <Check className="w-3 h-3" />
+            All required documents uploaded
+          </p>
+        )}
       </div>
 
       {/* Drag hint */}
       <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
         <GripVertical className="w-4 h-4" />
-        <span>Drag uploaded files to other websites or download them directly</span>
+        <span>
+          Drag uploaded files to other websites or download them directly
+        </span>
       </div>
 
       {/* Document List */}
@@ -269,6 +533,15 @@ export function PSPDocumentManager({
           const FileIcon = doc.file ? getFileIcon(doc.file.type) : FileText
           const isUploading = uploading === doc.id
           const isDragging = draggedDoc === doc.file?.id
+          const isVerifying = verifying === doc.id
+          const expirationStatus = doc.file
+            ? getExpirationStatus(doc.file, doc.id)
+            : null
+          const graduateConfig = getGraduateTypeConfig(
+            graduateType as GraduateType
+          )
+          const docRule = graduateConfig?.documents.find((d) => d.id === doc.id)
+          const hasExpirationField = docRule?.hasExpiration
 
           return (
             <div
@@ -276,7 +549,13 @@ export function PSPDocumentManager({
               className={cn(
                 "rounded-xl border transition-all overflow-hidden",
                 hasFile
-                  ? "border-[var(--success)] bg-[var(--success)]/5"
+                  ? doc.file?.is_verified
+                    ? "border-[var(--success)] bg-[var(--success)]/5"
+                    : expirationStatus?.isExpired
+                    ? "border-red-500 bg-red-50"
+                    : expirationStatus?.isExpiringSoon
+                    ? "border-amber-500 bg-amber-50"
+                    : "border-[var(--primary)]/50 bg-[var(--primary)]/5"
                   : "border-[var(--border)] bg-[var(--bg-surface)]",
                 isDragging && "ring-2 ring-[var(--primary)] ring-offset-2"
               )}
@@ -295,14 +574,26 @@ export function PSPDocumentManager({
                       <GripVertical className="w-4 h-4" />
                     </div>
                   )}
-                  <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                    hasFile ? "bg-[var(--success)]" : "bg-[var(--bg-sunken)]"
-                  )}>
+                  <div
+                    className={cn(
+                      "w-10 h-10 rounded-lg flex items-center justify-center",
+                      hasFile
+                        ? doc.file?.is_verified
+                          ? "bg-[var(--success)]"
+                          : expirationStatus?.isExpired
+                          ? "bg-red-500"
+                          : "bg-[var(--primary)]"
+                        : "bg-[var(--bg-sunken)]"
+                    )}
+                  >
                     {isUploading ? (
                       <Loader2 className="w-5 h-5 text-white animate-spin" />
                     ) : hasFile ? (
-                      <Check className="w-5 h-5 text-white" />
+                      doc.file?.is_verified ? (
+                        <ShieldCheck className="w-5 h-5 text-white" />
+                      ) : (
+                        <Check className="w-5 h-5 text-white" />
+                      )
                     ) : (
                       <FileText className="w-5 h-5 text-[var(--text-muted)]" />
                     )}
@@ -311,20 +602,51 @@ export function PSPDocumentManager({
 
                 {/* Document Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className={cn(
-                      "text-sm font-medium truncate",
-                      hasFile ? "text-[var(--success)]" : "text-[var(--text-primary)]"
-                    )}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p
+                      className={cn(
+                        "text-sm font-medium truncate",
+                        hasFile
+                          ? doc.file?.is_verified
+                            ? "text-[var(--success)]"
+                            : expirationStatus?.isExpired
+                            ? "text-red-600"
+                            : "text-[var(--text-primary)]"
+                          : "text-[var(--text-primary)]"
+                      )}
+                    >
                       {doc.name}
                     </p>
                     {doc.required && !hasFile && (
-                      <Badge variant="destructive" size="sm">Required</Badge>
+                      <Badge variant="destructive" size="sm">
+                        Required
+                      </Badge>
                     )}
+                    {hasFile && doc.file?.is_verified && (
+                      <Badge variant="success" size="sm" className="gap-1">
+                        <ShieldCheck className="w-3 h-3" />
+                        Verified
+                      </Badge>
+                    )}
+                    {expirationStatus?.isExpired && (
+                      <Badge variant="destructive" size="sm" className="gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        Expired
+                      </Badge>
+                    )}
+                    {expirationStatus?.isExpiringSoon &&
+                      !expirationStatus?.isExpired && (
+                        <Badge variant="warning" size="sm" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          Expires in {expirationStatus.daysUntilExpiration} days
+                        </Badge>
+                      )}
                   </div>
                   {hasFile ? (
                     <p className="text-xs text-[var(--text-muted)] truncate">
                       {doc.file!.name} • {formatFileSize(doc.file!.size)}
+                      {doc.file?.verified_by &&
+                        ` • Verified by ${doc.file.verified_by}`}
                     </p>
                   ) : (
                     <p className="text-xs text-[var(--text-muted)]">
@@ -337,9 +659,11 @@ export function PSPDocumentManager({
                 <div className="flex items-center gap-1">
                   {hasFile ? (
                     <>
-                      {doc.file!.type.startsWith('image/') && (
+                      {/* Preview button for images and PDFs */}
+                      {(doc.file!.type.startsWith("image/") ||
+                        doc.file!.type === "application/pdf") && (
                         <button
-                          onClick={() => setPreviewUrl(doc.file!.url)}
+                          onClick={() => handlePreview(doc.file!)}
                           className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                           title="Preview"
                         >
@@ -353,6 +677,34 @@ export function PSPDocumentManager({
                       >
                         <Download className="w-4 h-4" />
                       </button>
+                      {/* Admin verification toggle */}
+                      {isAdmin && (
+                        <button
+                          onClick={() =>
+                            handleVerify(doc.id, !!doc.file?.is_verified)
+                          }
+                          disabled={isVerifying}
+                          className={cn(
+                            "p-2 rounded-lg transition-colors",
+                            doc.file?.is_verified
+                              ? "bg-[var(--success)]/10 text-[var(--success)] hover:bg-[var(--success)]/20"
+                              : "hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--success)]"
+                          )}
+                          title={
+                            doc.file?.is_verified
+                              ? "Remove verification"
+                              : "Verify document"
+                          }
+                        >
+                          {isVerifying ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : doc.file?.is_verified ? (
+                            <ShieldCheck className="w-4 h-4" />
+                          ) : (
+                            <Shield className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDelete(doc.id)}
                         className="p-2 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors"
@@ -364,7 +716,9 @@ export function PSPDocumentManager({
                   ) : (
                     <>
                       <input
-                        ref={(el) => { fileInputRefs.current[doc.id] = el }}
+                        ref={(el) => {
+                          fileInputRefs.current[doc.id] = el
+                        }}
                         type="file"
                         onChange={(e) => handleUpload(doc.id, e)}
                         className="hidden"
@@ -389,6 +743,28 @@ export function PSPDocumentManager({
                 </div>
               </div>
 
+              {/* Expiration date input for documents that need it */}
+              {hasExpirationField && hasFile && (
+                <div className="mx-3 mb-3 p-3 rounded-lg bg-white border border-[var(--border)]">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-4 h-4 text-[var(--text-muted)]" />
+                    <label className="text-xs font-medium text-[var(--text-secondary)]">
+                      Expiration Date:
+                    </label>
+                    <input
+                      type="date"
+                      value={
+                        doc.file?.expiration_date || expirationDates[doc.id] || ""
+                      }
+                      onChange={(e) =>
+                        handleExpirationChange(doc.id, e.target.value)
+                      }
+                      className="flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* File Preview for uploaded files */}
               {hasFile && (
                 <div
@@ -401,21 +777,30 @@ export function PSPDocumentManager({
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                      doc.file!.type.startsWith('image/') ? "bg-violet-100" : "bg-blue-100"
-                    )}>
-                      <FileIcon className={cn(
-                        "w-5 h-5",
-                        doc.file!.type.startsWith('image/') ? "text-violet-600" : "text-blue-600"
-                      )} />
+                    <div
+                      className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                        doc.file!.type.startsWith("image/")
+                          ? "bg-violet-100"
+                          : "bg-blue-100"
+                      )}
+                    >
+                      <FileIcon
+                        className={cn(
+                          "w-5 h-5",
+                          doc.file!.type.startsWith("image/")
+                            ? "text-violet-600"
+                            : "text-blue-600"
+                        )}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                         {doc.file!.name}
                       </p>
                       <p className="text-xs text-[var(--text-muted)]">
-                        {formatFileSize(doc.file!.size)} • Drag to upload elsewhere
+                        {formatFileSize(doc.file!.size)} • Drag to upload
+                        elsewhere
                       </p>
                     </div>
                     <GripVertical className="w-5 h-5 text-[var(--text-muted)]" />
@@ -459,6 +844,15 @@ export function PSPDocumentManager({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PDFViewer
+          url={pdfPreview.url}
+          fileName={pdfPreview.name}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { InlineTagSelect, type TagOption } from "@/components/ui/notion-tag-select"
+import { InlineTagSelect, type TagOption, type RowVariant } from "@/components/ui/notion-tag-select"
 import {
   Phone,
   Mail,
@@ -34,14 +34,14 @@ import {
   Lock,
   Send,
   BookOpen,
-  ClipboardCheck
+  Check
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
-import { PIPELINE_STAGES, LEAD_SOURCES, SCHOOLS, LEAD_STATUSES, LOCKED_STAGES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus } from "@/types"
+import { PIPELINE_STAGES, LEAD_SOURCES, SCHOOLS, LEAD_STATUSES, LOCKED_STAGES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SF_DOCUMENTS, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus } from "@/types"
 import { formatKuwaitPhone, getRelativeTime } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
-import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
+import { createClient } from "@/lib/supabase/client"
 
 interface LeadTableProps {
   leads: Lead[]
@@ -135,6 +135,73 @@ const temperatureConfig = {
   }
 }
 
+// Document requirements by graduate type (must match PSP wizard)
+const DOCUMENTS_BY_TYPE: Record<string, { id: string; required: boolean }[]> = {
+  gov: [
+    { id: "passport", required: true },
+    { id: "civil_id", required: true },
+    { id: "parent_civil_id", required: true },
+    { id: "high_school_cert", required: true },
+    { id: "student_nationality", required: true },
+    { id: "puc_payment_receipt", required: true },
+    { id: "acceptance_letter", required: true },
+  ],
+  us: [
+    { id: "civil_id", required: true },
+    { id: "passport", required: true },
+    { id: "hs_transcript_moh_equivalency", required: true },
+    { id: "sequence_letter", required: true },
+  ],
+  uk: [
+    { id: "civil_id", required: true },
+    { id: "gcse_cert", required: true },
+    { id: "a_level_cert", required: true },
+    { id: "passport", required: true },
+    { id: "equivalency", required: true },
+    { id: "photo", required: true },
+  ],
+  ksa: [
+    { id: "civil_id", required: true },
+    { id: "high_school_cert", required: true },
+    { id: "transcript", required: true },
+    { id: "passport", required: true },
+    { id: "equivalency", required: true },
+    { id: "photo", required: true },
+  ],
+}
+
+// Check if all required documents are uploaded for a lead
+function checkAllDocumentsUploaded(leadId: string): boolean {
+  // Check all graduate types to find which one has documents
+  const graduateTypes = ['gov', 'us', 'uk', 'ksa']
+
+  for (const graduateType of graduateTypes) {
+    const storageKey = `psp-documents-${leadId}-${graduateType}`
+    const stored = localStorage.getItem(storageKey)
+
+    if (stored) {
+      try {
+        const savedDocs = JSON.parse(stored) as { id: string; file?: unknown }[]
+        const requiredDocs = DOCUMENTS_BY_TYPE[graduateType]
+
+        // Check if all required documents have files uploaded
+        const allUploaded = requiredDocs.every(reqDoc => {
+          const savedDoc = savedDocs.find(d => d.id === reqDoc.id)
+          return savedDoc?.file !== undefined
+        })
+
+        if (allUploaded && requiredDocs.length > 0) {
+          return true
+        }
+      } catch (e) {
+        console.error('Failed to parse document status:', e)
+      }
+    }
+  }
+
+  return false
+}
+
 export function LeadTable({
   leads,
   loading,
@@ -156,10 +223,89 @@ export function LeadTable({
   const [editingSubmissionStatus, setEditingSubmissionStatus] = useState<string | null>(null)
   const [bookingLead, setBookingLead] = useState<Lead | null>(null)
   const [bookingSimpleMode, setBookingSimpleMode] = useState(false)
-  const [pspWizardLead, setPspWizardLead] = useState<Lead | null>(null)
+  const [bookingCallbackMode, setBookingCallbackMode] = useState(false)
+  const [documentCompleteLeads, setDocumentCompleteLeads] = useState<Set<string>>(new Set())
+  const [sfGreenLeads, setSfGreenLeads] = useState<Set<string>>(new Set())
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
 
   // Check if we're viewing submission stage
-  const isSubmissionView = currentStageFilter === 'submission'
+  const isSubmissionView = currentStageFilter === 'applicant'
+
+  // Function to refresh document completion status
+  const refreshDocumentStatus = React.useCallback(() => {
+    const submissionLeads = leads.filter(
+      lead => lead.pipeline_stage === 'applicant' || lead.pipeline_stage === 'application'
+    )
+
+    if (submissionLeads.length === 0) {
+      setDocumentCompleteLeads(new Set())
+      return
+    }
+
+    const completeLeadIds = new Set<string>()
+    submissionLeads.forEach(lead => {
+      if (checkAllDocumentsUploaded(lead.id)) {
+        completeLeadIds.add(lead.id)
+      }
+    })
+
+    setDocumentCompleteLeads(completeLeadIds)
+  }, [leads])
+
+  // Check document completion status for leads in submission stage
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refreshDocumentStatus()
+  }, [refreshDocumentStatus])
+
+  // Fetch student data for SF leads to check payment > 150 KD + documents done
+  const refreshSfGreenStatus = useCallback(async () => {
+    const sfLeads = leads.filter(l => l.funding_type === 'self_funded')
+    if (sfLeads.length === 0) {
+      setSfGreenLeads(new Set())
+      return
+    }
+
+    const supabase = createClient()
+    const sfLeadIds = sfLeads.map(l => l.id)
+
+    const { data: students } = await supabase
+      .from('students')
+      .select('lead_id, amount_paid, sf_enrolled_stage, sf_declaration_submitted, sf_passport_submitted, sf_civil_id_submitted, sf_payment_receipt_submitted, sf_official_transcript_submitted, transfer_type')
+      .in('lead_id', sfLeadIds)
+
+    if (!students || students.length === 0) {
+      setSfGreenLeads(new Set())
+      return
+    }
+
+    const greenIds = new Set<string>()
+    for (const student of students) {
+      if (!student.lead_id) continue
+
+      // Check paid more than 150 KD
+      const paidOver150 = student.amount_paid > 150 ||
+        student.sf_enrolled_stage === '400' ||
+        student.sf_enrolled_stage === 'other'
+      if (!paidOver150) continue
+
+      // Check all SF documents are done
+      const isTransfer = !!student.transfer_type
+      const allDocsDone = SF_DOCUMENTS.every(doc => {
+        if ('transferOnly' in doc && doc.transferOnly && !isTransfer) return true
+        return !!student[doc.key as keyof typeof student]
+      })
+      if (!allDocsDone) continue
+
+      greenIds.add(student.lead_id)
+    }
+
+    setSfGreenLeads(greenIds)
+  }, [leads])
+
+  useEffect(() => {
+    refreshSfGreenStatus()
+  }, [refreshSfGreenStatus])
 
   // Optimistic updates - store pending changes locally
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, Partial<Lead>>>({})
@@ -244,6 +390,7 @@ export function LeadTable({
         const lead = leads.find(l => l.id === leadId)
         if (lead) {
           setBookingSimpleMode(true)
+          setBookingCallbackMode(false)
           setBookingLead(lead)
         }
       }
@@ -319,6 +466,7 @@ export function LeadTable({
         const lead = leads.find(l => l.id === leadId)
         if (lead) {
           setBookingSimpleMode(false)
+          setBookingCallbackMode(false)
           setBookingLead(lead)
         }
       }
@@ -367,11 +515,12 @@ export function LeadTable({
         return updated
       })
     } else {
-      // If status changed to Appointment, open appointment booking popup
-      if (newStatus === 'appointment') {
+      // If status changed to Appointment or CB, open appointment booking popup
+      if (newStatus === 'appointment' || newStatus === 'cb') {
         const lead = leads.find(l => l.id === leadId)
         if (lead) {
-          setBookingSimpleMode(false)
+          setBookingSimpleMode(true)
+          setBookingCallbackMode(newStatus === 'cb')
           setBookingLead(lead)
         }
       }
@@ -390,6 +539,7 @@ export function LeadTable({
   // Clear pending updates only for leads that have been updated in the new data
   // This prevents clearing pending updates while the API call is still in progress
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingUpdates(prev => {
       if (Object.keys(prev).length === 0) return prev
 
@@ -564,7 +714,7 @@ export function LeadTable({
                   </th>
                   <th className="p-4 text-left">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      Actual Lead
+                      Actual GPA
                     </span>
                   </th>
                 </>
@@ -583,6 +733,9 @@ export function LeadTable({
                   Actions
                 </span>
               </th>
+              <th className="p-2 text-center w-8">
+                <span className="sr-only">Ready Status</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -591,6 +744,27 @@ export function LeadTable({
               const sourceInfo = LEAD_SOURCES.find((s) => s.value === lead.source)
               const schoolInfo = SCHOOLS.find((s) => s.value === lead.school)
               const isSelected = selectedLeads.includes(lead.id)
+
+              // Determine row variant for substage/status tag coloring
+              // Check submission substages (application stage)
+              const effectiveSubstage = getEffectiveValue(lead.id, 'submission_substage', lead.submission_substage)
+              const isInSubmissionStage = lead.pipeline_stage === 'applicant'
+              const isSubmissionLost = isInSubmissionStage && effectiveSubstage === 'lost'
+              const isSubmissionReady = isInSubmissionStage && effectiveSubstage === 'ready'
+              const isSubmissionBlocked = isInSubmissionStage && effectiveSubstage === 'blocked'
+              const isSubmissionPending = isInSubmissionStage && effectiveSubstage === 'pending'
+              const isSubmissionSubmitted = isInSubmissionStage && effectiveSubstage === 'submitted'
+              const isSubmissionDocuments = isInSubmissionStage && effectiveSubstage === 'documents'
+
+              const rowVariant: RowVariant = lead.pipeline_stage === 'lost' || isSubmissionLost
+                ? 'lost'
+                : (lead.ministry_blocked || isSubmissionBlocked)
+                  ? 'blocked'
+                  : isSubmissionReady || documentCompleteLeads.has(lead.id)
+                    ? 'documents-complete'
+                    : isInSubmissionStage
+                      ? 'submission'
+                      : 'default'
 
               return (
                 <motion.tr
@@ -602,19 +776,33 @@ export function LeadTable({
                   className={cn(
                     "border-b border-[var(--border)] transition-all duration-150 group/row",
                     isSubmissionView && "cursor-pointer",
-                    // Submission stage + blocked = RED (critical blocking)
-                    lead.pipeline_stage === 'submission' && lead.ministry_blocked
-                      ? "bg-red-50 dark:bg-red-950/30 border-l-2 border-l-red-500"
-                      : lead.ministry_blocked
-                        ? "bg-orange-50 dark:bg-orange-950/30 border-l-2 border-l-orange-500"
-                        // Submission stage + ready substage = GREEN (ready to submit)
-                        : lead.pipeline_stage === 'submission' && lead.submission_substage === 'ready'
-                          ? "bg-emerald-50 dark:bg-emerald-950/30 border-l-2 border-l-emerald-500"
-                          : lead.pipeline_stage === 'submission'
-                            ? "bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-400"
-                            : isSelected
-                                ? "bg-[var(--primary-muted)] border-l-2 border-l-[var(--primary)]"
-                                : "hover:bg-[var(--bg-hover)] border-l-2 border-l-transparent hover:border-l-[var(--border-emphasis)]"
+                    // Lost stage OR submission with lost substage = RED background
+                    lead.pipeline_stage === 'lost' || isSubmissionLost
+                      ? "bg-red-100 dark:bg-red-900/50 border-l-4 border-l-red-500"
+                      // Blocked substage OR ministry blocked = ORANGE (entire row)
+                      : (lead.ministry_blocked || isSubmissionBlocked)
+                        ? "bg-orange-100 dark:bg-orange-900/50 border-l-4 border-l-orange-500"
+                        // SF lead paid > 150 KD + all SF documents done = FULL GREEN background
+                        : sfGreenLeads.has(lead.id)
+                          ? "bg-green-500 dark:bg-green-600 border-l-4 border-l-green-700 text-white [&_a]:text-white [&_p]:text-white [&_span]:text-white"
+                          // Ready substage OR all documents uploaded = GREEN background
+                          : isSubmissionReady || documentCompleteLeads.has(lead.id)
+                            ? "bg-green-100 dark:bg-green-900/40 border-l-4 border-l-green-500"
+                            // Pending substage = WHITE background
+                            : isSubmissionPending
+                              ? "bg-white dark:bg-gray-800 border-l-4 border-l-gray-300"
+                              // Submitted substage = BLUE
+                              : isSubmissionSubmitted
+                                ? "bg-blue-100 dark:bg-blue-900/50 border-l-4 border-l-blue-500"
+                                // Documents substage = WHITE background
+                                : isSubmissionDocuments
+                                  ? "bg-white dark:bg-gray-800 border-l-4 border-l-gray-300"
+                                  // Default submission stage (no substage selected)
+                                  : lead.pipeline_stage === 'applicant'
+                                    ? "bg-white dark:bg-gray-950/40 border-l-2 border-l-gray-300"
+                                    : isSelected
+                                        ? "bg-[var(--primary-muted)] border-l-2 border-l-[var(--primary)]"
+                                        : "hover:bg-[var(--bg-hover)] border-l-2 border-l-transparent hover:border-l-[var(--border-emphasis)]"
                   )}
                 >
                   <td className="p-4">
@@ -687,25 +875,47 @@ export function LeadTable({
                   </td>
                   <td className="p-4">
                     <div className="space-y-1.5">
-                      <a
-                        href={`tel:+965${lead.phone}`}
-                        className="flex items-center gap-2 text-sm text-[var(--text-primary)] hover:text-[var(--primary)] transition-colors group"
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(lead.phone)
+                          setCopiedPhone(lead.phone)
+                          setTimeout(() => setCopiedPhone(null), 1500)
+                        }}
+                        className="flex items-center gap-2 text-sm text-[var(--text-primary)] hover:text-[var(--primary)] transition-colors group cursor-pointer"
                       >
                         <div className="w-6 h-6 rounded-lg bg-[var(--bg-sunken)] flex items-center justify-center group-hover:bg-[var(--primary-muted)] transition-colors">
-                          <Phone className="w-3 h-3 text-[var(--text-muted)] group-hover:text-[var(--primary)]" />
+                          {copiedPhone === lead.phone ? (
+                            <Check className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <Phone className="w-3 h-3 text-[var(--text-muted)] group-hover:text-[var(--primary)]" />
+                          )}
                         </div>
-                        <span className="font-medium">{formatKuwaitPhone(lead.phone)}</span>
-                      </a>
+                        <span className="font-medium whitespace-nowrap">
+                          {copiedPhone === lead.phone ? "Copied!" : formatKuwaitPhone(lead.phone)}
+                        </span>
+                      </button>
                       {lead.phone_secondary && (
-                        <a
-                          href={`tel:+965${lead.phone_secondary}`}
-                          className="flex items-center gap-2 text-xs text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group"
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigator.clipboard.writeText(lead.phone_secondary!)
+                            setCopiedPhone(lead.phone_secondary!)
+                            setTimeout(() => setCopiedPhone(null), 1500)
+                          }}
+                          className="flex items-center gap-2 text-xs text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group cursor-pointer"
                         >
                           <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
-                            <Phone className="w-3 h-3 text-blue-500" />
+                            {copiedPhone === lead.phone_secondary ? (
+                              <Check className="w-3 h-3 text-green-500" />
+                            ) : (
+                              <Phone className="w-3 h-3 text-blue-500" />
+                            )}
                           </div>
-                          <span className="font-medium">{formatKuwaitPhone(lead.phone_secondary)}</span>
-                        </a>
+                          <span className="font-medium whitespace-nowrap">
+                            {copiedPhone === lead.phone_secondary ? "Copied!" : formatKuwaitPhone(lead.phone_secondary)}
+                          </span>
+                        </button>
                       )}
                       {lead.email && (
                         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -779,6 +989,7 @@ export function LeadTable({
                           onChange={(value) => handleSubmissionStatusChange(lead.id, value as SubmissionStatus)}
                           disabled={editingSubmissionStatus === lead.id}
                           loading={editingSubmissionStatus === lead.id}
+                          rowVariant={rowVariant}
                         />
                       </td>
                       {/* Agent column */}
@@ -853,9 +1064,13 @@ export function LeadTable({
                           const effectiveStage = getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage)
                           const isStatusDisabled = effectiveStage === 'new' || effectiveStage === 'test' || effectiveStage === 'appointment'
 
-                          // Filter statuses based on stage - visit stage only has specific statuses
-                          const availableStatuses = effectiveStage === 'visit'
-                            ? LEAD_STATUSES.filter(s => s.value === 'no_answer' || s.value === 'not_interested' || s.value === 'switched_off' || s.value === 'callback')
+                          // Filter statuses based on stage
+                          const contactedStatuses: LeadStatus[] = ['no_answer', 'switched_off', 'callback', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done']
+                          const visitStatuses: LeadStatus[] = ['no_answer', 'not_interested', 'switched_off', 'callback']
+                          const availableStatuses = effectiveStage === 'contacted'
+                            ? LEAD_STATUSES.filter(s => contactedStatuses.includes(s.value))
+                            : effectiveStage === 'visit'
+                            ? LEAD_STATUSES.filter(s => visitStatuses.includes(s.value))
                             : LEAD_STATUSES
 
                           return isStatusDisabled ? (
@@ -895,14 +1110,9 @@ export function LeadTable({
                         </span>
                       </td>
                       <td className="p-4">
-                        {lead.actual_lead ? (
-                          <Badge variant="success" size="xs" className="gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Actual
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-[var(--text-muted)]">—</span>
-                        )}
+                        <span className="text-sm text-[var(--text-secondary)]">
+                          {lead.actual_gpa ? `${lead.actual_gpa}%` : "—"}
+                        </span>
                       </td>
                     </>
                   )}
@@ -937,20 +1147,6 @@ export function LeadTable({
                           <Plus className="w-3.5 h-3.5" />
                           Application
                         </Button>
-                      ) : getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage) === 'application' || getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage) === 'submission' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setPspWizardLead(lead)
-                          }}
-                          className="text-xs gap-1.5 bg-purple-50 dark:bg-purple-950/30 border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-500 hover:text-white"
-                          title={getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage) === 'submission' ? "Edit PSP Submission" : "Submit to PSP"}
-                        >
-                          <ClipboardCheck className="w-3.5 h-3.5" />
-                          PSP
-                        </Button>
                       ) : null}
                       <Button
                         variant="ghost"
@@ -967,6 +1163,7 @@ export function LeadTable({
                         className="hover:bg-[var(--success-bg)] hover:text-[var(--success)]"
                         onClick={() => {
                           setBookingSimpleMode(false)
+                          setBookingCallbackMode(false)
                           setBookingLead(lead)
                         }}
                         title="Book appointment"
@@ -974,6 +1171,23 @@ export function LeadTable({
                         <Calendar className="w-4 h-4" />
                       </Button>
                     </div>
+                  </td>
+                  {/* Document completion indicator */}
+                  <td className="p-2">
+                    <SimpleTooltip
+                      content={documentCompleteLeads.has(lead.id) ? "All documents uploaded - Ready to submit" : "Documents pending"}
+                    >
+                      <div className="flex items-center justify-center">
+                        <div
+                          className={cn(
+                            "w-2.5 h-2.5 rounded-full transition-colors",
+                            documentCompleteLeads.has(lead.id)
+                              ? "bg-emerald-500"
+                              : "bg-gray-300 dark:bg-gray-600"
+                          )}
+                        />
+                      </div>
+                    </SimpleTooltip>
                   </td>
                 </motion.tr>
               )
@@ -1012,22 +1226,18 @@ export function LeadTable({
       onClose={() => {
         setBookingLead(null)
         setBookingSimpleMode(false)
+        setBookingCallbackMode(false)
       }}
       onSuccess={() => {
         setBookingLead(null)
         setBookingSimpleMode(false)
+        setBookingCallbackMode(false)
       }}
       preselectedLead={bookingLead || undefined}
       singleFormMode={true}
+      callbackMode={bookingCallbackMode}
     />
 
-    {/* PSP Submission Wizard */}
-    <PSPSubmissionWizard
-      isOpen={!!pspWizardLead}
-      onClose={() => setPspWizardLead(null)}
-      lead={pspWizardLead}
-      onSuccess={() => setPspWizardLead(null)}
-    />
     </>
   )
 }

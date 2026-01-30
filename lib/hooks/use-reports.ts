@@ -17,8 +17,9 @@ import type {
   School,
   IntendedMajor,
   DiscountType,
+  Governorate,
 } from "@/types"
-import { SCHOOLS } from "@/types"
+import { SCHOOLS, GOVERNORATES } from "@/types"
 
 // =============================================
 // FILTER TYPES
@@ -120,8 +121,8 @@ export interface ExecutiveReportData {
 export interface ChannelReportData {
   bySource: Array<{ source: LeadSource; label: string; count: number; converted: number; conversionRate: number }>
   byCategory: Array<{ category: LeadSourceCategory; label: string; count: number; percent: number }>
-  topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number }>
-  bySchool: Array<{ school: School; label: string; leads: number; applications: number; conversionRate: number }>
+  topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
+  bySchool: Array<{ schoolId: string; label: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
 }
 
 export interface LeaderboardData {
@@ -150,6 +151,7 @@ export interface DemographicReportData {
   byNationality: Array<{ label: string; isKuwaiti: boolean; count: number; percent: number }>
   byFunding: Array<{ funding: FundingType; label: string; count: number; percent: number }>
   byMajor: Array<{ major: IntendedMajor; label: string; count: number; percent: number }>
+  byGovernorate: Array<{ governorate: Governorate; label: string; count: number; percent: number }>
   discountAnalysis: Array<{ discountType: DiscountType; label: string; count: number; totalDiscount: number }>
 }
 
@@ -625,9 +627,9 @@ function calculateReports(
 
   // Executive Dashboard
   const totalTarget = agents.reduce((sum, a) => sum + (a.monthly_target || 0), 0)
-  const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'appointment', 'test', 'application', 'submission', 'enrolled', 'lost']
+  const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'appointment', 'test', 'application', 'applicant', 'enrolled', 'withdraw', 'lost']
   const stageLabels: Record<PipelineStage, string> = {
-    new: 'New', contacted: 'Contacted', visit: 'Visit', appointment: 'Appointment', test: 'Test', application: 'Application', submission: 'Submission', enrolled: 'Enrolled', lost: 'Lost'
+    new: 'New', contacted: 'Contacted', visit: 'Visit', appointment: 'Appointment', test: 'Test', application: 'Application', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost'
   }
 
   // Generate weekly trend (last 7 days)
@@ -686,7 +688,8 @@ function calculateReports(
     school_visit: 'School Visit', expo: 'Expo', exhibitions: 'Exhibitions',
     website_form: 'Website Form', facebook: 'Facebook', instagram: 'Instagram', snapchat: 'Snapchat',
     current_student_referral: 'Student Referral', staff_referral: 'Staff Referral', friend_referral: 'Friend Referral',
-    old_contacts: 'Old Contacts', paaet_rejected: 'PAAET Rejected', gpa_lists: 'GPA Lists'
+    old_contacts: 'Old Contacts', paaet_rejected: 'PAAET Rejected', gpa_lists: 'GPA Lists',
+    karnival: 'Karnival'
   }
   const categoryLabels: Record<LeadSourceCategory, string> = {
     direct: 'Direct', events: 'Events', digital: 'Digital', referrals: 'Referrals', outreach: 'Outreach'
@@ -703,14 +706,23 @@ function calculateReports(
     sourceGroups[lead.source].push(lead)
   })
 
-  // Group by school
+  // Group by school - supports both database (school_id + joined object) and demo (school string)
   const schoolGroups: Record<string, { name: string; leads: Lead[] }> = {}
   leads.forEach(lead => {
     if (lead.school_id && lead.school) {
+      // Real data: school is a joined object with name_en
       if (!schoolGroups[lead.school_id]) {
         schoolGroups[lead.school_id] = { name: (lead.school as { name_en?: string })?.name_en || 'Unknown', leads: [] }
       }
       schoolGroups[lead.school_id].leads.push(lead)
+    } else if (typeof lead.school === 'string' && lead.school) {
+      // Demo data: school is a string key
+      const schoolKey = lead.school as string
+      if (!schoolGroups[schoolKey]) {
+        const schoolInfo = SCHOOLS.find(s => s.value === schoolKey)
+        schoolGroups[schoolKey] = { name: schoolInfo?.label || schoolKey, leads: [] }
+      }
+      schoolGroups[schoolKey].leads.push(lead)
     }
   })
 
@@ -734,25 +746,38 @@ function calculateReports(
       }
     }),
     topSchools: Object.entries(schoolGroups)
-      .map(([schoolId, data]) => ({
-        schoolId,
-        schoolName: data.name,
-        leads: data.leads.length,
-        applications: data.leads.filter(l => l.pipeline_stage === 'application').length
-      }))
+      .map(([schoolId, data]) => {
+        const totalLeads = data.leads.length
+        const applications = data.leads.filter(l => l.pipeline_stage === 'application').length
+        const pucCount = data.leads.filter(l => l.funding_type === 'puc').length
+        return {
+          schoolId,
+          schoolName: data.name,
+          leads: totalLeads,
+          applications,
+          applicationPercent: totalLeads > 0 ? Math.round((applications / totalLeads) * 100) : 0,
+          pucCount,
+          pucPercent: totalLeads > 0 ? Math.round((pucCount / totalLeads) * 100) : 0,
+        }
+      })
       .sort((a, b) => b.leads - a.leads)
       .slice(0, 10),
-    bySchool: (['american_international', 'american_creativity', 'british_school', 'indian_community', 'public_capital', 'public_hawalli', 'other'] as School[]).map(school => {
-      const schoolLeads = leads.filter(l => l.school === school)
-      const applications = schoolLeads.filter(l => l.pipeline_stage === 'application').length
-      return {
-        school,
-        label: schoolLabels[school],
-        leads: schoolLeads.length,
-        applications,
-        conversionRate: schoolLeads.length > 0 ? Math.round((applications / schoolLeads.length) * 100) : 0
-      }
-    })
+    bySchool: Object.entries(schoolGroups)
+      .map(([schoolId, schoolData]) => {
+        const totalLeads = schoolData.leads.length
+        const applications = schoolData.leads.filter(l => l.pipeline_stage === 'application').length
+        const pucCount = schoolData.leads.filter(l => l.funding_type === 'puc').length
+        return {
+          schoolId,
+          label: schoolData.name,
+          leads: totalLeads,
+          applications,
+          applicationPercent: totalLeads > 0 ? Math.round((applications / totalLeads) * 100) : 0,
+          pucCount,
+          pucPercent: totalLeads > 0 ? Math.round((pucCount / totalLeads) * 100) : 0,
+        }
+      })
+      .sort((a, b) => b.leads - a.leads)
   }
 
   // Agent Leaderboard
@@ -775,8 +800,8 @@ function calculateReports(
     if (targetMode === 'simple') {
       target = agent.monthly_target || 0
     } else if (targetMode === 'gender') {
-      const targetMale = (agent as any).target_male || 0
-      const targetFemale = (agent as any).target_female || 0
+      const targetMale = agent.target_male || 0
+      const targetFemale = agent.target_female || 0
       target = targetMale + targetFemale
 
       categories = {
@@ -792,8 +817,8 @@ function calculateReports(
         }
       }
     } else if (targetMode === 'funding') {
-      const targetPuc = (agent as any).target_puc || 0
-      const targetSf = (agent as any).target_sf || 0
+      const targetPuc = agent.target_puc || 0
+      const targetSf = agent.target_sf || 0
       target = targetPuc + targetSf
 
       categories = {
@@ -880,6 +905,29 @@ function calculateReports(
         }
       })
       .filter(m => m.count > 0)
+      .sort((a, b) => b.count - a.count),
+    byGovernorate: GOVERNORATES.map(gov => {
+      // Get all school values that belong to this governorate
+      const govSchools = SCHOOLS.filter(s => s.governorate === gov.value).map(s => s.value)
+      const count = leads.filter(l => {
+        // Check direct school field (demo mode - string key)
+        if (typeof l.school === 'string' && l.school) {
+          return govSchools.includes(l.school as School)
+        }
+        // Check joined school object (real data) for governorate
+        if (l.school && typeof l.school === 'object' && 'governorate' in l.school) {
+          return (l.school as { governorate?: Governorate }).governorate === gov.value
+        }
+        return false
+      }).length
+      return {
+        governorate: gov.value,
+        label: gov.label,
+        count,
+        percent: leads.length > 0 ? Math.round((count / leads.length) * 100) : 0
+      }
+    })
+      .filter(g => g.count > 0)
       .sort((a, b) => b.count - a.count),
     discountAnalysis: Object.entries(discountGroups).map(([type, discountStudents]) => ({
       discountType: type as DiscountType,
@@ -1006,8 +1054,8 @@ export function useAgentTargetProgress(agentId?: string) {
           if (mode === 'simple') {
             target = agent.monthly_target || 0
           } else if (mode === 'gender') {
-            const targetMale = (agent as any).target_male || Math.floor((agent.monthly_target || 0) / 2)
-            const targetFemale = (agent as any).target_female || Math.floor((agent.monthly_target || 0) / 2)
+            const targetMale = agent.target_male || Math.floor((agent.monthly_target || 0) / 2)
+            const targetFemale = agent.target_female || Math.floor((agent.monthly_target || 0) / 2)
             target = targetMale + targetFemale
 
             categories = {
@@ -1023,8 +1071,8 @@ export function useAgentTargetProgress(agentId?: string) {
               }
             }
           } else if (mode === 'funding') {
-            const targetPuc = (agent as any).target_puc || Math.floor((agent.monthly_target || 0) / 2)
-            const targetSf = (agent as any).target_sf || Math.floor((agent.monthly_target || 0) / 2)
+            const targetPuc = agent.target_puc || Math.floor((agent.monthly_target || 0) / 2)
+            const targetSf = agent.target_sf || Math.floor((agent.monthly_target || 0) / 2)
             target = targetPuc + targetSf
 
             categories = {

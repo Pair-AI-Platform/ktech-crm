@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       .from("leads")
       .select("id", { count: "exact", head: true })
       .eq("funding_type", "puc")
-      .not("pipeline_stage", "in", '("submission","enrolled","lost")')
+      .not("pipeline_stage", "in", '("enrolled","lost")')
 
     if (countError) {
       console.error("[PSP Transfer] Count error:", countError)
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       .from("leads")
       .select("id, first_name, last_name, pipeline_stage")
       .eq("funding_type", "puc")
-      .not("pipeline_stage", "in", '("submission","enrolled","lost")')
+      .not("pipeline_stage", "in", '("enrolled","lost")')
 
     if (leadsError) {
       console.error("[PSP Transfer] Failed to fetch leads:", leadsError)
@@ -107,17 +107,37 @@ export async function POST(request: NextRequest) {
 
     const leadIds = eligibleLeads.map(l => l.id)
 
-    // Batch update all eligible leads to submission stage
-    const { error: updateError } = await supabase
+    // Get current max position in submission stage
+    const { data: maxPosRow } = await supabase
       .from("leads")
-      .update({
-        pipeline_stage: "submission",
-        updated_at: new Date().toISOString()
-      })
-      .in("id", leadIds)
+      .select("position_in_stage")
+      .eq("pipeline_stage", "applicant")
+      .order("position_in_stage", { ascending: false })
+      .limit(1)
+      .single()
+    let nextPos = (maxPosRow?.position_in_stage ?? 0) + 1
 
-    if (updateError) {
-      console.error("[PSP Transfer] Update error:", updateError)
+    // Update each lead individually with sequential positions
+    const updateErrors: string[] = []
+    for (const id of leadIds) {
+      const { error } = await supabase
+        .from("leads")
+        .update({
+          pipeline_stage: "applicant",
+          position_in_stage: nextPos,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", id)
+
+      if (error) {
+        updateErrors.push(error.message)
+      } else {
+        nextPos++
+      }
+    }
+
+    if (updateErrors.length === leadIds.length) {
+      console.error("[PSP Transfer] Update errors:", updateErrors)
       return NextResponse.json(
         { error: "Failed to update leads" },
         { status: 500 }
@@ -129,10 +149,10 @@ export async function POST(request: NextRequest) {
       lead_id: lead.id,
       activity_type: "stage_change",
       title: "PSP Transfer",
-      description: `${lead.first_name} ${lead.last_name}: ${lead.pipeline_stage} → submission (PSP bulk transfer)`,
+      description: `${lead.first_name} ${lead.last_name}: ${lead.pipeline_stage} → applicant (PSP bulk transfer)`,
       metadata: {
         old_stage: lead.pipeline_stage,
-        new_stage: "submission",
+        new_stage: "applicant",
         transfer_type: "psp_bulk",
       },
       created_by: user.id,

@@ -33,7 +33,7 @@ export const LEAD_CSV_COLUMNS: { key: string; label: string; required?: boolean 
 // Valid values for enum fields
 const VALID_SOURCES: LeadSource[] = [
   "walk_in", "call_center", "whatsapp", "email",
-  "school_visit", "expo", "exhibitions",
+  "school_visit", "expo", "exhibitions", "karnival",
   "website_form", "facebook", "instagram", "snapchat",
   "current_student_referral", "staff_referral", "friend_referral",
   "old_contacts", "paaet_rejected", "gpa_lists"
@@ -46,7 +46,7 @@ const VALID_SOURCE_CATEGORIES: LeadSourceCategory[] = [
 const VALID_FUNDING_TYPES: FundingType[] = ["self_funded", "puc"]
 
 const VALID_SCHOOLS: School[] = [
-  "alsalmiya_girls", "aljahra_boys", "aljahra_girls",
+  "alsalmiya_girls", "aljahra_private_boys", "aljahra_girls",
   "sabah_alsalem_girls", "other"
 ]
 

@@ -54,8 +54,7 @@ const PLACEMENT_COURSE_IDS = {
   computer: parseInt(process.env.MOODLE_COMPUTER_COURSE_ID || '3'),
 }
 
-// Passing thresholds
-const PASSING_THRESHOLD = 60
+import { PLACEMENT_TEST_PASSING_THRESHOLD } from '@/lib/config/constants'
 
 function getMoodleConfig(): MoodleConfig {
   const baseUrl = process.env.MOODLE_BASE_URL
@@ -217,21 +216,21 @@ async function getPlacementScores(userId: number): Promise<MoodlePlacementScores
   const englishGrade = await getCourseGrade(userId, PLACEMENT_COURSE_IDS.english)
   if (englishGrade && englishGrade.grade !== null) {
     scores.english_score = Math.round(englishGrade.grade)
-    scores.english_passed = englishGrade.grade >= PASSING_THRESHOLD
+    scores.english_passed = englishGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
   }
 
   // Fetch Math placement score
   const mathGrade = await getCourseGrade(userId, PLACEMENT_COURSE_IDS.math)
   if (mathGrade && mathGrade.grade !== null) {
     scores.math_score = Math.round(mathGrade.grade)
-    scores.math_passed = mathGrade.grade >= PASSING_THRESHOLD
+    scores.math_passed = mathGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
   }
 
   // Fetch Computer placement score
   const computerGrade = await getCourseGrade(userId, PLACEMENT_COURSE_IDS.computer)
   if (computerGrade && computerGrade.grade !== null) {
     scores.computer_score = Math.round(computerGrade.grade)
-    scores.computer_passed = computerGrade.grade >= PASSING_THRESHOLD
+    scores.computer_passed = computerGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
   }
 
   return scores

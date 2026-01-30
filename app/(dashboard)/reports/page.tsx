@@ -66,7 +66,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
-import { useReports, useAgents, defaultFilters, type ReportFilters } from "@/lib/hooks/use-reports"
+import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
 import {
   PIPELINE_STAGES,
   LEAD_SOURCES,
@@ -959,7 +959,7 @@ function QuickStatCard({
   )
 }
 
-function TargetProgressCard({ data, mounted }: { data: any; mounted: boolean }) {
+function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: boolean }) {
   const { current, target, percent } = data.executive.targetProgress
   const isGoalAchieved = percent >= 100
 
@@ -1044,7 +1044,7 @@ function TargetProgressCard({ data, mounted }: { data: any; mounted: boolean }) 
   )
 }
 
-function KPICardsGrid({ data, mounted }: { data: any; mounted: boolean }) {
+function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean }) {
   const kpis = [
     {
       title: "Complete Applications",
@@ -1056,8 +1056,8 @@ function KPICardsGrid({ data, mounted }: { data: any; mounted: boolean }) {
     {
       title: "Pending Applications",
       value: data.executive.pipelineFunnel
-        .filter((s: any) => ['test', 'application'].includes(s.stage))
-        .reduce((sum: number, s: any) => sum + s.count, 0),
+        .filter(s => ['test', 'application'].includes(s.stage))
+        .reduce((sum, s) => sum + s.count, 0),
       icon: Clock,
       color: "amber",
       gradient: "from-amber-500 to-amber-400",
@@ -1072,8 +1072,8 @@ function KPICardsGrid({ data, mounted }: { data: any; mounted: boolean }) {
     {
       title: "In Pipeline",
       value: data.executive.pipelineFunnel
-        .filter((s: any) => ['new', 'visit', 'test'].includes(s.stage))
-        .reduce((sum: number, s: any) => sum + s.count, 0),
+        .filter(s => ['new', 'visit', 'test'].includes(s.stage))
+        .reduce((sum, s) => sum + s.count, 0),
       icon: Activity,
       color: "purple",
       gradient: "from-purple-500 to-purple-400",

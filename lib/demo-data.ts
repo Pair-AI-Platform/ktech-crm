@@ -1,4 +1,4 @@
-import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType } from "@/types"
+import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType, MinistryBlockReason } from "@/types"
 
 // Check if we're in demo mode
 export function isDemoMode(): boolean {
@@ -107,8 +107,8 @@ export const DEMO_AGENTS: Profile[] = [
   // Agents
   {
     id: "agent-1",
-    email: "i.naajji@ktech.edu.kw",
-    full_name: "Iyad Naajji",
+    email: "sarah.jones@ktech.edu.kw",
+    full_name: "Sarah Jones",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -118,8 +118,8 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-2",
-    email: "f.alzamel@ktech.edu.kw",
-    full_name: "Fatema AlZamel",
+    email: "ahmed.hassan@ktech.edu.kw",
+    full_name: "Ahmed Hassan",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -129,8 +129,8 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-3",
-    email: "m.almasri@ktech.edu.kw",
-    full_name: "Maram AlMasri",
+    email: "nora.khalid@ktech.edu.kw",
+    full_name: "Nora Khalid",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -140,8 +140,8 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-4",
-    email: "o.asfour@ktech.edu.kw",
-    full_name: "Omar Asfour",
+    email: "omar.farid@ktech.edu.kw",
+    full_name: "Omar Farid",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -151,8 +151,8 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-5",
-    email: "l.abualakhras@ktech.edu.kw",
-    full_name: "Lamiss AbuAlakhras",
+    email: "lina.mahmoud@ktech.edu.kw",
+    full_name: "Lina Mahmoud",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -162,8 +162,8 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-6",
-    email: "m.alhamed@ktech.edu.kw",
-    full_name: "Mays AlHamed",
+    email: "khalid.nasser@ktech.edu.kw",
+    full_name: "Khalid Nasser",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -173,8 +173,41 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-7",
-    email: "l.altibawi@ktech.edu.kw",
-    full_name: "Laith Altibawi",
+    email: "dana.ali@ktech.edu.kw",
+    full_name: "Dana Ali",
+    role: "agent",
+    avatar_url: undefined,
+    is_active: true,
+    monthly_target: 40,
+    created_at: "2024-01-15T08:00:00Z",
+    updated_at: "2024-01-15T08:00:00Z",
+  },
+  {
+    id: "agent-8",
+    email: "faisal.khaled@ktech.edu.kw",
+    full_name: "Faisal Khaled",
+    role: "agent",
+    avatar_url: undefined,
+    is_active: true,
+    monthly_target: 40,
+    created_at: "2024-01-15T08:00:00Z",
+    updated_at: "2024-01-15T08:00:00Z",
+  },
+  {
+    id: "agent-9",
+    email: "reem.salem@ktech.edu.kw",
+    full_name: "Reem Salem",
+    role: "agent",
+    avatar_url: undefined,
+    is_active: true,
+    monthly_target: 40,
+    created_at: "2024-01-15T08:00:00Z",
+    updated_at: "2024-01-15T08:00:00Z",
+  },
+  {
+    id: "agent-10",
+    email: "yousef.ward@ktech.edu.kw",
+    full_name: "Yousef Ward",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -191,13 +224,24 @@ const lastNames = ["الصباح", "الرشيد", "الأحمد", "المطير
 
 const sources = ["instagram", "school_visit", "current_student_referral", "walk_in", "exhibitions", "snapchat", "facebook", "whatsapp", "call_center", "website_form"]
 const sourceCategories = ["digital", "events", "referrals", "direct", "outreach"]
-const schools = ["salmiya_secondary_boys", "hawally_secondary_girls", "sabah_alsalem_secondary", "jahra_secondary", "other"]
+const schools = [
+  "jaber_mubarak_boys", "ahmad_shihab_aldin", "saad_bin_alrabee",
+  "qurtuba_girls", "alasmaa_bint_alharith", "fatima_bint_alwalid",
+  "jaber_alahmad_hawalli", "saleh_shihab", "abdullatif_thunayan",
+  "khalida_bint_alaswad", "aljabriya_girls",
+  "shujaa_bin_alaslam", "ibn_alomaid", "anas_bin_malik",
+  "alfirdaws_girls", "alrabie_girls",
+  "alkindi", "alqurtubi", "salem_almubarak",
+  "fatima_bint_asad", "alkhairan_girls",
+  "aljahra_private_boys", "alwaha", "thabit_bin_qais",
+  "alimam_malik", "jaber_alali_alsabah",
+]
 const tracks = ["science", "arts"]
 const majors = ["cyber_security", "cis", "marketing", "accounting", "mis", "network_security", "other"]
 const fundingTypes = ["self_funded", "puc"]
 const contactStatuses = ["uncontacted", "interested", "not_interested", "no_answer", "callback", "will_see"]
 const gradeLevels = ["10th", "11th", "12th"]
-const stages: PipelineStage[] = ["new", "contacted", "visit", "appointment", "test", "application", "submission", "enrolled", "lost"]
+const stages: PipelineStage[] = ["new", "contacted", "appointment", "visit", "test", "application", "applicant", "enrolled", "withdraw", "lost"]
 
 function randomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -290,11 +334,12 @@ function generateActivityNotes(stage: PipelineStage, firstName: string): string 
     new: 1,
     contacted: 2,
     appointment: 3,
-    visit: 4,
+    visit: 3,
     test: 5,
     application: 6,
-    submission: 7,
+    applicant: 7,
     enrolled: 8,
+    withdraw: 3,
     lost: 3,
   }
 
@@ -348,6 +393,9 @@ export function generateDemoLeads(count: number = 50): Lead[] {
   // Each stage gets roughly equal leads, with some variation
   const leadsPerStage = Math.ceil(count / stages.length)
 
+  // Counter for submission stage leads to distribute substages evenly
+  let submissionLeadCounter = 0
+
   for (let i = 0; i < count; i++) {
     const isMale = Math.random() > 0.5
     const firstName = randomItem(isMale ? firstNamesM : firstNamesF)
@@ -361,9 +409,25 @@ export function generateDemoLeads(count: number = 50): Lead[] {
 
     // Ministry block reasons for submission stage leads
     const blockReasons: Lead["ministry_block_reasons"] = ['ku', 'paaet', 'abroad', 'aasu', 'paci', 'puc', 'gpa']
-    // For submission stage, ~60% are blocked to demonstrate the red highlighting
-    const isSubmissionBlocked = stage === 'submission' && Math.random() > 0.4
-    const selectedBlockReason = isSubmissionBlocked ? randomItem(blockReasons) : undefined
+
+    // Submission substages for even distribution of colors
+    const submissionSubstages: Lead["submission_substage"][] = ['pending', 'submitted', 'blocked', 'ready', 'documents', 'lost']
+
+    // For submission stage leads, assign substage in round-robin for even distribution
+    let submissionSubstage: Lead["submission_substage"] | undefined = undefined
+    let isSubmissionBlocked = false
+    let selectedBlockReason: MinistryBlockReason | undefined = undefined
+
+    if (stage === 'applicant') {
+      // Distribute substages evenly among applicant leads using dedicated counter
+      const substageIndex = submissionLeadCounter % submissionSubstages.length
+      submissionSubstage = submissionSubstages[substageIndex]
+      submissionLeadCounter++
+
+      // Only set ministry_blocked for 'blocked' substage leads
+      isSubmissionBlocked = submissionSubstage === 'blocked'
+      selectedBlockReason = isSubmissionBlocked ? randomItem(blockReasons) : undefined
+    }
 
     leads.push({
       id: `lead-${i + 1}`,
@@ -393,7 +457,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       gpa_grade_11: randomGPA(),
       gpa_grade_12_expected: stage !== "new" ? randomGPA() : undefined,
       intended_major: randomItem(majors) as Lead["intended_major"],
-      funding_type: stage === 'submission' ? 'puc' : randomItem(fundingTypes) as Lead["funding_type"],
+      funding_type: randomItem(fundingTypes) as Lead["funding_type"],
       has_bank_account: Math.random() > 0.3,
       has_weyay_account: Math.random() > 0.5,
       assigned_to: agent.id,
@@ -406,6 +470,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       updated_at: randomDate(5),
       ministry_blocked: isSubmissionBlocked,
       ministry_block_reasons: isSubmissionBlocked ? [selectedBlockReason!] : undefined,
+      submission_substage: submissionSubstage,
     })
   }
 
@@ -481,68 +546,288 @@ export function generateDemoStudents(count: number = 20): Student[] {
   return students.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 }
 
-// Generate demo appointments
-export function generateDemoAppointments(count: number = 30): Appointment[] {
+// Generate demo appointments - large realistic dataset
+export function generateDemoAppointments(count: number = 200): Appointment[] {
   const appointments: Appointment[] = []
-  const types: AppointmentType[] = ["new_appointment", "puc_documents", "puc_application", "retest", "sf_appointment"]
-  const statuses: Appointment["status"][] = ["scheduled", "no_answer", "confirmed", "on_the_way", "postponed", "cant_reach", "completed", "cancelled"]
+  const types: AppointmentType[] = ["new_appointment", "puc_documents", "puc_application", "retest", "sf_appointment", "sf_retest"]
+  const allStatuses: Appointment["status"][] = ["scheduled", "no_answer", "confirmed", "on_the_way", "postponed", "cant_reach", "will_see", "completed", "cancelled"]
+  const modalities: ("campus" | "online")[] = ["campus", "online"]
 
+  // Time slots for realistic scheduling (8:00 AM to 4:00 PM, 30-min increments)
+  const timeSlots = [
+    "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
+    "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
+    "14:00", "14:30", "15:00", "15:30", "16:00"
+  ]
+
+  // Varied realistic notes
+  const noteOptions = [
+    "Student requested afternoon slot",
+    "Parent will accompany",
+    "Rescheduled from last week",
+    "Needs wheelchair access",
+    "Coming from Jahra, may be late",
+    "Student called to confirm morning slot",
+    "Transfer student - needs evaluation",
+    "Referred by current student فهد",
+    "Interested in cyber security program",
+    "Wants to discuss scholarship options",
+    "Bringing required documents",
+    "Second visit - very interested",
+    "Parent wants to attend orientation",
+    "Student prefers online meeting",
+    "Called back after Instagram ad",
+    "Walk-in converted to appointment",
+    "Needs Arabic language support",
+    "Coming with friend who is also interested",
+    "High GPA - scholarship candidate",
+    "Previously missed appointment, rebooked",
+    "Documents partially ready",
+    "PUC application in progress",
+    "Waiting for school transcript",
+    "Student confirmed via WhatsApp",
+    "Agent follow-up needed",
+    undefined, undefined, undefined, // some appointments have no notes
+  ]
+
+  // Cancellation reasons
+  const cancelReasons = [
+    "Student changed mind",
+    "Family emergency",
+    "Schedule conflict with school",
+    "Will reschedule next week",
+    "Chose another university",
+    "Student unreachable",
+    "Parent requested cancellation",
+    "Transportation issue",
+  ]
+
+  // Can't reach reasons
+  const cantReachReasons = [
+    "Phone switched off",
+    "Number not in service",
+    "No answer after 3 attempts",
+    "Wrong number provided",
+    "WhatsApp message sent, no reply",
+  ]
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  // Helper: get a specific date relative to today
+  function getDate(daysOffset: number): string {
+    const d = new Date(today)
+    d.setDate(d.getDate() + daysOffset)
+    return d.toISOString().split("T")[0]
+  }
+
+  // Helper: skip weekends (Friday/Saturday in Kuwait)
+  function isWorkday(dateStr: string): boolean {
+    const d = new Date(dateStr)
+    const day = d.getDay()
+    return day !== 5 && day !== 6 // 5=Friday, 6=Saturday
+  }
+
+  // Build a pool of workday dates across a 5-week window
+  const datePool: { date: string; daysOffset: number }[] = []
+  for (let d = -21; d <= 14; d++) {
+    const dateStr = getDate(d)
+    if (isWorkday(dateStr)) {
+      datePool.push({ date: dateStr, daysOffset: d })
+    }
+  }
+
+  // Weighted date selection: today and this week get more appointments
+  function pickDate(): { date: string; daysOffset: number } {
+    const r = Math.random()
+    if (r < 0.12) {
+      // 12% chance: today
+      return { date: getDate(0), daysOffset: 0 }
+    } else if (r < 0.20) {
+      // 8% chance: tomorrow
+      const tom = { date: getDate(1), daysOffset: 1 }
+      return isWorkday(tom.date) ? tom : pickDate()
+    } else if (r < 0.35) {
+      // 15% chance: yesterday or day before
+      const offset = -(1 + Math.floor(Math.random() * 2))
+      const d = { date: getDate(offset), daysOffset: offset }
+      return isWorkday(d.date) ? d : pickDate()
+    } else if (r < 0.55) {
+      // 20% chance: this week (within ±3 days)
+      const offset = -3 + Math.floor(Math.random() * 7)
+      const d = { date: getDate(offset), daysOffset: offset }
+      return isWorkday(d.date) ? d : pickDate()
+    } else if (r < 0.75) {
+      // 20% chance: past 1-2 weeks
+      const offset = -(4 + Math.floor(Math.random() * 11))
+      const d = { date: getDate(offset), daysOffset: offset }
+      return isWorkday(d.date) ? d : pickDate()
+    } else {
+      // 25% chance: next 1-2 weeks
+      const offset = 2 + Math.floor(Math.random() * 13)
+      const d = { date: getDate(offset), daysOffset: offset }
+      return isWorkday(d.date) ? d : pickDate()
+    }
+  }
+
+  // Pick realistic status based on timing
+  function pickStatus(daysOffset: number, isNoUpdated: boolean): Appointment["status"] {
+    if (isNoUpdated) return "scheduled" // Past but still "scheduled" = needs attention
+
+    if (daysOffset < -3) {
+      // Well in the past: mostly completed or terminal
+      return randomItem(["completed", "completed", "completed", "completed", "cancelled", "no_answer", "cant_reach"] as Appointment["status"][])
+    } else if (daysOffset < 0) {
+      // Recent past (1-3 days ago): mixed results
+      return randomItem(["completed", "completed", "completed", "no_answer", "cant_reach", "cancelled", "confirmed"] as Appointment["status"][])
+    } else if (daysOffset === 0) {
+      // Today: active statuses
+      return randomItem(["scheduled", "confirmed", "confirmed", "on_the_way", "will_see", "completed", "no_answer"] as Appointment["status"][])
+    } else if (daysOffset <= 3) {
+      // Next few days: mostly scheduled/confirmed
+      return randomItem(["scheduled", "scheduled", "confirmed", "confirmed", "no_answer", "postponed"] as Appointment["status"][])
+    } else {
+      // Further future: mostly scheduled
+      return randomItem(["scheduled", "scheduled", "scheduled", "confirmed", "postponed"] as Appointment["status"][])
+    }
+  }
+
+  // Appointment type weights (new_appointment most common)
+  function pickType(): AppointmentType {
+    const r = Math.random()
+    if (r < 0.30) return "new_appointment"
+    if (r < 0.50) return "puc_documents"
+    if (r < 0.65) return "puc_application"
+    if (r < 0.78) return "retest"
+    if (r < 0.90) return "sf_appointment"
+    return "sf_retest"
+  }
+
+  // Sometimes appointments have multiple types
+  function pickTypes(): AppointmentType[] {
+    const primary = pickType()
+    if (Math.random() < 0.15) {
+      // 15% chance of dual-type appointment
+      const secondary = randomItem(types.filter(t => t !== primary))
+      return [primary, secondary]
+    }
+    return [primary]
+  }
+
+  // Pipeline stages matched to appointment types
+  function stageForType(type: AppointmentType): Lead["pipeline_stage"] {
+    switch (type) {
+      case "new_appointment": return randomItem(["contacted", "appointment"] as Lead["pipeline_stage"][])
+      case "puc_documents": return "applicant"
+      case "puc_application": return "application"
+      case "retest": return "test"
+      case "sf_appointment": return randomItem(["appointment", "visit"] as Lead["pipeline_stage"][])
+      case "sf_retest": return "test"
+      default: return "appointment"
+    }
+  }
+
+  // Funding type matched to appointment type
+  function fundingForType(type: AppointmentType): Lead["funding_type"] {
+    if (type === "puc_documents" || type === "puc_application") return "puc"
+    if (type === "sf_appointment" || type === "sf_retest") return "self_funded"
+    return Math.random() > 0.5 ? "puc" : "self_funded"
+  }
+
+  // First 10 appointments are "no updated" (past with "scheduled" status)
   for (let i = 0; i < count; i++) {
     const isMale = Math.random() > 0.5
     const firstName = randomItem(isMale ? firstNamesM : firstNamesF)
     const lastName = randomItem(lastNames)
     const agent = randomItem(DEMO_AGENTS)
-    const type = randomItem(types)
+    const appointmentTypes = pickTypes()
+    const primaryType = appointmentTypes[0]
+    const isNoUpdated = i < 10
 
-    // First 6 appointments are past with "scheduled" status (no updates - need attention)
-    const isNoUpdated = i < 6
-    const isPast = isNoUpdated || Math.random() > 0.5
-
-    let appointmentDate: string
-    let status: Appointment["status"]
+    let dateInfo: { date: string; daysOffset: number }
 
     if (isNoUpdated) {
-      // Past appointments with no status update - these need attention
-      const daysAgo = 1 + Math.floor(Math.random() * 7) // 1-7 days ago
-      const date = new Date()
-      date.setDate(date.getDate() - daysAgo)
-      appointmentDate = date.toISOString()
-      status = "no_answer" // Needs follow-up
-    } else if (isPast) {
-      appointmentDate = randomDate(14)
-      status = randomItem(["confirmed", "no_answer", "cant_reach"] as Appointment["status"][])
+      // Past appointments that still show "scheduled" - need attention
+      const daysAgo = -(1 + Math.floor(Math.random() * 5))
+      dateInfo = { date: getDate(daysAgo), daysOffset: daysAgo }
     } else {
-      appointmentDate = randomFutureDate(14)
-      status = randomItem(["no_answer", "confirmed", "postponed"] as Appointment["status"][])
+      dateInfo = pickDate()
     }
+
+    const status = pickStatus(dateInfo.daysOffset, isNoUpdated)
+    const timeSlot = randomItem(timeSlots)
+    const modality = Math.random() > 0.75 ? "online" : "campus"
+    const isCallback = Math.random() > 0.85
+    const stage = stageForType(primaryType)
+    const funding = fundingForType(primaryType)
+    const leadId = `lead-${(i % 360) + 1}`
+
+    // Build tracking fields based on status
+    const confirmedAt = (status === "confirmed" || status === "completed" || status === "on_the_way" || status === "will_see")
+      ? randomDate(3) : undefined
+    const confirmedBy = confirmedAt ? agent.id : undefined
+    const doneAt = status === "completed" ? randomDate(1) : undefined
+    const doneBy = doneAt ? agent.id : undefined
+    const cancelledAt = status === "cancelled" ? randomDate(2) : undefined
+    const cancelledBy = cancelledAt ? agent.id : undefined
+    const cancellationReason = cancelledAt ? randomItem(cancelReasons) : undefined
+    const naMarkedAt = status === "no_answer" ? randomDate(2) : undefined
+    const naMarkedBy = naMarkedAt ? agent.id : undefined
+    const naAttempts = naMarkedAt ? (1 + Math.floor(Math.random() * 4)) : undefined
+    const cantReachAt = status === "cant_reach" ? randomDate(2) : undefined
+    const cantReachBy = cantReachAt ? agent.id : undefined
+    const cantReachReason = cantReachAt ? randomItem(cantReachReasons) : undefined
+    const onTheWayAt = status === "on_the_way" ? new Date().toISOString() : undefined
+    const onTheWayBy = onTheWayAt ? agent.id : undefined
+    const willSeeAt = status === "will_see" ? randomDate(1) : undefined
+    const willSeeBy = willSeeAt ? agent.id : undefined
 
     appointments.push({
       id: `apt-${i + 1}`,
-      lead_id: `lead-${i + 1}`,
+      lead_id: leadId,
       lead: {
-        id: `lead-${i + 1}`,
+        id: leadId,
         first_name: firstName,
         last_name: lastName,
         phone: randomPhone(),
-        pipeline_stage: "visit",
+        pipeline_stage: stage,
         nationality: "Kuwaiti",
         is_kuwaiti: true,
-        funding_type: "self_funded",
-        has_weyay_account: false,
-        has_bank_account: false,
-        source_category: "digital",
-        source: "instagram",
-        contact_status: "interested",
-        created_at: randomDate(30),
+        funding_type: funding,
+        has_weyay_account: Math.random() > 0.4,
+        has_bank_account: Math.random() > 0.3,
+        source_category: randomItem(sourceCategories) as Lead["source_category"],
+        source: randomItem(sources) as Lead["source"],
+        contact_status: randomItem(contactStatuses) as Lead["contact_status"],
+        created_at: randomDate(60),
         updated_at: randomDate(2),
       } as Lead,
-      appointment_type: [type],
-      scheduled_date: appointmentDate.split("T")[0],
-      scheduled_time: `${9 + Math.floor(Math.random() * 8)}:${Math.random() > 0.5 ? "00" : "30"}`,
-      duration_minutes: type === "retest" || type === "sf_retest" ? 60 : 30,
+      appointment_type: appointmentTypes,
+      modality: modality,
+      scheduled_date: dateInfo.date,
+      scheduled_time: timeSlot,
+      duration_minutes: (primaryType === "retest" || primaryType === "sf_retest") ? 60 : 30,
       status: status,
-      is_callback: Math.random() > 0.9,
-      notes: Math.random() > 0.7 ? "Student requested afternoon slot" : undefined,
+      is_callback: isCallback,
+      callback_reason: isCallback ? randomItem(["Student requested callback", "Parent asked to reschedule", "Agent follow-up needed", "No answer - retry"]) : undefined,
+      confirmed_at: confirmedAt,
+      confirmed_by: confirmedBy,
+      done_at: doneAt,
+      done_by: doneBy,
+      cancelled_at: cancelledAt,
+      cancelled_by: cancelledBy,
+      cancellation_reason: cancellationReason,
+      na_marked_at: naMarkedAt,
+      na_marked_by: naMarkedBy,
+      na_attempts: naAttempts,
+      cant_reach_at: cantReachAt,
+      cant_reach_by: cantReachBy,
+      cant_reach_reason: cantReachReason,
+      on_the_way_at: onTheWayAt,
+      on_the_way_marked_by: onTheWayBy,
+      will_see_at: willSeeAt,
+      will_see_marked_by: willSeeBy,
+      notes: randomItem(noteOptions),
       assigned_agent: agent.id,
       assigned_agent_profile: {
         id: agent.id,
@@ -599,7 +884,7 @@ export function getDemoAppointments(): Appointment[] {
   })
 
   if (!cachedAppointments || (cachedAppointments.length > 0 && !cachedAppointments[0].assigned_agent_profile) || !hasNoUpdatedAppointments) {
-    cachedAppointments = generateDemoAppointments(30)
+    cachedAppointments = generateDemoAppointments(200)
   }
 
   // Apply any stored updates
@@ -617,7 +902,7 @@ export function getDemoLeadStats() {
   const leads = getDemoLeads()
   const byStage: Record<PipelineStage, number> = {
     new: 0, contacted: 0, appointment: 0, visit: 0,
-    test: 0, application: 0, submission: 0, enrolled: 0, lost: 0
+    test: 0, application: 0, applicant: 0, enrolled: 0, withdraw: 0, lost: 0
   }
 
   const now = new Date()
@@ -657,8 +942,8 @@ export function getDemoAppointmentStats() {
     total: appointments.length,
     today: appointments.filter(a => a.scheduled_date === today).length,
     pending: appointments.filter(a => a.status === "scheduled" || a.status === "confirmed").length,
-    attended: 0, // 'done' status removed
-    noShow: appointments.filter(a => a.status === "no_answer" || a.status === "cant_reach").length, // No Answer + Can't Reach = No Show
+    attended: appointments.filter(a => a.status === "completed").length,
+    noShow: appointments.filter(a => a.status === "no_answer" || a.status === "cant_reach").length,
   }
 }
 
@@ -666,10 +951,23 @@ export function getTodayAppointments(): Appointment[] {
   const appointments = getDemoAppointments()
   const today = new Date().toISOString().split("T")[0]
 
-  // Return some appointments for today regardless of actual date for demo
-  return appointments.slice(0, 5).map(apt => ({
-    ...apt,
-    scheduled_date: today,
-    status: randomItem(["scheduled", "confirmed"] as Appointment["status"][])
-  }))
+  // First get actual today appointments
+  const todayApts = appointments.filter(a => a.scheduled_date === today)
+
+  // If we have enough, return them
+  if (todayApts.length >= 8) return todayApts
+
+  // Otherwise supplement with some forced-today appointments for a full schedule
+  const supplementCount = Math.max(0, 12 - todayApts.length)
+  const todayStatuses: Appointment["status"][] = ["scheduled", "confirmed", "confirmed", "on_the_way", "will_see", "completed", "no_answer"]
+  const supplemented = appointments
+    .filter(a => a.scheduled_date !== today)
+    .slice(0, supplementCount)
+    .map(apt => ({
+      ...apt,
+      scheduled_date: today,
+      status: randomItem(todayStatuses),
+    }))
+
+  return [...todayApts, ...supplemented]
 }

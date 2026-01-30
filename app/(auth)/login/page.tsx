@@ -39,8 +39,12 @@ export default function LoginPage() {
     }
   }
 
+  const isDemoAllowed = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true' ||
+    process.env.NODE_ENV !== 'production'
+
   const handleDemoMode = () => {
-    // Set demo mode cookie (accessible by middleware) with proper settings for production
+    if (!isDemoAllowed) return
+    // Set demo mode cookie (accessible by middleware)
     document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax"
     localStorage.setItem("ktech-demo-mode", "true")
     // Use window.location for hard redirect to ensure cookie is sent
@@ -275,21 +279,23 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Demo Mode */}
-              <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-11 text-sm group"
-                  onClick={handleDemoMode}
-                >
-                  <Play className="w-4 h-4 mr-2" />
-                  Enter Demo Mode
-                </Button>
-                <p className="text-center text-xs text-[var(--text-muted)] mt-2">
-                  Try the CRM without signing in
-                </p>
-              </div>
+              {/* Demo Mode — hidden in production unless NEXT_PUBLIC_ENABLE_DEMO=true */}
+              {isDemoAllowed && (
+                <div className="mt-6 pt-6 border-t border-[var(--border)]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-11 text-sm group"
+                    onClick={handleDemoMode}
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Enter Demo Mode
+                  </Button>
+                  <p className="text-center text-xs text-[var(--text-muted)] mt-2">
+                    Try the CRM without signing in
+                  </p>
+                </div>
+              )}
 
               {/* Help Link */}
               <div className="mt-6 pt-6 border-t border-[var(--border)]">

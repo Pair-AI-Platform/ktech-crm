@@ -47,6 +47,17 @@ const TAG_COLORS: Record<string, { bg: string; text: string; border: string; hov
 // Color rotation for options without explicit colors
 const COLOR_ROTATION = ["blue", "green", "purple", "orange", "pink", "yellow", "brown", "red", "gray"]
 
+// Row variant colors - matches the row background styling from lead-table.tsx
+export type RowVariant = 'lost' | 'blocked' | 'documents-complete' | 'submission' | 'default'
+
+const ROW_VARIANT_COLORS: Record<RowVariant, { bg: string; text: string; border: string; hover: string }> = {
+  lost: { bg: "rgba(239, 68, 68, 0.15)", text: "#b91c1c", border: "rgba(239, 68, 68, 0.25)", hover: "rgba(239, 68, 68, 0.25)" },
+  blocked: { bg: "rgba(251, 146, 60, 0.15)", text: "#c2410c", border: "rgba(251, 146, 60, 0.25)", hover: "rgba(251, 146, 60, 0.25)" },
+  'documents-complete': { bg: "rgba(16, 185, 129, 0.15)", text: "#059669", border: "rgba(16, 185, 129, 0.25)", hover: "rgba(16, 185, 129, 0.25)" },
+  submission: { bg: "rgba(59, 130, 246, 0.12)", text: "#1d4ed8", border: "rgba(59, 130, 246, 0.2)", hover: "rgba(59, 130, 246, 0.2)" },
+  default: { bg: "rgba(140, 140, 140, 0.08)", text: "#6b7280", border: "rgba(140, 140, 140, 0.15)", hover: "rgba(140, 140, 140, 0.15)" },
+}
+
 function getTagColor(value: string, color?: string, index: number = 0) {
   if (color && TAG_COLORS[color]) {
     return TAG_COLORS[color]
@@ -293,6 +304,7 @@ interface InlineTagSelectProps {
   disabled?: boolean
   loading?: boolean
   className?: string
+  rowVariant?: RowVariant // When provided, uses row-based coloring instead of tag-specific colors
 }
 
 export function InlineTagSelect({
@@ -302,6 +314,7 @@ export function InlineTagSelect({
   disabled = false,
   loading = false,
   className,
+  rowVariant,
 }: InlineTagSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -314,8 +327,11 @@ export function InlineTagSelect({
   const listRef = useRef<HTMLDivElement>(null)
 
   const selectedOption = options.find((opt) => opt.value === value)
-  const colorStyle = selectedOption
-    ? getTagColor(selectedOption.value, selectedOption.color, options.indexOf(selectedOption))
+  // When rowVariant is provided, use row-based coloring
+  const colorStyle = rowVariant && rowVariant !== 'default'
+    ? ROW_VARIANT_COLORS[rowVariant]
+    : selectedOption
+      ? getTagColor(selectedOption.value, selectedOption.color, options.indexOf(selectedOption))
     : null
 
   const filteredOptions = options.filter((opt) =>
@@ -390,12 +406,21 @@ export function InlineTagSelect({
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 50)
-      // Set initial highlighted index to selected option
-      const selectedIdx = filteredOptions.findIndex(opt => opt.value === value)
-      setHighlightedIndex(selectedIdx >= 0 ? selectedIdx : 0)
+      setTimeout(() => {
+        inputRef.current?.focus()
+        // Set initial highlighted index to selected option
+        const selectedIdx = filteredOptions.findIndex(opt => opt.value === value)
+        setHighlightedIndex(selectedIdx >= 0 ? selectedIdx : 0)
+      }, 50)
     }
   }, [isOpen])
+
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue)
+    setIsOpen(false)
+    setSearch("")
+    setHighlightedIndex(-1)
+  }
 
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -427,7 +452,7 @@ export function InlineTagSelect({
         setHighlightedIndex(-1)
         break
     }
-  }, [isOpen, highlightedIndex, filteredOptions])
+  }, [isOpen, highlightedIndex, filteredOptions, handleSelect])
 
   // Scroll highlighted option into view
   useEffect(() => {
@@ -436,13 +461,6 @@ export function InlineTagSelect({
       items[highlightedIndex]?.scrollIntoView({ block: 'nearest' })
     }
   }, [highlightedIndex])
-
-  const handleSelect = (optionValue: string) => {
-    onChange(optionValue)
-    setIsOpen(false)
-    setSearch("")
-    setHighlightedIndex(-1)
-  }
 
   return (
     <div ref={containerRef} className={cn("relative inline-block", className)}>

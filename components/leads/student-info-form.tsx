@@ -15,6 +15,7 @@ import {
 import {
   Loader2,
   User,
+  Users,
   Phone,
   CreditCard,
   GraduationCap,
@@ -22,10 +23,14 @@ import {
   AlertCircle,
   Building2,
   Search,
+  BookOpen,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react"
 import { SCHOOLS, MAJORS, type Lead, type School, type IntendedMajor } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import type { MOEFetchResponse } from "@/lib/moe/types"
 
 interface StudentInfoFormProps {
   lead: Lead
@@ -38,14 +43,18 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [schoolSearch, setSchoolSearch] = useState("")
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
   const [hasGpaError, setHasGpaError] = useState(false)
+  const [moeFetching, setMoeFetching] = useState(false)
+  const [moeFetchResult, setMoeFetchResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const [formData, setFormData] = useState({
     first_name: lead.first_name || "",
     last_name: lead.last_name || "",
+    gender: lead.gender || "",
     phone: lead.phone || "",
     civil_id: lead.civil_id || "",
+    seat_number: lead.seat_number || "",
     school: lead.school || "",
-    actual_gpa: lead.gpa_grade_11?.toString() || "",
+    actual_gpa: lead.actual_gpa?.toString() || lead.gpa_grade_11?.toString() || "",
     funding_type: "puc", // Fixed to PUC only
     intended_major: lead.intended_major || "",
   })
@@ -126,9 +135,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     const leadData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
+      gender: formData.gender || undefined,
       phone: formData.phone.replace(/\D/g, ""),
       civil_id: formData.civil_id.replace(/\D/g, ""),
+      seat_number: formData.seat_number.trim(),
       school: formData.school as School,
+      actual_gpa: parseFloat(formData.actual_gpa),
       gpa_grade_11: parseFloat(formData.actual_gpa),
       funding_type: "puc" as const,
       intended_major: formData.intended_major as IntendedMajor,
@@ -148,7 +160,65 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
+    // Clear MOE fetch result when credentials change
+    if (field === 'civil_id' || field === 'seat_number') {
+      setMoeFetchResult(null)
+    }
   }
+
+  const handleMOEFetch = async () => {
+    // Validate that we have both civil_id and seat_number
+    const civilId = formData.civil_id.replace(/\D/g, "")
+    const seatNumber = formData.seat_number.trim()
+
+    if (!civilId || !isValidKuwaitCivilId(civilId)) {
+      setMoeFetchResult({ success: false, message: "Valid Civil ID is required (12 digits starting with 2 or 3)" })
+      return
+    }
+
+    if (!seatNumber) {
+      setMoeFetchResult({ success: false, message: "Seat Number is required to fetch GPA from MOE" })
+      return
+    }
+
+    setMoeFetching(true)
+    setMoeFetchResult(null)
+
+    try {
+      const response = await fetch("/api/moe/fetch-gpa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadIds: [lead.id],
+        }),
+      })
+
+      const data = (await response.json()) as MOEFetchResponse | { error: string }
+
+      if (!response.ok) {
+        throw new Error((data as { error: string }).error || "Fetch failed")
+      }
+
+      const fetchResponse = data as MOEFetchResponse
+      const result = fetchResponse.results[0]
+
+      if (result?.success && result.gpa !== undefined) {
+        // Update the form with the fetched GPA
+        setFormData(prev => ({ ...prev, actual_gpa: result.gpa!.toString() }))
+        setMoeFetchResult({ success: true, message: `GPA ${result.gpa}% fetched successfully from MOE portal` })
+        // Trigger a refetch of the lead data
+        onSuccess?.()
+      } else {
+        setMoeFetchResult({ success: false, message: result?.error || "Failed to fetch GPA from MOE portal" })
+      }
+    } catch (err) {
+      setMoeFetchResult({ success: false, message: err instanceof Error ? err.message : "Failed to fetch GPA" })
+    } finally {
+      setMoeFetching(false)
+    }
+  }
+
+  const canFetchMOE = formData.civil_id.trim() && formData.seat_number.trim()
 
   return (
     <div className="space-y-6">
@@ -218,6 +288,37 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         </div>
       </div>
 
+      {/* Gender */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
+            <Users className="w-4 h-4 text-[var(--primary)]" />
+          </div>
+          <h4 className="font-semibold text-[var(--text-primary)]">Gender</h4>
+        </div>
+        <div className="flex gap-3 pl-10">
+          {[
+            { value: "male", label: "Male" },
+            { value: "female", label: "Female" },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleChange("gender", formData.gender === option.value ? "" : option.value)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                formData.gender === option.value
+                  ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                  : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50"
+              )}
+            >
+              <Users className="w-4 h-4" />
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Mobile */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
@@ -245,15 +346,15 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         </div>
       </div>
 
-      {/* Civil ID */}
+      {/* Civil ID & Seat Number */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
             <CreditCard className="w-4 h-4 text-[var(--primary)]" />
           </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Civil ID</h4>
+          <h4 className="font-semibold text-[var(--text-primary)]">Civil ID & Seat Number</h4>
         </div>
-        <div className="pl-10">
+        <div className="pl-10 grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="civil_id">Civil ID Number *</Label>
             <Input
@@ -267,6 +368,18 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             {errors.civil_id && (
               <p className="text-xs text-[var(--error)]">{errors.civil_id}</p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="seat_number">Seat Number (for MOE)</Label>
+            <Input
+              id="seat_number"
+              value={formData.seat_number}
+              onChange={(e) => handleChange("seat_number", e.target.value)}
+              placeholder="Enter seat number"
+            />
+            <p className="text-xs text-[var(--text-muted)]">
+              Required to fetch GPA from MOE portal
+            </p>
           </div>
         </div>
       </div>
@@ -359,28 +472,88 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           <h4 className="font-semibold text-[var(--text-primary)]">Actual GPA</h4>
         </div>
         <div className="pl-10">
-          <div className="space-y-2">
-            <Label htmlFor="actual_gpa">GPA Percentage * (must be 70% or higher)</Label>
-            <Input
-              id="actual_gpa"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={formData.actual_gpa}
-              onChange={(e) => handleChange("actual_gpa", e.target.value)}
-              placeholder="e.g. 75"
-              className={cn(
-                hasGpaError && "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:ring-red-500/20"
-              )}
-              error={errors.actual_gpa}
-            />
-            {errors.actual_gpa && (
-              <p className="text-xs text-[var(--error)]">{errors.actual_gpa}</p>
+          <div className="space-y-3">
+            {/* MOE Fetch Button */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-blue-700 dark:text-blue-300 text-sm">
+                  Fetch from Ministry of Education
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  {canFetchMOE
+                    ? "Click to automatically retrieve GPA using Civil ID and Seat Number"
+                    : "Enter Civil ID and Seat Number above to enable"}
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={handleMOEFetch}
+                disabled={!canFetchMOE || moeFetching}
+                className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+              >
+                {moeFetching ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Fetching...
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Fetch GPA
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* MOE Fetch Result */}
+            {moeFetchResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "flex items-center gap-2 p-3 rounded-lg text-sm",
+                  moeFetchResult.success
+                    ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                    : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                )}
+              >
+                {moeFetchResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <XCircle className="w-4 h-4 shrink-0" />
+                )}
+                {moeFetchResult.message}
+              </motion.div>
             )}
-            <p className="text-xs text-[var(--text-muted)]">
-              Minimum GPA of 70% is required for PUC scholarship eligibility
-            </p>
+
+            {/* Manual GPA Input */}
+            <div className="space-y-2">
+              <Label htmlFor="actual_gpa">GPA Percentage * (must be 70% or higher)</Label>
+              <Input
+                id="actual_gpa"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={formData.actual_gpa}
+                onChange={(e) => handleChange("actual_gpa", e.target.value)}
+                placeholder="e.g. 75"
+                className={cn(
+                  hasGpaError && "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:ring-red-500/20"
+                )}
+                error={errors.actual_gpa}
+              />
+              {errors.actual_gpa && (
+                <p className="text-xs text-[var(--error)]">{errors.actual_gpa}</p>
+              )}
+              <p className="text-xs text-[var(--text-muted)]">
+                Minimum GPA of 70% is required for PUC scholarship eligibility
+              </p>
+            </div>
           </div>
         </div>
       </div>

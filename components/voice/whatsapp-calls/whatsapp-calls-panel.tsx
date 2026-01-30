@@ -869,7 +869,7 @@ export function WhatsAppCallsPanel() {
           <AlertCircle className="w-5 h-5" />
           <p>
             <strong>Note:</strong> WhatsApp calls are initiated from your WhatsApp app.
-            Click "Call via WhatsApp" to open WhatsApp with the contact, then tap the call button.
+            Click &quot;Call via WhatsApp&quot; to open WhatsApp with the contact, then tap the call button.
           </p>
         </div>
       </div>

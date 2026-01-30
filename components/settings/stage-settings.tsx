@@ -25,8 +25,9 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
   visit: "bg-[var(--stage-visit)]",
   test: "bg-[var(--stage-test)]",
   application: "bg-[var(--stage-application)]",
-  submission: "bg-blue-500",
+  applicant: "bg-indigo-500",
   enrolled: "bg-[var(--stage-enrolled)]",
+  withdraw: "bg-red-500",
   lost: "bg-[var(--stage-lost)]",
 }
 

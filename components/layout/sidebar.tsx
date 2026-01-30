@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -22,6 +22,7 @@ import {
   Sparkles,
   Megaphone,
   Trash2,
+  GraduationCap,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -36,9 +37,112 @@ interface SidebarProps {
   user: Profile | null
 }
 
-const navigation = [
+type NavItem = {
+  name: string
+  href: string
+  icon: React.ElementType
+  description: string
+  badge?: string
+}
+
+interface NavLinkProps {
+  item: NavItem
+  index: number
+  pathname: string
+  isCollapsed: boolean
+  onNavigate: () => void
+}
+
+function NavLink({ item, index, pathname, isCollapsed, onNavigate }: NavLinkProps) {
+  const searchParams = useSearchParams()
+  const itemHasQuery = item.href.includes("?")
+  let isActive: boolean
+
+  if (itemHasQuery) {
+    const [itemPath, itemQuery] = item.href.split("?")
+    const itemParams = new URLSearchParams(itemQuery)
+    isActive = pathname === itemPath && Array.from(itemParams.entries()).every(
+      ([key, value]) => searchParams.get(key) === value
+    )
+  } else {
+    const matchesPath = pathname === item.href || pathname.startsWith(item.href + "/")
+    // Avoid matching "Leads" when a query-param nav item (like PUC SRJ) is active
+    const hasQueryNavSibling = navigation.some(
+      (nav) => nav.href.startsWith(item.href + "?")
+    )
+    if (hasQueryNavSibling && matchesPath) {
+      const siblingParams = navigation
+        .filter((nav) => nav.href.startsWith(item.href + "?"))
+        .map((nav) => new URLSearchParams(nav.href.split("?")[1]))
+      const anySiblingActive = siblingParams.some((params) =>
+        Array.from(params.entries()).every(([key, value]) => searchParams.get(key) === value)
+      )
+      isActive = matchesPath && !anySiblingActive
+    } else {
+      isActive = matchesPath
+    }
+  }
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative",
+        isActive
+          ? "active bg-gradient-to-r from-[var(--primary-muted)] to-[var(--primary-muted)]/60 text-[var(--primary)] shadow-sm border border-[var(--primary)]/10"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+      )}
+      onClick={onNavigate}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      {/* Active indicator bar */}
+      {isActive && (
+        <motion.span
+          layoutId="activeNavIndicator"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[var(--primary)] rounded-full"
+          transition={{ type: "spring", stiffness: 350, damping: 30 }}
+        />
+      )}
+      <span className={cn(
+        "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 shrink-0",
+        isActive
+          ? "bg-[var(--primary)] text-white shadow-sm"
+          : "bg-[var(--bg-sunken)] text-[var(--text-tertiary)] group-hover:bg-[var(--bg-hover)] group-hover:text-[var(--text-primary)]"
+      )}>
+        <item.icon className="w-4 h-4" />
+      </span>
+      {!isCollapsed && (
+        <div className="flex-1 min-w-0 flex items-center justify-between">
+          <span className="truncate">{item.name}</span>
+          {item.badge && (
+            <Badge variant="accent" size="xs" shape="pill" className="ml-2 shrink-0">
+              <Sparkles className="w-2.5 h-2.5 mr-0.5" />
+              {item.badge}
+            </Badge>
+          )}
+        </div>
+      )}
+      {isCollapsed && (
+        <div className="absolute left-full ml-3 px-3 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-xl border border-[var(--border)]">
+          <div className="flex items-center gap-2">
+            <span>{item.name}</span>
+            {item.badge && (
+              <Badge variant="accent" size="xs" shape="pill">
+                {item.badge}
+              </Badge>
+            )}
+          </div>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{item.description}</p>
+        </div>
+      )}
+    </Link>
+  )
+}
+
+const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & stats" },
   { name: "Leads", href: "/leads", icon: Users, description: "Manage prospects" },
+  { name: "PUC SRJ", href: "/leads?funding_type=puc", icon: GraduationCap, description: "PUC submissions" },
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
   { name: "Voice", href: "/voice", icon: Phone, description: "Kadi AI & calls" },
   { name: "Campaigns", href: "/campaigns", icon: Megaphone, description: "Outreach automation" },
@@ -56,11 +160,13 @@ const emptySubscribe = () => () => {}
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const supabase = createClient()
   const { collapsed, setCollapsed } = useSidebar()
   const [mobileOpen, setMobileOpen] = useState(false)
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+
 
   // On mobile, always show expanded sidebar with names
   const isCollapsed = collapsed && !mobileOpen
@@ -71,64 +177,7 @@ export function Sidebar({ user }: SidebarProps) {
     router.refresh()
   }
 
-  const NavLink = ({ item, index }: { item: typeof navigation[0]; index: number }) => {
-    const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-
-    return (
-      <Link
-        href={item.href}
-        className={cn(
-          "nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative",
-          isActive
-            ? "active bg-gradient-to-r from-[var(--primary-muted)] to-[var(--primary-muted)]/60 text-[var(--primary)] shadow-sm border border-[var(--primary)]/10"
-            : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-        )}
-        onClick={() => setMobileOpen(false)}
-        style={{ animationDelay: `${index * 50}ms` }}
-      >
-        {/* Active indicator bar */}
-        {isActive && (
-          <motion.span
-            layoutId="activeNavIndicator"
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[var(--primary)] rounded-full"
-            transition={{ type: "spring", stiffness: 350, damping: 30 }}
-          />
-        )}
-        <span className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 shrink-0",
-          isActive
-            ? "bg-[var(--primary)] text-white shadow-sm"
-            : "bg-[var(--bg-sunken)] text-[var(--text-tertiary)] group-hover:bg-[var(--bg-hover)] group-hover:text-[var(--text-primary)]"
-        )}>
-          <item.icon className="w-4 h-4" />
-        </span>
-        {!isCollapsed && (
-          <div className="flex-1 min-w-0 flex items-center justify-between">
-            <span className="truncate">{item.name}</span>
-            {item.badge && (
-              <Badge variant="accent" size="xs" shape="pill" className="ml-2 shrink-0">
-                <Sparkles className="w-2.5 h-2.5 mr-0.5" />
-                {item.badge}
-              </Badge>
-            )}
-          </div>
-        )}
-        {isCollapsed && (
-          <div className="absolute left-full ml-3 px-3 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-xl border border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <span>{item.name}</span>
-              {item.badge && (
-                <Badge variant="accent" size="xs" shape="pill">
-                  {item.badge}
-                </Badge>
-              )}
-            </div>
-            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{item.description}</p>
-          </div>
-        )}
-      </Link>
-    )
-  }
+  const handleNavigate = () => setMobileOpen(false)
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -172,7 +221,7 @@ export function Sidebar({ user }: SidebarProps) {
         )}
         <div className="space-y-1">
           {navigation.map((item, index) => (
-            <NavLink key={item.name} item={item} index={index} />
+            <NavLink key={item.name} item={item} index={index} pathname={pathname} isCollapsed={isCollapsed} onNavigate={handleNavigate} />
           ))}
         </div>
 
@@ -191,7 +240,7 @@ export function Sidebar({ user }: SidebarProps) {
             )}
           </div>
           {secondaryNavigation.map((item, index) => (
-            <NavLink key={item.name} item={item} index={navigation.length + index} />
+            <NavLink key={item.name} item={item} index={navigation.length + index} pathname={pathname} isCollapsed={isCollapsed} onNavigate={handleNavigate} />
           ))}
         </div>
 
@@ -214,6 +263,9 @@ export function Sidebar({ user }: SidebarProps) {
             <NavLink
               item={{ name: "Deleted Leads", href: "/deleted-leads", icon: Trash2, description: "Restore deleted leads" }}
               index={navigation.length + secondaryNavigation.length}
+              pathname={pathname}
+              isCollapsed={isCollapsed}
+              onNavigate={handleNavigate}
             />
           </div>
         )}

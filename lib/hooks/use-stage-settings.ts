@@ -20,9 +20,9 @@ const DEFAULT_STAGE_SETTINGS: StageSettings[] = [
   { id: '2', stage: 'visit', is_active: true, display_order: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { id: '3', stage: 'test', is_active: true, display_order: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { id: '4', stage: 'application', is_active: true, display_order: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '5', stage: 'submission', is_active: true, display_order: 5, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '6', stage: 'enrolled', is_active: true, display_order: 6, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '7', stage: 'lost', is_active: true, display_order: 7, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '5', stage: 'lost', is_active: true, display_order: 5, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '6', stage: 'applicant', is_active: true, display_order: 6, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '7', stage: 'enrolled', is_active: true, display_order: 7, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ]
 
 const DEMO_STORAGE_KEY = 'ktech_demo_stage_settings'

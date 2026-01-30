@@ -69,8 +69,9 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
 
   const topSource = data.bySource[0]
   const topSchool = data.topSchools[0]
-  const topSchoolByLeads = data.bySchool.reduce((max, school) =>
-    school.leads > max.leads ? school : max, data.bySchool[0] || { label: 'N/A', leads: 0 })
+  const topSchoolByLeads = data.bySchool.length > 0
+    ? data.bySchool.reduce((max, school) => school.leads > max.leads ? school : max, data.bySchool[0])
+    : { label: 'N/A', leads: 0, applicationPercent: 0, pucPercent: 0 }
 
   return (
     <div className="space-y-6">
@@ -135,10 +136,10 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 </div>
                 <Badge variant="success" size="sm">Top Area</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Performing School Type</p>
-              <p className="text-xl font-bold text-[var(--text-primary)]">{topSchoolByLeads?.label || 'N/A'}</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Top School by Leads</p>
+              <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchoolByLeads?.label || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {topSchoolByLeads?.leads || 0} leads, {topSchoolByLeads?.conversionRate || 0}% conversion
+                {topSchoolByLeads?.leads || 0} leads, {topSchoolByLeads?.applicationPercent || 0}% application
               </p>
             </CardContent>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] opacity-50" />
@@ -271,89 +272,76 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
         </motion.div>
       </div>
 
-      {/* Top Schools & School Analysis Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Schools */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.6 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="w-5 h-5 text-[var(--success)]" />
-                Top Schools
-              </CardTitle>
-              <CardDescription>Schools with most leads</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {data.topSchools.length > 0 ? (
-                <div className="space-y-3">
-                  {data.topSchools.slice(0, 8).map((school, index) => (
-                    <div key={school.schoolId} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-depth-3)]">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-[var(--text-muted)] w-5">{index + 1}</span>
-                        <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[180px]">
-                          {school.schoolName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary" size="sm">{school.leads} leads</Badge>
-                        <Badge variant="success" size="sm">{school.applications} applications</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-[var(--text-muted)]">
-                  No school data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* School Type Analysis */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.7 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-[var(--info)]" />
-                School Type Analysis
-              </CardTitle>
-              <CardDescription>Leads and conversion by school type</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {data.bySchool.map((school) => (
-                  <div key={school.school} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">{school.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-[var(--text-secondary)]">{school.leads} leads</span>
-                        <Badge variant={school.conversionRate >= 30 ? 'success' : school.conversionRate >= 15 ? 'warning' : 'secondary'} size="sm">
-                          {school.conversionRate}%
-                        </Badge>
-                      </div>
-                    </div>
-                    <ProgressBar
-                      value={school.leads}
-                      max={Math.max(...data.bySchool.map(s => s.leads)) || 1}
-                      size="sm"
-                      variant="gradient"
-                    />
-                  </div>
-                ))}
+      {/* School Breakdown */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.6 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="w-5 h-5 text-[var(--success)]" />
+              School Breakdown
+            </CardTitle>
+            <CardDescription>Total leads, application stage %, and PUC % per school</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.topSchools.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
+                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">School</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total Leads</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Applications</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Application %</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3">PUC %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.topSchools.map((school, index) => (
+                      <tr key={school.schoolId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-depth-3)] transition-colors">
+                        <td className="py-3 pr-4">
+                          <span className="text-sm font-bold text-[var(--text-muted)]">{index + 1}</span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className="text-sm font-medium text-[var(--text-primary)]">{school.schoolName}</span>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.leads}</span>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.applications}</span>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant={school.applicationPercent >= 30 ? 'success' : school.applicationPercent >= 15 ? 'warning' : 'secondary'} size="sm">
+                            {school.applicationPercent}%
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.pucCount}</span>
+                        </td>
+                        <td className="py-3 pl-3 text-center">
+                          <Badge variant="info" size="sm">
+                            {school.pucPercent}%
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+            ) : (
+              <div className="text-center py-8 text-[var(--text-muted)]">
+                No school data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   )
 }

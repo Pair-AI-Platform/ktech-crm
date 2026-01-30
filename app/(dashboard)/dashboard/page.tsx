@@ -50,7 +50,7 @@ export default function DashboardPage() {
   const myLeads = useMemo(() => {
     if (!profile?.id) return allLeads
     return allLeads.filter(lead => lead.assigned_to === profile.id)
-  }, [allLeads, profile?.id])
+  }, [allLeads, profile])
 
   // Get priority leads that need attention
   const priorityLeads = useMemo(() => {
@@ -144,7 +144,7 @@ export default function DashboardPage() {
                     <p className="text-2xl font-bold text-[var(--text-primary)]">
                       {appointmentsLoading ? "..." : appointmentStats.today}
                     </p>
-                    <p className="text-xs text-[var(--text-muted)]">Today's Appts</p>
+                    <p className="text-xs text-[var(--text-muted)]">Today&apos;s Appts</p>
                   </div>
                 </div>
               </CardContent>
@@ -238,7 +238,7 @@ export default function DashboardPage() {
                       <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
                         <Calendar className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                      Today's Appointments
+                      Today&apos;s Appointments
                     </CardTitle>
                     <Link href="/calendar">
                       <Button variant="ghost" size="sm" className="text-[var(--text-muted)]">
@@ -270,7 +270,14 @@ export default function DashboardPage() {
                     <div className="space-y-3">
                       {todayAppointments.slice(0, 5).map((apt, index) => {
                         const employeeName = getAgentName(apt)
-                        const leadName = apt.lead ? `${apt.lead.first_name} ${apt.lead.last_name}` : 'Unknown'
+                        const aptLeads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
+                        const leadName = aptLeads.length > 0
+                          ? aptLeads.length === 1
+                            ? `${aptLeads[0]!.first_name} ${aptLeads[0]!.last_name}`
+                            : `${aptLeads[0]!.first_name} ${aptLeads[0]!.last_name} +${aptLeads.length - 1}`
+                          : apt.lead
+                          ? `${apt.lead.first_name} ${apt.lead.last_name}`
+                          : 'Unknown'
                         const typeInfo = APPOINTMENT_TYPES.find(t => apt.appointment_type.includes(t.value))
 
                         return (
@@ -280,7 +287,7 @@ export default function DashboardPage() {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.05 }}
                           >
-                            <Link href={`/leads/${apt.lead_id}`}>
+                            <Link href={`/leads/${apt.appointment_leads?.[0]?.lead_id || apt.lead_id}`}>
                               <div className="flex items-center gap-4 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--primary)]/50 transition-all group">
                                 <div className="flex-shrink-0">
                                   <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">

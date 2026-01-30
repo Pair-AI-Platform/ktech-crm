@@ -51,6 +51,34 @@ interface DeletedLeadsTableProps {
 type SortField = "name" | "deleted_at" | "pipeline_stage" | "deleted_by"
 type SortDirection = "asc" | "desc"
 
+interface SortButtonProps {
+  field: SortField
+  label: string
+  sortField: SortField
+  sortDirection: SortDirection
+  onSort: (field: SortField) => void
+}
+
+function SortButton({ field, label, sortField, sortDirection, onSort }: SortButtonProps) {
+  return (
+    <button
+      onClick={() => onSort(field)}
+      className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
+    >
+      <span>{label}</span>
+      {sortField === field ? (
+        sortDirection === "asc" ? (
+          <ArrowUp className="w-3.5 h-3.5 text-[var(--primary)]" />
+        ) : (
+          <ArrowDown className="w-3.5 h-3.5 text-[var(--primary)]" />
+        )
+      ) : (
+        <ArrowUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+      )}
+    </button>
+  )
+}
+
 export function DeletedLeadsTable({
   deletedLeads,
   loading,
@@ -114,24 +142,6 @@ export function DeletedLeadsTable({
     setDeleteConfirmId(null)
   }
 
-  const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button
-      onClick={() => handleSort(field)}
-      className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
-    >
-      <span>{label}</span>
-      {sortField === field ? (
-        sortDirection === "asc" ? (
-          <ArrowUp className="w-3.5 h-3.5 text-[var(--primary)]" />
-        ) : (
-          <ArrowDown className="w-3.5 h-3.5 text-[var(--primary)]" />
-        )
-      ) : (
-        <ArrowUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-      )}
-    </button>
-  )
-
   const getStageColor = (stage: string | undefined) => {
     switch (stage) {
       case "new": return "bg-blue-500/10 text-blue-600 border-blue-500/20"
@@ -182,10 +192,10 @@ export function DeletedLeadsTable({
               className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
             />
           </div>
-          <SortButton field="name" label="Lead" />
-          <SortButton field="pipeline_stage" label="Stage (at deletion)" />
-          <SortButton field="deleted_by" label="Deleted By" />
-          <SortButton field="deleted_at" label="Deleted At" />
+          <SortButton field="name" label="Lead" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} />
+          <SortButton field="pipeline_stage" label="Stage (at deletion)" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} />
+          <SortButton field="deleted_by" label="Deleted By" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} />
+          <SortButton field="deleted_at" label="Deleted At" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} />
           <div className="text-xs font-semibold text-[var(--text-secondary)]">Reason</div>
           <div className="text-xs font-semibold text-[var(--text-secondary)]">Actions</div>
         </div>
@@ -228,7 +238,7 @@ export function DeletedLeadsTable({
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                     <Phone className="w-3 h-3" />
-                    <span>{formatKuwaitPhone(lead.phone)}</span>
+                    <span className="whitespace-nowrap">{formatKuwaitPhone(lead.phone)}</span>
                   </div>
                 </div>
               </div>

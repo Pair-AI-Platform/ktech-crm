@@ -135,6 +135,14 @@ export default function CalendarPage() {
   }
 
   const getAppointmentName = (apt: Appointment) => {
+    const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
+    if (leads.length > 0) {
+      if (leads.length === 1) {
+        return `${leads[0]!.first_name} ${leads[0]!.last_name}`
+      }
+      return `${leads[0]!.first_name} ${leads[0]!.last_name} +${leads.length - 1}`
+    }
+    // Legacy fallback
     if (apt.lead) return `${apt.lead.first_name} ${apt.lead.last_name}`
     if (apt.student) return `${apt.student.first_name} ${apt.student.last_name}`
     return "Unknown"
@@ -493,7 +501,7 @@ export default function CalendarPage() {
                             <div className="flex items-center gap-2">
                               <div className={cn(
                                 "w-2 h-2 rounded-full",
-                                getAppointmentColor(apt.appointment_type[0])
+                                getAppointmentColor(apt.appointment_type?.[0] || "new_appointment")
                               )} />
                               <span className="font-medium text-sm text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                                 {getAppointmentName(apt)}
@@ -502,7 +510,7 @@ export default function CalendarPage() {
                             {getStatusIcon(apt.status)}
                           </div>
                           <p className="text-xs text-[var(--text-muted)] mt-1 ml-4">
-                            {apt.appointment_type.map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
+                            {(apt.appointment_type || []).map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
                           </p>
                           <div className="flex items-center gap-3 mt-2 ml-4 text-xs text-[var(--text-muted)]">
                             <span className="flex items-center gap-1">
@@ -583,7 +591,7 @@ export default function CalendarPage() {
                               <div className="flex items-center gap-2">
                                 <div className={cn(
                                   "w-2 h-2 rounded-full",
-                                  getAppointmentColor(apt.appointment_type[0])
+                                  getAppointmentColor(apt.appointment_type?.[0] || "new_appointment")
                                 )} />
                                 <span className="font-medium text-sm text-[var(--text-primary)] group-hover:text-[var(--warning)] transition-colors">
                                   {getAppointmentName(apt)}
@@ -592,7 +600,7 @@ export default function CalendarPage() {
                               <AlertTriangle className="w-3 h-3 text-[var(--warning)]" />
                             </div>
                             <p className="text-xs text-[var(--text-muted)] mt-1 ml-4">
-                              {apt.appointment_type.map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
+                              {(apt.appointment_type || []).map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
                             </p>
                             <div className="flex items-center gap-3 mt-2 ml-4 text-xs text-[var(--text-muted)]">
                               <span className="flex items-center gap-1">
@@ -670,6 +678,7 @@ export default function CalendarPage() {
         onSuccess={handleBookingSuccess}
         preselectedDate={preselectedDate}
         preselectedTime={preselectedTime}
+        singleFormMode
       />
 
       <AppointmentDetail

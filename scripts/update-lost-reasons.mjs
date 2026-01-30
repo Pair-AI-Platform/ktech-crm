@@ -16,8 +16,7 @@ async function updateLostReasons() {
   const existingNames = new Set(existingReasons?.map(r => r.reason_en) || [])
 
   const newReasons = [
-    // Competitors (just university names, no "Chose" prefix)
-    { category: 'competitors', reason_en: 'ACK', reason_ar: 'ACK' },
+    { category: 'competitors', reason_en: 'AU', reason_ar: 'AU' },
     { category: 'competitors', reason_en: 'ACM', reason_ar: 'ACM' },
     { category: 'competitors', reason_en: 'AOU', reason_ar: 'AOU' },
     { category: 'competitors', reason_en: 'AUK', reason_ar: 'AUK' },
@@ -29,34 +28,7 @@ async function updateLostReasons() {
     { category: 'competitors', reason_en: 'PAAET', reason_ar: 'PAAET' },
     { category: 'competitors', reason_en: 'MOHE', reason_ar: 'MOHE' },
     { category: 'competitors', reason_en: 'Other', reason_ar: 'أخرى' },
-    // Military / Security
-    { category: 'military_security', reason_en: 'Joined Military', reason_ar: 'التحق بالجيش' },
-    { category: 'military_security', reason_en: 'Joined Police', reason_ar: 'التحق بالشرطة' },
-    { category: 'military_security', reason_en: 'Joined Fire Force', reason_ar: 'التحق بالإطفاء' },
-    { category: 'military_security', reason_en: 'Joined National Guard', reason_ar: 'التحق بالحرس الوطني' },
-    // Academic
-    { category: 'academic', reason_en: 'Low GPA', reason_ar: 'معدل منخفض' },
-    { category: 'academic', reason_en: 'High GPA', reason_ar: 'معدل عالي' },
-    { category: 'academic', reason_en: 'Failed placement test', reason_ar: 'فشل في اختبار تحديد المستوى' },
-    { category: 'academic', reason_en: 'Already enrolled elsewhere', reason_ar: 'مسجل في جامعة أخرى' },
-    { category: 'academic', reason_en: 'Bachelors', reason_ar: 'بكالوريوس' },
-    { category: 'academic', reason_en: 'Current Student', reason_ar: 'طالب حالي' },
-    // Financial
-    { category: 'financial', reason_en: 'Cannot afford tuition', reason_ar: 'لا يستطيع تحمل الرسوم' },
-    { category: 'financial', reason_en: 'PUC rejected', reason_ar: 'رفض PUC' },
-    { category: 'financial', reason_en: 'Payment Issue', reason_ar: 'مشكلة في الدفع' },
-    { category: 'financial', reason_en: 'Scholarship elsewhere', reason_ar: 'منحة في مكان آخر' },
-    // Personal
-    { category: 'personal', reason_en: 'Traveling abroad', reason_ar: 'مسافر للخارج' },
-    { category: 'personal', reason_en: 'Family reasons', reason_ar: 'أسباب عائلية' },
-    { category: 'personal', reason_en: 'Health reasons', reason_ar: 'أسباب صحية' },
-    { category: 'personal', reason_en: 'Not Interested', reason_ar: 'غير مهتم' },
     { category: 'personal', reason_en: 'Changed mind', reason_ar: 'غير رأيه' },
-    // Administrative
-    { category: 'administrative', reason_en: 'No response', reason_ar: 'لا يوجد رد' },
-    { category: 'administrative', reason_en: 'Wrong Number', reason_ar: 'رقم خاطئ' },
-    { category: 'administrative', reason_en: 'Duplicate lead', reason_ar: 'سجل مكرر' },
-    { category: 'administrative', reason_en: "DON'T CALL", reason_ar: 'لا تتصل' },
   ]
 
   // Filter out reasons that already exist

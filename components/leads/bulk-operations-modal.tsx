@@ -8,16 +8,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogBody,
+  DialogFooter,
 } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   UserPlus,
   Trash2,
@@ -26,6 +21,8 @@ import {
   Loader2,
   CheckCircle2,
   Users,
+  Check,
+  X,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -35,7 +32,7 @@ interface BulkAssignModalProps {
   isOpen: boolean
   onClose: () => void
   selectedCount: number
-  onConfirm: (agentId: string) => Promise<void>
+  onConfirm: (agentIds: string[]) => Promise<void>
   loading?: boolean
 }
 
@@ -47,7 +44,7 @@ export function BulkAssignModal({
   loading = false,
 }: BulkAssignModalProps) {
   const [agents, setAgents] = useState<Profile[]>([])
-  const [selectedAgent, setSelectedAgent] = useState<string>("")
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const [loadingAgents, setLoadingAgents] = useState(true)
 
   useEffect(() => {
@@ -64,18 +61,37 @@ export function BulkAssignModal({
     }
 
     if (isOpen) {
+      setSelectedAgents([])
       fetchAgents()
     }
   }, [isOpen])
 
+  const toggleAgent = (agentId: string) => {
+    setSelectedAgents((prev) =>
+      prev.includes(agentId)
+        ? prev.filter((id) => id !== agentId)
+        : [...prev, agentId]
+    )
+  }
+
   const handleConfirm = async () => {
-    if (selectedAgent) {
-      await onConfirm(selectedAgent)
-      setSelectedAgent("")
+    if (selectedAgents.length > 0) {
+      await onConfirm(selectedAgents)
+      setSelectedAgents([])
     }
   }
 
-  const selectedAgentInfo = agents.find((a) => a.id === selectedAgent)
+  const getDistribution = () => {
+    if (selectedAgents.length === 0) return []
+    const base = Math.floor(selectedCount / selectedAgents.length)
+    const remainder = selectedCount % selectedAgents.length
+    return selectedAgents.map((id, i) => ({
+      id,
+      count: base + (i < remainder ? 1 : 0),
+    }))
+  }
+
+  const distribution = getDistribution()
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -86,73 +102,124 @@ export function BulkAssignModal({
           </div>
           <DialogTitle>Assign Leads</DialogTitle>
           <DialogDescription>
-            Select an agent to assign {selectedCount} lead{selectedCount !== 1 ? "s" : ""} to.
+            Select {selectedAgents.length > 1 ? "agents" : "an agent"} to assign {selectedCount} lead{selectedCount !== 1 ? "s" : ""} to.
+            {selectedAgents.length > 1 && " Leads will be split evenly."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <DialogBody className="space-y-4">
           {loadingAgents ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <>
-              <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select an agent..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {agents.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar size="sm">
-                          <AvatarImage src={agent.avatar_url} />
-                          <AvatarFallback>
-                            {agent.full_name?.split(" ").map((n) => n[0]).join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{agent.full_name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Selected agents chips */}
+              {selectedAgents.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedAgents.map((agentId) => {
+                    const agent = agents.find((a) => a.id === agentId)
+                    if (!agent) return null
+                    return (
+                      <motion.button
+                        key={agentId}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        onClick={() => toggleAgent(agentId)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                      >
+                        <span>{agent.full_name?.split(" ")[0]}</span>
+                        <X className="w-3.5 h-3.5" />
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              )}
 
-              {selectedAgentInfo && (
+              {/* Agent list */}
+              <div className="max-h-[240px] overflow-y-auto rounded-xl border border-[var(--border)] divide-y divide-[var(--border)]">
+                {agents.map((agent) => {
+                  const isSelected = selectedAgents.includes(agent.id)
+                  return (
+                    <button
+                      key={agent.id}
+                      onClick={() => toggleAgent(agent.id)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-depth-2)]",
+                        isSelected && "bg-[var(--primary-muted)]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                        isSelected
+                          ? "bg-[var(--primary)] border-[var(--primary)]"
+                          : "border-[var(--border)]"
+                      )}>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                      </div>
+                      <Avatar size="sm">
+                        <AvatarImage src={agent.avatar_url} />
+                        <AvatarFallback>
+                          {agent.full_name?.split(" ").map((n) => n[0]).join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                          {agent.full_name}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] truncate">
+                          {agent.email}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Distribution preview */}
+              {distribution.length > 1 && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-[var(--bg-depth-3)] rounded-xl"
+                  className="p-3 bg-[var(--bg-depth-3)] rounded-xl space-y-2"
                 >
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src={selectedAgentInfo.avatar_url} />
-                      <AvatarFallback>
-                        {selectedAgentInfo.full_name?.split(" ").map((n) => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)]">
-                        {selectedAgentInfo.full_name}
-                      </p>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        {selectedAgentInfo.email}
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                    Distribution
+                  </p>
+                  {distribution.map(({ id, count }) => {
+                    const agent = agents.find((a) => a.id === id)
+                    if (!agent) return null
+                    return (
+                      <div key={id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <Avatar size="sm">
+                            <AvatarImage src={agent.avatar_url} />
+                            <AvatarFallback>
+                              {agent.full_name?.split(" ").map((n) => n[0]).join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-[var(--text-primary)]">{agent.full_name}</span>
+                        </div>
+                        <span className="text-[var(--text-muted)] font-medium">
+                          {count} lead{count !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </motion.div>
               )}
             </>
           )}
-        </div>
+        </DialogBody>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border)]">
+        <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={!selectedAgent || loading}
+            disabled={selectedAgents.length === 0 || loading}
           >
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -160,8 +227,9 @@ export function BulkAssignModal({
               <Users className="w-4 h-4 mr-2" />
             )}
             Assign {selectedCount} Lead{selectedCount !== 1 ? "s" : ""}
+            {selectedAgents.length > 1 && ` to ${selectedAgents.length} Agents`}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

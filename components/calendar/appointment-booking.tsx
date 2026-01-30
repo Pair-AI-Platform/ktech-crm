@@ -31,7 +31,8 @@ import {
   Sparkles,
   AlertCircle,
   UserCircle,
-  Video
+  Video,
+  XCircle
 } from "lucide-react"
 import type { AppointmentType, AppointmentModality, Lead, Student } from "@/types"
 import { APPOINTMENT_TYPES, APPOINTMENT_MODALITIES } from "@/types"
@@ -54,6 +55,8 @@ interface AppointmentBookingProps {
   preselectedType?: AppointmentType
   /** When true, shows all fields in a single form without multi-step wizard */
   singleFormMode?: boolean
+  /** When true, shows only Date, Time, and Notes fields (for callback scheduling) */
+  callbackMode?: boolean
 }
 
 type BookingStep = "type" | "person" | "datetime" | "confirm" | "success"
@@ -72,9 +75,14 @@ const SIMPLE_STEPS: { id: BookingStep; label: string; icon: typeof Calendar }[] 
 ]
 
 const TIME_OPTIONS = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
+  "00:00", "00:30", "01:00", "01:30", "02:00", "02:30",
+  "03:00", "03:30", "04:00", "04:30", "05:00", "05:30",
+  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+  "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+  "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
 ]
 
 export function AppointmentBooking({
@@ -87,12 +95,13 @@ export function AppointmentBooking({
   preselectedLead,
   skipToDateTime = false,
   preselectedType = "new_appointment",
-  singleFormMode = false
+  singleFormMode = false,
+  callbackMode = false
 }: AppointmentBookingProps) {
   const [currentStep, setCurrentStep] = useState<BookingStep>(skipToDateTime ? "datetime" : "person")
   const [selectedTypes, setSelectedTypes] = useState<AppointmentType[]>([])
   const [selectedModality, setSelectedModality] = useState<AppointmentModality | null>(null)
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [selectedLeads, setSelectedLeads] = useState<Lead[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(preselectedDate || null)
   const [selectedTime, setSelectedTime] = useState<string>(preselectedTime || "")
   const [notes, setNotes] = useState("")
@@ -109,10 +118,10 @@ export function AppointmentBooking({
   // Reset on close
   useEffect(() => {
     if (!isOpen) {
-      setCurrentStep(skipToDateTime || singleFormMode ? "datetime" : "person")
-      setSelectedTypes(skipToDateTime ? [preselectedType] : (singleFormMode ? ["new_appointment"] : []))
-      setSelectedModality(singleFormMode ? "campus" : null)
-      setSelectedLead(preselectedLead || null)
+      setCurrentStep(skipToDateTime || singleFormMode || callbackMode ? "datetime" : "person")
+      setSelectedTypes(skipToDateTime ? [preselectedType] : ((singleFormMode || callbackMode) ? ["new_appointment"] : []))
+      setSelectedModality((singleFormMode || callbackMode) ? "campus" : null)
+      setSelectedLeads(preselectedLead ? [preselectedLead] : [])
       setSelectedDate(preselectedDate || null)
       setSelectedTime(preselectedTime || "")
       setNotes("")
@@ -120,12 +129,15 @@ export function AppointmentBooking({
       setError(null)
       setSelectedAgent("")
     }
-  }, [isOpen, preselectedDate, preselectedTime, skipToDateTime, preselectedType, singleFormMode, preselectedLead])
+  }, [isOpen, preselectedDate, preselectedTime, skipToDateTime, preselectedType, singleFormMode, preselectedLead, callbackMode])
 
   // Set lead from preselectedLead prop when modal opens
   useEffect(() => {
     if (isOpen && preselectedLead) {
-      setSelectedLead(preselectedLead)
+      setSelectedLeads(prev => {
+        if (prev.some(l => l.id === preselectedLead.id)) return prev
+        return [preselectedLead]
+      })
     }
   }, [isOpen, preselectedLead])
 
@@ -140,7 +152,12 @@ export function AppointmentBooking({
   useEffect(() => {
     if (preselectedLeadId && leads.length > 0) {
       const lead = leads.find(l => l.id === preselectedLeadId)
-      if (lead) setSelectedLead(lead)
+      if (lead) {
+        setSelectedLeads(prev => {
+          if (prev.some(l => l.id === lead.id)) return prev
+          return [lead]
+        })
+      }
     }
   }, [preselectedLeadId, leads])
 
@@ -156,15 +173,18 @@ export function AppointmentBooking({
   const activeSteps = skipToDateTime ? SIMPLE_STEPS : STEPS
   const currentStepIndex = activeSteps.findIndex(s => s.id === currentStep)
 
-  // Filter appointment types based on selected lead's stage
+  // Helper: first selected lead (for backward compat and display)
+  const selectedLead = selectedLeads[0] || null
+
+  // Filter appointment types based on selected leads' stages
   // puc_documents is only available for leads in the "application" stage
   // new_appointment is NOT available for leads in the "application" stage
   const availableAppointmentTypes = APPOINTMENT_TYPES.filter(type => {
     if (type.value === 'puc_documents') {
-      return selectedLead?.pipeline_stage === 'application'
+      return selectedLeads.some(l => l.pipeline_stage === 'application')
     }
     if (type.value === 'new_appointment') {
-      return selectedLead?.pipeline_stage !== 'application'
+      return !selectedLeads.some(l => l.pipeline_stage === 'application')
     }
     return true
   })
@@ -172,7 +192,7 @@ export function AppointmentBooking({
   const canProceed = () => {
     switch (currentStep) {
       case "person":
-        return selectedLead !== null
+        return selectedLeads.length > 0
       case "type":
         return selectedTypes.length > 0 && selectedModality !== null
       case "datetime":
@@ -204,7 +224,7 @@ export function AppointmentBooking({
   }
 
   const handleSubmit = async () => {
-    if (selectedTypes.length === 0 || !selectedModality || !selectedLead || !selectedDate || !selectedTime) return
+    if (selectedTypes.length === 0 || !selectedModality || selectedLeads.length === 0 || !selectedDate || !selectedTime) return
 
     setIsSubmitting(true)
     setError(null)
@@ -216,7 +236,8 @@ export function AppointmentBooking({
       const { error } = await createAppointment({
         appointment_type: selectedTypes,
         modality: selectedModality,
-        lead_id: selectedLead.id,
+        lead_ids: selectedLeads.map(l => l.id),
+        lead_id: selectedLeads[0]?.id,
         scheduled_date: selectedDate.toISOString().split("T")[0],
         scheduled_time: selectedTime,
         duration_minutes: maxDuration,
@@ -256,9 +277,12 @@ export function AppointmentBooking({
     }
   }
 
-  // Single Form Mode - All fields in one popup
-  if (singleFormMode) {
-    const canSubmitSingleForm = selectedTypes.length > 0 && selectedModality && selectedLead && selectedDate && selectedTime
+  // Single Form Mode - All fields in one popup (or simplified callback mode)
+  if (singleFormMode || callbackMode) {
+    // In callback mode, type and modality are auto-set to defaults
+    const canSubmitSingleForm = callbackMode
+      ? selectedLeads.length > 0 && selectedDate && selectedTime
+      : selectedTypes.length > 0 && selectedModality && selectedLeads.length > 0 && selectedDate && selectedTime
 
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -284,8 +308,8 @@ export function AppointmentBooking({
                   <Check className="w-10 h-10 text-white" strokeWidth={3} />
                 </motion.div>
               </motion.div>
-              <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">Appointment Booked!</h3>
-              <p className="text-sm text-[var(--text-muted)]">The appointment has been scheduled successfully</p>
+              <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">{callbackMode ? "Callback Scheduled!" : "Appointment Booked!"}</h3>
+              <p className="text-sm text-[var(--text-muted)]">{callbackMode ? "The callback has been scheduled successfully" : "The appointment has been scheduled successfully"}</p>
               <div className="mt-4 flex items-center gap-2 text-xs text-[var(--text-muted)]">
                 <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />
                 Closing automatically...
@@ -301,10 +325,12 @@ export function AppointmentBooking({
                       <Calendar className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <span className="text-base font-semibold">Book Appointment</span>
-                      {selectedLead && (
+                      <span className="text-base font-semibold">{callbackMode ? "Schedule Callback" : "Book Appointment"}</span>
+                      {selectedLeads.length > 0 && (
                         <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
-                          for {selectedLead.first_name} {selectedLead.last_name}
+                          for {selectedLeads.length === 1
+                            ? `${selectedLeads[0].first_name} ${selectedLeads[0].last_name}`
+                            : `${selectedLeads.length} leads`}
                         </p>
                       )}
                     </div>
@@ -314,30 +340,100 @@ export function AppointmentBooking({
 
               {/* Single Form Content */}
               <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-                {/* Lead Info (Read-only) */}
-                {selectedLead && (
-                  <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-[var(--primary)]">
-                          {selectedLead.first_name[0]}{selectedLead.last_name[0]}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-[var(--text-primary)]">
-                          {selectedLead.first_name} {selectedLead.last_name}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
-                          <Phone className="w-3 h-3" />
-                          {selectedLead.phone}
-                        </p>
-                      </div>
-                      <Badge variant="outline" size="xs" shape="pill">
-                        {selectedLead.pipeline_stage?.replace(/_/g, " ")}
-                      </Badge>
+                {/* Lead Selection / Info */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                    {selectedLeads.length > 1 ? `Leads (${selectedLeads.length})` : 'Lead'}
+                  </label>
+
+                  {/* Selected leads tags */}
+                  {selectedLeads.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {selectedLeads.map((lead) => (
+                        <div
+                          key={lead.id}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--primary-muted)] border border-[var(--primary)]/20"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-semibold text-[var(--primary)]">
+                              {lead.first_name[0]}{lead.last_name[0]}
+                            </span>
+                          </div>
+                          <span className="text-xs font-medium text-[var(--text-primary)]">
+                            {lead.first_name} {lead.last_name}
+                          </span>
+                          {!preselectedLead && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedLeads(prev => prev.filter(l => l.id !== lead.id))}
+                              className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {/* Search to add more leads */}
+                  {!preselectedLead && (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                        <Input
+                          placeholder="Search by name or phone to add leads..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9 h-10 rounded-lg"
+                        />
+                      </div>
+                      {searchQuery && (
+                        <div className="max-h-[200px] overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] divide-y divide-[var(--border)]">
+                          {leadsLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="relative w-5 h-5">
+                                <div className="absolute inset-0 rounded-full border-2 border-[var(--primary)]/20" />
+                                <div className="absolute inset-0 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
+                              </div>
+                            </div>
+                          ) : leads.length === 0 ? (
+                            <div className="text-center py-4 text-sm text-[var(--text-muted)]">
+                              No leads found
+                            </div>
+                          ) : (
+                            leads.filter(l => !selectedLeads.some(sl => sl.id === l.id)).map((lead) => (
+                              <button
+                                key={lead.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedLeads(prev => [...prev, lead])
+                                  setSearchQuery("")
+                                }}
+                                className="w-full p-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-3"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-xs font-semibold text-[var(--primary)]">
+                                    {lead.first_name[0]}{lead.last_name[0]}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm text-[var(--text-primary)] truncate">
+                                    {lead.first_name} {lead.last_name}
+                                  </p>
+                                  <p className="text-xs text-[var(--text-muted)]">{lead.phone}</p>
+                                </div>
+                                <Badge variant="outline" size="xs" shape="pill">
+                                  {lead.pipeline_stage?.replace(/_/g, " ")}
+                                </Badge>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
 
                 {/* Date & Time Row */}
                 <div className="grid grid-cols-2 gap-3">
@@ -372,85 +468,91 @@ export function AppointmentBooking({
                   </div>
                 </div>
 
-                {/* Type Selection (Multi-select) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                    Type <span className="font-normal normal-case">(select one or more)</span>
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {availableAppointmentTypes.map((type) => {
-                      const isSelected = selectedTypes.includes(type.value)
-                      return (
-                        <button
-                          key={type.value}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTypes(prev =>
-                              prev.includes(type.value)
-                                ? prev.filter(t => t !== type.value)
-                                : [...prev, type.value]
-                            )
-                          }}
-                          className={cn(
-                            "px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                            isSelected
-                              ? "bg-[var(--primary)] text-white shadow-sm"
-                              : "bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border)]"
-                          )}
-                        >
-                          {isSelected && <Check className="w-3.5 h-3.5" />}
-                          {type.label}
-                        </button>
-                      )
-                    })}
+                {/* Type Selection (Multi-select) - Hidden in callback mode */}
+                {!callbackMode && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      Type <span className="font-normal normal-case">(select one or more)</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableAppointmentTypes.map((type) => {
+                        const isSelected = selectedTypes.includes(type.value)
+                        return (
+                          <button
+                            key={type.value}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTypes(prev =>
+                                prev.includes(type.value)
+                                  ? prev.filter(t => t !== type.value)
+                                  : [...prev, type.value]
+                              )
+                            }}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
+                              isSelected
+                                ? "bg-[var(--primary)] text-white shadow-sm"
+                                : "bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border)]"
+                            )}
+                          >
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                            {type.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Location */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                    Location
-                  </label>
-                  <Select value={selectedModality || ""} onValueChange={(v) => setSelectedModality(v as AppointmentModality)}>
-                    <SelectTrigger className="h-10 rounded-lg">
-                      <SelectValue placeholder="Select location..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {APPOINTMENT_MODALITIES.map((modality) => (
-                        <SelectItem key={modality.value} value={modality.value}>
-                          <div className="flex items-center gap-2">
-                            {modality.value === "campus" ? <Building2 className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
-                            {modality.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Assigned Employee */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                    Assigned To
-                  </label>
-                  <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                    <SelectTrigger className="h-10 rounded-lg">
-                      <SelectValue placeholder="Select employee..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agents.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[10px] font-semibold text-[var(--primary)]">
-                              {agent.full_name?.charAt(0).toUpperCase()}
+                {/* Location - Hidden in callback mode */}
+                {!callbackMode && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      Location
+                    </label>
+                    <Select value={selectedModality || ""} onValueChange={(v) => setSelectedModality(v as AppointmentModality)}>
+                      <SelectTrigger className="h-10 rounded-lg">
+                        <SelectValue placeholder="Select location..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {APPOINTMENT_MODALITIES.map((modality) => (
+                          <SelectItem key={modality.value} value={modality.value}>
+                            <div className="flex items-center gap-2">
+                              {modality.value === "campus" ? <Building2 className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                              {modality.label}
                             </div>
-                            {agent.full_name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Assigned Employee - Hidden in callback mode */}
+                {!callbackMode && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      Assigned To
+                    </label>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                      <SelectTrigger className="h-10 rounded-lg">
+                        <SelectValue placeholder="Select employee..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agents.map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[10px] font-semibold text-[var(--primary)]">
+                                {agent.full_name?.charAt(0).toUpperCase()}
+                              </div>
+                              {agent.full_name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div className="space-y-1.5">
@@ -499,7 +601,7 @@ export function AppointmentBooking({
                   ) : (
                     <>
                       <Check className="w-4 h-4 mr-1.5" />
-                      Book Appointment
+                      {callbackMode ? "Schedule Callback" : "Book Appointment"}
                     </>
                   )}
                 </Button>
@@ -769,12 +871,45 @@ export function AppointmentBooking({
               >
                 <div className="mb-5">
                   <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                    Select Lead
+                    Select Leads
+                    {selectedLeads.length > 0 && (
+                      <span className="ml-2 text-sm font-normal text-[var(--text-muted)]">
+                        ({selectedLeads.length} selected)
+                      </span>
+                    )}
                   </h3>
                   <p className="text-sm text-[var(--text-muted)] mt-1">
-                    Choose the lead for this appointment
+                    Choose one or more leads for this appointment
                   </p>
                 </div>
+
+                {/* Selected leads tags */}
+                {selectedLeads.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedLeads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--primary-muted)] border border-[var(--primary)]/20"
+                      >
+                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] font-semibold text-[var(--primary)]">
+                            {lead.first_name[0]}{lead.last_name[0]}
+                          </span>
+                        </div>
+                        <span className="text-xs font-medium text-[var(--text-primary)]">
+                          {lead.first_name} {lead.last_name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLeads(prev => prev.filter(l => l.id !== lead.id))}
+                          className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Search */}
                 <div className="relative">
@@ -805,60 +940,66 @@ export function AppointmentBooking({
                       <p className="text-sm text-[var(--text-muted)]">No leads found</p>
                     </div>
                   ) : (
-                    leads.map((lead, idx) => (
-                      <motion.button
-                        key={lead.id}
-                        onClick={() => setSelectedLead(lead)}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.03 }}
-                        whileHover={{ scale: 1.01, x: 2 }}
-                        className={cn(
-                          "w-full p-3.5 rounded-xl border-2 text-left transition-all duration-200 relative",
-                          selectedLead?.id === lead.id
-                            ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-md shadow-[var(--primary)]/10"
-                            : "border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--bg-hover)]"
-                        )}
-                      >
-                        {selectedLead?.id === lead.id && (
-                          <motion.div
-                            layoutId="leadSelection"
-                            className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--primary)] rounded-r-full"
-                          />
-                        )}
-                        <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-semibold text-[var(--primary)]">
-                              {lead.first_name[0]}{lead.last_name[0]}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-[var(--text-primary)] truncate">
-                              {lead.first_name} {lead.last_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] px-2 py-0.5 rounded-md bg-[var(--bg-sunken)]">
-                                <Phone className="w-3 h-3" />
-                                {lead.phone}
+                    leads.map((lead, idx) => {
+                      const isSelected = selectedLeads.some(l => l.id === lead.id)
+                      return (
+                        <motion.button
+                          key={lead.id}
+                          onClick={() => {
+                            setSelectedLeads(prev =>
+                              isSelected
+                                ? prev.filter(l => l.id !== lead.id)
+                                : [...prev, lead]
+                            )
+                          }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          whileHover={{ scale: 1.01, x: 2 }}
+                          className={cn(
+                            "w-full p-3.5 rounded-xl border-2 text-left transition-all duration-200 relative",
+                            isSelected
+                              ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-md shadow-[var(--primary)]/10"
+                              : "border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--bg-hover)]"
+                          )}
+                        >
+                          {isSelected && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--primary)] rounded-r-full" />
+                          )}
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                              <span className="text-sm font-semibold text-[var(--primary)]">
+                                {lead.first_name[0]}{lead.last_name[0]}
                               </span>
-                              <Badge variant="outline" size="xs" shape="pill">
-                                {lead.pipeline_stage?.replace(/_/g, " ")}
-                              </Badge>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-[var(--text-primary)] truncate">
+                                {lead.first_name} {lead.last_name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] px-2 py-0.5 rounded-md bg-[var(--bg-sunken)]">
+                                  <Phone className="w-3 h-3" />
+                                  {lead.phone}
+                                </span>
+                                <Badge variant="outline" size="xs" shape="pill">
+                                  {lead.pipeline_stage?.replace(/_/g, " ")}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0",
+                              isSelected
+                                ? "border-[var(--primary)] bg-[var(--primary)]"
+                                : "border-[var(--border)]"
+                            )}>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-white" />
+                              )}
                             </div>
                           </div>
-                          <div className={cn(
-                            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0",
-                            selectedLead?.id === lead.id
-                              ? "border-[var(--primary)] bg-[var(--primary)]"
-                              : "border-[var(--border)]"
-                          )}>
-                            {selectedLead?.id === lead.id && (
-                              <Check className="w-3.5 h-3.5 text-white" />
-                            )}
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))
+                        </motion.button>
+                      )
+                    })
                   )}
                 </div>
               </motion.div>
@@ -1046,29 +1187,42 @@ export function AppointmentBooking({
                     {/* Divider */}
                     <div className="h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent" />
 
-                    {/* Lead */}
+                    {/* Leads */}
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.05 }}
-                      className="flex items-center gap-4"
+                      className="space-y-2"
                     >
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-[var(--primary)]">
-                          {selectedLead?.first_name[0]}{selectedLead?.last_name[0]}
-                        </span>
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center">
+                          <User className="w-5 h-5 text-[var(--primary)]" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                            {selectedLeads.length > 1 ? `Leads (${selectedLeads.length})` : 'Lead'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
-                          Lead
-                        </p>
-                        <p className="font-semibold text-[var(--text-primary)] mt-0.5">
-                          {selectedLead?.first_name} {selectedLead?.last_name}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3" />
-                          {selectedLead?.phone}
-                        </p>
+                      <div className="ml-16 space-y-1.5">
+                        {selectedLeads.map((lead) => (
+                          <div key={lead.id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-surface)]">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                              <span className="text-[10px] font-semibold text-[var(--primary)]">
+                                {lead.first_name[0]}{lead.last_name[0]}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-[var(--text-primary)]">
+                                {lead.first_name} {lead.last_name}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {lead.phone}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </motion.div>
 
@@ -1217,7 +1371,9 @@ export function AppointmentBooking({
                         ))}
                       </div>
                       <p className="text-xs text-[var(--text-muted)]">
-                        {selectedLead?.first_name} {selectedLead?.last_name}
+                        {selectedLeads.length === 1
+                          ? `${selectedLeads[0].first_name} ${selectedLeads[0].last_name}`
+                          : `${selectedLeads.length} leads`}
                       </p>
                     </div>
                   </div>

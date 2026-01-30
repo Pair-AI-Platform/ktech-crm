@@ -4,70 +4,104 @@
 
 export type UserRole = 'admin' | 'agent'
 
-export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up'
+export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'interested' | 'high_gpa' | 'low_gpa' | 'already_done'
 
 export type LeadSourceCategory = 'direct' | 'events' | 'digital' | 'referrals' | 'outreach'
 
 export type LeadSource =
   | 'walk_in' | 'call_center' | 'whatsapp' | 'email'
-  | 'school_visit' | 'expo' | 'exhibitions'
+  | 'school_visit' | 'expo' | 'exhibitions' | 'karnival'
   | 'website_form' | 'facebook' | 'instagram' | 'snapchat'
   | 'current_student_referral' | 'staff_referral' | 'friend_referral'
   | 'old_contacts' | 'paaet_rejected' | 'gpa_lists'
 
 export type PipelineStage =
-  | 'new' | 'contacted' | 'visit' | 'appointment' | 'test' | 'application' | 'submission' | 'enrolled' | 'lost'
+  | 'new' | 'contacted' | 'appointment' | 'visit' | 'test' | 'application' | 'lost' | 'applicant' | 'enrolled' | 'withdraw'
 
 export type ContactStatus =
   | 'uncontacted' | 'interested' | 'not_interested' | 'no_answer'
   | 'callback' | 'will_see' | 'wrong_number'
 
 export type School =
-  // Capital (العاصمة) - Boys
-  | 'al_awzai' | 'jaber_almubarak_boys' | 'ahmad_shihab_aldin' | 'saad_bin_alrabee'
-  | 'abdullah_alotaibi' | 'issa_ahmad_alhamad' | 'ahmad_mishari_aladwani' | 'youssef_bin_issa'
-  // Capital - Girls
-  | 'qurtuba_girls' | 'fatima_bint_alwalid' | 'aljazair_girls' | 'aldoha_girls' | 'alrawda_girls'
-  | 'asmaa_bint_alharith' | 'alyarmouk_girls' | 'bibi_alsalem' | 'almansouriya_girls'
-  | 'jumana_bint_abi_talib' | 'sharifa_aloudi'
-  // Hawalli (حولي) - Boys
-  | 'jaber_alahmad_hawalli' | 'abdulrazzaq_albassir' | 'farhan_alkhaled' | 'palestine_boys'
-  | 'salah_aldin' | 'fahad_alsalem' | 'fahd_alduwiri'
-  // Hawalli - Girls
-  | 'maria_alqibtiya' | 'mushrif_girls' | 'hind_girls' | 'aljabriya_girls' | 'alsalmiya_girls'
-  | 'omama_bint_abi_alaas' | 'khalida_bint_alaswad' | 'bayan_girls' | 'salwa_girls'
-  // Farwaniya (الفروانية) - Boys
-  | 'alshujaa_bin_alaslam' | 'ibn_alomaid' | 'anas_bin_malik' | 'juleib_alshuyoukh'
-  | 'salman_alfarsi' | 'abdullatif_thunayan' | 'murshid_saad_albathal'
-  // Farwaniya - Girls
-  | 'um_ziyad_girls' | 'abriq_khaitan_girls' | 'alrabie_girls' | 'alfirdaws_girls' | 'alnahda_girls'
-  | 'um_alhakam_girls' | 'um_amer_alansariya' | 'juleib_alshuyoukh_girls' | 'alfarwaniya_girls'
-  | 'alomriya_girls' | 'hawaa_bint_yazid' | 'durrat_alhashimiya'
-  // Ahmadi (الأحمدي) - Boys
-  | 'alzour' | 'aldahr' | 'alqurtubi' | 'alsiddiq' | 'alnasr' | 'alkindi'
-  | 'salem_almubarak' | 'saeed_bin_amer' | 'abdullah_alahmad_alsabah' | 'omar_bin_alkhattab'
-  | 'hisham_bin_alaas'
-  // Ahmadi - Girls
-  | 'awatif_khalifa_alathbi' | 'fatima_bint_asad' | 'lubna_bint_alharith'
-  | 'latifa_alfares' | 'muadhah_alghifariya' | 'hadiya_girls' | 'alfahaheel_girls'
-  | 'um_alala_alansariya' | 'anisa_bint_khabib' | 'alzour_girls' | 'safiya_bint_abdulmuttalib' | 'alritqa_girls'
-  // Jahra (الجهراء) - Boys
-  | 'aljahra_boys' | 'alwaha' | 'thabit_bin_qais' | 'jaber_alabdullah'
-  | 'khaled_bin_saeed' | 'orwa_bin_alzubayr' | 'sabah_alnasser'
-  // Jahra - Girls
-  | 'amra_bint_rawaha' | 'fatima_bint_utba' | 'aljahra_girls' | 'alnoor_bint_malik' | 'taimaa_girls'
-  | 'rabiea_bint_alharith' | 'um_alharith_alansariya' | 'um_mubashir_alansariya' | 'zainab_bint_muhammad'
-  // Mubarak Al-Kabeer (مبارك الكبير) - Boys
-  | 'alimam_malik' | 'jaber_alali_alsabah' | 'suleiman_aladassani'
-  | 'duaij_alsalman' | 'khaled_saud_alzaid'
-  // Mubarak Al-Kabeer - Girls
-  | 'faria_bint_abi_alsalt' | 'fatima_alhashimiya' | 'layla_alghifariya'
-  | 'aladan_girls' | 'barqan_girls' | 'sabah_alsalem_girls'
+  // Capital (العاصمة) - Boys (19)
+  | 'jaber_mubarak_boys' | 'jasem_alkhurafi' | 'abdullah_aljaber' | 'ahmad_mishari_aladwani'
+  | 'abdullah_alotaibi' | 'hamad_alrajeeb' | 'issa_ahmad_alhamad' | 'ahmad_albishr_alroumi'
+  | 'youssef_bin_issa' | 'academy_talent_boys' | 'saad_bin_alrabee' | 'yaqoub_alghuneim'
+  | 'ahmad_shihab_aldin' | 'sulaiman_abu_ghosh' | 'oqab_alkhatib' | 'mohammed_mahmoud_najm'
+  | 'alasmai' | 'institute_alsumait' | 'altadamun_boys'
+  // Capital (العاصمة) - Girls (21)
+  | 'alisraa_girls' | 'qurtuba_girls' | 'alyarmouk_girls' | 'alrawda_girls'
+  | 'sharifa_alawadhi' | 'alasmaa_bint_alharith' | 'bibi_alsalem' | 'suad_mohammed_alsabah'
+  | 'jumana_bint_abi_talib' | 'aljazair_girls' | 'academy_talent_girls' | 'latifa_alshamali'
+  | 'fatima_bint_alwalid' | 'aldoha_girls' | 'um_habib_alqurashiya' | 'munira_alahmad_alsabah'
+  | 'habiba_bint_shariq' | 'um_maqil_alasadiya' | 'institute_qurtuba_girls'
+  | 'altadamun_girls' | 'alsharq_alawsat_girls'
+  // Hawalli (حولي) - Boys (18)
+  | 'saleh_shihab' | 'fahad_alsalem' | 'palestine_boys' | 'abdullah_alassousi'
+  | 'jaber_alahmad_hawalli' | 'fahd_alduwiri' | 'abdullah_abdullatif_alrajeeb' | 'ahmad_alrabei'
+  | 'nasser_almuhsin_alsaeed' | 'salah_aldin' | 'alrajaa_boys' | 'alnoor_boys'
+  | 'alamal_boys' | 'alwataniya_private' | 'alikhlas_boys' | 'kuwait_academy'
+  | 'alnajat_boys' | 'institute_qurtuba_boys'
+  // Hawalli (حولي) - Girls (19)
+  | 'mushrif_girls' | 'salwa_girls' | 'khalida_bint_alaswad' | 'omama_bint_bishr'
+  | 'february25_girls' | 'alsalmiya_girls' | 'aljabriya_girls' | 'bayan_girls'
+  | 'fatima_alsarawi' | 'maria_alqibtiya' | 'alnoor_girls' | 'alrajaa_girls'
+  | 'alamal_girls' | 'aljeel_aljadeed' | 'arabian_academy' | 'alikhlas_girls'
+  | 'alnajat_girls' | 'aldana_girls' | 'institute_qurtuba_girls_hawalli'
+  // Farwaniya (الفروانية) - Boys (21)
+  | 'aldawgha' | 'tariq_bin_ziyad' | 'shujaa_bin_alaslam' | 'labid_bin_alrabee'
+  | 'juleib_alshuyoukh' | 'aljahiz' | 'alsabah_farwaniya' | 'abdullatif_thunayan'
+  | 'abdulrazzaq_aladassani' | 'murshid_saad_albathal' | 'ibn_alomaid' | 'almubarakiya'
+  | 'hamoud_aljaber_alsabah' | 'anas_bin_malik' | 'alnukhba' | 'fajr_aljadeed'
+  | 'alimtiaz' | 'jawhara_alsaleh' | 'kuwait_private_modern' | 'mohammed_alothman_alrashid'
+  | 'altamayyuz_boys'
+  // Farwaniya (الفروانية) - Girls (20)
+  | 'dalal_albishr_alroumi' | 'altahira_bint_alharith' | 'alfuraia_bint_malik'
+  | 'khadija_bint_alzubayr' | 'um_ziyad_girls' | 'razina_girls' | 'durrat_alhashimiya'
+  | 'alfirdaws_girls' | 'um_alhakam_girls' | 'alrabee_bint_muawwadh'
+  | 'hawaa_bint_yazid' | 'um_amer_alansariya' | 'alrabie_girls' | 'umaima_bint_rabeea'
+  | 'alfarwaniya_girls' | 'abriq_khaitan_girls' | 'institute_farwaniya_girls'
+  | 'aljaber_private_girls' | 'um_hani_private' | 'harvard_girls'
+  // Ahmadi (الأحمدي) - Boys (20)
+  | 'abdulaziz_alzamel' | 'mohammed_almutawa' | 'abdullah_bin_abbas' | 'ayoub_alayoub'
+  | 'talha_bin_ubaid' | 'omar_bin_alkhattab' | 'mohammed_alnashmi' | 'alkindi'
+  | 'hisham_bin_alaas' | 'alsabahiya_boys' | 'alqurtubi' | 'balat_alshuhada'
+  | 'salem_almubarak' | 'saeed_bin_amer' | 'issa_alhouli' | 'abdullah_alahmad_alsabah'
+  | 'harun_alrashid' | 'institute_south_sabahiya' | 'institute_aliman' | 'almaarifa_boys'
+  // Ahmadi (الأحمدي) - Girls (23)
+  | 'moudhi_alissa' | 'alkhairan_girls' | 'ghunaimah_almarzouk' | 'shakriya_alsaeedi'
+  | 'jumana_bint_alhasan' | 'alrawdatain_girls' | 'um_alhaiman' | 'fatima_bint_asad'
+  | 'latifa_alfares' | 'amah_bint_khaled' | 'alsabahiya_girls' | 'lubna_bint_alharith'
+  | 'alritqa_girls' | 'alraqqa_girls' | 'hadiya_girls' | 'um_alala_alansariya'
+  | 'anisa_bint_khabib' | 'awatif_khalifa_alathbi' | 'muadhah_alghifariya'
+  | 'almaarifa_girls' | 'alnajat_ahmadi_girls' | 'um_alqura' | 'zainab_bint_mazoun'
+  // Jahra (الجهراء) - Boys (9)
+  | 'thabit_bin_qais' | 'orwa_bin_alzubayr' | 'saad_alabdullah_alsabah'
+  | 'mohammed_almuhaini' | 'khaled_bin_saeed' | 'sabah_alnasser' | 'alwaha'
+  | 'youssef_alathbi_alsabah' | 'aljahra_private_boys'
+  // Jahra (الجهراء) - Girls (15)
+  | 'um_alharith_alansariya' | 'fatima_bint_utba' | 'suad_bint_salma'
+  | 'rita_bint_alharith' | 'nouriya_alsubaih' | 'amena_bint_alarqam' | 'taimaa_girls'
+  | 'um_mubashir_alansariya' | 'zainab_bint_muhammad' | 'alnoor_bint_malik'
+  | 'aljahra_girls' | 'amra_bint_rawaha' | 'aljahra_private_girls'
+  | 'thabia_bint_albaraa' | 'thabia_bint_alharith'
+  // Mubarak Al-Kabeer (مبارك الكبير) - Boys (8)
+  | 'alimam_malik' | 'khaled_saud_alzaid' | 'suleiman_aladassani'
+  | 'abdullah_almubarak_alsabah' | 'jaber_alali_alsabah' | 'sabah_alsalem_boys'
+  | 'duaij_alsalman' | 'alriyada_boys'
+  // Mubarak Al-Kabeer (مبارك الكبير) - Girls (9)
+  | 'alsharqiya_girls' | 'layla_alghifariya' | 'tulaitula_girls' | 'barqan_girls'
+  | 'fatima_alhashimiya' | 'aladan_girls' | 'sabah_alsalem_girls'
+  | 'faria_bint_abi_alsalt' | 'alriyada_girls'
+  // Religious Institutes (standalone)
+  | 'institute_alfahaheel' | 'institute_jaber_alahmad'
   | 'other'
 
 export type AcademicTrack = 'science' | 'arts'
 
 export type GradeLevel = '10th' | '11th' | '12th'
+
+export type EducationType = 'GOV' | 'US' | 'UK' | 'KSA' | 'other'
 
 export type FundingType = 'self_funded' | 'puc'
 
@@ -91,11 +125,6 @@ export type MinistryBlockReason = 'ku' | 'paaet' | 'abroad' | 'aasu' | 'paci' | 
 
 export type SFEnrolledStage = '150' | '400' | 'other'
 
-export type SubmissionSubstage = 'pending' | 'submitted' | 'blocked' | 'ready' | 'documents' | 'lost'
-
-export type SubmissionStatus = 'cancelled' | 'cb' | 'appointment'
-
-export type SubmissionBlockedReason = 'ku' | 'paaet' | 'abroad' | 'aasu' | 'paci' | 'puc' | 'gpa' | 'documents_missing' | 'payment_pending' | 'other'
 
 export type HighSchoolCertificateType = 'original' | 'true_copy'
 
@@ -115,6 +144,7 @@ export type AppointmentStatus =
   | 'on_the_way'   // On The Way (بالطريق)
   | 'postponed'    // Postponed to new date (مؤجل)
   | 'cant_reach'   // Can't reach (لا يمكن الوصول)
+  | 'will_see'     // Will See (بيجي)
   | 'completed'    // Completed/Attended (تم)
   | 'cancelled'    // Cancelled (ملغي)
 
@@ -185,6 +215,8 @@ export interface Lead {
   school_id?: string
   school_name_custom?: string
   school?: School
+  education_type?: EducationType
+  education_type_custom?: string
   grade_level?: GradeLevel
   academic_track?: AcademicTrack
   gpa_grade_10?: number
@@ -203,6 +235,7 @@ export interface Lead {
 
   intended_major?: IntendedMajor
   custom_major?: string
+  preferred_major?: string
   graduation_year?: number
   expected_gpa?: number
   actual_lead?: boolean
@@ -233,6 +266,11 @@ export interface Lead {
   has_weyay_account: boolean
   has_bank_account: boolean
 
+  // Discount (SF leads)
+  discount_type?: DiscountType
+  discount_percentage?: number
+  discount_notes?: string
+
   // Lead Tracking
   source_category: LeadSourceCategory
   source: LeadSource
@@ -243,20 +281,23 @@ export interface Lead {
   // Pipeline
   status?: LeadStatus
   pipeline_stage: PipelineStage
+  position_in_stage?: number
   completed_stages?: PipelineStage[]
   contact_status: ContactStatus
-  lost_reason_id?: string
+  lost_reason_id?: string | null
   lost_reason?: LostReason
-  lost_reason_notes?: string
+  lost_reason_notes?: string | null
+  lost_at_stage?: PipelineStage | null
 
   // Ministry Submission Block
   ministry_blocked?: boolean
   ministry_block_reasons?: MinistryBlockReason[]
 
-  // Submission Stage Tracking
+  // Submission Tracking
   submission_substage?: SubmissionSubstage
   submission_status?: SubmissionStatus
   submission_blocked_reason?: SubmissionBlockedReason
+  submission_blocked_reason_notes?: string
   submission_lost_reason_id?: string
 
   // Assignment
@@ -273,6 +314,9 @@ export interface Lead {
 
   // Notes
   notes?: string
+
+  // Joined relations (from queries)
+  appointments?: { id: string; appointment_type: AppointmentType[]; status: AppointmentStatus; scheduled_date: string }[]
 }
 
 export interface LeadFormData {
@@ -298,6 +342,8 @@ export interface LeadFormData {
   school_id?: string
   school_name_custom?: string
   school?: School
+  education_type?: EducationType
+  education_type_custom?: string
   grade_level?: GradeLevel
   academic_track?: AcademicTrack
   gpa_grade_10?: number
@@ -311,8 +357,10 @@ export interface LeadFormData {
 
   intended_major?: IntendedMajor
   custom_major?: string
+  preferred_major?: string
   graduation_year?: number
   expected_gpa?: number
+  actual_gpa?: number
   actual_lead?: boolean
   seat_number?: string
   // Placement Test
@@ -537,12 +585,21 @@ export interface AppointmentSlot {
   created_at: string
 }
 
+export interface AppointmentLead {
+  id: string
+  appointment_id: string
+  lead_id: string
+  lead?: Lead
+  created_at: string
+}
+
 export interface Appointment {
   id: string
   slot_id?: string
   slot?: AppointmentSlot
   lead_id?: string
   lead?: Lead
+  appointment_leads?: AppointmentLead[]
   student_id?: string
   student?: Student
 
@@ -586,6 +643,10 @@ export interface Appointment {
   on_the_way_at?: string
   on_the_way_marked_by?: string
 
+  // Will See tracking
+  will_see_at?: string
+  will_see_marked_by?: string
+
   // Legacy no_show fields (migrated to na)
   no_show_marked_at?: string
   no_show_marked_by?: string
@@ -628,6 +689,7 @@ export interface SchoolEntity {
   id: string
   name_en: string
   name_ar: string
+  governorate?: Governorate
   is_active: boolean
   created_at: string
 }
@@ -778,18 +840,23 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; labelAr: string;
   { value: 'by_mistake', label: 'By Mistake', labelAr: 'بالخطأ', color: 'secondary' },
   { value: 'disconnected', label: 'Disconnected', labelAr: 'غير متصل', color: 'secondary' },
   { value: 'hanged_up', label: 'Hanged Up', labelAr: 'أغلق الخط', color: 'destructive' },
+  { value: 'interested', label: 'Interested', labelAr: 'مهتم', color: 'success' },
+  { value: 'high_gpa', label: 'High GPA', labelAr: 'معدل عالي', color: 'success' },
+  { value: 'low_gpa', label: 'Low GPA', labelAr: 'معدل منخفض', color: 'warning' },
+  { value: 'already_done', label: 'Already Done', labelAr: 'تم بالفعل', color: 'secondary' },
 ]
 
 export const PIPELINE_STAGES: { value: PipelineStage; label: string; labelAr: string }[] = [
   { value: 'new', label: 'New', labelAr: 'جديد' },
   { value: 'contacted', label: 'Contacted', labelAr: 'تم التواصل' },
-  { value: 'visit', label: 'Visit', labelAr: 'زيارة' },
   { value: 'appointment', label: 'Appointment', labelAr: 'موعد' },
+  { value: 'visit', label: 'Visit', labelAr: 'زيارة' },
   { value: 'test', label: 'Test', labelAr: 'اختبار' },
   { value: 'application', label: 'Application', labelAr: 'طلب' },
-  { value: 'submission', label: 'Submission', labelAr: 'تقديم' },
+  { value: 'lost', label: 'Lost', labelAr: 'خسارة' },
+  { value: 'applicant', label: 'Applicant', labelAr: 'متقدم' },
   { value: 'enrolled', label: 'Enrolled', labelAr: 'مسجل' },
-  { value: 'lost', label: 'Lost', labelAr: 'خسارة' }
+  { value: 'withdraw', label: 'Withdraw', labelAr: 'انسحاب' }
 ]
 
 // Stages that are locked and cannot be changed (add stage values here to lock them)
@@ -802,36 +869,6 @@ export const SF_ENROLLED_STAGES: { value: SFEnrolledStage; label: string; labelA
   { value: 'other', label: 'Other', labelAr: 'أخرى', color: 'secondary' },
 ]
 
-// Submission Stage - Substages
-export const SUBMISSION_SUBSTAGES: { value: SubmissionSubstage; label: string; labelAr: string; color: string }[] = [
-  { value: 'pending', label: 'Pending', labelAr: 'قيد الانتظار', color: 'secondary' },
-  { value: 'submitted', label: 'Submitted', labelAr: 'تم التقديم', color: 'accent' },
-  { value: 'blocked', label: 'Blocked', labelAr: 'محظور', color: 'destructive' },
-  { value: 'ready', label: 'Ready', labelAr: 'جاهز', color: 'success' },
-  { value: 'documents', label: 'Documents', labelAr: 'المستندات', color: 'warning' },
-  { value: 'lost', label: 'Lost', labelAr: 'مفقود', color: 'destructive' },
-]
-
-// Submission Stage - Blocked Reasons
-export const SUBMISSION_BLOCKED_REASONS: { value: SubmissionBlockedReason; label: string; labelAr: string }[] = [
-  { value: 'ku', label: 'KU - Kuwait University', labelAr: 'جامعة الكويت' },
-  { value: 'paaet', label: 'PAAET', labelAr: 'التطبيقي' },
-  { value: 'abroad', label: 'Studying Abroad', labelAr: 'في الخارج' },
-  { value: 'aasu', label: 'AASU', labelAr: 'الجامعة العربية المفتوحة' },
-  { value: 'paci', label: 'PACI Issue', labelAr: 'مشكلة في الهيئة العامة للمعلومات المدنية' },
-  { value: 'puc', label: 'PUC Issue', labelAr: 'مشكلة في ديوان الخدمة' },
-  { value: 'gpa', label: 'GPA Below 70%', labelAr: 'المعدل أقل من 70%' },
-  { value: 'documents_missing', label: 'Documents Missing', labelAr: 'مستندات ناقصة' },
-  { value: 'payment_pending', label: 'Payment Pending', labelAr: 'في انتظار الدفع' },
-  { value: 'other', label: 'Other', labelAr: 'أخرى' },
-]
-
-// Submission Stage - Statuses
-export const SUBMISSION_STATUSES: { value: SubmissionStatus; label: string; labelAr: string; color: string }[] = [
-  { value: 'cancelled', label: 'Cancelled', labelAr: 'ملغي', color: 'destructive' },
-  { value: 'cb', label: 'CB', labelAr: 'معاودة الاتصال', color: 'accent' },
-  { value: 'appointment', label: 'Appointment', labelAr: 'موعد', color: 'success' },
-]
 
 // SF (Self-Funded) Documents Configuration - Optional documents
 export const SF_DOCUMENTS = [
@@ -855,7 +892,68 @@ export const PUC_DOCUMENTS = [
 
 export const PUC_FEE_AMOUNT = 10 // KWD
 
-// Ministry Website Block Reasons - when submission is blocked for a lead
+// =============================================
+// PUC SRJ DOCUMENTS (Database-backed)
+// =============================================
+
+export type PSPDocumentType =
+  | 'passport'
+  | 'civil_id'
+  | 'parent_civil_id'
+  | 'hs_certificate'
+  | 'nationality'
+  | 'puc_receipt'
+  | 'acceptance_letter'
+  | 'transcript_moh'
+  | 'sequence_letter'
+  | 'gcse'
+  | 'a_level'
+  | 'equivalency'
+  | 'photo'
+  | 'shahada'
+  | 'transcript'
+
+export type PSPGraduateType = 'GOV' | 'US' | 'UK' | 'KSA'
+
+export interface PSPDocument {
+  id: string
+  lead_id: string
+  document_type: PSPDocumentType
+  graduate_type: PSPGraduateType
+  file_name: string
+  file_type: string | null
+  file_size: number | null
+  storage_path: string
+  public_url: string | null
+  is_verified: boolean
+  verified_by: string | null
+  verified_at: string | null
+  verification_notes: string | null
+  expiration_date: string | null
+  is_expired: boolean
+  uploaded_by: string | null
+  uploaded_at: string
+  updated_at: string
+  // Joined relations
+  verified_by_profile?: Profile | null
+  uploaded_by_profile?: Profile | null
+}
+
+export interface PSPDocumentValidationResult {
+  valid: boolean
+  errors: string[]
+}
+
+export interface PSPDocumentCompletionStatus {
+  total: number
+  uploaded: number
+  verified: number
+  missing: number
+  percentage: number
+  isComplete: boolean
+}
+
+// Ministry Website Block Reasons
 export const MINISTRY_BLOCK_REASONS: { value: MinistryBlockReason; label: string; labelAr: string }[] = [
   { value: 'ku', label: 'KU', labelAr: 'جامعة الكويت' },
   { value: 'paaet', label: 'PAAET', labelAr: 'التطبيقي' },
@@ -884,156 +982,260 @@ export const GOVERNORATES: { value: Governorate; label: string; labelAr: string 
 
 export const SCHOOLS: { value: School; label: string; labelAr: string; governorate?: Governorate; gender?: 'boys' | 'girls' }[] = [
   // =============================================
-  // CAPITAL (العاصمة) - BOYS
+  // CAPITAL (العاصمة) - BOYS (19)
   // =============================================
-  { value: 'al_awzai', label: 'ثانوية الأوزاعي', labelAr: 'ثانوية الأوزاعي', governorate: 'capital', gender: 'boys' },
-  { value: 'jaber_almubarak_boys', label: 'ثانوية جابر المبارك الصباح', labelAr: 'ثانوية جابر المبارك الصباح', governorate: 'capital', gender: 'boys' },
-  { value: 'ahmad_shihab_aldin', label: 'ثانوية أحمد شهاب الدين', labelAr: 'ثانوية أحمد شهاب الدين', governorate: 'capital', gender: 'boys' },
-  { value: 'saad_bin_alrabee', label: 'ثانوية سعد بن الربيع الأنصاري', labelAr: 'ثانوية سعد بن الربيع الأنصاري', governorate: 'capital', gender: 'boys' },
-  { value: 'abdullah_alotaibi', label: 'ثانوية عبدالله العتيبي', labelAr: 'ثانوية عبدالله العتيبي', governorate: 'capital', gender: 'boys' },
-  { value: 'issa_ahmad_alhamad', label: 'ثانوية عيسى أحمد الحمد', labelAr: 'ثانوية عيسى أحمد الحمد', governorate: 'capital', gender: 'boys' },
-  { value: 'ahmad_mishari_aladwani', label: 'ثانوية أحمد مشاري العدواني', labelAr: 'ثانوية أحمد مشاري العدواني', governorate: 'capital', gender: 'boys' },
-  { value: 'youssef_bin_issa', label: 'ثانوية يوسف بن عيسى', labelAr: 'ثانوية يوسف بن عيسى', governorate: 'capital', gender: 'boys' },
+  { value: 'jaber_mubarak_boys', label: 'جابر مبارك الصباح', labelAr: 'جابر مبارك الصباح', governorate: 'capital', gender: 'boys' },
+  { value: 'jasem_alkhurafi', label: 'جاسم محمد الخرافي', labelAr: 'جاسم محمد الخرافي', governorate: 'capital', gender: 'boys' },
+  { value: 'abdullah_aljaber', label: 'عبدالله الجابر', labelAr: 'عبدالله الجابر', governorate: 'capital', gender: 'boys' },
+  { value: 'ahmad_mishari_aladwani', label: 'أحمد مشاري العدواني', labelAr: 'أحمد مشاري العدواني', governorate: 'capital', gender: 'boys' },
+  { value: 'abdullah_alotaibi', label: 'عبدالله العتيبي', labelAr: 'عبدالله العتيبي', governorate: 'capital', gender: 'boys' },
+  { value: 'hamad_alrajeeb', label: 'حمد عيسي الرجيب', labelAr: 'حمد عيسي الرجيب', governorate: 'capital', gender: 'boys' },
+  { value: 'issa_ahmad_alhamad', label: 'عيسى أحمد الحمد', labelAr: 'عيسى أحمد الحمد', governorate: 'capital', gender: 'boys' },
+  { value: 'ahmad_albishr_alroumi', label: 'أحمد البشر الرومي', labelAr: 'أحمد البشر الرومي', governorate: 'capital', gender: 'boys' },
+  { value: 'youssef_bin_issa', label: 'يوسف بن عيسى', labelAr: 'يوسف بن عيسى', governorate: 'capital', gender: 'boys' },
+  { value: 'academy_talent_boys', label: 'أكاديمية الموهبة بنين', labelAr: 'أكاديمية الموهبة بنين', governorate: 'capital', gender: 'boys' },
+  { value: 'saad_bin_alrabee', label: 'سعد بن الربيع الأنصارى', labelAr: 'سعد بن الربيع الأنصارى', governorate: 'capital', gender: 'boys' },
+  { value: 'yaqoub_alghuneim', label: 'يعقوب يوسف الغنيم', labelAr: 'يعقوب يوسف الغنيم', governorate: 'capital', gender: 'boys' },
+  { value: 'ahmad_shihab_aldin', label: 'أحمد شهاب الدين', labelAr: 'أحمد شهاب الدين', governorate: 'capital', gender: 'boys' },
+  { value: 'sulaiman_abu_ghosh', label: 'سليمان أبو غوش', labelAr: 'سليمان أبو غوش', governorate: 'capital', gender: 'boys' },
+  { value: 'oqab_alkhatib', label: 'عقاب الخطيب', labelAr: 'عقاب الخطيب', governorate: 'capital', gender: 'boys' },
+  { value: 'mohammed_mahmoud_najm', label: 'محمد محمود نجم', labelAr: 'محمد محمود نجم', governorate: 'capital', gender: 'boys' },
+  { value: 'alasmai', label: 'الأصمعي', labelAr: 'الأصمعي', governorate: 'capital', gender: 'boys' },
+  { value: 'institute_alsumait', label: 'معهد عبدالرحمن السميط الديني', labelAr: 'معهد عبدالرحمن السميط الديني', governorate: 'capital', gender: 'boys' },
+  { value: 'altadamun_boys', label: 'التضامن بنين', labelAr: 'التضامن بنين', governorate: 'capital', gender: 'boys' },
 
   // =============================================
-  // CAPITAL (العاصمة) - GIRLS
+  // CAPITAL (العاصمة) - GIRLS (21)
   // =============================================
-  { value: 'qurtuba_girls', label: 'ثانوية قرطبة للبنات', labelAr: 'ثانوية قرطبة للبنات', governorate: 'capital', gender: 'girls' },
-  { value: 'fatima_bint_alwalid', label: 'ثانوية فاطمة بنت الوليد', labelAr: 'ثانوية فاطمة بنت الوليد', governorate: 'capital', gender: 'girls' },
-  { value: 'aljazair_girls', label: 'ثانوية الجزائر للبنات', labelAr: 'ثانوية الجزائر للبنات', governorate: 'capital', gender: 'girls' },
-  { value: 'aldoha_girls', label: 'ثانوية الدوحة للبنات', labelAr: 'ثانوية الدوحة للبنات', governorate: 'capital', gender: 'girls' },
-  { value: 'alrawda_girls', label: 'ثانوية الروضة للبنات', labelAr: 'ثانوية الروضة للبنات', governorate: 'capital', gender: 'girls' },
-  { value: 'asmaa_bint_alharith', label: 'ثانوية أسماء بنت الحارث', labelAr: 'ثانوية أسماء بنت الحارث', governorate: 'capital', gender: 'girls' },
-  { value: 'alyarmouk_girls', label: 'ثانوية اليرموك للبنات', labelAr: 'ثانوية اليرموك للبنات', governorate: 'capital', gender: 'girls' },
-  { value: 'bibi_alsalem', label: 'ثانوية بيبي السالم', labelAr: 'ثانوية بيبي السالم', governorate: 'capital', gender: 'girls' },
-  { value: 'almansouriya_girls', label: 'ثانوية المنصورية للبنات', labelAr: 'ثانوية المنصورية للبنات', governorate: 'capital', gender: 'girls' },
-  { value: 'jumana_bint_abi_talib', label: 'ثانوية جمانة بنت أبي طالب', labelAr: 'ثانوية جمانة بنت أبي طالب', governorate: 'capital', gender: 'girls' },
-  { value: 'sharifa_aloudi', label: 'ثانوية شريفة العودي', labelAr: 'ثانوية شريفة العودي', governorate: 'capital', gender: 'girls' },
+  { value: 'alisraa_girls', label: 'الإسراء', labelAr: 'الإسراء', governorate: 'capital', gender: 'girls' },
+  { value: 'qurtuba_girls', label: 'قرطبة', labelAr: 'قرطبة', governorate: 'capital', gender: 'girls' },
+  { value: 'alyarmouk_girls', label: 'اليرموك', labelAr: 'اليرموك', governorate: 'capital', gender: 'girls' },
+  { value: 'alrawda_girls', label: 'الروضة', labelAr: 'الروضة', governorate: 'capital', gender: 'girls' },
+  { value: 'sharifa_alawadhi', label: 'شريفة العوضي', labelAr: 'شريفة العوضي', governorate: 'capital', gender: 'girls' },
+  { value: 'alasmaa_bint_alharith', label: 'العصماء بنت الحارث', labelAr: 'العصماء بنت الحارث', governorate: 'capital', gender: 'girls' },
+  { value: 'bibi_alsalem', label: 'بيبي السالم', labelAr: 'بيبي السالم', governorate: 'capital', gender: 'girls' },
+  { value: 'suad_mohammed_alsabah', label: 'سعاد محمد الصباح', labelAr: 'سعاد محمد الصباح', governorate: 'capital', gender: 'girls' },
+  { value: 'jumana_bint_abi_talib', label: 'جمانة بنت ابى طالب', labelAr: 'جمانة بنت ابى طالب', governorate: 'capital', gender: 'girls' },
+  { value: 'aljazair_girls', label: 'الجزائر', labelAr: 'الجزائر', governorate: 'capital', gender: 'girls' },
+  { value: 'academy_talent_girls', label: 'أكاديمية الموهبة للبنات', labelAr: 'أكاديمية الموهبة للبنات', governorate: 'capital', gender: 'girls' },
+  { value: 'latifa_alshamali', label: 'لطيفة الشمالي', labelAr: 'لطيفة الشمالي', governorate: 'capital', gender: 'girls' },
+  { value: 'fatima_bint_alwalid', label: 'فاطمة بنت الوليد', labelAr: 'فاطمة بنت الوليد', governorate: 'capital', gender: 'girls' },
+  { value: 'aldoha_girls', label: 'الدوحة', labelAr: 'الدوحة', governorate: 'capital', gender: 'girls' },
+  { value: 'um_habib_alqurashiya', label: 'أم حبيب بنت العاص القرشية', labelAr: 'أم حبيب بنت العاص القرشية', governorate: 'capital', gender: 'girls' },
+  { value: 'munira_alahmad_alsabah', label: 'منيرة الأحمد الجابر الصباح', labelAr: 'منيرة الأحمد الجابر الصباح', governorate: 'capital', gender: 'girls' },
+  { value: 'habiba_bint_shariq', label: 'حبيبة بنت شريق الأنصارية', labelAr: 'حبيبة بنت شريق الأنصارية', governorate: 'capital', gender: 'girls' },
+  { value: 'um_maqil_alasadiya', label: 'أم معقل الأسدية', labelAr: 'أم معقل الأسدية', governorate: 'capital', gender: 'girls' },
+  { value: 'institute_qurtuba_girls', label: 'معهد قرطبة الديني', labelAr: 'معهد قرطبة الديني', governorate: 'capital', gender: 'girls' },
+  { value: 'altadamun_girls', label: 'التضامن بنات', labelAr: 'التضامن بنات', governorate: 'capital', gender: 'girls' },
+  { value: 'alsharq_alawsat_girls', label: 'الشرق الأوسط', labelAr: 'الشرق الأوسط', governorate: 'capital', gender: 'girls' },
 
   // =============================================
-  // HAWALLI (حولي) - BOYS
+  // HAWALLI (حولي) - BOYS (18)
   // =============================================
-  { value: 'jaber_alahmad_hawalli', label: 'ثانوية جابر الأحمد الصباح', labelAr: 'ثانوية جابر الأحمد الصباح', governorate: 'hawalli', gender: 'boys' },
-  { value: 'abdulrazzaq_albassir', label: 'ثانوية عبدالرزاق البصير', labelAr: 'ثانوية عبدالرزاق البصير', governorate: 'hawalli', gender: 'boys' },
-  { value: 'farhan_alkhaled', label: 'ثانوية فرحان الخالد', labelAr: 'ثانوية فرحان الخالد', governorate: 'hawalli', gender: 'boys' },
-  { value: 'palestine_boys', label: 'ثانوية فلسطين', labelAr: 'ثانوية فلسطين', governorate: 'hawalli', gender: 'boys' },
-  { value: 'salah_aldin', label: 'ثانوية صلاح الدين', labelAr: 'ثانوية صلاح الدين', governorate: 'hawalli', gender: 'boys' },
-  { value: 'fahad_alsalem', label: 'ثانوية فهد السالم', labelAr: 'ثانوية فهد السالم', governorate: 'hawalli', gender: 'boys' },
-  { value: 'fahd_alduwiri', label: 'ثانوية فهد الدويري', labelAr: 'ثانوية فهد الدويري', governorate: 'hawalli', gender: 'boys' },
+  { value: 'saleh_shihab', label: 'صالح شهاب', labelAr: 'صالح شهاب', governorate: 'hawalli', gender: 'boys' },
+  { value: 'fahad_alsalem', label: 'فهد السالم', labelAr: 'فهد السالم', governorate: 'hawalli', gender: 'boys' },
+  { value: 'palestine_boys', label: 'فلسطين', labelAr: 'فلسطين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'abdullah_alassousi', label: 'عبدالله العسعوسي', labelAr: 'عبدالله العسعوسي', governorate: 'hawalli', gender: 'boys' },
+  { value: 'jaber_alahmad_hawalli', label: 'جابر الأحمد الصباح', labelAr: 'جابر الأحمد الصباح', governorate: 'hawalli', gender: 'boys' },
+  { value: 'fahd_alduwiri', label: 'فهد الدويري', labelAr: 'فهد الدويري', governorate: 'hawalli', gender: 'boys' },
+  { value: 'abdullah_abdullatif_alrajeeb', label: 'عبدالله عبداللطيف الرجيب', labelAr: 'عبدالله عبداللطيف الرجيب', governorate: 'hawalli', gender: 'boys' },
+  { value: 'ahmad_alrabei', label: 'أحمد الربعي', labelAr: 'أحمد الربعي', governorate: 'hawalli', gender: 'boys' },
+  { value: 'nasser_almuhsin_alsaeed', label: 'ناصر عبد المحسن السعيد الثانوية', labelAr: 'ناصر عبد المحسن السعيد الثانوية', governorate: 'hawalli', gender: 'boys' },
+  { value: 'salah_aldin', label: 'صلاح الدين', labelAr: 'صلاح الدين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alrajaa_boys', label: 'الرجاء المشتركة بنين', labelAr: 'الرجاء المشتركة بنين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alnoor_boys', label: 'النور المشتركة بنين', labelAr: 'النور المشتركة بنين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alamal_boys', label: 'الأمل و تأهيل الأمل بنين', labelAr: 'الأمل و تأهيل الأمل بنين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alwataniya_private', label: 'الوطنية الاهلية', labelAr: 'الوطنية الاهلية', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alikhlas_boys', label: 'الإخلاص الأهلية بنين', labelAr: 'الإخلاص الأهلية بنين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'kuwait_academy', label: 'أكاديمية الكويت التعليمية', labelAr: 'أكاديمية الكويت التعليمية', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alnajat_boys', label: 'النجاة بنين', labelAr: 'النجاة بنين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'institute_qurtuba_boys', label: 'المعهد الديني قرطبة (بنين)', labelAr: 'المعهد الديني قرطبة (بنين)', governorate: 'hawalli', gender: 'boys' },
 
   // =============================================
-  // HAWALLI (حولي) - GIRLS
+  // HAWALLI (حولي) - GIRLS (19)
   // =============================================
-  { value: 'maria_alqibtiya', label: 'ثانوية ماريا القبطية', labelAr: 'ثانوية ماريا القبطية', governorate: 'hawalli', gender: 'girls' },
-  { value: 'mushrif_girls', label: 'ثانوية مشرف للبنات', labelAr: 'ثانوية مشرف للبنات', governorate: 'hawalli', gender: 'girls' },
-  { value: 'hind_girls', label: 'ثانوية هند للبنات', labelAr: 'ثانوية هند للبنات', governorate: 'hawalli', gender: 'girls' },
-  { value: 'aljabriya_girls', label: 'ثانوية الجابرية للبنات', labelAr: 'ثانوية الجابرية للبنات', governorate: 'hawalli', gender: 'girls' },
-  { value: 'alsalmiya_girls', label: 'ثانوية السالمية للبنات', labelAr: 'ثانوية السالمية للبنات', governorate: 'hawalli', gender: 'girls' },
-  { value: 'omama_bint_abi_alaas', label: 'ثانوية أمامة بنت بشر', labelAr: 'ثانوية أمامة بنت بشر', governorate: 'hawalli', gender: 'girls' },
-  { value: 'khalida_bint_alaswad', label: 'ثانوية خالدة بنت الأسود', labelAr: 'ثانوية خالدة بنت الأسود', governorate: 'hawalli', gender: 'girls' },
-  { value: 'bayan_girls', label: 'ثانوية بيان للبنات', labelAr: 'ثانوية بيان للبنات', governorate: 'hawalli', gender: 'girls' },
-  { value: 'salwa_girls', label: 'ثانوية سلوى للبنات', labelAr: 'ثانوية سلوى للبنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'mushrif_girls', label: 'مشرف', labelAr: 'مشرف', governorate: 'hawalli', gender: 'girls' },
+  { value: 'salwa_girls', label: 'سلوى', labelAr: 'سلوى', governorate: 'hawalli', gender: 'girls' },
+  { value: 'khalida_bint_alaswad', label: 'خالدة بنت الأسود', labelAr: 'خالدة بنت الأسود', governorate: 'hawalli', gender: 'girls' },
+  { value: 'omama_bint_bishr', label: 'أمامة بنت بشر', labelAr: 'أمامة بنت بشر', governorate: 'hawalli', gender: 'girls' },
+  { value: 'february25_girls', label: '25 فبراير', labelAr: '25 فبراير', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alsalmiya_girls', label: 'السالمية', labelAr: 'السالمية', governorate: 'hawalli', gender: 'girls' },
+  { value: 'aljabriya_girls', label: 'الجابرية', labelAr: 'الجابرية', governorate: 'hawalli', gender: 'girls' },
+  { value: 'bayan_girls', label: 'بيان', labelAr: 'بيان', governorate: 'hawalli', gender: 'girls' },
+  { value: 'fatima_alsarawi', label: 'فاطمة الصرعاوي', labelAr: 'فاطمة الصرعاوي', governorate: 'hawalli', gender: 'girls' },
+  { value: 'maria_alqibtiya', label: 'مارية القبطية', labelAr: 'مارية القبطية', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alnoor_girls', label: 'النور المشتركة البنات', labelAr: 'النور المشتركة البنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alrajaa_girls', label: 'الرجاء المشتركة البنات', labelAr: 'الرجاء المشتركة البنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alamal_girls', label: 'الأمل وتأهيل الأمل بنات', labelAr: 'الأمل وتأهيل الأمل بنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'aljeel_aljadeed', label: 'الجيل الجديد', labelAr: 'الجيل الجديد', governorate: 'hawalli', gender: 'girls' },
+  { value: 'arabian_academy', label: 'الأكاديمية العربية', labelAr: 'الأكاديمية العربية', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alikhlas_girls', label: 'الإخلاص الأهلية بنات', labelAr: 'الإخلاص الأهلية بنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alnajat_girls', label: 'النجاة بنات', labelAr: 'النجاة بنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'aldana_girls', label: 'الدانة', labelAr: 'الدانة', governorate: 'hawalli', gender: 'girls' },
+  { value: 'institute_qurtuba_girls_hawalli', label: 'المعهد الديني قرطبة (بنات)', labelAr: 'المعهد الديني قرطبة (بنات)', governorate: 'hawalli', gender: 'girls' },
 
   // =============================================
-  // FARWANIYA (الفروانية) - BOYS
+  // FARWANIYA (الفروانية) - BOYS (21)
   // =============================================
-  { value: 'alshujaa_bin_alaslam', label: 'ثانوية الشجاع بن الأسلم', labelAr: 'ثانوية الشجاع بن الأسلم', governorate: 'farwaniya', gender: 'boys' },
-  { value: 'ibn_alomaid', label: 'ثانوية ابن العميد', labelAr: 'ثانوية ابن العميد', governorate: 'farwaniya', gender: 'boys' },
-  { value: 'anas_bin_malik', label: 'ثانوية أنس بن مالك', labelAr: 'ثانوية أنس بن مالك', governorate: 'farwaniya', gender: 'boys' },
-  { value: 'juleib_alshuyoukh', label: 'ثانوية جليب الشيوخ', labelAr: 'ثانوية جليب الشيوخ', governorate: 'farwaniya', gender: 'boys' },
-  { value: 'salman_alfarsi', label: 'ثانوية سلمان الفارسي', labelAr: 'ثانوية سلمان الفارسي', governorate: 'farwaniya', gender: 'boys' },
-  { value: 'abdullatif_thunayan', label: 'ثانوية عبداللطيف ثنيان الغانم', labelAr: 'ثانوية عبداللطيف ثنيان الغانم', governorate: 'farwaniya', gender: 'boys' },
-  { value: 'murshid_saad_albathal', label: 'ثانوية مرشد سعد البذال', labelAr: 'ثانوية مرشد سعد البذال', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'aldawgha', label: 'الدوغة', labelAr: 'الدوغة', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'tariq_bin_ziyad', label: 'طارق بن زياد', labelAr: 'طارق بن زياد', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'shujaa_bin_alaslam', label: 'شجاع بن الأسلم', labelAr: 'شجاع بن الأسلم', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'labid_bin_alrabee', label: 'لبيد بن الربيعة', labelAr: 'لبيد بن الربيعة', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'juleib_alshuyoukh', label: 'جليب الشيوخ', labelAr: 'جليب الشيوخ', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'aljahiz', label: 'الجاحظ', labelAr: 'الجاحظ', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'alsabah_farwaniya', label: 'الصباح', labelAr: 'الصباح', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'abdullatif_thunayan', label: 'عبداللطيف ثنيان الغانم', labelAr: 'عبداللطيف ثنيان الغانم', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'abdulrazzaq_aladassani', label: 'عبدالرزاق محمد صالح العدساني', labelAr: 'عبدالرزاق محمد صالح العدساني', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'murshid_saad_albathal', label: 'مرشد سعد البذال', labelAr: 'مرشد سعد البذال', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'ibn_alomaid', label: 'إبن العميد', labelAr: 'إبن العميد', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'almubarakiya', label: 'المباركية', labelAr: 'المباركية', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'hamoud_aljaber_alsabah', label: 'حمود الجابر الصباح', labelAr: 'حمود الجابر الصباح', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'anas_bin_malik', label: 'أنس بن مالك', labelAr: 'أنس بن مالك', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'alnukhba', label: 'النخبة', labelAr: 'النخبة', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'fajr_aljadeed', label: 'فجر الجديد', labelAr: 'فجر الجديد', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'alimtiaz', label: 'الإمتياز', labelAr: 'الإمتياز', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'jawhara_alsaleh', label: 'جوهرة الصالح', labelAr: 'جوهرة الصالح', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'kuwait_private_modern', label: 'الكويت الأهلية الحديثة', labelAr: 'الكويت الأهلية الحديثة', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'mohammed_alothman_alrashid', label: 'محمد العثمان الراشد', labelAr: 'محمد العثمان الراشد', governorate: 'farwaniya', gender: 'boys' },
+  { value: 'altamayyuz_boys', label: 'التميز بنين', labelAr: 'التميز بنين', governorate: 'farwaniya', gender: 'boys' },
 
   // =============================================
-  // FARWANIYA (الفروانية) - GIRLS
+  // FARWANIYA (الفروانية) - GIRLS (20)
   // =============================================
-  { value: 'um_ziyad_girls', label: 'ثانوية أم زياد للبنات', labelAr: 'ثانوية أم زياد للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'abriq_khaitan_girls', label: 'ثانوية ابريق خيطان للبنات', labelAr: 'ثانوية ابريق خيطان للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'alrabie_girls', label: 'ثانوية الرابية للبنات', labelAr: 'ثانوية الرابية للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'alfirdaws_girls', label: 'ثانوية الفردوس للبنات', labelAr: 'ثانوية الفردوس للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'alnahda_girls', label: 'ثانوية النهضة للبنات', labelAr: 'ثانوية النهضة للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'um_alhakam_girls', label: 'ثانوية أم الحكم بنت أبي سفيان', labelAr: 'ثانوية أم الحكم بنت أبي سفيان', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'um_amer_alansariya', label: 'ثانوية أم عامر الأنصارية', labelAr: 'ثانوية أم عامر الأنصارية', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'juleib_alshuyoukh_girls', label: 'ثانوية جليب الشيوخ للبنات', labelAr: 'ثانوية جليب الشيوخ للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'alfarwaniya_girls', label: 'ثانوية الفروانية للبنات', labelAr: 'ثانوية الفروانية للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'alomriya_girls', label: 'ثانوية العمرية للبنات', labelAr: 'ثانوية العمرية للبنات', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'hawaa_bint_yazid', label: 'ثانوية حواء بنت يزيد الأنصارية', labelAr: 'ثانوية حواء بنت يزيد الأنصارية', governorate: 'farwaniya', gender: 'girls' },
-  { value: 'durrat_alhashimiya', label: 'ثانوية درة الهاشمية', labelAr: 'ثانوية درة الهاشمية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'dalal_albishr_alroumi', label: 'دلال أحمد البشر الرومي', labelAr: 'دلال أحمد البشر الرومي', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'altahira_bint_alharith', label: 'الطاهرة بنت الحارث', labelAr: 'الطاهرة بنت الحارث', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'alfuraia_bint_malik', label: 'الفريعة بنت مالك', labelAr: 'الفريعة بنت مالك', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'khadija_bint_alzubayr', label: 'خديجة بنت الزبير', labelAr: 'خديجة بنت الزبير', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'um_ziyad_girls', label: 'أم زياد الأشجعية', labelAr: 'أم زياد الأشجعية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'razina_girls', label: 'رزينة الثانوية', labelAr: 'رزينة الثانوية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'durrat_alhashimiya', label: 'درة الهاشمية', labelAr: 'درة الهاشمية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'alfirdaws_girls', label: 'الفردوس', labelAr: 'الفردوس', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'um_alhakam_girls', label: 'أم الحكم بنت ابي سفيان', labelAr: 'أم الحكم بنت ابي سفيان', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'alrabee_bint_muawwadh', label: 'الربيع بنت معوذ', labelAr: 'الربيع بنت معوذ', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'hawaa_bint_yazid', label: 'حواء بنت يزيد الانصارية', labelAr: 'حواء بنت يزيد الانصارية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'um_amer_alansariya', label: 'أم عامر الأنصارية', labelAr: 'أم عامر الأنصارية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'alrabie_girls', label: 'الرابية', labelAr: 'الرابية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'umaima_bint_rabeea', label: 'أميمة بنت ربيعة', labelAr: 'أميمة بنت ربيعة', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'alfarwaniya_girls', label: 'الفروانية', labelAr: 'الفروانية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'abriq_khaitan_girls', label: 'أبرق خيطان', labelAr: 'أبرق خيطان', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'institute_farwaniya_girls', label: 'المعهد الفروانية الديني', labelAr: 'المعهد الفروانية الديني', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'aljaber_private_girls', label: 'الجابر الاهلية', labelAr: 'الجابر الاهلية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'um_hani_private', label: 'أم هاني الأهلية', labelAr: 'أم هاني الأهلية', governorate: 'farwaniya', gender: 'girls' },
+  { value: 'harvard_girls', label: 'هارفرد', labelAr: 'هارفرد', governorate: 'farwaniya', gender: 'girls' },
 
   // =============================================
-  // AHMADI (الأحمدي) - BOYS
+  // AHMADI (الأحمدي) - BOYS (20)
   // =============================================
-  { value: 'alzour', label: 'ثانوية الزور', labelAr: 'ثانوية الزور', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'aldahr', label: 'ثانوية الظهر', labelAr: 'ثانوية الظهر', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'alqurtubi', label: 'ثانوية القرطبي', labelAr: 'ثانوية القرطبي', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'alsiddiq', label: 'ثانوية الصديق', labelAr: 'ثانوية الصديق', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'alnasr', label: 'ثانوية النصر', labelAr: 'ثانوية النصر', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'alkindi', label: 'ثانوية الكندي', labelAr: 'ثانوية الكندي', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'salem_almubarak', label: 'ثانوية سالم المبارك', labelAr: 'ثانوية سالم المبارك', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'saeed_bin_amer', label: 'ثانوية سعيد بن عامر', labelAr: 'ثانوية سعيد بن عامر', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'abdullah_alahmad_alsabah', label: 'ثانوية عبدالله الأحمد الصباح', labelAr: 'ثانوية عبدالله الأحمد الصباح', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'omar_bin_alkhattab', label: 'ثانوية عمر بن الخطاب', labelAr: 'ثانوية عمر بن الخطاب', governorate: 'ahmadi', gender: 'boys' },
-  { value: 'hisham_bin_alaas', label: 'ثانوية هشام بن العاص', labelAr: 'ثانوية هشام بن العاص', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'abdulaziz_alzamel', label: 'عبدالعزيز مسلم الزامل', labelAr: 'عبدالعزيز مسلم الزامل', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'mohammed_almutawa', label: 'محمد غيث المطوع', labelAr: 'محمد غيث المطوع', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'abdullah_bin_abbas', label: 'عبدالله بن عباس', labelAr: 'عبدالله بن عباس', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'ayoub_alayoub', label: 'أيوب حسين الأيوب', labelAr: 'أيوب حسين الأيوب', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'talha_bin_ubaid', label: 'طلحة بن عبيد', labelAr: 'طلحة بن عبيد', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'omar_bin_alkhattab', label: 'عمر بن الخطاب', labelAr: 'عمر بن الخطاب', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'mohammed_alnashmi', label: 'محمد النشمي', labelAr: 'محمد النشمي', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'alkindi', label: 'الكندي', labelAr: 'الكندي', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'hisham_bin_alaas', label: 'هشام بن العاص', labelAr: 'هشام بن العاص', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'alsabahiya_boys', label: 'الصباحية بنين', labelAr: 'الصباحية بنين', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'alqurtubi', label: 'القرطبي', labelAr: 'القرطبي', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'balat_alshuhada', label: 'بلاط الشهداء', labelAr: 'بلاط الشهداء', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'salem_almubarak', label: 'سالم المبارك', labelAr: 'سالم المبارك', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'saeed_bin_amer', label: 'سعيد بن عامر', labelAr: 'سعيد بن عامر', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'issa_alhouli', label: 'عيسى عبدالله الهولي', labelAr: 'عيسى عبدالله الهولي', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'abdullah_alahmad_alsabah', label: 'عبدالله الأحمد الصباح', labelAr: 'عبدالله الأحمد الصباح', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'harun_alrashid', label: 'هارون الرشيد', labelAr: 'هارون الرشيد', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'institute_south_sabahiya', label: 'المعهد الديني (جنوب الصباحية)', labelAr: 'المعهد الديني (جنوب الصباحية)', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'institute_aliman', label: 'معهد الإيمان الشرعي الأهلية', labelAr: 'معهد الإيمان الشرعي الأهلية', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'almaarifa_boys', label: 'المعرفة النموذجية بنين', labelAr: 'المعرفة النموذجية بنين', governorate: 'ahmadi', gender: 'boys' },
 
   // =============================================
-  // AHMADI (الأحمدي) - GIRLS
+  // AHMADI (الأحمدي) - GIRLS (23)
   // =============================================
-  { value: 'awatif_khalifa_alathbi', label: 'ثانوية عواطف خليفة العذبي الصباح', labelAr: 'ثانوية عواطف خليفة العذبي الصباح', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'fatima_bint_asad', label: 'ثانوية فاطمة بنت أسد', labelAr: 'ثانوية فاطمة بنت أسد', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'lubna_bint_alharith', label: 'ثانوية لبنى بنت الحارث', labelAr: 'ثانوية لبنى بنت الحارث', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'latifa_alfares', label: 'ثانوية لطيفة الفارس', labelAr: 'ثانوية لطيفة الفارس', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'muadhah_alghifariya', label: 'ثانوية معاذة الغفارية', labelAr: 'ثانوية معاذة الغفارية', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'hadiya_girls', label: 'ثانوية هدية للبنات', labelAr: 'ثانوية هدية للبنات', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'alfahaheel_girls', label: 'ثانوية الفحيحيل للبنات', labelAr: 'ثانوية الفحيحيل للبنات', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'um_alala_alansariya', label: 'ثانوية أم العلاء الأنصارية', labelAr: 'ثانوية أم العلاء الأنصارية', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'anisa_bint_khabib', label: 'ثانوية أنيسة بنت خبيب الأنصارية', labelAr: 'ثانوية أنيسة بنت خبيب الأنصارية', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'alzour_girls', label: 'ثانوية الزور للبنات', labelAr: 'ثانوية الزور للبنات', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'safiya_bint_abdulmuttalib', label: 'ثانوية صفية بنت عبدالمطلب', labelAr: 'ثانوية صفية بنت عبدالمطلب', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'alritqa_girls', label: 'ثانوية الرتقة للبنات', labelAr: 'ثانوية الرتقة للبنات', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'moudhi_alissa', label: 'موضي سلطان العيسى', labelAr: 'موضي سلطان العيسى', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alkhairan_girls', label: 'الخيران المشتركة', labelAr: 'الخيران المشتركة', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'ghunaimah_almarzouk', label: 'غنيمة المرزوق', labelAr: 'غنيمة المرزوق', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'shakriya_alsaeedi', label: 'شكرية عبيد السعيدي', labelAr: 'شكرية عبيد السعيدي', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'jumana_bint_alhasan', label: 'جمانة بنت الحسن', labelAr: 'جمانة بنت الحسن', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alrawdatain_girls', label: 'الروضتين', labelAr: 'الروضتين', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'um_alhaiman', label: 'أم الهيمان', labelAr: 'أم الهيمان', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'fatima_bint_asad', label: 'فاطمة بنت أسد الثانوية', labelAr: 'فاطمة بنت أسد الثانوية', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'latifa_alfares', label: 'لطيفه عبد الرحمن الفارس', labelAr: 'لطيفه عبد الرحمن الفارس', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'amah_bint_khaled', label: 'أمة بنت خالد', labelAr: 'أمة بنت خالد', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alsabahiya_girls', label: 'الصباحية بنات', labelAr: 'الصباحية بنات', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'lubna_bint_alharith', label: 'لبنى بنت الحارث', labelAr: 'لبنى بنت الحارث', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alritqa_girls', label: 'الرتقة', labelAr: 'الرتقة', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alraqqa_girls', label: 'الرقة', labelAr: 'الرقة', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'hadiya_girls', label: 'هدية', labelAr: 'هدية', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'um_alala_alansariya', label: 'أم العلاء الأنصارية', labelAr: 'أم العلاء الأنصارية', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'anisa_bint_khabib', label: 'أنيسة بنت خبيب الانصارية', labelAr: 'أنيسة بنت خبيب الانصارية', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'awatif_khalifa_alathbi', label: 'عواطف خليفة العذبي الصباح', labelAr: 'عواطف خليفة العذبي الصباح', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'muadhah_alghifariya', label: 'معاذة الغفارية', labelAr: 'معاذة الغفارية', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'almaarifa_girls', label: 'المعرفة النموذجية بنات', labelAr: 'المعرفة النموذجية بنات', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alnajat_ahmadi_girls', label: 'النجاة بنات', labelAr: 'النجاة بنات', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'um_alqura', label: 'أم القرى', labelAr: 'أم القرى', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'zainab_bint_mazoun', label: 'زينب بنت مظعون', labelAr: 'زينب بنت مظعون', governorate: 'ahmadi', gender: 'girls' },
 
   // =============================================
-  // JAHRA (الجهراء) - BOYS
+  // JAHRA (الجهراء) - BOYS (9)
   // =============================================
-  { value: 'aljahra_boys', label: 'ثانوية الجهراء للبنين', labelAr: 'ثانوية الجهراء للبنين', governorate: 'jahra', gender: 'boys' },
-  { value: 'alwaha', label: 'ثانوية الواحة', labelAr: 'ثانوية الواحة', governorate: 'jahra', gender: 'boys' },
-  { value: 'thabit_bin_qais', label: 'ثانوية ثابت بن قيس', labelAr: 'ثانوية ثابت بن قيس', governorate: 'jahra', gender: 'boys' },
-  { value: 'jaber_alabdullah', label: 'ثانوية جابر العبدالله الصباح', labelAr: 'ثانوية جابر العبدالله الصباح', governorate: 'jahra', gender: 'boys' },
-  { value: 'khaled_bin_saeed', label: 'ثانوية خالد بن سعيد', labelAr: 'ثانوية خالد بن سعيد', governorate: 'jahra', gender: 'boys' },
-  { value: 'orwa_bin_alzubayr', label: 'ثانوية عروة بن الزبير', labelAr: 'ثانوية عروة بن الزبير', governorate: 'jahra', gender: 'boys' },
-  { value: 'sabah_alnasser', label: 'ثانوية صباح الناصر الصباح', labelAr: 'ثانوية صباح الناصر الصباح', governorate: 'jahra', gender: 'boys' },
+  { value: 'thabit_bin_qais', label: 'ثابت بن قيس', labelAr: 'ثابت بن قيس', governorate: 'jahra', gender: 'boys' },
+  { value: 'orwa_bin_alzubayr', label: 'عروة بن الزبير', labelAr: 'عروة بن الزبير', governorate: 'jahra', gender: 'boys' },
+  { value: 'saad_alabdullah_alsabah', label: 'سعد العبدالله الصباح', labelAr: 'سعد العبدالله الصباح', governorate: 'jahra', gender: 'boys' },
+  { value: 'mohammed_almuhaini', label: 'محمد عبدالله المهيني', labelAr: 'محمد عبدالله المهيني', governorate: 'jahra', gender: 'boys' },
+  { value: 'khaled_bin_saeed', label: 'خالد بن سعيد', labelAr: 'خالد بن سعيد', governorate: 'jahra', gender: 'boys' },
+  { value: 'sabah_alnasser', label: 'صباح الناصر الصباح', labelAr: 'صباح الناصر الصباح', governorate: 'jahra', gender: 'boys' },
+  { value: 'alwaha', label: 'الواحة', labelAr: 'الواحة', governorate: 'jahra', gender: 'boys' },
+  { value: 'youssef_alathbi_alsabah', label: 'يوسف العذبي الصباح', labelAr: 'يوسف العذبي الصباح', governorate: 'jahra', gender: 'boys' },
+  { value: 'aljahra_private_boys', label: 'الجهراء الأهلية بنين', labelAr: 'الجهراء الأهلية بنين', governorate: 'jahra', gender: 'boys' },
 
   // =============================================
-  // JAHRA (الجهراء) - GIRLS
+  // JAHRA (الجهراء) - GIRLS (15)
   // =============================================
-  { value: 'amra_bint_rawaha', label: 'ثانوية عمرة بنت رواحة', labelAr: 'ثانوية عمرة بنت رواحة', governorate: 'jahra', gender: 'girls' },
-  { value: 'fatima_bint_utba', label: 'ثانوية فاطمة بنت عتبة', labelAr: 'ثانوية فاطمة بنت عتبة', governorate: 'jahra', gender: 'girls' },
-  { value: 'aljahra_girls', label: 'ثانوية الجهراء للبنات', labelAr: 'ثانوية الجهراء للبنات', governorate: 'jahra', gender: 'girls' },
-  { value: 'alnoor_bint_malik', label: 'ثانوية النوار بنت مالك', labelAr: 'ثانوية النوار بنت مالك', governorate: 'jahra', gender: 'girls' },
-  { value: 'taimaa_girls', label: 'ثانوية تيماء للبنات', labelAr: 'ثانوية تيماء للبنات', governorate: 'jahra', gender: 'girls' },
-  { value: 'rabiea_bint_alharith', label: 'ثانوية رابطة بنت الحارث', labelAr: 'ثانوية رابطة بنت الحارث', governorate: 'jahra', gender: 'girls' },
-  { value: 'um_alharith_alansariya', label: 'ثانوية أم الحارث الأنصارية', labelAr: 'ثانوية أم الحارث الأنصارية', governorate: 'jahra', gender: 'girls' },
-  { value: 'um_mubashir_alansariya', label: 'ثانوية أم مبشر الأنصارية', labelAr: 'ثانوية أم مبشر الأنصارية', governorate: 'jahra', gender: 'girls' },
-  { value: 'zainab_bint_muhammad', label: 'ثانوية زينب بنت محمد بن عبدالله', labelAr: 'ثانوية زينب بنت محمد بن عبدالله', governorate: 'jahra', gender: 'girls' },
+  { value: 'um_alharith_alansariya', label: 'أم الحارث الأنصارية', labelAr: 'أم الحارث الأنصارية', governorate: 'jahra', gender: 'girls' },
+  { value: 'fatima_bint_utba', label: 'فاطمة بنت عتبة', labelAr: 'فاطمة بنت عتبة', governorate: 'jahra', gender: 'girls' },
+  { value: 'suad_bint_salma', label: 'سعاد بنت سلمة', labelAr: 'سعاد بنت سلمة', governorate: 'jahra', gender: 'girls' },
+  { value: 'rita_bint_alharith', label: 'ريطة بنت الحارث', labelAr: 'ريطة بنت الحارث', governorate: 'jahra', gender: 'girls' },
+  { value: 'nouriya_alsubaih', label: 'نورية صبيح الصبيح', labelAr: 'نورية صبيح الصبيح', governorate: 'jahra', gender: 'girls' },
+  { value: 'amena_bint_alarqam', label: 'آمنة بنت الأرقم المخزومية', labelAr: 'آمنة بنت الأرقم المخزومية', governorate: 'jahra', gender: 'girls' },
+  { value: 'taimaa_girls', label: 'تيماء', labelAr: 'تيماء', governorate: 'jahra', gender: 'girls' },
+  { value: 'um_mubashir_alansariya', label: 'أم مبشر الانصارية', labelAr: 'أم مبشر الانصارية', governorate: 'jahra', gender: 'girls' },
+  { value: 'zainab_bint_muhammad', label: 'زينب بنت محمد', labelAr: 'زينب بنت محمد', governorate: 'jahra', gender: 'girls' },
+  { value: 'alnoor_bint_malik', label: 'النوار بنت مالك', labelAr: 'النوار بنت مالك', governorate: 'jahra', gender: 'girls' },
+  { value: 'aljahra_girls', label: 'الجهراء', labelAr: 'الجهراء', governorate: 'jahra', gender: 'girls' },
+  { value: 'amra_bint_rawaha', label: 'عمرة بنت رواحة', labelAr: 'عمرة بنت رواحة', governorate: 'jahra', gender: 'girls' },
+  { value: 'aljahra_private_girls', label: 'الجهراء الأهلية بنات', labelAr: 'الجهراء الأهلية بنات', governorate: 'jahra', gender: 'girls' },
+  { value: 'thabia_bint_albaraa', label: 'ظبية بنت البراء', labelAr: 'ظبية بنت البراء', governorate: 'jahra', gender: 'girls' },
+  { value: 'thabia_bint_alharith', label: 'ظبية بنت الحارث', labelAr: 'ظبية بنت الحارث', governorate: 'jahra', gender: 'girls' },
 
   // =============================================
-  // MUBARAK AL-KABEER (مبارك الكبير) - BOYS
+  // MUBARAK AL-KABEER (مبارك الكبير) - BOYS (8)
   // =============================================
-  { value: 'alimam_malik', label: 'ثانوية الإمام مالك', labelAr: 'ثانوية الإمام مالك', governorate: 'mubarak_alkabeer', gender: 'boys' },
-  { value: 'jaber_alali_alsabah', label: 'ثانوية جابر العلي الصباح', labelAr: 'ثانوية جابر العلي الصباح', governorate: 'mubarak_alkabeer', gender: 'boys' },
-  { value: 'suleiman_aladassani', label: 'ثانوية سليمان العدساني', labelAr: 'ثانوية سليمان العدساني', governorate: 'mubarak_alkabeer', gender: 'boys' },
-  { value: 'duaij_alsalman', label: 'ثانوية دعيج السلمان الصباح', labelAr: 'ثانوية دعيج السلمان الصباح', governorate: 'mubarak_alkabeer', gender: 'boys' },
-  { value: 'khaled_saud_alzaid', label: 'ثانوية خالد سعود الزيد', labelAr: 'ثانوية خالد سعود الزيد', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'alimam_malik', label: 'الإمام مالك', labelAr: 'الإمام مالك', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'khaled_saud_alzaid', label: 'خالد سعود الزيد', labelAr: 'خالد سعود الزيد', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'suleiman_aladassani', label: 'سليمان العدساني', labelAr: 'سليمان العدساني', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'abdullah_almubarak_alsabah', label: 'عبدالله المبارك الصباح', labelAr: 'عبدالله المبارك الصباح', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'jaber_alali_alsabah', label: 'جابر العلي الصباح', labelAr: 'جابر العلي الصباح', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'sabah_alsalem_boys', label: 'صباح السالم بنين', labelAr: 'صباح السالم بنين', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'duaij_alsalman', label: 'دعيج السلمان الصباح', labelAr: 'دعيج السلمان الصباح', governorate: 'mubarak_alkabeer', gender: 'boys' },
+  { value: 'alriyada_boys', label: 'الريادة بنين', labelAr: 'الريادة بنين', governorate: 'mubarak_alkabeer', gender: 'boys' },
 
   // =============================================
-  // MUBARAK AL-KABEER (مبارك الكبير) - GIRLS
+  // MUBARAK AL-KABEER (مبارك الكبير) - GIRLS (9)
   // =============================================
-  { value: 'faria_bint_abi_alsalt', label: 'ثانوية فارعة بنت أبي الصلت', labelAr: 'ثانوية فارعة بنت أبي الصلت', governorate: 'mubarak_alkabeer', gender: 'girls' },
-  { value: 'fatima_alhashimiya', label: 'ثانوية فاطمة الهاشمية', labelAr: 'ثانوية فاطمة الهاشمية', governorate: 'mubarak_alkabeer', gender: 'girls' },
-  { value: 'layla_alghifariya', label: 'ثانوية ليلى الغفارية', labelAr: 'ثانوية ليلى الغفارية', governorate: 'mubarak_alkabeer', gender: 'girls' },
-  { value: 'aladan_girls', label: 'ثانوية العدان للبنات', labelAr: 'ثانوية العدان للبنات', governorate: 'mubarak_alkabeer', gender: 'girls' },
-  { value: 'barqan_girls', label: 'ثانوية برقان للبنات', labelAr: 'ثانوية برقان للبنات', governorate: 'mubarak_alkabeer', gender: 'girls' },
-  { value: 'sabah_alsalem_girls', label: 'ثانوية صباح السالم للبنات', labelAr: 'ثانوية صباح السالم للبنات', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'alsharqiya_girls', label: 'الشرقية', labelAr: 'الشرقية', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'layla_alghifariya', label: 'ليلى الغفارية', labelAr: 'ليلى الغفارية', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'tulaitula_girls', label: 'طليطلة', labelAr: 'طليطلة', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'barqan_girls', label: 'برقان', labelAr: 'برقان', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'fatima_alhashimiya', label: 'فاطمة الهاشمية', labelAr: 'فاطمة الهاشمية', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'aladan_girls', label: 'العدان', labelAr: 'العدان', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'sabah_alsalem_girls', label: 'صباح السالم للبنات', labelAr: 'صباح السالم للبنات', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'faria_bint_abi_alsalt', label: 'فارعة بنت ابي الصلت', labelAr: 'فارعة بنت ابي الصلت', governorate: 'mubarak_alkabeer', gender: 'girls' },
+  { value: 'alriyada_girls', label: 'الريادة بنات', labelAr: 'الريادة بنات', governorate: 'mubarak_alkabeer', gender: 'girls' },
+
+  // =============================================
+  // RELIGIOUS INSTITUTES (standalone)
+  // =============================================
+  { value: 'institute_alfahaheel', label: 'المعهد الديني الفحيحيل', labelAr: 'المعهد الديني الفحيحيل', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'institute_jaber_alahmad', label: 'المعهد الديني جابر الأحمد', labelAr: 'المعهد الديني جابر الأحمد', governorate: 'capital', gender: 'girls' },
 
   // =============================================
   // OTHER
@@ -1047,8 +1249,8 @@ export const LEAD_SOURCES: { value: LeadSource; label: string; category: LeadSou
   { value: 'whatsapp', label: 'WhatsApp', category: 'direct' },
   { value: 'email', label: 'Email', category: 'direct' },
   { value: 'school_visit', label: 'School Visit', category: 'events' },
-  { value: 'expo', label: 'Expo', category: 'events' },
   { value: 'exhibitions', label: 'Exhibitions', category: 'events' },
+  { value: 'karnival', label: 'Karnival', category: 'events' },
   { value: 'website_form', label: 'Website Form', category: 'digital' },
   { value: 'facebook', label: 'Facebook', category: 'digital' },
   { value: 'instagram', label: 'Instagram', category: 'digital' },
@@ -1061,6 +1263,14 @@ export const LEAD_SOURCES: { value: LeadSource; label: string; category: LeadSou
   { value: 'gpa_lists', label: 'GPA Lists', category: 'outreach' }
 ]
 
+export const EDUCATION_TYPES: { value: EducationType; label: string; description: string }[] = [
+  { value: 'GOV', label: 'GOV', description: 'Kuwait Government School' },
+  { value: 'US', label: 'US', description: 'American Curriculum' },
+  { value: 'UK', label: 'UK', description: 'British Curriculum' },
+  { value: 'KSA', label: 'KSA', description: 'Saudi Arabian Curriculum' },
+  { value: 'other', label: 'Other', description: 'Other curriculum' },
+]
+
 export const MAJORS: { value: IntendedMajor; label: string }[] = [
   { value: 'cyber_security', label: 'Cyber Security' },
   { value: 'cis', label: 'CIS' },
@@ -1069,6 +1279,94 @@ export const MAJORS: { value: IntendedMajor; label: string }[] = [
   { value: 'mis', label: 'MIS' },
   { value: 'network_security', label: 'Network Security' },
   { value: 'other', label: 'Other' }
+]
+
+export const NATIONALITIES: { value: string; label: string; labelAr: string }[] = [
+  { value: 'Kuwaiti', label: 'Kuwaiti', labelAr: 'كويتي' },
+  { value: 'None', label: 'None', labelAr: 'بدون' },
+  { value: 'Saudi', label: 'Saudi', labelAr: 'سعودي' },
+  { value: 'Emirati', label: 'Emirati', labelAr: 'إماراتي' },
+  { value: 'Bahraini', label: 'Bahraini', labelAr: 'بحريني' },
+  { value: 'Qatari', label: 'Qatari', labelAr: 'قطري' },
+  { value: 'Omani', label: 'Omani', labelAr: 'عماني' },
+  { value: 'Iraqi', label: 'Iraqi', labelAr: 'عراقي' },
+  { value: 'Jordanian', label: 'Jordanian', labelAr: 'أردني' },
+  { value: 'Lebanese', label: 'Lebanese', labelAr: 'لبناني' },
+  { value: 'Syrian', label: 'Syrian', labelAr: 'سوري' },
+  { value: 'Palestinian', label: 'Palestinian', labelAr: 'فلسطيني' },
+  { value: 'Egyptian', label: 'Egyptian', labelAr: 'مصري' },
+  { value: 'Yemeni', label: 'Yemeni', labelAr: 'يمني' },
+  { value: 'Sudanese', label: 'Sudanese', labelAr: 'سوداني' },
+  { value: 'Libyan', label: 'Libyan', labelAr: 'ليبي' },
+  { value: 'Tunisian', label: 'Tunisian', labelAr: 'تونسي' },
+  { value: 'Algerian', label: 'Algerian', labelAr: 'جزائري' },
+  { value: 'Moroccan', label: 'Moroccan', labelAr: 'مغربي' },
+  { value: 'Somali', label: 'Somali', labelAr: 'صومالي' },
+  { value: 'Comoran', label: 'Comoran', labelAr: 'قمري' },
+  { value: 'Djiboutian', label: 'Djiboutian', labelAr: 'جيبوتي' },
+  { value: 'Mauritanian', label: 'Mauritanian', labelAr: 'موريتاني' },
+  { value: 'Iranian', label: 'Iranian', labelAr: 'إيراني' },
+  { value: 'Turkish', label: 'Turkish', labelAr: 'تركي' },
+  { value: 'Pakistani', label: 'Pakistani', labelAr: 'باكستاني' },
+  { value: 'Indian', label: 'Indian', labelAr: 'هندي' },
+  { value: 'Bangladeshi', label: 'Bangladeshi', labelAr: 'بنغلاديشي' },
+  { value: 'Sri Lankan', label: 'Sri Lankan', labelAr: 'سريلانكي' },
+  { value: 'Nepali', label: 'Nepali', labelAr: 'نيبالي' },
+  { value: 'Afghan', label: 'Afghan', labelAr: 'أفغاني' },
+  { value: 'Filipino', label: 'Filipino', labelAr: 'فلبيني' },
+  { value: 'Indonesian', label: 'Indonesian', labelAr: 'إندونيسي' },
+  { value: 'Malaysian', label: 'Malaysian', labelAr: 'ماليزي' },
+  { value: 'Chinese', label: 'Chinese', labelAr: 'صيني' },
+  { value: 'Japanese', label: 'Japanese', labelAr: 'ياباني' },
+  { value: 'South Korean', label: 'South Korean', labelAr: 'كوري جنوبي' },
+  { value: 'Thai', label: 'Thai', labelAr: 'تايلاندي' },
+  { value: 'Vietnamese', label: 'Vietnamese', labelAr: 'فيتنامي' },
+  { value: 'Myanmar', label: 'Myanmar', labelAr: 'ميانماري' },
+  { value: 'Uzbek', label: 'Uzbek', labelAr: 'أوزبكي' },
+  { value: 'Kazakh', label: 'Kazakh', labelAr: 'كازاخستاني' },
+  { value: 'Turkmen', label: 'Turkmen', labelAr: 'تركمانستاني' },
+  { value: 'Kyrgyz', label: 'Kyrgyz', labelAr: 'قيرغيزستاني' },
+  { value: 'Tajik', label: 'Tajik', labelAr: 'طاجيكستاني' },
+  { value: 'American', label: 'American', labelAr: 'أمريكي' },
+  { value: 'Canadian', label: 'Canadian', labelAr: 'كندي' },
+  { value: 'Mexican', label: 'Mexican', labelAr: 'مكسيكي' },
+  { value: 'Brazilian', label: 'Brazilian', labelAr: 'برازيلي' },
+  { value: 'Argentine', label: 'Argentine', labelAr: 'أرجنتيني' },
+  { value: 'Colombian', label: 'Colombian', labelAr: 'كولومبي' },
+  { value: 'British', label: 'British', labelAr: 'بريطاني' },
+  { value: 'French', label: 'French', labelAr: 'فرنسي' },
+  { value: 'German', label: 'German', labelAr: 'ألماني' },
+  { value: 'Italian', label: 'Italian', labelAr: 'إيطالي' },
+  { value: 'Spanish', label: 'Spanish', labelAr: 'إسباني' },
+  { value: 'Portuguese', label: 'Portuguese', labelAr: 'برتغالي' },
+  { value: 'Dutch', label: 'Dutch', labelAr: 'هولندي' },
+  { value: 'Belgian', label: 'Belgian', labelAr: 'بلجيكي' },
+  { value: 'Swiss', label: 'Swiss', labelAr: 'سويسري' },
+  { value: 'Austrian', label: 'Austrian', labelAr: 'نمساوي' },
+  { value: 'Swedish', label: 'Swedish', labelAr: 'سويدي' },
+  { value: 'Norwegian', label: 'Norwegian', labelAr: 'نرويجي' },
+  { value: 'Danish', label: 'Danish', labelAr: 'دنماركي' },
+  { value: 'Finnish', label: 'Finnish', labelAr: 'فنلندي' },
+  { value: 'Polish', label: 'Polish', labelAr: 'بولندي' },
+  { value: 'Romanian', label: 'Romanian', labelAr: 'روماني' },
+  { value: 'Greek', label: 'Greek', labelAr: 'يوناني' },
+  { value: 'Russian', label: 'Russian', labelAr: 'روسي' },
+  { value: 'Ukrainian', label: 'Ukrainian', labelAr: 'أوكراني' },
+  { value: 'Australian', label: 'Australian', labelAr: 'أسترالي' },
+  { value: 'New Zealander', label: 'New Zealander', labelAr: 'نيوزيلندي' },
+  { value: 'South African', label: 'South African', labelAr: 'جنوب أفريقي' },
+  { value: 'Nigerian', label: 'Nigerian', labelAr: 'نيجيري' },
+  { value: 'Ghanaian', label: 'Ghanaian', labelAr: 'غاني' },
+  { value: 'Kenyan', label: 'Kenyan', labelAr: 'كيني' },
+  { value: 'Ethiopian', label: 'Ethiopian', labelAr: 'إثيوبي' },
+  { value: 'Tanzanian', label: 'Tanzanian', labelAr: 'تنزاني' },
+  { value: 'Ugandan', label: 'Ugandan', labelAr: 'أوغندي' },
+  { value: 'Eritrean', label: 'Eritrean', labelAr: 'إريتري' },
+  { value: 'Senegalese', label: 'Senegalese', labelAr: 'سنغالي' },
+  { value: 'Cameroonian', label: 'Cameroonian', labelAr: 'كاميروني' },
+  { value: 'Congolese', label: 'Congolese', labelAr: 'كونغولي' },
+  { value: 'Bedoon', label: 'Bedoon (Stateless)', labelAr: 'بدون جنسية' },
+  { value: 'Other', label: 'Other', labelAr: 'أخرى' },
 ]
 
 export const PLACEMENT_LEVELS: { value: PlacementLevel; label: string; labelAr: string }[] = [
@@ -1103,7 +1401,6 @@ export const APPOINTMENT_TYPES: {
   { value: 'puc_application', label: 'PUC Application Submission', labelAr: 'تقديم طلب PUC', duration: 30, capacity: 10, location: 'Admissions Office' },
   { value: 'retest', label: 'Retest', labelAr: 'إعادة الاختبار', duration: 60, capacity: 20, location: 'Test Center' },
   { value: 'sf_appointment', label: 'SF Appointment', labelAr: 'موعد SF', duration: 30, capacity: 10, location: 'Admissions Office' },
-  { value: 'sf_retest', label: 'SF Appointment + Retest', labelAr: 'موعد SF + إعادة الاختبار', duration: 60, capacity: 20, location: 'Test Center' }
 ]
 
 export const APPOINTMENT_MODALITIES: {
@@ -1129,6 +1426,7 @@ export const APPOINTMENT_STATUSES: {
   { value: 'on_the_way', label: 'On The Way', labelAr: 'بالطريق', color: 'info', icon: 'Car' },
   { value: 'postponed', label: 'Postponed', labelAr: 'مؤجل', color: 'primary', icon: 'Calendar' },
   { value: 'cant_reach', label: "Can't Reach", labelAr: 'لا يمكن الوصول', color: 'error', icon: 'PhoneOff' },
+  { value: 'will_see', label: 'Will See', labelAr: 'بيجي', color: 'info', icon: 'Eye' },
   { value: 'completed', label: 'Completed', labelAr: 'تم', color: 'success', icon: 'CheckCircle' },
   { value: 'cancelled', label: 'Cancelled', labelAr: 'ملغي', color: 'destructive', icon: 'XCircle' },
 ]
@@ -1894,6 +2192,43 @@ export interface AvayaMissedCall {
   processed: boolean
   created_at: string
 }
+
+// Submission Substage
+export type SubmissionSubstage = 'pending' | 'documents' | 'ready' | 'submitted' | 'blocked' | 'lost'
+
+export const SUBMISSION_SUBSTAGES: { value: SubmissionSubstage; label: string; labelAr: string; color: string }[] = [
+  { value: 'pending', label: 'Pending', labelAr: 'قيد الانتظار', color: 'secondary' },
+  { value: 'documents', label: 'Documents', labelAr: 'المستندات', color: 'warning' },
+  { value: 'ready', label: 'Ready', labelAr: 'جاهز', color: 'success' },
+  { value: 'submitted', label: 'Submitted', labelAr: 'تم التقديم', color: 'primary' },
+  { value: 'blocked', label: 'Blocked', labelAr: 'محظور', color: 'warning' },
+  { value: 'lost', label: 'Lost', labelAr: 'خسارة', color: 'destructive' },
+]
+
+// Submission Status
+export type SubmissionStatus = 'cancelled' | 'cb' | 'appointment'
+
+export const SUBMISSION_STATUSES: { value: SubmissionStatus; label: string; labelAr: string; color: string }[] = [
+  { value: 'cancelled', label: 'Cancelled', labelAr: 'ملغى', color: 'destructive' },
+  { value: 'cb', label: 'Callback', labelAr: 'معاودة الاتصال', color: 'warning' },
+  { value: 'appointment', label: 'Appointment', labelAr: 'موعد', color: 'primary' },
+]
+
+// Submission Blocked Reasons
+export type SubmissionBlockedReason = 'ku' | 'paaet' | 'abroad' | 'aasu' | 'paci' | 'puc' | 'gpa' | 'documents_missing' | 'payment_pending' | 'other'
+
+export const SUBMISSION_BLOCKED_REASONS: { value: SubmissionBlockedReason; label: string; labelAr: string }[] = [
+  { value: 'ku', label: 'KU', labelAr: 'جامعة الكويت' },
+  { value: 'paaet', label: 'PAAET', labelAr: 'التطبيقي' },
+  { value: 'abroad', label: 'Abroad', labelAr: 'في الخارج' },
+  { value: 'aasu', label: 'AASU', labelAr: 'الجامعة العربية المفتوحة' },
+  { value: 'paci', label: 'PACI', labelAr: 'الهيئة العامة للمعلومات المدنية' },
+  { value: 'puc', label: 'PUC', labelAr: 'ديوان الخدمة المدنية' },
+  { value: 'gpa', label: 'GPA', labelAr: 'المعدل' },
+  { value: 'documents_missing', label: 'Documents Missing', labelAr: 'مستندات ناقصة' },
+  { value: 'payment_pending', label: 'Payment Pending', labelAr: 'دفع معلق' },
+  { value: 'other', label: 'Other', labelAr: 'أخرى' },
+]
 
 export const CALL_SOURCES: { value: CallSource; label: string; labelAr: string; color: string; icon: string }[] = [
   { value: 'twilio', label: 'Twilio', labelAr: 'تويليو', color: 'primary', icon: 'Cloud' },

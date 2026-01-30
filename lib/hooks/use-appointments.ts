@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, getTodayAppointments as getDemoTodayAppointments, saveDemoAppointmentUpdate } from "@/lib/demo-data"
-import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
+import type { Appointment, AppointmentLead, AppointmentType, AppointmentStatus } from "@/types"
 
 interface UseAppointmentsOptions {
   date?: string
@@ -87,7 +87,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         .from("appointments")
         .select(`
           *,
-          lead:leads(id, first_name, last_name, phone),
+          appointment_leads(id, lead_id, created_at, lead:leads(id, first_name, last_name, phone)),
           student:students(id, first_name, last_name, ktech_id),
           assigned_agent_profile:profiles!assigned_agent(id, full_name, email),
           created_by_profile:profiles!created_by(id, full_name, email)
@@ -111,7 +111,18 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       }
 
       if (leadId) {
-        query = query.eq("lead_id", leadId)
+        // Query through junction table to find appointments for this lead
+        const { data: junctionData } = await supabase
+          .from("appointment_leads")
+          .select("appointment_id")
+          .eq("lead_id", leadId)
+        const appointmentIds = junctionData?.map(j => j.appointment_id) || []
+        if (appointmentIds.length === 0) {
+          // Fallback: also check legacy lead_id column
+          query = query.eq("lead_id", leadId)
+        } else {
+          query = query.in("id", appointmentIds)
+        }
       }
 
       if (studentId) {
@@ -132,8 +143,15 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
 
       if (error) throw error
 
+      // Backfill legacy lead/lead_id from junction table for backward compat
+      const processedData = (data || []).map((apt: any) => ({
+        ...apt,
+        lead: apt.appointment_leads?.[0]?.lead || apt.lead || null,
+        lead_id: apt.appointment_leads?.[0]?.lead_id || apt.lead_id || null,
+      }))
+
       // For noUpdated/needsAttention, do additional client-side filtering for time
-      let filteredData = data || []
+      let filteredData = processedData
       if (filterNoUpdated) {
         filteredData = filteredData.filter(apt => isAppointmentNeedsAttention(apt))
       }
@@ -167,8 +185,20 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       )
       .subscribe()
 
+    const junctionChannel = supabase
+      .channel("appointment-leads-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointment_leads" },
+        () => {
+          fetchAppointments()
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
+      supabase.removeChannel(junctionChannel)
     }
   }, [fetchAppointments])
 
@@ -203,36 +233,67 @@ export function useAppointmentMutations() {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
 
-  const createAppointment = async (appointmentData: Partial<Appointment>) => {
+  const createAppointment = async (appointmentData: Partial<Appointment> & { lead_ids?: string[] }) => {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
+      // Extract lead_ids from the payload (not a DB column)
+      const leadIds = appointmentData.lead_ids ||
+        (appointmentData.lead_id ? [appointmentData.lead_id] : [])
+      const { lead_ids: _leadIds, ...insertData } = appointmentData
+
       const { data, error } = await supabase
         .from("appointments")
         .insert({
-          ...appointmentData,
+          ...insertData,
+          // Shadow: keep lead_id as first lead for backward compat
+          lead_id: leadIds[0] || insertData.lead_id || null,
           created_by: user?.id,
-          assigned_agent: appointmentData.assigned_agent || user?.id,
+          assigned_agent: insertData.assigned_agent || user?.id,
         })
         .select()
         .single()
 
       if (error) throw error
 
-      // Update lead stage to visit if this is their first appointment
-      if (appointmentData.lead_id) {
+      // Insert junction records for all leads
+      if (leadIds.length > 0 && data) {
+        const junctionRecords = leadIds.map(lid => ({
+          appointment_id: data.id,
+          lead_id: lid,
+        }))
+        const { error: junctionError } = await supabase
+          .from("appointment_leads")
+          .insert(junctionRecords)
+        if (junctionError) {
+          console.error("Error creating appointment_leads:", junctionError)
+        }
+      }
+
+      // Update pipeline stage for ALL leads (not just the first)
+      for (const lid of leadIds) {
         const { data: lead } = await supabase
           .from("leads")
           .select("pipeline_stage")
-          .eq("id", appointmentData.lead_id)
+          .eq("id", lid)
           .single()
 
         if (lead?.pipeline_stage === "new") {
+          // Get next position in "visit" stage
+          const { data: maxPosRow } = await supabase
+            .from("leads")
+            .select("position_in_stage")
+            .eq("pipeline_stage", "visit")
+            .order("position_in_stage", { ascending: false })
+            .limit(1)
+            .single()
+          const nextPos = (maxPosRow?.position_in_stage ?? 0) + 1
+
           await supabase
             .from("leads")
-            .update({ pipeline_stage: "visit" })
-            .eq("id", appointmentData.lead_id)
+            .update({ pipeline_stage: "visit", position_in_stage: nextPos })
+            .eq("id", lid)
         }
       }
 
@@ -344,6 +405,17 @@ export function useAppointmentMutations() {
     })
   }
 
+  // Mark as Will See (بيجي)
+  const markWillSee = async (id: string) => {
+    const userId = await getUserId()
+
+    return updateAppointment(id, {
+      status: "will_see",
+      will_see_at: new Date().toISOString(),
+      will_see_marked_by: userId,
+    })
+  }
+
   // Cancel appointment (لغى الموعد)
   const cancelAppointment = async (id: string, reason?: string) => {
     const userId = await getUserId()
@@ -376,6 +448,7 @@ export function useAppointmentMutations() {
     markNA,
     markCantReach,
     markOnTheWay,
+    markWillSee,
     cancelAppointment,
     postponeAppointment,
     // Legacy methods

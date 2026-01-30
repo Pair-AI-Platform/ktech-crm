@@ -313,7 +313,7 @@ function ConversationFlow({
                   )}
                   style={{ direction: message.language === "ar" ? "rtl" : "ltr" }}
                 >
-                  "{message.text}"
+                  &quot;{message.text}&quot;
                 </motion.p>
                 <motion.div
                   className="absolute -left-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gradient-to-br from-[#2d3a6d] to-[#3d4a7d] flex items-center justify-center"
@@ -874,7 +874,7 @@ function AnalyticsPanel({
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-800">Analytics</h2>
-                  <p className="text-sm text-slate-400">This week's performance</p>
+                  <p className="text-sm text-slate-400">This week&apos;s performance</p>
                 </div>
               </div>
               <button

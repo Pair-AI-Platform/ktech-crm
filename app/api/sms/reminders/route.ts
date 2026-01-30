@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendSMS, formatKuwaitPhone, replaceTemplateVariables } from '@/lib/sms/provider'
+import { BUSINESS_CONFIG } from '@/lib/config/constants'
 
 // Use service role for scheduled job (no user context)
 const supabase = createClient(
@@ -22,11 +23,18 @@ const REMINDER_TEMPLATES = {
 
 export async function POST(request: Request) {
   try {
-    // Verify cron secret (optional security)
-    const authHeader = request.headers.get('authorization')
+    // Verify cron secret (mandatory)
     const cronSecret = process.env.CRON_SECRET
+    if (!cronSecret) {
+      console.error('[SMS Reminders] CRON_SECRET is not configured')
+      return NextResponse.json(
+        { error: 'Server misconfiguration: CRON_SECRET is not set' },
+        { status: 500 }
+      )
+    }
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -40,28 +48,30 @@ export async function POST(request: Request) {
     let endTime: Date
 
     if (reminderType === '24h') {
-      // Appointments 23-25 hours from now
-      startTime = new Date(now.getTime() + 23 * 60 * 60 * 1000)
-      endTime = new Date(now.getTime() + 25 * 60 * 60 * 1000)
+      startTime = new Date(now.getTime() + BUSINESS_CONFIG.REMINDER_24H.START_HOURS * 60 * 60 * 1000)
+      endTime = new Date(now.getTime() + BUSINESS_CONFIG.REMINDER_24H.END_HOURS * 60 * 60 * 1000)
     } else {
-      // Appointments 1.5-2.5 hours from now
-      startTime = new Date(now.getTime() + 1.5 * 60 * 60 * 1000)
-      endTime = new Date(now.getTime() + 2.5 * 60 * 60 * 1000)
+      startTime = new Date(now.getTime() + BUSINESS_CONFIG.REMINDER_2H.START_HOURS * 60 * 60 * 1000)
+      endTime = new Date(now.getTime() + BUSINESS_CONFIG.REMINDER_2H.END_HOURS * 60 * 60 * 1000)
     }
 
     const startDate = startTime.toISOString().split('T')[0]
     const endDate = endTime.toISOString().split('T')[0]
 
     // Fetch appointments in the time range that haven't been reminded yet
+    // Join through junction table for multi-lead support
     const { data: appointments, error: fetchError } = await supabase
       .from('appointments')
       .select(`
         *,
-        lead:leads!appointments_lead_id_fkey(
-          id,
-          first_name,
-          phone,
-          preferred_language
+        appointment_leads(
+          lead_id,
+          lead:leads(
+            id,
+            first_name,
+            phone,
+            preferred_language
+          )
         )
       `)
       .in('status', ['scheduled', 'confirmed'])
@@ -75,9 +85,10 @@ export async function POST(request: Request) {
     }
 
     // Filter appointments by exact time range
-    const eligibleAppointments = (appointments || []).filter(apt => {
+    const eligibleAppointments = (appointments || []).filter((apt: any) => {
       const aptDateTime = new Date(`${apt.scheduled_date}T${apt.scheduled_time}`)
-      return aptDateTime >= startTime && aptDateTime <= endTime && apt.lead?.phone
+      const hasLeadWithPhone = apt.appointment_leads?.some((al: any) => al.lead?.phone)
+      return aptDateTime >= startTime && aptDateTime <= endTime && hasLeadWithPhone
     })
 
     const results = {
@@ -94,90 +105,129 @@ export async function POST(request: Request) {
       }>
     }
 
+    // Collect all SMS tasks to send in batches
+    interface SMSTask {
+      appointmentId: string
+      lead: { id: string; first_name: string; phone: string; preferred_language?: string }
+      message: string
+    }
+
+    const smsTasks: SMSTask[] = []
+
     for (const apt of eligibleAppointments) {
-      const lead = apt.lead
-      if (!lead?.phone) {
+      // Get all leads from junction table
+      const leads = (apt as any).appointment_leads
+        ?.map((al: any) => al.lead)
+        .filter((l: any) => l?.phone) || []
+
+      if (leads.length === 0) {
         results.skipped++
         results.details.push({
           appointmentId: apt.id,
           leadName: 'Unknown',
           phone: '',
           status: 'skipped',
-          error: 'No phone number'
+          error: 'No leads with phone number'
         })
         continue
       }
 
-      // Choose language
-      const lang = lead.preferred_language === 'ar' ? 'ar' : 'en'
-      const template = REMINDER_TEMPLATES[reminderType as keyof typeof REMINDER_TEMPLATES][lang]
-      const firstName = lead.first_name
+      for (const lead of leads) {
+        // Choose language
+        const lang = lead.preferred_language === 'ar' ? 'ar' : 'en'
+        const template = REMINDER_TEMPLATES[reminderType as keyof typeof REMINDER_TEMPLATES][lang]
 
-      // Format date and time
-      const aptDate = new Date(apt.scheduled_date)
-      const dateStr = aptDate.toLocaleDateString(lang === 'ar' ? 'ar-KW' : 'en-US', {
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric'
-      })
-      const timeStr = apt.scheduled_time.slice(0, 5)
-
-      // Build message
-      const message = replaceTemplateVariables(template, {
-        first_name: firstName || 'Student',
-        date: dateStr,
-        time: timeStr
-      })
-
-      if (dryRun) {
-        results.sent++
-        results.details.push({
-          appointmentId: apt.id,
-          leadName: `${lead.first_name}`,
-          phone: lead.phone,
-          status: 'dry_run'
+        // Format date and time
+        const aptDate = new Date(apt.scheduled_date)
+        const dateStr = aptDate.toLocaleDateString(lang === 'ar' ? 'ar-KW' : 'en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
         })
-        continue
+        const timeStr = apt.scheduled_time.slice(0, 5)
+
+        const message = replaceTemplateVariables(template, {
+          first_name: lead.first_name || 'Student',
+          date: dateStr,
+          time: timeStr
+        })
+
+        if (dryRun) {
+          results.sent++
+          results.details.push({
+            appointmentId: apt.id,
+            leadName: `${lead.first_name}`,
+            phone: lead.phone,
+            status: 'dry_run'
+          })
+        } else {
+          smsTasks.push({ appointmentId: apt.id, lead, message })
+        }
       }
+    }
 
-      // Send SMS
-      const smsResult = await sendSMS(lead.phone, message)
+    // Send SMS in batches using Promise.allSettled
+    const BATCH_SIZE = BUSINESS_CONFIG.SMS_BATCH_SIZE
+    for (let i = 0; i < smsTasks.length; i += BATCH_SIZE) {
+      const batch = smsTasks.slice(i, i + BATCH_SIZE)
 
-      // Store SMS record
-      await supabase.from('sms_messages').insert({
-        lead_id: lead.id,
-        phone_number: lead.phone,
-        content: message,
-        status: smsResult.success ? 'sent' : 'failed',
-        provider_id: smsResult.messageId || null,
-        error_message: smsResult.error || null,
-        sent_at: smsResult.success ? new Date().toISOString() : null,
-      })
+      const batchResults = await Promise.allSettled(
+        batch.map(async (task) => {
+          const smsResult = await sendSMS(task.lead.phone, task.message)
 
-      // Mark appointment as reminded
+          // Store SMS record
+          await supabase.from('sms_messages').insert({
+            lead_id: task.lead.id,
+            phone_number: task.lead.phone,
+            content: task.message,
+            status: smsResult.success ? 'sent' : 'failed',
+            provider_id: smsResult.messageId || null,
+            error_message: smsResult.error || null,
+            sent_at: smsResult.success ? new Date().toISOString() : null,
+          })
+
+          return { task, smsResult }
+        })
+      )
+
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          const { task, smsResult } = result.value
+          if (smsResult.success) {
+            results.sent++
+            results.details.push({
+              appointmentId: task.appointmentId,
+              leadName: `${task.lead.first_name}`,
+              phone: task.lead.phone,
+              status: 'sent'
+            })
+          } else {
+            results.failed++
+            results.details.push({
+              appointmentId: task.appointmentId,
+              leadName: `${task.lead.first_name}`,
+              phone: task.lead.phone,
+              status: 'failed',
+              error: smsResult.error
+            })
+          }
+        } else {
+          // Promise rejected (network error, etc.)
+          results.failed++
+        }
+      }
+    }
+
+    // Mark appointments as reminded (once per appointment, not per lead)
+    if (!dryRun) {
+      const remindedAptIds = new Set(smsTasks.map(t => t.appointmentId))
       const updateField = reminderType === '24h' ? 'reminder_24h_sent' : 'reminder_2h_sent'
-      await supabase
-        .from('appointments')
-        .update({ [updateField]: new Date().toISOString() })
-        .eq('id', apt.id)
 
-      if (smsResult.success) {
-        results.sent++
-        results.details.push({
-          appointmentId: apt.id,
-          leadName: `${lead.first_name}`,
-          phone: lead.phone,
-          status: 'sent'
-        })
-      } else {
-        results.failed++
-        results.details.push({
-          appointmentId: apt.id,
-          leadName: `${lead.first_name}`,
-          phone: lead.phone,
-          status: 'failed',
-          error: smsResult.error
-        })
+      for (const aptId of remindedAptIds) {
+        await supabase
+          .from('appointments')
+          .update({ [updateField]: new Date().toISOString() })
+          .eq('id', aptId)
       }
     }
 
