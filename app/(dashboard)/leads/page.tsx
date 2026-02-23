@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Sparkles,
   GraduationCap,
-  SendHorizontal,
   BookOpen,
 } from "lucide-react"
 import { type PipelineStage, type Lead } from "@/types"
@@ -28,6 +27,7 @@ import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { ErrorState } from "@/components/ui/error-state"
 
@@ -48,8 +48,10 @@ const defaultFilters: LeadFilters = {
   hasPhone: null,
   gpaMin: null,
   gpaMax: null,
+  isKuwaiti: null,
   ministryBlocked: "all",
   hasNotes: "all",
+  paymentStatus: "all",
 }
 
 export default function LeadsPage() {
@@ -74,6 +76,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
 
   const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
   const initialCheckDone = useRef(false)
+  const [studentPaymentMap, setStudentPaymentMap] = useState<Map<string, string>>(new Map())
 
   // Check URL params for opening the form (only once on mount)
   useEffect(() => {
@@ -88,11 +91,28 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     }
   }, [searchParams])
 
-  // Sync stage filter from URL params (for sidebar sub-tab navigation)
+  // Sync filters from URL params (for sidebar sub-tab navigation like PUC SRJ)
   useEffect(() => {
     const stageParam = searchParams.get("stage") as PipelineStage | null
     if (stageParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing URL params to local state
       setStageFilter(stageParam)
+    }
+
+    const fundingTypeParam = searchParams.get("funding_type") as "self_funded" | "puc" | null
+    const gpaMinParam = searchParams.get("gpa_min")
+    const isKuwaitiParam = searchParams.get("is_kuwaiti")
+    const paymentStatusParam = searchParams.get("payment_status") as "pending" | "seat_reserved" | "full_tuition" | null
+
+    if (fundingTypeParam || gpaMinParam || isKuwaitiParam || paymentStatusParam) {
+
+      setFilters(prev => ({
+        ...prev,
+        ...(fundingTypeParam ? { fundingType: fundingTypeParam } : {}),
+        ...(gpaMinParam ? { gpaMin: parseFloat(gpaMinParam) } : {}),
+        ...(isKuwaitiParam === "true" ? { isKuwaiti: true } : isKuwaitiParam === "false" ? { isKuwaiti: false } : {}),
+        ...(paymentStatusParam ? { paymentStatus: paymentStatusParam } : {}),
+      }))
     }
   }, [searchParams])
 
@@ -103,6 +123,36 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   })
 
   const { stats } = useLeadStats()
+
+  // Fetch student payment data when payment filter is active
+  useEffect(() => {
+    if (filters.paymentStatus === "all") {
+      setStudentPaymentMap(new Map())
+      return
+    }
+
+    const sfLeadIds = leads.filter(l => l.funding_type === "self_funded").map(l => l.id)
+    if (sfLeadIds.length === 0) {
+      setStudentPaymentMap(new Map())
+      return
+    }
+
+    const supabase = createClient()
+    supabase
+      .from("students")
+      .select("lead_id, payment_status")
+      .in("lead_id", sfLeadIds)
+      .then(({ data }) => {
+        const map = new Map<string, string>()
+        if (data) {
+          for (const row of data) {
+            if (row.lead_id) map.set(row.lead_id, row.payment_status ?? "pending")
+          }
+        }
+        setStudentPaymentMap(map)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.paymentStatus, leads])
 
   // Client-side filtering for advanced filters
   const filteredLeads = leads.filter((lead) => {
@@ -173,9 +223,20 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     if (filters.lostAtStages.length > 0) {
       if (!lead.lost_at_stage || !filters.lostAtStages.includes(lead.lost_at_stage)) return false
     }
+    // Kuwaiti filter
+    if (filters.isKuwaiti !== null) {
+      if (filters.isKuwaiti && !lead.is_kuwaiti) return false
+      if (!filters.isKuwaiti && lead.is_kuwaiti) return false
+    }
     // Has notes filter
     if (filters.hasNotes === "with_notes" && (!lead.notes || lead.notes.trim() === "")) return false
     if (filters.hasNotes === "without_notes" && lead.notes && lead.notes.trim() !== "") return false
+    // Payment status filter (self-funded only)
+    if (filters.paymentStatus !== "all") {
+      if (lead.funding_type !== "self_funded") return false
+      const status = studentPaymentMap.get(lead.id) ?? "pending"
+      if (status !== filters.paymentStatus) return false
+    }
     return true
   })
 
@@ -329,7 +390,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       <div className="p-6 gap-6 page-enter flex flex-col flex-1 min-h-0 h-full">
         {/* Stats Bar */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             {/* SF/PUC Toggle */}
             <div className="flex items-center p-1 bg-[var(--bg-surface)] rounded-lg border border-[var(--border)]">
               {[
@@ -393,19 +454,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             >
               <BookOpen className="w-4 h-4" />
             </Button>
-            {profile?.role === "admin" && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-[var(--text-muted)]"
-                  onClick={() => setShowPSPTransferModal(true)}
-                  title="PSP Transfer (Move PUC leads to Submission)"
-                >
-                  <SendHorizontal className="w-4 h-4" />
-                </Button>
-              </>
-            )}
             <Button
               variant="ghost"
               size="icon"
@@ -448,6 +496,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             }}
             onEditLead={handleEditLead}
             currentStageFilter={stageFilter}
+            fundingTypeFilter={filters.fundingType}
           />
         </motion.div>
 
@@ -469,7 +518,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-20"
           >
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center mb-4">
+            <div className="w-20 h-20 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center mb-4">
               <Sparkles className="w-10 h-10 text-[var(--primary)]" />
             </div>
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
@@ -517,6 +566,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       {/* Add/Edit Lead Form Modal */}
       {(showAddForm || editingLead) && (
         <LeadForm
+          key={editingLead?.id || 'new'}
           lead={editingLead}
           onClose={() => {
             setShowAddForm(false)
