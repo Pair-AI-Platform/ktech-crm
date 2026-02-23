@@ -26,6 +26,7 @@ import { PUCImportDialog } from "@/components/leads/puc-import-dialog"
 import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
+import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -66,6 +67,7 @@ export default function LeadsPage() {
   const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showLostModal, setShowLostModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showPUCImportModal, setShowPUCImportModal] = useState(false)
   const [showPSPTransferModal, setShowPSPTransferModal] = useState(false)
@@ -74,7 +76,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
-  const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
+  const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
   const initialCheckDone = useRef(false)
   const [studentPaymentMap, setStudentPaymentMap] = useState<Map<string, string>>(new Map())
 
@@ -335,6 +337,21 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     }
   }
 
+  const handleBulkLost = () => {
+    setShowLostModal(true)
+  }
+
+  const handleBulkLostConfirm = async (reasonId: string, notes?: string) => {
+    const result = await bulkUpdateStage(selectedLeads, "lost" as PipelineStage)
+    if (!result.error) {
+      setShowLostModal(false)
+      setSelectedLeads([])
+      setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} marked as lost`)
+      setShowSuccessToast(true)
+      refetch()
+    }
+  }
+
   const handleExportCSV = () => {
     const csvContent = exportLeadsToCSV(filteredLeads)
     const filename = `leads_export_${new Date().toISOString().split("T")[0]}.csv`
@@ -549,6 +566,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               selectedCount={selectedLeads.length}
               onAssign={handleBulkAssign}
               onBook={handleBulkBook}
+              onLost={handleBulkLost}
               onDelete={handleBulkDelete}
               onClear={() => setSelectedLeads([])}
               onMOEFetch={() => setShowMOEFetchModal(true)}
@@ -595,6 +613,14 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         selectedCount={selectedLeads.length}
         onConfirm={handleBulkDeleteConfirm}
         loading={mutationLoading}
+      />
+
+      {/* Bulk Mark Lost Dialog */}
+      <MarkLostDialog
+        open={showLostModal}
+        onOpenChange={setShowLostModal}
+        onConfirm={handleBulkLostConfirm}
+        leadName={`${selectedLeads.length} lead${selectedLeads.length !== 1 ? "s" : ""}`}
       />
 
       {/* Success Toast */}

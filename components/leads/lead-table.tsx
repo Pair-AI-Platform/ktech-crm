@@ -1480,12 +1480,13 @@ interface BulkActionsProps {
   selectedCount: number
   onAssign: () => void
   onBook: () => void
+  onLost?: () => void
   onDelete: () => void
   onClear: () => void
   onMOEFetch?: () => void
 }
 
-export function BulkActionsBar({ selectedCount, onAssign, onBook, onDelete, onClear, onMOEFetch }: BulkActionsProps) {
+export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDelete, onClear, onMOEFetch }: BulkActionsProps) {
   if (selectedCount === 0) return null
 
   return (
@@ -1524,6 +1525,17 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onDelete, onCl
             <Button variant="ghost" size="sm" onClick={onMOEFetch} className="rounded-lg hover:bg-blue-50 hover:text-blue-600">
               <BookOpen className="w-4 h-4 mr-1.5" />
               Fetch GPA
+            </Button>
+          )}
+          {onLost && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onLost}
+              className="rounded-lg text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+            >
+              <XCircle className="w-4 h-4 mr-1.5" />
+              Lost
             </Button>
           )}
           <Button

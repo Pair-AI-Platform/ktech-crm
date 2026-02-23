@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
 import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
+import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -64,10 +65,11 @@ export default function PUCSRJPage() {
   const [wizardLead, setWizardLead] = useState<Lead | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showLostModal, setShowLostModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
-  const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
+  const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
 
   // PUC leads
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
@@ -336,6 +338,17 @@ export default function PUCSRJPage() {
   const handleBulkBook = () => {
     const leadIds = selectedLeads.join(",")
     window.location.href = `/calendar?book=${leadIds}`
+  }
+
+  const handleBulkLostConfirm = async (reasonId: string, notes?: string) => {
+    const result = await bulkUpdateStage(selectedLeads, "lost" as PipelineStage)
+    if (!result.error) {
+      setShowLostModal(false)
+      setSelectedLeads([])
+      setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} marked as lost`)
+      setShowSuccessToast(true)
+      refetch()
+    }
   }
 
   const handleExportCSV = () => {
@@ -666,6 +679,7 @@ export default function PUCSRJPage() {
               selectedCount={selectedLeads.length}
               onAssign={() => setShowAssignModal(true)}
               onBook={handleBulkBook}
+              onLost={() => setShowLostModal(true)}
               onDelete={() => setShowDeleteModal(true)}
               onClear={() => setSelectedLeads([])}
             />
@@ -710,6 +724,14 @@ export default function PUCSRJPage() {
         selectedCount={selectedLeads.length}
         onConfirm={handleBulkDeleteConfirm}
         loading={mutationLoading}
+      />
+
+      {/* Bulk Mark Lost Dialog */}
+      <MarkLostDialog
+        open={showLostModal}
+        onOpenChange={setShowLostModal}
+        onConfirm={handleBulkLostConfirm}
+        leadName={`${selectedLeads.length} lead${selectedLeads.length !== 1 ? "s" : ""}`}
       />
 
       {/* Success Toast */}
