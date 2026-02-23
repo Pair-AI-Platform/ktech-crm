@@ -23,6 +23,7 @@ import {
   Search,
   Ban,
   UserMinus,
+  Wallet,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -208,6 +209,7 @@ const navigation: NavItem[] = [
     { name: "Withdraw", href: "/leads?stage=withdraw", icon: UserMinus, description: "Withdrawn leads" },
   ]},
   { name: "PUC SRJ", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions" },
+  { name: "Self Funded SRJ", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded SRJ submissions" },
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
   // { name: "Voice", href: "/voice", icon: Phone, description: "Kadi AI & calls" },
   { name: "Reports", href: "/reports", icon: BarChart3, description: "Analytics & insights" },

@@ -86,10 +86,10 @@ const LOST_AT_STAGES = PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value
 // Allowed statuses per stage (matches lead-table.tsx logic)
 const STAGE_ALLOWED_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none'> = {
   new: 'none',
-  contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential'],
+  contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'wrong_number', 'will_see'],
   visit: ['no_answer', 'cant_reach', 'interested', 'not_interested'],
   test: ['online', 'on_campus'],
-  application: 'none',
+  application: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'wrong_number', 'will_see'],
   lost: 'all',
   applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
   enrolled: 'none',

@@ -18,7 +18,7 @@ import type { LeadStatus } from "@/types"
 
 const CONTACTED_STATUSES: LeadStatus[] = [
   'no_answer', 'switched_off', 'interested',
-  'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential',
+  'not_interested', 'high_gpa', 'wrong_number', 'will_see',
   'by_mistake', 'disconnected', 'rude', 'asking_bachelors', 'courses_masters',
   'current_student', 'seeking_job', 'cant_reach',
 ]

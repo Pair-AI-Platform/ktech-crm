@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo, useEffect, startTransition } from "react"
+import { useState, useMemo, useEffect, startTransition, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { useLeads, useLeadMutations } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
@@ -50,7 +51,18 @@ const SF_STAGE_CONFIG: { value: PipelineStage | "all"; label: string }[] = [
 export default function PUCSRJPage() {
   const { profile } = useUser()
   const router = useRouter()
-  const [topTab, setTopTab] = useState<TopTab>("puc")
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab") as TopTab | null
+  const [topTab, setTopTab] = useState<TopTab>(tabParam && ["puc", "sf_srj", "self_fund"].includes(tabParam) ? tabParam : "puc")
+
+  // Sync tab state when URL search param changes (e.g. sidebar navigation)
+  useEffect(() => {
+    if (tabParam && ["puc", "sf_srj", "self_fund"].includes(tabParam)) {
+      setTopTab(tabParam)
+    } else if (!tabParam) {
+      setTopTab("puc")
+    }
+  }, [tabParam])
   const [searchQuery, setSearchQuery] = useState("")
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [sfSrjStageFilter, setSfSrjStageFilter] = useState<string>("all")

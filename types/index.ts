@@ -4,7 +4,7 @@
 
 export type UserRole = 'admin' | 'agent'
 
-export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'interested' | 'high_gpa' | 'low_gpa' | 'already_done' | 'cancelled' | 'online' | 'on_campus' | 'on_the_way' | 'cant_reach' | 'contacted' | 'seeking_job' | 'current_student' | 'asking_bachelors' | 'courses_masters' | 'potential' | 'rude' | 'informed' | 'travelling' | 'might_withdraw'
+export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'interested' | 'high_gpa' | 'cancelled' | 'online' | 'on_campus' | 'on_the_way' | 'cant_reach' | 'contacted' | 'seeking_job' | 'current_student' | 'asking_bachelors' | 'courses_masters' | 'rude' | 'informed' | 'travelling' | 'might_withdraw'
 
 export type LeadSourceCategory = 'direct' | 'events' | 'digital' | 'referrals' | 'outreach'
 
@@ -859,9 +859,6 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; labelAr: string;
   { value: 'hanged_up', label: 'Hanged Up', labelAr: 'أغلق الخط', color: 'destructive' },
   { value: 'interested', label: 'Interested', labelAr: 'مهتم', color: 'success' },
   { value: 'high_gpa', label: 'High GPA', labelAr: 'معدل عالي', color: 'success' },
-  { value: 'low_gpa', label: 'Low GPA', labelAr: 'معدل منخفض', color: 'warning' },
-  { value: 'already_done', label: 'Already Done', labelAr: 'تم بالفعل', color: 'secondary' },
-  { value: 'potential', label: 'Potential', labelAr: 'محتمل', color: 'success' },
   { value: 'cancelled', label: 'Cancelled', labelAr: 'ملغى', color: 'destructive' },
   { value: 'online', label: 'Online', labelAr: 'أونلاين', color: 'accent' },
   { value: 'on_campus', label: 'On Campus', labelAr: 'حضوري', color: 'success' },
