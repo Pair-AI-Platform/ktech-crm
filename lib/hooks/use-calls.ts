@@ -152,7 +152,7 @@ const DEMO_CALLS: Call[] = [
         "Prepare program materials",
         "Follow up after visit"
       ],
-      recommended_pipeline_stage: "visit",
+      recommended_pipeline_stage: "contacted",
       created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     },
     action_items: [

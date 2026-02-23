@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { VoiceWorkflow, VoiceWorkflowStep, WorkflowStatus } from "@/types"
+import { VoiceWorkflowStep, WorkflowStatus } from "@/types"
 
 // GET - List all workflows with optional filters
 export async function GET(request: NextRequest) {

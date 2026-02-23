@@ -66,25 +66,25 @@ export function EnrollmentReports({ data }: EnrollmentReportsProps) {
       title: "Total Enrolled",
       value: data.totalEnrolled,
       icon: GraduationCap,
-      gradient: "from-[#22C55E] to-[#16A34A]"
+      colorClass: "bg-[var(--success)]"
     },
     {
       title: "Active Agents",
       value: data.byAgent.length,
       icon: Users,
-      gradient: "from-[#445eb7] to-[#212e7f]"
+      colorClass: "bg-[var(--bg-sunken)]"
     },
     {
       title: "Withdrawals",
       value: data.withdrawals.total,
       icon: UserMinus,
-      gradient: "from-[#EF4444] to-[#DC2626]"
+      colorClass: "bg-[var(--error)]"
     },
     {
       title: "Withdrawal Rate",
       value: `${data.withdrawals.rate}%`,
       icon: TrendingDown,
-      gradient: "from-[#F59E0B] to-[#D97706]"
+      colorClass: "bg-[var(--warning)]"
     },
   ]
 
@@ -102,14 +102,14 @@ export function EnrollmentReports({ data }: EnrollmentReportsProps) {
             <Card hover glow className="relative overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
+                  <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
               </CardContent>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.gradient} opacity-50`} />
+              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
             </Card>
           </motion.div>
         ))}
@@ -235,7 +235,7 @@ export function EnrollmentReports({ data }: EnrollmentReportsProps) {
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="h-full bg-[var(--bg-depth-3)] rounded animate-pulse" />
+                      <div className="h-full bg-[var(--bg-sunken)] rounded animate-pulse" />
                     )}
                   </div>
                   {/* Legend */}
@@ -281,7 +281,7 @@ function AgentRow({
   const progressColor = agent.progress >= 100 ? 'success' : agent.progress >= 50 ? 'warning' : 'error'
 
   return (
-    <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+    <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <span className="text-lg font-bold text-[var(--text-muted)] w-6">{rank}</span>
         <Avatar size="sm">

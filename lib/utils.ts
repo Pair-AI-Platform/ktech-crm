@@ -34,6 +34,12 @@ export function formatCivilId(civilId: string): string {
   return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`
 }
 
+// Convert Date to "YYYY-MM-DD" using LOCAL timezone (not UTC)
+// This avoids off-by-one bugs from toISOString().split("T")[0] in UTC+3
+export function toDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 // Date utilities
 export function formatDate(date: Date | string, locale: 'en' | 'ar' = 'en'): string {
   const d = typeof date === 'string' ? new Date(date) : date
@@ -111,9 +117,30 @@ export const stageColors: Record<string, string> = {
   lost: 'bg-gray-100 text-gray-700 border-gray-200'
 }
 
-// Generate initials from name
-export function getInitials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+// Get the meaningful first letter of an Arabic or Latin name part
+// Skips the Arabic definite article "ال" to get the actual initial
+function getNameInitial(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return ''
+  // Skip Arabic definite article "ال" (al-)
+  if (trimmed.startsWith('ال') && trimmed.length > 2) {
+    return trimmed[2]
+  }
+  return trimmed[0]
+}
+
+// Generate initials from name (supports Arabic names with "ال" prefix)
+export function getInitials(firstName: string, lastName?: string): string {
+  const first = getNameInitial(firstName)
+  if (lastName) {
+    return `${first}${getNameInitial(lastName)}`.toUpperCase()
+  }
+  // If only one name provided, try splitting by space
+  const parts = firstName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${getNameInitial(parts[0])}${getNameInitial(parts[parts.length - 1])}`.toUpperCase()
+  }
+  return first.toUpperCase()
 }
 
 // Truncate text

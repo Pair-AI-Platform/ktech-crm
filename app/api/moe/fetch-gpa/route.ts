@@ -153,7 +153,7 @@ export async function GET() {
         rate_limit: "3 seconds between each lead to prevent blocking",
       },
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Service unavailable" },
       { status: 500 }

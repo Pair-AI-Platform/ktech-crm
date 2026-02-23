@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
-import type { Lead, Profile, PipelineStage, ContactStatus, LeadSource, LeadSourceCategory, FundingType } from "@/types"
+import type { Profile, PipelineStage, ContactStatus, LeadSource, LeadSourceCategory, FundingType } from "@/types"
 
 export interface DeletedLead {
   id: string

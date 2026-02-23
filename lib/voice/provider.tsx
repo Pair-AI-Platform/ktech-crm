@@ -11,7 +11,7 @@ import {
 } from "react"
 import { Device, Call } from "@twilio/voice-sdk"
 import { createClient } from "@/lib/supabase/client"
-import type { Call as DbCall, Lead, Profile } from "@/types"
+import type { Lead } from "@/types"
 
 // Call state types
 export type CallState =
@@ -135,7 +135,7 @@ export function VoiceProvider({ children, agentId }: VoiceProviderProps) {
   }, [])
 
   // Set up call event handlers - defined before initializeDevice since it's used there
-  const setupCallEventHandlers = useCallback((call: Call, direction: CallDirection) => {
+  const setupCallEventHandlers = useCallback((call: Call) => {
     call.on("accept", () => {
       console.log("[Voice] Call accepted")
       setActiveCall(prev => prev ? {
@@ -234,7 +234,7 @@ export function VoiceProvider({ children, agentId }: VoiceProviderProps) {
         callRef.current = call
 
         // Set up call event handlers
-        setupCallEventHandlers(call, "inbound")
+        setupCallEventHandlers(call)
       })
 
       // Register device
@@ -285,7 +285,7 @@ export function VoiceProvider({ children, agentId }: VoiceProviderProps) {
         leadId,
       })
 
-      setupCallEventHandlers(call, "outbound")
+      setupCallEventHandlers(call)
     } catch (err) {
       console.error("[Voice] Failed to make call:", err)
       throw err

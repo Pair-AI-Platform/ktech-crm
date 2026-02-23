@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
     const callSid = formData.get("CallSid") as string
     const from = formData.get("From") as string
     const to = formData.get("To") as string
-    const callStatus = formData.get("CallStatus") as string
 
     console.log(`[Inbound] Call from ${from} to ${to}, SID: ${callSid}`)
 

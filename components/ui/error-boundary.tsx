@@ -56,12 +56,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Again
               </Button>
-              <Link href="/dashboard">
-                <Button>
+              <Button asChild>
+                <Link href="/dashboard">
                   <Home className="w-4 h-4 mr-2" />
                   Go Home
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -99,12 +99,12 @@ export function ErrorFallback({
               Try Again
             </Button>
           )}
-          <Link href="/dashboard">
-            <Button>
+          <Button asChild>
+            <Link href="/dashboard">
               <Home className="w-4 h-4 mr-2" />
               Go Home
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
     </div>

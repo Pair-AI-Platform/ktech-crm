@@ -45,7 +45,7 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
   const [file, setFile] = useState<File | null>(null)
   const [records, setRecords] = useState<MinistryRecord[]>([])
   const [invalidRecords, setInvalidRecords] = useState<{ record: MinistryRecord; reason: string }[]>([])
-  const [importing, setImporting] = useState(false)
+  const [, setImporting] = useState(false)
   const [result, setResult] = useState<MinistryImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [overwriteExisting, setOverwriteExisting] = useState(false)

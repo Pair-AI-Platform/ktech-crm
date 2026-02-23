@@ -1,8 +1,8 @@
 "use client"
 
-import { Bell, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { CounterBadge } from "@/components/ui/badge"
+import { NotificationDropdown } from "./notification-dropdown"
 import Link from "next/link"
 import type { Profile } from "@/lib/hooks/use-user"
 
@@ -21,10 +21,8 @@ interface HeaderProps {
 }
 
 export function Header({ user, title, subtitle, action, breadcrumbs }: HeaderProps) {
-  const notificationCount = 3 // This would come from real data
-
   return (
-    <header className="sticky top-0 z-20 bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)] border-b border-[var(--glass-border)]">
+    <header className="sticky top-0 z-20 bg-[var(--bg-surface)] border-b border-[var(--border)]">
       <div className="flex items-center justify-between min-h-[4.5rem] md:min-h-[4rem] py-3 md:py-2 px-4 md:px-6">
         {/* Left Section - Title & Breadcrumbs */}
         <div className="flex items-center gap-2 md:gap-4">
@@ -63,14 +61,7 @@ export function Header({ user, title, subtitle, action, breadcrumbs }: HeaderPro
         {/* Right Section - Actions */}
         <div className="flex items-center gap-3">
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-            <Bell className="w-5 h-5" />
-            {notificationCount > 0 && (
-              <div className="absolute -top-0.5 -right-0.5">
-                <CounterBadge count={notificationCount} />
-              </div>
-            )}
-          </Button>
+          <NotificationDropdown userId={user?.id} />
 
           {/* Divider */}
           <div className="hidden sm:block w-px h-6 bg-[var(--border)]" />
@@ -78,16 +69,16 @@ export function Header({ user, title, subtitle, action, breadcrumbs }: HeaderPro
           {/* Primary Action */}
           {action && (
             action.href ? (
-              <Link href={action.href}>
-                <Button className="hidden sm:flex shadow-lg shadow-[var(--primary)]/20 hover:shadow-[var(--primary)]/40">
+              <Button asChild className="hidden sm:flex shadow-sm">
+                <Link href={action.href}>
                   {action.icon || <Plus className="w-4 h-4" />}
                   {action.label}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             ) : (
               <Button
                 onClick={action.onClick}
-                className="hidden sm:flex shadow-lg shadow-[var(--primary)]/20 hover:shadow-[var(--primary)]/40"
+                className="hidden sm:flex shadow-sm"
               >
                 {action.icon || <Plus className="w-4 h-4" />}
                 {action.label}
@@ -98,16 +89,16 @@ export function Header({ user, title, subtitle, action, breadcrumbs }: HeaderPro
           {/* Mobile Action */}
           {action && (
             action.href ? (
-              <Link href={action.href} className="sm:hidden">
-                <Button size="icon" className="shadow-lg shadow-[var(--primary)]/20">
+              <Button asChild size="icon" className="sm:hidden shadow-sm">
+                <Link href={action.href}>
                   {action.icon || <Plus className="w-4 h-4" />}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             ) : (
               <Button
                 size="icon"
                 onClick={action.onClick}
-                className="sm:hidden shadow-lg shadow-[var(--primary)]/20"
+                className="sm:hidden shadow-sm"
               >
                 {action.icon || <Plus className="w-4 h-4" />}
               </Button>

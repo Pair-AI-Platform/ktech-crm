@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 // Design is how it works."
 
 export default function LeadDetailJobs() {
-  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   const lead = {

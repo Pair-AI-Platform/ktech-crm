@@ -3,7 +3,7 @@
 
 -- Step 1: Create junction table
 CREATE TABLE IF NOT EXISTS appointment_leads (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
   lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),

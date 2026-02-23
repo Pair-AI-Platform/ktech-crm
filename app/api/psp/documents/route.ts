@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
       .from("psp_documents")
       .select(`
         *,
-        verified_by_profile:profiles!psp_documents_verified_by_fkey(id, full_name, email),
-        uploaded_by_profile:profiles!psp_documents_uploaded_by_fkey(id, full_name, email)
+        verified_by_profile:profiles!verified_by(id, full_name, email),
+        uploaded_by_profile:profiles!uploaded_by(id, full_name, email)
       `)
       .eq("lead_id", leadId)
       .order("uploaded_at", { ascending: false })
@@ -51,14 +51,33 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error("Error fetching PSP documents:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // If the join fails, try a simpler query without profile joins
+      console.warn("PSP documents query with joins failed, trying without joins:", error.message)
+      let fallbackQuery = supabase
+        .from("psp_documents")
+        .select("*")
+        .eq("lead_id", leadId)
+        .order("uploaded_at", { ascending: false })
+
+      if (graduateType) {
+        fallbackQuery = fallbackQuery.eq("graduate_type", graduateType)
+      }
+
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery
+
+      if (fallbackError) {
+        // Table likely doesn't exist yet - return empty array
+        console.warn("PSP documents table not available:", fallbackError.message)
+        return NextResponse.json({ documents: [] })
+      }
+
+      return NextResponse.json({ documents: fallbackData || [] })
     }
 
     return NextResponse.json({ documents: data || [] })
   } catch (err) {
     console.error("Error fetching PSP documents:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ documents: [] })
   }
 }
 
@@ -117,8 +136,8 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        verified_by_profile:profiles!psp_documents_verified_by_fkey(id, full_name, email),
-        uploaded_by_profile:profiles!psp_documents_uploaded_by_fkey(id, full_name, email)
+        verified_by_profile:profiles!verified_by(id, full_name, email),
+        uploaded_by_profile:profiles!uploaded_by(id, full_name, email)
       `)
       .single()
 
@@ -226,8 +245,8 @@ export async function PATCH(request: NextRequest) {
       .eq("id", id)
       .select(`
         *,
-        verified_by_profile:profiles!psp_documents_verified_by_fkey(id, full_name, email),
-        uploaded_by_profile:profiles!psp_documents_uploaded_by_fkey(id, full_name, email)
+        verified_by_profile:profiles!verified_by(id, full_name, email),
+        uploaded_by_profile:profiles!uploaded_by(id, full_name, email)
       `)
       .single()
 

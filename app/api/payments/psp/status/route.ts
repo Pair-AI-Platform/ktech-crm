@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       .from("psp_documents")
       .select("id, public_url, file_name")
       .eq("lead_id", leadId)
-      .eq("document_type", "psp_payment_receipt")
+      .eq("document_type", "puc_receipt")
       .single()
 
     if (!transaction) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, startTransition } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
@@ -20,13 +20,18 @@ import {
   UserCheck,
   XCircle,
   PhoneCall,
-  Eye
+  Eye,
+  Trash2,
+  Pencil,
+  Check,
+  StickyNote
 } from "lucide-react"
-import type { Appointment, PipelineStage } from "@/types"
-import { APPOINTMENT_TYPES, PIPELINE_STAGES } from "@/types"
+import type { Appointment, PipelineStage, LeadStatus } from "@/types"
+import { APPOINTMENT_TYPES, PIPELINE_STAGES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES } from "@/types"
 import { stageColors } from "@/lib/utils"
 import { useAppointmentMutations, useRescheduleHistory } from "@/lib/hooks/use-appointments"
 import { createClient } from "@/lib/supabase/client"
+import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 
 interface AppointmentDetailProps {
   appointment: Appointment | null
@@ -40,6 +45,11 @@ const STATUS_CONFIG: Record<string, {
   color: string
   icon: typeof CheckCircle2
 }> = {
+  scheduled: {
+    label: "Scheduled",
+    color: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/30",
+    icon: Calendar
+  },
   no_answer: {
     label: "No Answer",
     color: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
@@ -70,6 +80,11 @@ const STATUS_CONFIG: Record<string, {
     color: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/30",
     icon: Eye
   },
+  cancelled: {
+    label: "Canceled",
+    color: "bg-red-500/10 text-red-500 border-red-500/30",
+    icon: XCircle
+  },
 }
 
 export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: AppointmentDetailProps) {
@@ -79,7 +94,16 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const [isLoading, setIsLoading] = useState(false)
   const [showCancelForm, setShowCancelForm] = useState(false)
   const [cancelNotes, setCancelNotes] = useState("")
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [stageLoading, setStageLoading] = useState(false)
+  const [localStageOverride, setLocalStageOverride] = useState<PipelineStage | null>(null)
+  const [, setLocalStatusOverride] = useState<string | null>(null)
+  const [showLostDialog, setShowLostDialog] = useState(false)
+  const [localLeadStatusOverride, setLocalLeadStatusOverride] = useState<LeadStatus | null>(null)
+  const [leadStatusLoading, setLeadStatusLoading] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesValue, setNotesValue] = useState("")
+  const [notesSaving, setNotesSaving] = useState(false)
 
   const {
     markNA,
@@ -87,16 +111,29 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     markOnTheWay,
     markWillSee,
     confirmAppointment,
-    postponeAppointment
+    cancelAppointment,
+    postponeAppointment,
+    deleteAppointment,
+    updateAppointment
   } = useAppointmentMutations()
 
   // Fetch reschedule history - use empty string if no appointment to satisfy hook rules
   const { reschedules } = useRescheduleHistory(appointment?.id || "")
 
+  // Reset local state when appointment changes
+  useEffect(() => {
+    startTransition(() => {
+      setLocalStageOverride(null)
+      setLocalStatusOverride(null)
+      setLocalLeadStatusOverride(null)
+      setEditingNotes(false)
+      setNotesValue(appointment?.notes || "")
+    })
+  }, [appointment?.id, appointment?.notes])
+
   if (!appointment) return null
 
-  const typeInfo = APPOINTMENT_TYPES.find(t => appointment.appointment_type.includes(t.value))
-  const statusConfig = STATUS_CONFIG[appointment.status] || STATUS_CONFIG.na
+  const statusConfig = STATUS_CONFIG[appointment.status] || STATUS_CONFIG.scheduled
   const StatusIcon = statusConfig.icon
 
   // Derive leads list from junction table with legacy fallback
@@ -132,7 +169,15 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const handleMarkOnTheWay = () => handleAction(() => markOnTheWay(appointment.id))
   const handleMarkWillSee = () => handleAction(() => markWillSee(appointment.id))
 
-  // Mark all leads as Canceled with notes
+  const handleSaveNotes = async () => {
+    setNotesSaving(true)
+    await updateAppointment(appointment.id, { notes: notesValue.trim() || null } as Partial<Appointment>)
+    setNotesSaving(false)
+    setEditingNotes(false)
+    onUpdate?.()
+  }
+
+  // Mark all leads as Canceled with notes + cancel the appointment
   const handleMarkCanceled = async () => {
     if (allLeadIds.length === 0) return
     setIsLoading(true)
@@ -143,6 +188,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         .update({ status: "not_interested", notes: cancelNotes || undefined })
         .eq("id", lid)
     }
+    // Also cancel the appointment itself
+    await cancelAppointment(appointment.id, cancelNotes || undefined)
     setIsLoading(false)
     setShowCancelForm(false)
     setCancelNotes("")
@@ -165,23 +212,87 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     onUpdate?.()
     onClose()
   }
-  // Change lead pipeline stage for all leads
-  const handleChangeStage = async (stage: PipelineStage) => {
+  // Change lead pipeline stage for all leads + auto-confirm appointment
+  const handleChangeStage = async (stage: PipelineStage, lostReasonId?: string, lostReasonNotes?: string) => {
     if (allLeadIds.length === 0) return
+    // Intercept "lost" stage to show the reason dialog
+    if (stage === "lost" && !lostReasonId) {
+      setShowLostDialog(true)
+      return
+    }
     setStageLoading(true)
+    setLocalStageOverride(stage)
     const supabase = createClient()
     for (const lid of allLeadIds) {
+      const updates: Record<string, unknown> = { pipeline_stage: stage }
+      if (stage === "lost" && lostReasonId) {
+        updates.lost_reason_id = lostReasonId
+        if (lostReasonNotes) updates.lost_reason_notes = lostReasonNotes
+      }
       await supabase
         .from("leads")
-        .update({ pipeline_stage: stage })
+        .update(updates)
         .eq("id", lid)
+    }
+    // Auto-confirm the appointment if not already confirmed
+    if (appointment.status !== "confirmed") {
+      await confirmAppointment(appointment.id)
     }
     setStageLoading(false)
     onUpdate?.()
   }
 
+  // Lead status color mapping
+  const LEAD_STATUS_COLORS: Record<string, string> = {
+    warning: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
+    success: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30",
+    destructive: "bg-red-500/10 text-red-500 border-red-500/30",
+    secondary: "bg-[var(--text-secondary)]/10 text-[var(--text-secondary)] border-[var(--text-secondary)]/30",
+    accent: "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30",
+  }
+
+  // Filter statuses based on current pipeline stage
+  const currentStageForStatus = localStageOverride || appointmentLeads[0]?.pipeline_stage
+  const STAGE_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none'> = {
+    new: 'none',
+    contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential'],
+    visit: ['no_answer', 'cant_reach', 'interested', 'not_interested'],
+    test: ['online', 'on_campus'],
+    application: 'none',
+    lost: 'all',
+    applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
+    enrolled: 'none',
+    withdraw: 'all',
+  }
+  const stageConfig = currentStageForStatus ? STAGE_STATUSES[currentStageForStatus as PipelineStage] : 'all'
+  const availableLeadStatuses = stageConfig === 'none'
+    ? []
+    : stageConfig === 'all'
+    ? LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+    : LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
+
+  // Change lead status for all leads
+  const handleChangeLeadStatus = async (status: LeadStatus) => {
+    if (allLeadIds.length === 0) return
+    setLeadStatusLoading(true)
+    setLocalLeadStatusOverride(status)
+    const supabase = createClient()
+    for (const lid of allLeadIds) {
+      await supabase
+        .from("leads")
+        .update({ status })
+        .eq("id", lid)
+    }
+    setLeadStatusLoading(false)
+    onUpdate?.()
+  }
+
   const handlePostpone = () => handleAction(() =>
     postponeAppointment(appointment.id, postponedDate, postponedTime)
+  )
+
+  const handleDelete = () => handleAction(() =>
+    deleteAppointment(appointment.id)
   )
 
   const getTypeGradient = () => {
@@ -342,6 +453,38 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
             </div>
           </div>
 
+          {/* Lead Status */}
+          {hasLeads && availableLeadStatuses.length > 0 && (
+            <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+                Lead Status {appointmentLeads.length > 1 ? `(${appointmentLeads.length} leads)` : ''}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {availableLeadStatuses.map((status) => {
+                  const currentLeadStatus = localLeadStatusOverride || appointmentLeads[0]?.status
+                  const isActive = currentLeadStatus === status.value
+                  const colorClass = LEAD_STATUS_COLORS[status.color] || LEAD_STATUS_COLORS.secondary
+                  return (
+                    <button
+                      key={status.value}
+                      onClick={() => handleChangeLeadStatus(status.value)}
+                      disabled={leadStatusLoading || isActive}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+                        isActive
+                          ? cn(colorClass, "ring-2 ring-offset-1 ring-current/30 scale-105")
+                          : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                        leadStatusLoading && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {status.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Lead Pipeline Stage */}
           {hasLeads && (
             <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
@@ -350,7 +493,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               </p>
               <div className="flex flex-wrap gap-2">
                 {PIPELINE_STAGES.map((stage) => {
-                  const isActive = appointmentLeads[0]?.pipeline_stage === stage.value
+                  const currentStage = localStageOverride || appointmentLeads[0]?.pipeline_stage
+                  const isActive = currentStage === stage.value
                   const colors = stageColors[stage.value] || 'bg-gray-100 text-gray-700 border-gray-200'
                   return (
                     <button
@@ -374,12 +518,68 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           )}
 
           {/* Notes */}
-          {appointment.notes && (
-            <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">Notes</p>
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{appointment.notes}</p>
+          <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] flex items-center gap-1.5">
+                <StickyNote className="w-3 h-3" />
+                Notes
+              </p>
+              {!editingNotes ? (
+                <button
+                  onClick={() => { setNotesValue(appointment.notes || ""); setEditingNotes(true) }}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => { setEditingNotes(false); setNotesValue(appointment.notes || "") }}
+                    className="text-[var(--text-muted)] hover:text-[var(--error)] transition-colors text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={notesSaving}
+                    className="flex items-center gap-1 text-xs text-[var(--success)] hover:text-[var(--success)] disabled:opacity-50 transition-colors"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    {notesSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+            {editingNotes ? (
+              <textarea
+                value={notesValue}
+                onChange={(e) => setNotesValue(e.target.value)}
+                placeholder="Add notes..."
+                autoFocus
+                rows={3}
+                className="w-full text-sm bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg p-2.5 text-[var(--text-secondary)] placeholder:text-[var(--text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    handleSaveNotes()
+                  }
+                  if (e.key === "Escape") {
+                    setEditingNotes(false)
+                    setNotesValue(appointment.notes || "")
+                  }
+                }}
+              />
+            ) : (
+              <p
+                className={cn(
+                  "text-sm leading-relaxed cursor-pointer rounded-lg p-1 -m-1 hover:bg-[var(--bg-primary)]/50 transition-colors",
+                  appointment.notes ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]/50 italic"
+                )}
+                onClick={() => { setNotesValue(appointment.notes || ""); setEditingNotes(true) }}
+              >
+                {appointment.notes || "Click to add notes..."}
+              </p>
+            )}
+          </div>
 
           {/* Cancel Form */}
           {showCancelForm && (
@@ -462,6 +662,42 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                   className="rounded-lg"
                 >
                   {isLoading ? "Saving..." : "Confirm Postpone"}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Delete Confirmation */}
+          {showDeleteConfirm && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="p-4 rounded-xl border border-red-500/30 bg-red-500/5"
+            >
+              <p className="text-sm font-semibold text-red-500 mb-2 flex items-center gap-2">
+                <Trash2 className="w-4 h-4" />
+                Delete Appointment
+              </p>
+              <p className="text-sm text-[var(--text-secondary)] mb-3">
+                Are you sure you want to permanently delete this appointment? This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={isLoading}
+                  className="rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                >
+                  {isLoading ? "Deleting..." : "Delete"}
                 </Button>
               </div>
             </motion.div>
@@ -561,7 +797,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         </div>
 
         {/* Footer Actions - Status Action Buttons */}
-        {isActionable && !showPostponedForm && !showCancelForm && (
+        {isActionable && !showPostponedForm && !showCancelForm && !showDeleteConfirm && (
           <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
             {/* Status Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
@@ -589,17 +825,15 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                 </Button>
               )}
 
-              {appointment.status !== "postponed" && (
-                <Button
-                  variant="outline"
-                  onClick={() => setShowPostponedForm(true)}
-                  disabled={isLoading}
-                  className="rounded-xl border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary)]/10"
-                >
-                  <Calendar className="w-5 h-5 mr-2" />
-                  Postponed
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                onClick={() => setShowPostponedForm(true)}
+                disabled={isLoading}
+                className="rounded-xl border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              >
+                <Calendar className="w-5 h-5 mr-2" />
+                {appointment.status === "postponed" ? "Reschedule" : "Postponed"}
+              </Button>
 
               {appointment.status !== "no_answer" && (
                 <Button
@@ -661,10 +895,31 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                   </Button>
                 </>
               )}
+
+              {/* Delete Button */}
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isLoading}
+                className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10 ml-auto"
+              >
+                <Trash2 className="w-5 h-5 mr-2" />
+                Delete
+              </Button>
             </div>
           </div>
         )}
       </DialogContent>
+
+      {/* Lost Reason Dialog */}
+      <MarkLostDialog
+        open={showLostDialog}
+        onOpenChange={setShowLostDialog}
+        leadName={personName}
+        onConfirm={async (reasonId, notes) => {
+          await handleChangeStage("lost", reasonId, notes)
+        }}
+      />
     </Dialog>
   )
 }

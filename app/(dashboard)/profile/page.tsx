@@ -156,7 +156,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Target Progress */}
-                <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-depth-3)]">
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)]">
                   <ProgressRing value={progressPercent} size={60}>
                     <span className="text-sm font-bold">{progressPercent}%</span>
                   </ProgressRing>
@@ -235,7 +235,7 @@ export default function ProfilePage() {
                           onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
                         />
                       ) : (
-                        <p className="px-3 py-2 rounded-lg bg-[var(--bg-depth-3)] text-[var(--text-primary)]">
+                        <p className="px-3 py-2 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-primary)]">
                           {profile.full_name}
                         </p>
                       )}
@@ -243,7 +243,7 @@ export default function ProfilePage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-depth-3)]">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-sunken)]">
                         <Mail className="w-4 h-4 text-[var(--text-muted)]" />
                         <span className="text-[var(--text-primary)]">{profile.email}</span>
                       </div>
@@ -259,7 +259,7 @@ export default function ProfilePage() {
                           placeholder="+965 XXXX XXXX"
                         />
                       ) : (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-depth-3)]">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-sunken)]">
                           <Phone className="w-4 h-4 text-[var(--text-muted)]" />
                           <span className="text-[var(--text-primary)]">
                             {profile.phone || "Not set"}
@@ -270,7 +270,7 @@ export default function ProfilePage() {
 
                     <div className="space-y-2">
                       <Label>Role</Label>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-depth-3)]">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-sunken)]">
                         <Shield className="w-4 h-4 text-[var(--text-muted)]" />
                         <span className="text-[var(--text-primary)] capitalize">{profile.role}</span>
                       </div>
@@ -317,7 +317,7 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] text-center">
+                    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] text-center">
                       <div className="w-10 h-10 mx-auto rounded-lg bg-[var(--primary-muted)] flex items-center justify-center mb-2">
                         <Users className="w-5 h-5 text-[var(--primary)]" />
                       </div>
@@ -325,7 +325,7 @@ export default function ProfilePage() {
                       <p className="text-xs text-[var(--text-muted)]">Leads Assigned</p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] text-center">
+                    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] text-center">
                       <div className="w-10 h-10 mx-auto rounded-lg bg-[var(--success)]/10 flex items-center justify-center mb-2">
                         <GraduationCap className="w-5 h-5 text-[var(--success)]" />
                       </div>
@@ -333,7 +333,7 @@ export default function ProfilePage() {
                       <p className="text-xs text-[var(--text-muted)]">Enrolled</p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] text-center">
+                    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] text-center">
                       <div className="w-10 h-10 mx-auto rounded-lg bg-[var(--accent)]/10 flex items-center justify-center mb-2">
                         <Calendar className="w-5 h-5 text-[var(--accent)]" />
                       </div>
@@ -341,7 +341,7 @@ export default function ProfilePage() {
                       <p className="text-xs text-[var(--text-muted)]">Appointments</p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] text-center">
+                    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] text-center">
                       <div className="w-10 h-10 mx-auto rounded-lg bg-[var(--warning)]/10 flex items-center justify-center mb-2">
                         <TrendingUp className="w-5 h-5 text-[var(--warning)]" />
                       </div>

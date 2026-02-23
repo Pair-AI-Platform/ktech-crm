@@ -23,8 +23,6 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
-  Users,
-  MapPin,
   Sparkles,
   GraduationCap,
   Shuffle,
@@ -87,7 +85,7 @@ interface LeadAssignmentRulesProps {
   currentUser: Profile | null
 }
 
-export function LeadAssignmentRules({ currentUser }: LeadAssignmentRulesProps) {
+export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
   const [rules, setRules] = useState<AssignmentRule[]>([])
   const [agents, setAgents] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -312,7 +310,7 @@ export function LeadAssignmentRules({ currentUser }: LeadAssignmentRulesProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       className={cn(
-                        "p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-depth-2)]",
+                        "p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)]",
                         !rule.is_active && "opacity-60"
                       )}
                     >
@@ -321,7 +319,7 @@ export function LeadAssignmentRules({ currentUser }: LeadAssignmentRulesProps) {
                           <div
                             className={cn(
                               "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                              rule.is_active ? "bg-[var(--primary-muted)]" : "bg-[var(--bg-depth-3)]"
+                              rule.is_active ? "bg-[var(--primary-muted)]" : "bg-[var(--bg-sunken)]"
                             )}
                           >
                             <TypeIcon
@@ -374,7 +372,7 @@ export function LeadAssignmentRules({ currentUser }: LeadAssignmentRulesProps) {
                                   .map((agent) => (
                                     <div
                                       key={agent.id}
-                                      className="w-6 h-6 rounded-full bg-[var(--primary-muted)] border-2 border-[var(--bg-depth-2)] flex items-center justify-center"
+                                      className="w-6 h-6 rounded-full bg-[var(--primary-muted)] border-2 border-[var(--bg-elevated)] flex items-center justify-center"
                                       title={agent.full_name}
                                     >
                                       <span className="text-[10px] font-medium text-[var(--primary)]">
@@ -386,7 +384,7 @@ export function LeadAssignmentRules({ currentUser }: LeadAssignmentRulesProps) {
                                     </div>
                                   ))}
                                 {rule.assigned_agents.length > 3 && (
-                                  <div className="w-6 h-6 rounded-full bg-[var(--bg-depth-3)] border-2 border-[var(--bg-depth-2)] flex items-center justify-center">
+                                  <div className="w-6 h-6 rounded-full bg-[var(--bg-sunken)] border-2 border-[var(--bg-elevated)] flex items-center justify-center">
                                     <span className="text-[10px] font-medium text-[var(--text-muted)]">
                                       +{rule.assigned_agents.length - 3}
                                     </span>
@@ -654,7 +652,7 @@ function RuleModal({
                     "p-4 rounded-lg border text-left transition-all",
                     ruleType === type.value
                       ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                      : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                      : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -692,7 +690,7 @@ function RuleModal({
               </div>
 
               {conditions.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)] p-4 bg-[var(--bg-depth-3)] rounded-lg text-center">
+                <p className="text-sm text-[var(--text-muted)] p-4 bg-[var(--bg-sunken)] rounded-lg text-center">
                   No conditions added. Add a condition to specify when this rule applies.
                 </p>
               ) : (
@@ -700,7 +698,7 @@ function RuleModal({
                   {conditions.map((condition, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-2 p-3 bg-[var(--bg-depth-3)] rounded-lg"
+                      className="flex items-center gap-2 p-3 bg-[var(--bg-sunken)] rounded-lg"
                     >
                       <span className="text-sm text-[var(--text-muted)] w-24">
                         {condition.field}
@@ -761,7 +759,7 @@ function RuleModal({
                     "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
                     selectedAgents.includes(agent.id)
                       ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                      : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                      : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                   )}
                 >
                   <div
@@ -769,7 +767,7 @@ function RuleModal({
                       "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
                       selectedAgents.includes(agent.id)
                         ? "bg-[var(--primary)] text-white"
-                        : "bg-[var(--bg-depth-2)]"
+                        : "bg-[var(--bg-elevated)]"
                     )}
                   >
                     {selectedAgents.includes(agent.id) ? (
@@ -800,7 +798,7 @@ function RuleModal({
           </div>
 
           {/* Active Toggle */}
-          <div className="flex items-center justify-between p-4 bg-[var(--bg-depth-3)] rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-[var(--bg-sunken)] rounded-lg">
             <div>
               <Label>Active</Label>
               <p className="text-xs text-[var(--text-muted)]">

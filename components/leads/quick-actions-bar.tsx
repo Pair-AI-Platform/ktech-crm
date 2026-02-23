@@ -98,14 +98,14 @@ export function QuickActionsBar({
           Reactivate
         </Button>
       ) : (
-        <Link
-          href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name} ${lead.last_name}`)}`}
-        >
-          <Button className="gap-2 bg-emerald-500 hover:bg-emerald-600">
+        <Button asChild className="gap-2 bg-emerald-500 hover:bg-emerald-600">
+          <Link
+            href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name} ${lead.last_name}`)}`}
+          >
             <Phone className="w-4 h-4" />
             Call
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
 
       {/* WhatsApp - More Prominent */}
@@ -139,11 +139,11 @@ export function QuickActionsBar({
       )}
 
       {/* Book Appointment */}
-      <Link href={`/calendar?book=${lead.id}`}>
-        <Button variant="ghost" size="icon" title="Book Appointment">
+      <Button asChild variant="ghost" size="icon" title="Book Appointment">
+        <Link href={`/calendar?book=${lead.id}`}>
           <Calendar className="w-4 h-4" />
-        </Button>
-      </Link>
+        </Link>
+      </Button>
 
       {/* Add Note */}
       <Button onClick={onAddNote} variant="ghost" size="icon" title="Add Note">

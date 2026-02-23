@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect, useSyncExternalStore, useRef } from "react"
-import { motion, useInView, AnimatePresence } from "framer-motion"
+import { motion, useInView } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge, type BadgeProps } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge"
 import {
   AreaChart,
   Area,
@@ -12,8 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
 } from "recharts"
 import {
   Target,
@@ -24,13 +22,10 @@ import {
   TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
-  Zap,
-  Sparkles,
   Activity,
-  BarChart3,
 } from "lucide-react"
 import type { ExecutiveReportData } from "@/lib/hooks/use-reports"
-import { PipelineFunnelVisual, PipelineFunnelHorizontal } from "./pipeline-funnel-visual"
+import { PipelineFunnelVisual } from "./pipeline-funnel-visual"
 
 interface ExecutiveDashboardProps {
   data: ExecutiveReportData
@@ -82,7 +77,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-xl"
+        className="px-4 py-3 rounded-xl border shadow-md"
         style={{
           background: 'var(--bg-elevated)',
           borderColor: 'var(--border)',
@@ -119,36 +114,32 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
       suffix: ` / ${data.targetProgress.target}`,
       percent: data.targetProgress.percent,
       icon: Target,
-      color: "#6366F1", // Indigo
-      bgGradient: "from-indigo-500/20 via-indigo-500/10 to-transparent",
-      iconBg: "from-indigo-600 to-indigo-400",
+      color: "var(--primary)",
+      iconColorClass: "bg-[var(--primary)]",
     },
     {
       title: "New Leads Today",
       value: data.todayNumbers.newLeads,
       change: data.weekOverWeek.leads.change,
       icon: Users,
-      color: "#8B5CF6", // Violet
-      bgGradient: "from-violet-500/20 via-violet-500/10 to-transparent",
-      iconBg: "from-violet-600 to-violet-400",
+      color: "var(--accent)",
+      iconColorClass: "bg-[var(--accent)]",
     },
     {
       title: "Enrollments",
       value: data.weekOverWeek.enrollments.current,
       change: data.weekOverWeek.enrollments.change,
       icon: GraduationCap,
-      color: "#22C55E", // Green
-      bgGradient: "from-emerald-500/20 via-emerald-500/10 to-transparent",
-      iconBg: "from-emerald-600 to-emerald-400",
+      color: "var(--success)",
+      iconColorClass: "bg-[var(--success)]",
     },
     {
       title: "Appointments Today",
       value: data.todayNumbers.appointments,
       change: data.weekOverWeek.appointments.change,
       icon: Calendar,
-      color: "#F59E0B", // Amber
-      bgGradient: "from-amber-500/20 via-amber-500/10 to-transparent",
-      iconBg: "from-amber-600 to-amber-400",
+      color: "var(--warning)",
+      iconColorClass: "bg-[var(--warning)]",
     },
   ]
 
@@ -164,33 +155,12 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
             transition={{ duration: 0.5, delay: index * 0.1 }}
           >
             <div className="group relative h-full">
-              {/* Glow effect on hover */}
-              <div
-                className="absolute -inset-0.5 rounded-2xl opacity-0 group-hover:opacity-100 blur-lg transition-all duration-500"
-                style={{ background: `linear-gradient(135deg, ${stat.color}40, transparent)` }}
-              />
-
-              <Card className="relative h-full overflow-hidden border-0 bg-[var(--bg-elevated)] shadow-lg">
-                {/* Background gradient */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgGradient} opacity-60`} />
-
-                {/* Decorative corner accent */}
-                <div
-                  className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-20"
-                  style={{ backgroundColor: stat.color }}
-                />
-
+              <Card className="relative h-full overflow-hidden bg-[var(--bg-surface)] shadow-sm">
                 <CardContent className="relative p-5">
                   <div className="flex items-start justify-between mb-4">
-                    {/* Icon with gradient background */}
-                    <div className="relative">
-                      <div
-                        className="absolute inset-0 blur-lg opacity-50"
-                        style={{ background: `linear-gradient(135deg, ${stat.color}, transparent)` }}
-                      />
-                      <div className={`relative p-3 rounded-xl bg-gradient-to-br ${stat.iconBg} shadow-lg`}>
-                        <stat.icon className="w-5 h-5 text-white" />
-                      </div>
+                    {/* Icon with flat background */}
+                    <div className={`p-3 rounded-xl ${stat.iconColorClass} shadow-sm`}>
+                      <stat.icon className="w-5 h-5 text-white" />
                     </div>
 
                     {/* Change indicator or badge */}
@@ -201,8 +171,8 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                         transition={{ delay: index * 0.1 + 0.3, type: "spring" }}
                         className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
                           stat.change >= 0
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : "bg-red-500/10 text-red-600 dark:text-red-400"
+                            ? "bg-[var(--success)]/10 text-[var(--success)]"
+                            : "bg-[var(--error)]/10 text-[var(--error)]"
                         }`}
                       >
                         {stat.change >= 0 ? (
@@ -242,7 +212,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                   {/* Progress bar for target */}
                   {stat.percent !== undefined && (
                     <div className="mt-3">
-                      <div className="h-1.5 rounded-full bg-[var(--bg-depth-3)] overflow-hidden">
+                      <div className="h-1.5 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
                         <motion.div
                           className="h-full rounded-full"
                           style={{ backgroundColor: stat.color }}
@@ -269,11 +239,11 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <Card className="h-full border-0 shadow-lg bg-[var(--bg-elevated)]">
+          <Card className="h-full shadow-sm bg-[var(--bg-surface)]">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-[var(--primary)] to-blue-400 shadow-lg">
+                  <div className="p-2 rounded-xl bg-[var(--primary)] shadow-sm">
                     <Activity className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -358,7 +328,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full bg-[var(--bg-depth-3)] rounded-xl animate-pulse" />
+                  <div className="h-full bg-[var(--bg-sunken)] rounded-xl animate-pulse" />
                 )}
               </div>
 
@@ -384,10 +354,10 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.5 }}
         >
-          <Card className="h-full border-0 shadow-lg bg-[var(--bg-elevated)]">
+          <Card className="h-full shadow-sm bg-[var(--bg-surface)]">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-400 shadow-lg">
+                <div className="p-2 rounded-xl bg-[var(--success)] shadow-sm">
                   <TrendingUp className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -437,7 +407,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
         animate={isInView ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.5, delay: 0.6 }}
       >
-        <Card className="border-0 shadow-xl bg-[var(--bg-elevated)] overflow-hidden">
+        <Card className="shadow-sm bg-[var(--bg-surface)] overflow-hidden">
           <CardContent className="p-8">
             <PipelineFunnelVisual data={data.pipelineFunnel} />
           </CardContent>
@@ -474,7 +444,7 @@ function ComparisonCard({
       transition={{ duration: 0.4, delay }}
       className="relative group"
     >
-      <div className="p-4 rounded-xl bg-[var(--bg-depth-2)] border border-[var(--border)] transition-all duration-300 hover:border-[var(--border-hover)] hover:shadow-lg">
+      <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] transition-all duration-300 hover:border-[var(--border-hover)] hover:shadow-lg">
         {/* Accent line */}
         <div
           className="absolute left-0 top-4 bottom-4 w-1 rounded-full"
@@ -489,8 +459,8 @@ function ComparisonCard({
             transition={{ delay: delay + 0.2, type: "spring" }}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
               isPositive
-                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                : "bg-red-500/15 text-red-600 dark:text-red-400"
+                ? "bg-[var(--success)]/15 text-[var(--success)]"
+                : "bg-[var(--error)]/15 text-[var(--error)]"
             }`}
           >
             {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
@@ -514,7 +484,7 @@ function ComparisonCard({
         {/* Mini comparison bar */}
         <div className="mt-3 pl-3">
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-depth-4)] overflow-hidden">
+            <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
               <motion.div
                 className="h-full rounded-full"
                 style={{ backgroundColor: color }}
@@ -528,7 +498,7 @@ function ComparisonCard({
             <span className="text-[10px] text-[var(--text-muted)] font-medium w-8">now</span>
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-depth-4)] overflow-hidden">
+            <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
               <motion.div
                 className="h-full rounded-full opacity-50"
                 style={{ backgroundColor: color }}

@@ -20,14 +20,10 @@ interface TooltipProps {
 
 export function Tooltip({
   content,
-  title,
   children,
-  side = "bottom",
   className,
   wrapperClassName,
   showIcon = false,
-  accentColor,
-  icon
 }: TooltipProps) {
   const [visible, setVisible] = React.useState(false)
   const [position, setPosition] = React.useState({ top: 0, left: 0 })
@@ -80,23 +76,6 @@ export function Tooltip({
     }
   }, [])
 
-  const motionVariants = {
-    top: { initial: { opacity: 0, y: 8, scale: 0.96 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 8, scale: 0.96 } },
-    bottom: { initial: { opacity: 0, y: -8, scale: 0.96 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -8, scale: 0.96 } },
-    left: { initial: { opacity: 0, x: 8, scale: 0.96 }, animate: { opacity: 1, x: 0, scale: 1 }, exit: { opacity: 0, x: 8, scale: 0.96 } },
-    right: { initial: { opacity: 0, x: -8, scale: 0.96 }, animate: { opacity: 1, x: 0, scale: 1 }, exit: { opacity: 0, x: -8, scale: 0.96 } },
-  }
-
-  const transformOrigin = {
-    top: "bottom center",
-    bottom: "top center",
-    left: "center right",
-    right: "center left",
-  }
-
-  // Default color fallback
-  const color = accentColor || "#6366f1"
-
   const tooltipContent = (
     <AnimatePresence>
       {visible && (
@@ -114,19 +93,17 @@ export function Tooltip({
           }}
           className={cn("w-[260px]", className)}
         >
-          {/* Apple-style glassmorphism card */}
           <div
             className={cn(
               "relative rounded-xl overflow-hidden",
-              "bg-white/80 dark:bg-[#2c2c2e]/80",
-              "backdrop-blur-xl backdrop-saturate-150",
-              "border border-black/5 dark:border-white/10",
-              "shadow-[0_4px_20px_rgba(0,0,0,0.1)]",
+              "bg-[var(--bg-surface)]",
+              "border border-[var(--border)]",
+              "shadow-[0_4px_20px_rgba(31,29,26,0.08)]",
             )}
           >
             {/* Content */}
             <div className="p-3">
-              <p className="text-[13px] leading-[1.5] text-[#1d1d1f] dark:text-[#f5f5f7]">
+              <p className="text-[13px] leading-[1.5] text-[var(--text-primary)]">
                 {content}
               </p>
             </div>
@@ -231,9 +208,9 @@ export function SimpleTooltip({
           }}
           className={cn(
             "px-3 py-1.5 rounded-lg",
-            "bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)]",
+            "bg-[var(--bg-surface)]",
             "text-[var(--text-primary)] text-xs font-medium whitespace-nowrap",
-            "shadow-lg border border-[var(--glass-border)]",
+            "shadow-lg border border-[var(--border)]",
             className
           )}
         >

@@ -3,7 +3,7 @@
 import { useState, useEffect, useSyncExternalStore, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -26,11 +26,9 @@ import {
   FileCheck,
   Clock,
   TrendingUp,
-  TrendingDown,
   AlertCircle,
   Filter,
   X,
-  Loader2,
   Download,
   RefreshCw,
   Calendar,
@@ -39,20 +37,15 @@ import {
   BarChart3,
   PieChart,
   Target,
-  Award,
   Building2,
   CreditCard,
   TestTube,
-  School,
   UserCheck,
   Megaphone,
   ChevronDown,
   FileSpreadsheet,
   FileText,
   Printer,
-  Share2,
-  Eye,
-  EyeOff,
   Maximize2,
   Minimize2,
   SlidersHorizontal,
@@ -63,15 +56,13 @@ import {
   Zap,
   Activity,
   Sparkles,
+  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
 import {
-  PIPELINE_STAGES,
-  LEAD_SOURCES,
   MAJORS,
-  SCHOOLS,
 } from "@/types"
 
 // Report Section Components
@@ -84,6 +75,10 @@ import {
   ChannelPerformance,
   AgentLeaderboard,
   DemographicReports,
+  ConversionBySource,
+  AgentComparison,
+  TimeToConversion,
+  DetailedAnalytics,
 } from "@/components/reports"
 
 const emptySubscribe = () => () => {}
@@ -142,6 +137,10 @@ const REPORT_TABS = [
   { id: 'puc', label: 'PUC', icon: Building2, description: 'PUC funding' },
   { id: 'demographics', label: 'Demographics', icon: PieChart, description: 'Student breakdown' },
   { id: 'test-center', label: 'Test Center', icon: TestTube, description: 'Placement tests' },
+  { id: 'conversion', label: 'Conversion', icon: TrendingUp, description: 'Conversion rates by lead source' },
+  { id: 'agent-compare', label: 'Agent Compare', icon: UserCheck, description: 'Multi-metric agent comparison' },
+  { id: 'time-analysis', label: 'Time Analysis', icon: Clock, description: 'Time-to-conversion analytics' },
+  { id: 'detailed-analytics', label: 'Detailed', icon: ClipboardList, description: 'Enrollment, withdrawals, gender, foundation & breakdown analytics' },
 ] as const
 
 const SOURCE_CATEGORIES = [
@@ -194,8 +193,6 @@ export default function ReportsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [showCompactView, setShowCompactView] = useState(false)
-
   const { data, loading, error, refetch } = useReports(filters)
 
   // Calculate summary metrics
@@ -332,8 +329,8 @@ export default function ReportsPage() {
         <div className="flex items-center justify-center py-32">
           <Card className="max-w-md">
             <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              <div className="w-16 h-16 rounded-full bg-[var(--error-bg)] flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-[var(--error)]" />
               </div>
               <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Failed to Load Reports</h3>
               <p className="text-[var(--text-muted)] mb-4">{error || 'An unexpected error occurred'}</p>
@@ -363,24 +360,15 @@ export default function ReportsPage() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-3xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl"
+          className="relative overflow-hidden rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-md"
         >
-          {/* Subtle background pattern */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--primary)]/5 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl" />
-          </div>
-
-          <div className="relative z-10 p-6 lg:p-8">
+          <div className="p-6 lg:p-8">
             {/* Header Row */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--primary)] to-indigo-500 blur-lg opacity-30" />
-                    <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--primary)] to-indigo-500 flex items-center justify-center shadow-lg">
-                      <BarChart3 className="w-5 h-5 text-white" />
-                    </div>
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center shadow-sm">
+                    <BarChart3 className="w-5 h-5 text-white" />
                   </div>
                   <h1
                     className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)] tracking-tight"
@@ -390,7 +378,7 @@ export default function ReportsPage() {
                   </h1>
                 </div>
                 <p className="text-[var(--text-muted)] text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
                   Real-time insights • Updated {lastUpdated.toLocaleTimeString()}
                 </p>
               </div>
@@ -491,36 +479,40 @@ export default function ReportsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-col lg:flex-row gap-4"
         >
-          {/* Date Range Quick Select */}
-          <Card className="flex-1">
+          <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                <span className="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">
-                  <Calendar className="w-4 h-4 inline mr-2" />
-                  Date Range:
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {DATE_PRESETS.map((preset) => (
-                    <Button
-                      key={preset.value}
-                      variant={datePreset === preset.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handleDatePresetChange(preset.value)}
-                      className={cn(
-                        "transition-all",
-                        datePreset === preset.value && "shadow-md"
-                      )}
-                    >
-                      <preset.icon className="w-3.5 h-3.5 mr-1.5" />
-                      {preset.label}
-                    </Button>
-                  ))}
+              <div className="flex items-center gap-3">
+                {/* Date Presets Row */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">
+                    <Calendar className="w-4 h-4 inline mr-1.5" />
+                    Date Range:
+                  </span>
+                  <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+                    {DATE_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.value}
+                        variant={datePreset === preset.value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDatePresetChange(preset.value)}
+                        className={cn(
+                          "transition-all h-8 text-xs shrink-0",
+                          datePreset === preset.value && "shadow-md"
+                        )}
+                      >
+                        <preset.icon className="w-3.5 h-3.5 mr-1" />
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
 
+                {/* Divider */}
+                <div className="hidden lg:block w-px h-8 bg-[var(--border)]" />
+
                 {/* Custom Date Range */}
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="hidden lg:flex items-center gap-2">
                   <Input
                     type="date"
                     value={dateFrom}
@@ -528,10 +520,10 @@ export default function ReportsPage() {
                       setDateFrom(e.target.value)
                       setDatePreset('all')
                     }}
-                    className="w-[140px] h-9"
+                    className="w-[130px] h-8 text-xs"
                     placeholder="From"
                   />
-                  <span className="text-[var(--text-muted)]">to</span>
+                  <span className="text-xs text-[var(--text-muted)]">to</span>
                   <Input
                     type="date"
                     value={dateTo}
@@ -539,28 +531,57 @@ export default function ReportsPage() {
                       setDateTo(e.target.value)
                       setDatePreset('all')
                     }}
-                    className="w-[140px] h-9"
+                    className="w-[130px] h-8 text-xs"
                     placeholder="To"
                   />
                 </div>
+
+                {/* Divider */}
+                <div className="hidden lg:block w-px h-8 bg-[var(--border)]" />
+
+                {/* Advanced Filters Toggle */}
+                <Button
+                  variant={showFilters ? "default" : "outline"}
+                  onClick={() => setShowFilters(!showFilters)}
+                  size="sm"
+                  className="gap-1.5 h-8 whitespace-nowrap"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Filters
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="ml-1 bg-white/20 text-[10px] px-1.5 py-0">
+                      Active
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+
+              {/* Mobile custom date range */}
+              <div className="flex lg:hidden items-center gap-2 mt-3 pt-3 border-t border-[var(--border)]">
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setDateFrom(e.target.value)
+                    setDatePreset('all')
+                  }}
+                  className="flex-1 h-8 text-xs"
+                  placeholder="From"
+                />
+                <span className="text-xs text-[var(--text-muted)]">to</span>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setDateTo(e.target.value)
+                    setDatePreset('all')
+                  }}
+                  className="flex-1 h-8 text-xs"
+                  placeholder="To"
+                />
               </div>
             </CardContent>
           </Card>
-
-          {/* Advanced Filters Toggle */}
-          <Button
-            variant={showFilters ? "default" : "outline"}
-            onClick={() => setShowFilters(!showFilters)}
-            className="gap-2 h-auto py-4 lg:py-0"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            Filters
-            {hasActiveFilters && (
-              <Badge variant="secondary" className="ml-1 bg-white/20">
-                Active
-              </Badge>
-            )}
-          </Button>
         </motion.div>
 
         {/* ============================================= */}
@@ -728,8 +749,8 @@ export default function ReportsPage() {
         >
           <div className="relative">
             {/* Background container */}
-            <div className="flex overflow-x-auto gap-1.5 p-1.5 rounded-2xl bg-[var(--bg-depth-2)] border border-[var(--border)] scrollbar-hide">
-              {REPORT_TABS.map((tab, index) => {
+            <div className="flex overflow-x-auto gap-1.5 p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] scrollbar-hide">
+              {REPORT_TABS.map((tab) => {
                 const isActive = activeTab === tab.id
                 return (
                   <motion.button
@@ -739,7 +760,7 @@ export default function ReportsPage() {
                       "relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300",
                       isActive
                         ? "text-white"
-                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-depth-3)]"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)]"
                     )}
                     whileHover={{ scale: isActive ? 1 : 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -748,7 +769,7 @@ export default function ReportsPage() {
                     {isActive && (
                       <motion.div
                         layoutId="activeTabBg"
-                        className="absolute inset-0 rounded-xl bg-gradient-to-r from-[var(--primary)] to-indigo-500 shadow-lg shadow-[var(--primary)]/30"
+                        className="absolute inset-0 rounded-xl bg-[var(--primary)] shadow-sm"
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
@@ -776,8 +797,8 @@ export default function ReportsPage() {
             </div>
 
             {/* Fade edges for scroll indication */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[var(--bg-depth-1)] to-transparent pointer-events-none rounded-l-2xl opacity-0 lg:hidden" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--bg-depth-1)] to-transparent pointer-events-none rounded-r-2xl opacity-0 lg:hidden" />
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-[var(--bg-surface)] pointer-events-none rounded-l-xl opacity-0 lg:hidden" />
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-[var(--bg-surface)] pointer-events-none rounded-r-xl opacity-0 lg:hidden" />
           </div>
 
           {/* Current tab description */}
@@ -805,7 +826,7 @@ export default function ReportsPage() {
           {activeTab === 'overview' && (
             <>
               {/* Target Progress */}
-              <TargetProgressCard data={data} mounted={mounted} />
+              <TargetProgressCard data={data} />
 
               {/* KPI Cards */}
               <KPICardsGrid data={data} mounted={mounted} />
@@ -853,6 +874,26 @@ export default function ReportsPage() {
           {/* Test Center Tab */}
           {activeTab === 'test-center' && (
             <TestCenterReports data={data.testCenter} />
+          )}
+
+          {/* Conversion by Source Tab */}
+          {activeTab === 'conversion' && (
+            <ConversionBySource data={data.channel} />
+          )}
+
+          {/* Agent Comparison Tab */}
+          {activeTab === 'agent-compare' && (
+            <AgentComparison data={data.agentComparison} />
+          )}
+
+          {/* Time Analysis Tab */}
+          {activeTab === 'time-analysis' && (
+            <TimeToConversion data={data.timeToConversion} />
+          )}
+
+          {/* Detailed Analytics Tab */}
+          {activeTab === 'detailed-analytics' && (
+            <DetailedAnalytics data={data.detailedAnalytics} />
           )}
         </motion.div>
 
@@ -907,7 +948,7 @@ function QuickStatCard({
       whileHover={{ scale: 1.02, y: -2 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 bg-[var(--bg-depth-2)] border border-[var(--border)]",
+        "group relative overflow-hidden rounded-xl p-4 transition-all duration-300 bg-[var(--bg-elevated)] border border-[var(--border)]",
         className
       )}
     >
@@ -934,8 +975,8 @@ function QuickStatCard({
               className={cn(
                 "flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full",
                 trend >= 0
-                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                  : "bg-red-500/15 text-red-600 dark:text-red-400"
+                  ? "bg-[var(--success-bg)] text-[var(--success)]"
+                  : "bg-[var(--error-bg)] text-[var(--error)]"
               )}
             >
               {trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
@@ -959,7 +1000,7 @@ function QuickStatCard({
   )
 }
 
-function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: boolean }) {
+function TargetProgressCard({ data }: { data: ReportData }) {
   const { current, target, percent } = data.executive.targetProgress
   const isGoalAchieved = percent >= 100
 
@@ -971,12 +1012,12 @@ function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: bool
             <div className={cn(
               "w-12 h-12 rounded-xl flex items-center justify-center",
               isGoalAchieved
-                ? "bg-emerald-100 dark:bg-emerald-900/30"
-                : "bg-blue-100 dark:bg-blue-900/30"
+                ? "bg-[var(--success-bg)]"
+                : "bg-[var(--primary-muted)]"
             )}>
               <Target className={cn(
                 "w-6 h-6",
-                isGoalAchieved ? "text-emerald-600" : "text-blue-600"
+                isGoalAchieved ? "text-[var(--success)]" : "text-[var(--primary)]"
               )} />
             </div>
             <div>
@@ -991,7 +1032,7 @@ function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: bool
           <div className="text-right">
             <span className={cn(
               "text-3xl font-bold",
-              isGoalAchieved ? "text-emerald-600" : "text-[var(--primary)]"
+              isGoalAchieved ? "text-[var(--success)]" : "text-[var(--primary)]"
             )}>
               {percent}%
             </span>
@@ -1002,7 +1043,7 @@ function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: bool
         </div>
 
         {/* Progress Bar */}
-        <div className="relative h-4 bg-[var(--bg-depth-2)] rounded-full overflow-hidden">
+        <div className="relative h-4 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${Math.min(percent, 100)}%` }}
@@ -1010,8 +1051,8 @@ function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: bool
             className={cn(
               "absolute inset-y-0 left-0 rounded-full",
               isGoalAchieved
-                ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
-                : "bg-gradient-to-r from-[var(--primary)] to-blue-400"
+                ? "bg-[var(--success)]"
+                : "bg-[var(--primary)]"
             )}
           />
           {/* Milestone markers */}
@@ -1031,10 +1072,10 @@ function TargetProgressCard({ data, mounted }: { data: ReportData; mounted: bool
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl"
+            className="mt-4 flex items-center gap-3 p-3 bg-[var(--success-bg)] border border-[var(--success)]/20 rounded-xl"
           >
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            <p className="text-sm text-emerald-800 dark:text-emerald-200 font-medium">
+            <CheckCircle2 className="w-5 h-5 text-[var(--success)]" />
+            <p className="text-sm text-[var(--success)] font-medium">
               Congratulations! Target achieved with {current.toLocaleString()} enrollments!
             </p>
           </motion.div>
@@ -1051,7 +1092,7 @@ function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean })
       value: data.enrollment.totalEnrolled,
       icon: FileCheck,
       color: "emerald",
-      gradient: "from-emerald-500 to-emerald-400",
+      gradient: "bg-[var(--success)]",
     },
     {
       title: "Pending Applications",
@@ -1060,46 +1101,46 @@ function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean })
         .reduce((sum, s) => sum + s.count, 0),
       icon: Clock,
       color: "amber",
-      gradient: "from-amber-500 to-amber-400",
+      gradient: "bg-[var(--warning)]",
     },
     {
       title: "Today's Conversions",
       value: data.executive.todayNumbers.enrolled,
       icon: TrendingUp,
       color: "blue",
-      gradient: "from-blue-500 to-blue-400",
+      gradient: "bg-[var(--primary)]",
     },
     {
       title: "In Pipeline",
       value: data.executive.pipelineFunnel
-        .filter(s => ['new', 'visit', 'test'].includes(s.stage))
+        .filter(s => ['new', 'test'].includes(s.stage))
         .reduce((sum, s) => sum + s.count, 0),
       icon: Activity,
       color: "purple",
-      gradient: "from-purple-500 to-purple-400",
+      gradient: "bg-[var(--primary)]",
     },
   ]
 
   const colorClasses: Record<string, { bg: string; icon: string; border: string }> = {
     emerald: {
-      bg: "bg-emerald-100 dark:bg-emerald-900/30",
-      icon: "text-emerald-600 dark:text-emerald-400",
-      border: "border-l-emerald-500",
+      bg: "bg-[var(--success-bg)]",
+      icon: "text-[var(--success)]",
+      border: "border-l-[var(--success)]",
     },
     amber: {
-      bg: "bg-amber-100 dark:bg-amber-900/30",
-      icon: "text-amber-600 dark:text-amber-400",
-      border: "border-l-amber-500",
+      bg: "bg-[var(--warning-bg)]",
+      icon: "text-[var(--warning)]",
+      border: "border-l-[var(--warning)]",
     },
     blue: {
-      bg: "bg-blue-100 dark:bg-blue-900/30",
-      icon: "text-blue-600 dark:text-blue-400",
-      border: "border-l-blue-500",
+      bg: "bg-[var(--primary-muted)]",
+      icon: "text-[var(--primary)]",
+      border: "border-l-[var(--primary)]",
     },
     purple: {
-      bg: "bg-purple-100 dark:bg-purple-900/30",
-      icon: "text-purple-600 dark:text-purple-400",
-      border: "border-l-purple-500",
+      bg: "bg-[var(--primary-muted)]",
+      icon: "text-[var(--primary)]",
+      border: "border-l-[var(--primary)]",
     },
   }
 

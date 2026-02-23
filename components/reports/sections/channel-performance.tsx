@@ -4,7 +4,6 @@ import { useSyncExternalStore } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ProgressBar } from "@/components/ui/progress"
 import {
   BarChart,
   Bar,
@@ -23,7 +22,6 @@ import {
   Building,
   MapPin,
   Layers,
-  GraduationCap,
 } from "lucide-react"
 import type { ChannelReportData } from "@/lib/hooks/use-reports"
 
@@ -85,7 +83,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
           <Card hover glow className="relative overflow-hidden">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#445eb7] to-[#212e7f] shadow-lg">
+                <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
                   <Share2 className="w-5 h-5 text-white" />
                 </div>
                 <Badge variant="success" size="sm">Top Source</Badge>
@@ -96,7 +94,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 {topSource?.count || 0} leads, {topSource?.conversionRate || 0}% conversion
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#445eb7] to-[#212e7f] opacity-50" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--bg-sunken)] opacity-50" />
           </Card>
         </motion.div>
 
@@ -108,7 +106,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
           <Card hover glow className="relative overflow-hidden">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#22C55E] to-[#16A34A] shadow-lg">
+                <div className="p-2.5 rounded-xl bg-[var(--success)] shadow-sm">
                   <Building className="w-5 h-5 text-white" />
                 </div>
                 <Badge variant="success" size="sm">Top School</Badge>
@@ -119,7 +117,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 {topSchool?.leads || 0} leads, {topSchool?.applications || 0} applications
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#22C55E] to-[#16A34A] opacity-50" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--success)] opacity-50" />
           </Card>
         </motion.div>
 
@@ -131,7 +129,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
           <Card hover glow className="relative overflow-hidden">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#2563EB] shadow-lg">
+                <div className="p-2.5 rounded-xl bg-[var(--primary)] shadow-sm">
                   <MapPin className="w-5 h-5 text-white" />
                 </div>
                 <Badge variant="success" size="sm">Top Area</Badge>
@@ -142,7 +140,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 {topSchoolByLeads?.leads || 0} leads, {topSchoolByLeads?.applicationPercent || 0}% application
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] opacity-50" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--primary)] opacity-50" />
           </Card>
         </motion.div>
       </div>
@@ -303,7 +301,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                   </thead>
                   <tbody>
                     {data.topSchools.map((school, index) => (
-                      <tr key={school.schoolId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-depth-3)] transition-colors">
+                      <tr key={school.schoolId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
                         <td className="py-3 pr-4">
                           <span className="text-sm font-bold text-[var(--text-muted)]">{index + 1}</span>
                         </td>

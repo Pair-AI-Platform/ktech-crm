@@ -8,13 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Target,
   Users,
   Check,
@@ -45,6 +38,7 @@ export function TargetSettings() {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchData = async () => {
@@ -221,7 +215,7 @@ export function TargetSettings() {
             />
           </div>
 
-          <div className="mt-4 p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+          <div className="mt-4 p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
             <p className="text-sm text-[var(--text-secondary)]">
               <strong>Current Mode:</strong> {getModeDescription(targetMode)}
             </p>
@@ -262,7 +256,7 @@ export function TargetSettings() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-3)]"
+                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)]"
               >
                 <div className="flex items-center gap-4 mb-4">
                   <Avatar className="w-10 h-10">
@@ -395,7 +389,7 @@ function TargetModeOption({
         <div
           className={cn(
             "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
-            selected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-depth-3)]"
+            selected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-sunken)]"
           )}
         >
           <Icon className="w-5 h-5" />

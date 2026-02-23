@@ -4,7 +4,7 @@
 
 export type UserRole = 'admin' | 'agent'
 
-export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'interested' | 'high_gpa' | 'low_gpa' | 'already_done'
+export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'interested' | 'high_gpa' | 'low_gpa' | 'already_done' | 'cancelled' | 'online' | 'on_campus' | 'on_the_way' | 'cant_reach' | 'contacted' | 'seeking_job' | 'current_student' | 'asking_bachelors' | 'courses_masters' | 'potential' | 'rude' | 'informed' | 'travelling' | 'might_withdraw'
 
 export type LeadSourceCategory = 'direct' | 'events' | 'digital' | 'referrals' | 'outreach'
 
@@ -16,7 +16,7 @@ export type LeadSource =
   | 'old_contacts' | 'paaet_rejected' | 'gpa_lists'
 
 export type PipelineStage =
-  | 'new' | 'contacted' | 'appointment' | 'visit' | 'test' | 'application' | 'lost' | 'applicant' | 'enrolled' | 'withdraw'
+  | 'new' | 'contacted' | 'visit' | 'test' | 'application' | 'lost' | 'applicant' | 'enrolled' | 'withdraw'
 
 export type ContactStatus =
   | 'uncontacted' | 'interested' | 'not_interested' | 'no_answer'
@@ -289,6 +289,10 @@ export interface Lead {
   lost_reason_notes?: string | null
   lost_at_stage?: PipelineStage | null
 
+  // Withdrawal
+  withdrawal_reason?: string | null
+  withdrawal_notes?: string | null
+
   // Ministry Submission Block
   ministry_blocked?: boolean
   ministry_block_reasons?: MinistryBlockReason[]
@@ -299,12 +303,16 @@ export interface Lead {
   submission_blocked_reason?: SubmissionBlockedReason
   submission_blocked_reason_notes?: string
   submission_lost_reason_id?: string
+  puc_document_status_override?: PUCDocumentStatus | null
 
   // Assignment
   assigned_to?: string
   assigned_agent?: Profile
   assigned_at?: string
   assigned_by?: string
+
+  // Contact Counter
+  contact_count?: number
 
   // Timestamps
   created_at: string
@@ -685,11 +693,20 @@ export interface OrientationGroup {
 // REFERENCE DATA
 // =============================================
 
+export type SchoolGender = 'male' | 'female' | 'mixed'
+
+export const SCHOOL_GENDERS: { value: SchoolGender; label: string; labelAr: string }[] = [
+  { value: 'male', label: 'Male', labelAr: 'بنين' },
+  { value: 'female', label: 'Female', labelAr: 'بنات' },
+  { value: 'mixed', label: 'Mixed', labelAr: 'مختلط' },
+]
+
 export interface SchoolEntity {
   id: string
   name_en: string
   name_ar: string
   governorate?: Governorate
+  gender?: SchoolGender
   is_active: boolean
   created_at: string
 }
@@ -844,15 +861,32 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; labelAr: string;
   { value: 'high_gpa', label: 'High GPA', labelAr: 'معدل عالي', color: 'success' },
   { value: 'low_gpa', label: 'Low GPA', labelAr: 'معدل منخفض', color: 'warning' },
   { value: 'already_done', label: 'Already Done', labelAr: 'تم بالفعل', color: 'secondary' },
+  { value: 'potential', label: 'Potential', labelAr: 'محتمل', color: 'success' },
+  { value: 'cancelled', label: 'Cancelled', labelAr: 'ملغى', color: 'destructive' },
+  { value: 'online', label: 'Online', labelAr: 'أونلاين', color: 'accent' },
+  { value: 'on_campus', label: 'On Campus', labelAr: 'حضوري', color: 'success' },
+  { value: 'on_the_way', label: 'OTW', labelAr: 'بالطريق', color: 'success' },
+  { value: 'cant_reach', label: "Can't Reach", labelAr: 'لا يمكن الوصول', color: 'destructive' },
+  { value: 'contacted', label: 'Contacted', labelAr: 'تم التواصل', color: 'success' },
+  { value: 'seeking_job', label: 'Seeking Job', labelAr: 'يبحث عن وظيفة', color: 'accent' },
+  { value: 'current_student', label: 'Current Student', labelAr: 'طالب حالي', color: 'accent' },
+  { value: 'asking_bachelors', label: 'Asking for Bachelors', labelAr: 'يسأل عن البكالوريوس', color: 'accent' },
+  { value: 'courses_masters', label: 'Courses/Masters', labelAr: 'دورات/ماجستير', color: 'accent' },
+  { value: 'rude', label: 'Rude', labelAr: 'وقح', color: 'destructive' },
+  { value: 'informed', label: 'Informed', labelAr: 'تم الإبلاغ', color: 'success' },
+  { value: 'travelling', label: 'Travelling', labelAr: 'مسافر', color: 'accent' },
+  { value: 'might_withdraw', label: 'Might Withdraw', labelAr: 'قد ينسحب', color: 'warning' },
 ]
+
+// Statuses that are exclusive to the Applicant stage
+export const APPLICANT_ONLY_STATUSES: LeadStatus[] = ['informed', 'travelling', 'might_withdraw']
 
 export const PIPELINE_STAGES: { value: PipelineStage; label: string; labelAr: string }[] = [
   { value: 'new', label: 'New', labelAr: 'جديد' },
   { value: 'contacted', label: 'Contacted', labelAr: 'تم التواصل' },
-  { value: 'appointment', label: 'Appointment', labelAr: 'موعد' },
   { value: 'visit', label: 'Visit', labelAr: 'زيارة' },
   { value: 'test', label: 'Test', labelAr: 'اختبار' },
-  { value: 'application', label: 'Application', labelAr: 'طلب' },
+  { value: 'application', label: 'File', labelAr: 'طلب' },
   { value: 'lost', label: 'Lost', labelAr: 'خسارة' },
   { value: 'applicant', label: 'Applicant', labelAr: 'متقدم' },
   { value: 'enrolled', label: 'Enrolled', labelAr: 'مسجل' },
@@ -905,15 +939,15 @@ export type PSPDocumentType =
   | 'puc_receipt'
   | 'acceptance_letter'
   | 'transcript_moh'
-  | 'sequence_letter'
+  | 'sequence'
   | 'gcse'
-  | 'a_level'
   | 'equivalency'
-  | 'photo'
   | 'shahada'
-  | 'transcript'
+  | 'qiyas'
+  | 'special_needs_certificate'
+  | 'ministry_foreign_affairs'
 
-export type PSPGraduateType = 'GOV' | 'US' | 'UK' | 'KSA'
+export type PSPGraduateType = 'GOV' | 'US' | 'UK' | 'KSA' | 'OTHER'
 
 export interface PSPDocument {
   id: string
@@ -952,6 +986,17 @@ export interface PSPDocumentCompletionStatus {
   percentage: number
   isComplete: boolean
 }
+
+// PUC Document Status (auto-computed)
+export type PUCDocumentStatus = 'ready_to_apply' | 'pending_payment' | 'missing_document' | 'applied' | 'blocked'
+
+export const PUC_DOCUMENT_STATUSES: { value: PUCDocumentStatus; label: string; color: string }[] = [
+  { value: 'missing_document', label: 'Missing Document', color: 'red' },
+  { value: 'pending_payment', label: 'Pending Payment', color: 'amber' },
+  { value: 'ready_to_apply', label: 'Ready to Apply', color: 'green' },
+  { value: 'applied', label: 'Applied', color: 'blue' },
+  { value: 'blocked', label: 'Blocked', color: 'orange' },
+]
 
 // Ministry Website Block Reasons
 export const MINISTRY_BLOCK_REASONS: { value: MinistryBlockReason; label: string; labelAr: string }[] = [
@@ -2194,24 +2239,22 @@ export interface AvayaMissedCall {
 }
 
 // Submission Substage
-export type SubmissionSubstage = 'pending' | 'documents' | 'ready' | 'submitted' | 'blocked' | 'lost'
+export type SubmissionSubstage = 'documents' | 'submissions' | 'sf_srj' | 'lost'
 
 export const SUBMISSION_SUBSTAGES: { value: SubmissionSubstage; label: string; labelAr: string; color: string }[] = [
-  { value: 'pending', label: 'Pending', labelAr: 'قيد الانتظار', color: 'secondary' },
   { value: 'documents', label: 'Documents', labelAr: 'المستندات', color: 'warning' },
-  { value: 'ready', label: 'Ready', labelAr: 'جاهز', color: 'success' },
-  { value: 'submitted', label: 'Submitted', labelAr: 'تم التقديم', color: 'primary' },
-  { value: 'blocked', label: 'Blocked', labelAr: 'محظور', color: 'warning' },
+  { value: 'submissions', label: 'Submissions', labelAr: 'تم التقديم', color: 'primary' },
+  { value: 'sf_srj', label: 'SF SRJ', labelAr: 'SF SRJ', color: 'info' },
   { value: 'lost', label: 'Lost', labelAr: 'خسارة', color: 'destructive' },
 ]
 
 // Submission Status
-export type SubmissionStatus = 'cancelled' | 'cb' | 'appointment'
+export type SubmissionStatus = 'informed' | 'no_answer' | 'might_withdraw'
 
 export const SUBMISSION_STATUSES: { value: SubmissionStatus; label: string; labelAr: string; color: string }[] = [
-  { value: 'cancelled', label: 'Cancelled', labelAr: 'ملغى', color: 'destructive' },
-  { value: 'cb', label: 'Callback', labelAr: 'معاودة الاتصال', color: 'warning' },
-  { value: 'appointment', label: 'Appointment', labelAr: 'موعد', color: 'primary' },
+  { value: 'informed', label: 'Informed', labelAr: 'تم الإبلاغ', color: 'success' },
+  { value: 'no_answer', label: 'No Answer', labelAr: 'لا يرد', color: 'warning' },
+  { value: 'might_withdraw', label: 'Might Withdraw', labelAr: 'قد ينسحب', color: 'destructive' },
 ]
 
 // Submission Blocked Reasons

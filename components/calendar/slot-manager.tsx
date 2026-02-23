@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { cn, toDateString } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,6 @@ import {
 import {
   Calendar,
   Clock,
-  Users,
   MapPin,
   Plus,
   Trash2,
@@ -68,7 +67,7 @@ export function SlotManager({ isOpen, onClose, onSuccess, preselectedDate }: Slo
       ...slots,
       {
         appointment_type: "",
-        date: preselectedDate?.toISOString().split("T")[0] || "",
+        date: preselectedDate ? toDateString(preselectedDate) : "",
         start_time: "09:00",
         end_time: "10:00",
         capacity: 5,
@@ -149,7 +148,7 @@ export function SlotManager({ isOpen, onClose, onSuccess, preselectedDate }: Slo
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[720px] max-h-[85vh] overflow-hidden flex flex-col p-0">
         {/* Header */}
-        <DialogHeader className="px-8 pt-8 pb-6 border-b border-[var(--border)]/60 bg-gradient-to-b from-[var(--bg-depth-1)] to-transparent">
+        <DialogHeader className="px-8 pt-8 pb-6 border-b border-[var(--border)]/60 bg-gradient-to-b from-[var(--bg-surface)] to-transparent">
           <DialogTitle className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
               <Settings className="w-6 h-6 text-white" />
@@ -193,12 +192,12 @@ export function SlotManager({ isOpen, onClose, onSuccess, preselectedDate }: Slo
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-6 rounded-2xl border border-[var(--border)]/80 bg-gradient-to-br from-[var(--bg-depth-3)] to-[var(--bg-depth-2)] shadow-sm"
+                  className="p-6 rounded-2xl border border-[var(--border)]/80 bg-gradient-to-br from-[var(--bg-sunken)] to-[var(--bg-elevated)] shadow-sm"
                 >
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
                       <div className={cn(
-                        "w-4 h-4 rounded-full ring-2 ring-offset-2 ring-offset-[var(--bg-depth-2)]",
+                        "w-4 h-4 rounded-full ring-2 ring-offset-2 ring-offset-[var(--bg-elevated)]",
                         slot.appointment_type ? getTypeColor(slot.appointment_type as AppointmentType) : "bg-slate-400 ring-slate-400/30"
                       )} />
                       <span className="text-sm font-semibold text-[var(--text-primary)]">
@@ -253,7 +252,7 @@ export function SlotManager({ isOpen, onClose, onSuccess, preselectedDate }: Slo
                         type="date"
                         value={slot.date}
                         onChange={(e) => updateSlot(index, "date", e.target.value)}
-                        min={new Date().toISOString().split("T")[0]}
+                        min={toDateString(new Date())}
                         className="h-11"
                       />
                     </div>
@@ -348,7 +347,7 @@ export function SlotManager({ isOpen, onClose, onSuccess, preselectedDate }: Slo
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-[var(--border)]/60 bg-gradient-to-t from-[var(--bg-depth-1)] to-transparent flex items-center justify-between">
+        <div className="px-8 py-6 border-t border-[var(--border)]/60 bg-gradient-to-t from-[var(--bg-surface)] to-transparent flex items-center justify-between">
           <div className="text-sm font-medium text-[var(--text-muted)]">
             <span className="inline-flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[var(--primary)]/60"></span>
@@ -387,7 +386,7 @@ interface QuickSlotSelectorProps {
 }
 
 export function QuickSlotSelector({ date, appointmentType, slots, onSelect }: QuickSlotSelectorProps) {
-  const dateStr = date.toISOString().split("T")[0]
+  const dateStr = toDateString(date)
   const availableSlots = slots.filter(
     s => s.date === dateStr &&
          s.appointment_type.includes(appointmentType) &&
@@ -397,7 +396,7 @@ export function QuickSlotSelector({ date, appointmentType, slots, onSelect }: Qu
 
   if (availableSlots.length === 0) {
     return (
-      <div className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-depth-3)] text-center">
+      <div className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-center">
         <p className="text-sm text-[var(--text-muted)]">
           No available slots for this date
         </p>
@@ -413,7 +412,7 @@ export function QuickSlotSelector({ date, appointmentType, slots, onSelect }: Qu
           onClick={() => onSelect(slot)}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="w-full p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--primary)]/50 transition-all text-left"
+          className="w-full p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50 transition-all text-left"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

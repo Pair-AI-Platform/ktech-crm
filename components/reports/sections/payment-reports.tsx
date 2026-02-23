@@ -4,18 +4,12 @@ import { useSyncExternalStore } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ProgressRing } from "@/components/ui/progress"
 import {
   PieChart,
   Pie,
   Cell,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
 } from "recharts"
 import {
   CreditCard,
@@ -29,8 +23,6 @@ import type { PaymentReportData } from "@/lib/hooks/use-reports"
 interface PaymentReportsProps {
   data: PaymentReportData
 }
-
-const COLORS = ['#F59E0B', '#3B82F6', '#22C55E']
 
 const emptySubscribe = () => () => {}
 
@@ -68,7 +60,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
       value: data.totalStudents,
       icon: Users,
       color: "primary",
-      gradient: "from-[#445eb7] to-[#212e7f]"
+      colorClass: "bg-[var(--bg-sunken)]"
     },
     {
       title: "Pending",
@@ -76,7 +68,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
       subtext: `${Math.round((data.pending / data.totalStudents) * 100) || 0}% of total`,
       icon: Clock,
       color: "warning",
-      gradient: "from-[#F59E0B] to-[#D97706]"
+      colorClass: "bg-[var(--warning)]"
     },
     {
       title: "Seat Reserved",
@@ -84,7 +76,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
       subtext: `${data.seatReserved} students`,
       icon: CheckCircle2,
       color: "info",
-      gradient: "from-[#3B82F6] to-[#2563EB]"
+      colorClass: "bg-[var(--primary)]"
     },
     {
       title: "Full Payment",
@@ -92,7 +84,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
       subtext: `${data.fullTuition} students`,
       icon: TrendingUp,
       color: "success",
-      gradient: "from-[#22C55E] to-[#16A34A]"
+      colorClass: "bg-[var(--success)]"
     },
   ]
 
@@ -110,7 +102,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
             <Card hover glow className="relative overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
+                  <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
                 </div>
@@ -120,7 +112,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
                   <p className="text-xs text-[var(--text-muted)] mt-1">{stat.subtext}</p>
                 )}
               </CardContent>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.gradient} opacity-50`} />
+              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
             </Card>
           </motion.div>
         ))}
@@ -251,7 +243,7 @@ function StatusCard({
   }
 
   return (
-    <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
       <div className="flex items-start justify-between mb-3">
         <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
           <Icon className="w-5 h-5" />

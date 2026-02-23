@@ -28,11 +28,11 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         }}
         className={cn(
           "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-depth-1)]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)]",
           "disabled:cursor-not-allowed disabled:opacity-50",
           checked
             ? "bg-[var(--primary)]"
-            : "bg-[var(--bg-depth-3)]",
+            : "bg-[var(--bg-sunken)]",
           className
         )}
       >
@@ -44,7 +44,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
           className={cn(
             "pointer-events-none block h-4 w-4 rounded-full shadow-lg ring-0",
-            checked ? "bg-white" : "bg-[var(--text-muted)]"
+            checked ? "bg-[#FAF9F7]" : "bg-[var(--text-muted)]"
           )}
         />
       </button>

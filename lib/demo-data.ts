@@ -1,4 +1,5 @@
-import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType, MinistryBlockReason } from "@/types"
+import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType } from "@/types"
+import { toDateString } from "@/lib/utils"
 
 // Check if we're in demo mode
 export function isDemoMode(): boolean {
@@ -241,7 +242,7 @@ const majors = ["cyber_security", "cis", "marketing", "accounting", "mis", "netw
 const fundingTypes = ["self_funded", "puc"]
 const contactStatuses = ["uncontacted", "interested", "not_interested", "no_answer", "callback", "will_see"]
 const gradeLevels = ["10th", "11th", "12th"]
-const stages: PipelineStage[] = ["new", "contacted", "appointment", "visit", "test", "application", "applicant", "enrolled", "withdraw", "lost"]
+const stages: PipelineStage[] = ["new", "contacted", "visit", "test", "application", "applicant", "enrolled", "withdraw", "lost"]
 
 function randomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -267,55 +268,10 @@ function randomDate(daysAgo: number): string {
   return date.toISOString()
 }
 
-function randomFutureDate(daysAhead: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + Math.floor(Math.random() * daysAhead))
-  return date.toISOString()
-}
-
 // Generate realistic activity notes for a lead
 function generateActivityNotes(stage: PipelineStage, firstName: string): string {
   const now = new Date()
   const notes: string[] = []
-
-  // Call notes
-  const callNotes = [
-    `[Call] Spoke with ${firstName}, very interested in the program`,
-    `[Call] Left voicemail, will try again tomorrow`,
-    `[Call] ${firstName} asked about scholarship options`,
-    `[Call] Discussed course curriculum and career paths`,
-    `[Call] Parent answered, ${firstName} was at school. Callback scheduled`,
-    `[Call] Quick chat - confirmed interest, sending brochure`,
-    `[Call] ${firstName} wants to visit campus next week`,
-    `[Call] Answered questions about admission requirements`,
-  ]
-
-  // Meeting notes
-  const meetingNotes = [
-    `[Meeting] Campus tour completed - ${firstName} loved the facilities`,
-    `[Meeting] Met with ${firstName} and parent. Very positive meeting`,
-    `[Meeting] Orientation session attended`,
-    `[Meeting] Had coffee with ${firstName}, discussed major options`,
-    `[Meeting] Career counseling session - interested in IT field`,
-  ]
-
-  // Follow-up notes
-  const followUpNotes = [
-    `[Follow-up] Sent program details via WhatsApp`,
-    `[Follow-up] ${firstName} requested more time to decide`,
-    `[Follow-up] Reminded about application deadline`,
-    `[Follow-up] Sent scholarship application form`,
-    `[Follow-up] Checking on document submission status`,
-    `[Follow-up] ${firstName} confirmed will submit documents this week`,
-  ]
-
-  // Email notes
-  const emailNotes = [
-    `[Email] Sent welcome email with program brochure`,
-    `[Email] Shared admission requirements document`,
-    `[Email] Sent campus map and parking info for visit`,
-    `[Email] Application confirmation sent`,
-  ]
 
   // General notes
   const generalNotes = [
@@ -333,7 +289,6 @@ function generateActivityNotes(stage: PipelineStage, firstName: string): string 
   const stageProgress: Record<PipelineStage, number> = {
     new: 1,
     contacted: 2,
-    appointment: 3,
     visit: 3,
     test: 5,
     application: 6,
@@ -359,24 +314,8 @@ function generateActivityNotes(stage: PipelineStage, firstName: string): string 
       minute: '2-digit'
     })
 
-    // Pick note type based on stage and randomness
-    let note: string
-    const rand = Math.random()
-
-    if (i === 0 && stage !== 'new') {
-      // Most recent note is usually a call or follow-up
-      note = randomItem([...callNotes, ...followUpNotes])
-    } else if (rand < 0.35) {
-      note = randomItem(callNotes)
-    } else if (rand < 0.5 && ['visit', 'test', 'application'].includes(stage)) {
-      note = randomItem(meetingNotes)
-    } else if (rand < 0.7) {
-      note = randomItem(followUpNotes)
-    } else if (rand < 0.85) {
-      note = randomItem(emailNotes)
-    } else {
-      note = randomItem(generalNotes)
-    }
+    // Pick a general note (plain notes only)
+    const note = randomItem(generalNotes)
 
     notes.push(`[${timestamp}] ${note}`)
   }
@@ -388,10 +327,6 @@ function generateActivityNotes(stage: PipelineStage, firstName: string): string 
 // Generate demo leads with even distribution across all stages
 export function generateDemoLeads(count: number = 50): Lead[] {
   const leads: Lead[] = []
-
-  // Ensure even distribution across stages
-  // Each stage gets roughly equal leads, with some variation
-  const leadsPerStage = Math.ceil(count / stages.length)
 
   // Counter for submission stage leads to distribute substages evenly
   let submissionLeadCounter = 0
@@ -408,25 +343,17 @@ export function generateDemoLeads(count: number = 50): Lead[] {
     const statuses: Lead["status"][] = ["no_answer", "callback", "not_interested", "switched_off", "busy", "confirmed", "wrong_number", "will_see", "postponed", "by_mistake", "disconnected", "hanged_up"]
 
     // Ministry block reasons for submission stage leads
-    const blockReasons: Lead["ministry_block_reasons"] = ['ku', 'paaet', 'abroad', 'aasu', 'paci', 'puc', 'gpa']
-
     // Submission substages for even distribution of colors
-    const submissionSubstages: Lead["submission_substage"][] = ['pending', 'submitted', 'blocked', 'ready', 'documents', 'lost']
+    const submissionSubstages: Lead["submission_substage"][] = ['documents', 'submissions', 'lost']
 
     // For submission stage leads, assign substage in round-robin for even distribution
     let submissionSubstage: Lead["submission_substage"] | undefined = undefined
-    let isSubmissionBlocked = false
-    let selectedBlockReason: MinistryBlockReason | undefined = undefined
 
     if (stage === 'applicant') {
       // Distribute substages evenly among applicant leads using dedicated counter
       const substageIndex = submissionLeadCounter % submissionSubstages.length
       submissionSubstage = submissionSubstages[substageIndex]
       submissionLeadCounter++
-
-      // Only set ministry_blocked for 'blocked' substage leads
-      isSubmissionBlocked = submissionSubstage === 'blocked'
-      selectedBlockReason = isSubmissionBlocked ? randomItem(blockReasons) : undefined
     }
 
     leads.push({
@@ -449,7 +376,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       source_category: randomItem(sourceCategories) as Lead["source_category"],
       source: randomItem(sources) as Lead["source"],
       pipeline_stage: stage,
-      status: stage === "visit" ? undefined : randomItem(statuses),
+      status: randomItem(statuses),
       contact_status: randomItem(contactStatuses) as Lead["contact_status"],
       grade_level: randomItem(gradeLevels) as Lead["grade_level"],
       academic_track: randomItem(tracks) as Lead["academic_track"],
@@ -468,8 +395,6 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       notes: generateActivityNotes(stage, firstName),
       created_at: randomDate(60),
       updated_at: randomDate(5),
-      ministry_blocked: isSubmissionBlocked,
-      ministry_block_reasons: isSubmissionBlocked ? [selectedBlockReason!] : undefined,
       submission_substage: submissionSubstage,
     })
   }
@@ -550,9 +475,6 @@ export function generateDemoStudents(count: number = 20): Student[] {
 export function generateDemoAppointments(count: number = 200): Appointment[] {
   const appointments: Appointment[] = []
   const types: AppointmentType[] = ["new_appointment", "puc_documents", "puc_application", "retest", "sf_appointment", "sf_retest"]
-  const allStatuses: Appointment["status"][] = ["scheduled", "no_answer", "confirmed", "on_the_way", "postponed", "cant_reach", "will_see", "completed", "cancelled"]
-  const modalities: ("campus" | "online")[] = ["campus", "online"]
-
   // Time slots for realistic scheduling (8:00 AM to 4:00 PM, 30-min increments)
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
@@ -618,7 +540,7 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
   function getDate(daysOffset: number): string {
     const d = new Date(today)
     d.setDate(d.getDate() + daysOffset)
-    return d.toISOString().split("T")[0]
+    return toDateString(d)
   }
 
   // Helper: skip weekends (Friday/Saturday in Kuwait)
@@ -717,13 +639,13 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
   // Pipeline stages matched to appointment types
   function stageForType(type: AppointmentType): Lead["pipeline_stage"] {
     switch (type) {
-      case "new_appointment": return randomItem(["contacted", "appointment"] as Lead["pipeline_stage"][])
+      case "new_appointment": return "contacted"
       case "puc_documents": return "applicant"
       case "puc_application": return "application"
       case "retest": return "test"
-      case "sf_appointment": return randomItem(["appointment", "visit"] as Lead["pipeline_stage"][])
+      case "sf_appointment": return "contacted"
       case "sf_retest": return "test"
-      default: return "appointment"
+      default: return "contacted"
     }
   }
 
@@ -889,19 +811,29 @@ export function getDemoAppointments(): Appointment[] {
 
   // Apply any stored updates
   const updates = getDemoAppointmentUpdates()
-  return cachedAppointments.map(apt => {
+  const result = cachedAppointments.map(apt => {
     if (updates[apt.id]) {
       return { ...apt, ...updates[apt.id] }
     }
     return apt
   })
+
+  // Include newly created appointments (IDs not in cached list)
+  const cachedIds = new Set(cachedAppointments.map(apt => apt.id))
+  for (const [id, data] of Object.entries(updates)) {
+    if (!cachedIds.has(id)) {
+      result.push(data as Appointment)
+    }
+  }
+
+  return result
 }
 
 // Stats helpers
 export function getDemoLeadStats() {
   const leads = getDemoLeads()
   const byStage: Record<PipelineStage, number> = {
-    new: 0, contacted: 0, appointment: 0, visit: 0,
+    new: 0, contacted: 0, visit: 0,
     test: 0, application: 0, applicant: 0, enrolled: 0, withdraw: 0, lost: 0
   }
 
@@ -936,7 +868,7 @@ export function getDemoStudentStats() {
 
 export function getDemoAppointmentStats() {
   const appointments = getDemoAppointments()
-  const today = new Date().toISOString().split("T")[0]
+  const today = toDateString(new Date())
 
   return {
     total: appointments.length,
@@ -949,7 +881,7 @@ export function getDemoAppointmentStats() {
 
 export function getTodayAppointments(): Appointment[] {
   const appointments = getDemoAppointments()
-  const today = new Date().toISOString().split("T")[0]
+  const today = toDateString(new Date())
 
   // First get actual today appointments
   const todayApts = appointments.filter(a => a.scheduled_date === today)

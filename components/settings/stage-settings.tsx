@@ -21,8 +21,7 @@ import { PIPELINE_STAGES, PipelineStage } from "@/types"
 const STAGE_COLORS: Record<PipelineStage, string> = {
   new: "bg-[var(--stage-new)]",
   contacted: "bg-[var(--stage-contacted)]",
-  appointment: "bg-[var(--stage-appointment)]",
-  visit: "bg-[var(--stage-visit)]",
+  visit: "bg-teal-500",
   test: "bg-[var(--stage-test)]",
   application: "bg-[var(--stage-application)]",
   applicant: "bg-indigo-500",
@@ -162,8 +161,8 @@ export function StageSettings() {
                 className={cn(
                   "flex items-center justify-between p-4 rounded-xl border transition-all",
                   isActive
-                    ? "bg-[var(--bg-depth-3)] border-[var(--border)]"
-                    : "bg-[var(--bg-depth-2)] border-[var(--border)]/50 opacity-60"
+                    ? "bg-[var(--bg-sunken)] border-[var(--border)]"
+                    : "bg-[var(--bg-elevated)] border-[var(--border)]/50 opacity-60"
                 )}
               >
                 <div className="flex items-center gap-4">

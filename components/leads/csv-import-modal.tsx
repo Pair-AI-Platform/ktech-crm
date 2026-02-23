@@ -35,7 +35,7 @@ import {
   LEAD_CSV_COLUMNS,
 } from "@/lib/csv-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
-import { useAgents, type Profile } from "@/lib/hooks/use-user"
+import { useAgents } from "@/lib/hooks/use-user"
 import type { LeadFormData } from "@/types"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -321,7 +321,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                 </div>
 
                 {/* Template Download */}
-                <div className="p-4 bg-[var(--bg-depth-3)] rounded-xl">
+                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
                   <div className="flex items-start gap-3">
                     <Download className="w-5 h-5 text-[var(--primary)] mt-0.5" />
                     <div className="flex-1">
@@ -352,7 +352,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                     {LEAD_CSV_COLUMNS.filter(c => c.required).map(col => (
                       <span
                         key={col.key}
-                        className="px-2 py-1 bg-[var(--bg-depth-3)] rounded-md text-xs"
+                        className="px-2 py-1 bg-[var(--bg-sunken)] rounded-md text-xs"
                       >
                         {col.label}
                       </span>
@@ -371,7 +371,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                 className="space-y-6"
               >
                 {/* File Info */}
-                <div className="flex items-center gap-3 p-4 bg-[var(--bg-depth-3)] rounded-xl">
+                <div className="flex items-center gap-3 p-4 bg-[var(--bg-sunken)] rounded-xl">
                   <FileSpreadsheet className="w-8 h-8 text-[var(--primary)]" />
                   <div className="flex-1">
                     <p className="font-medium text-[var(--text-primary)]">{file?.name}</p>
@@ -397,7 +397,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                     "p-4 rounded-xl border",
                     invalidCount > 0
                       ? "bg-[var(--error-bg)] border-[var(--error)]/20"
-                      : "bg-[var(--bg-depth-3)] border-transparent"
+                      : "bg-[var(--bg-sunken)] border-transparent"
                   )}>
                     <div className={cn(
                       "flex items-center gap-2",
@@ -435,7 +435,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                     <p className="text-sm font-medium text-[var(--text-secondary)]">Preview (first 5 valid rows)</p>
                     <div className="overflow-x-auto border border-[var(--border)] rounded-lg">
                       <table className="w-full text-sm">
-                        <thead className="bg-[var(--bg-depth-3)]">
+                        <thead className="bg-[var(--bg-sunken)]">
                           <tr>
                             <th className="px-3 py-2 text-left text-[var(--text-muted)] font-medium">Name</th>
                             <th className="px-3 py-2 text-left text-[var(--text-muted)] font-medium">Phone</th>
@@ -480,7 +480,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                 className="space-y-6"
               >
                 {/* Header Info */}
-                <div className="p-4 bg-[var(--bg-depth-3)] rounded-xl">
+                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
                       <Users className="w-5 h-5 text-[var(--primary)]" />
@@ -506,7 +506,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                         "p-4 rounded-lg border text-left transition-all",
                         assignmentMode === "none"
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -529,7 +529,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                         "p-4 rounded-lg border text-left transition-all",
                         assignmentMode === "single"
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -552,7 +552,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                         "p-4 rounded-lg border text-left transition-all",
                         assignmentMode === "distribute"
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -575,7 +575,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                         "p-4 rounded-lg border text-left transition-all",
                         assignmentMode === "school"
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -611,14 +611,14 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                               "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
                               singleAgentId === agent.id
                                 ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                                : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                                : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                             )}
                           >
                             <div className={cn(
                               "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
                               singleAgentId === agent.id
                                 ? "bg-[var(--primary)] text-white"
-                                : "bg-[var(--bg-depth-2)]"
+                                : "bg-[var(--bg-elevated)]"
                             )}>
                               {singleAgentId === agent.id ? (
                                 <Check className="w-4 h-4" />
@@ -675,14 +675,14 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                                 "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
                                 isSelected
                                   ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                                  : "border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--text-muted)]"
+                                  : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--text-muted)]"
                               )}
                             >
                               <div className={cn(
                                 "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
                                 isSelected
                                   ? "bg-[var(--primary)] text-white"
-                                  : "bg-[var(--bg-depth-2)]"
+                                  : "bg-[var(--bg-elevated)]"
                               )}>
                                 {isSelected ? (
                                   <Check className="w-4 h-4" />
@@ -718,7 +718,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                         <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
                       </div>
                     ) : schools.length === 0 ? (
-                      <p className="text-sm text-[var(--text-muted)] p-4 bg-[var(--bg-depth-3)] rounded-lg text-center">
+                      <p className="text-sm text-[var(--text-muted)] p-4 bg-[var(--bg-sunken)] rounded-lg text-center">
                         No schools found. Please add schools first.
                       </p>
                     ) : (
@@ -728,7 +728,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                           return (
                             <div
                               key={school.id}
-                              className="flex items-center gap-3 p-3 bg-[var(--bg-depth-3)] rounded-lg"
+                              className="flex items-center gap-3 p-3 bg-[var(--bg-sunken)] rounded-lg"
                             >
                               <GraduationCap className="w-5 h-5 text-[var(--text-muted)] shrink-0" />
                               <div className="flex-1 min-w-0">
@@ -748,7 +748,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                                     return filtered
                                   })
                                 }}
-                                className="px-3 py-1.5 text-sm bg-[var(--bg-depth-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] min-w-[140px]"
+                                className="px-3 py-1.5 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] min-w-[140px]"
                               >
                                 <option value="">Unassigned</option>
                                 {agents.map((agent) => (

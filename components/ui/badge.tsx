@@ -41,27 +41,25 @@ const badgeVariants = cva(
           "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white shadow-sm",
         // Pipeline stage variants - using CSS variables for theme consistency
         new:
-          "bg-gradient-to-r from-[rgba(99,102,241,0.15)] to-[rgba(99,102,241,0.08)] text-[var(--stage-new)] border border-[rgba(99,102,241,0.25)]",
+          "bg-[var(--bg-sunken)] text-[var(--stage-new)] border border-[var(--border)]",
         contacted:
-          "bg-gradient-to-r from-[rgba(139,92,246,0.15)] to-[rgba(139,92,246,0.08)] text-[var(--stage-contacted)] border border-[rgba(139,92,246,0.25)]",
-        appointment:
-          "bg-gradient-to-r from-[rgba(168,85,247,0.15)] to-[rgba(168,85,247,0.08)] text-[var(--stage-appointment)] border border-[rgba(168,85,247,0.25)]",
+          "bg-[var(--bg-sunken)] text-[var(--stage-contacted)] border border-[var(--border)]",
         visit:
-          "bg-gradient-to-r from-[rgba(217,70,239,0.15)] to-[rgba(217,70,239,0.08)] text-[var(--stage-visit)] border border-[rgba(217,70,239,0.25)]",
+          "bg-[rgba(20,184,166,0.08)] text-teal-600 border border-[rgba(20,184,166,0.15)]",
         test:
-          "bg-gradient-to-r from-[rgba(244,63,94,0.15)] to-[rgba(244,63,94,0.08)] text-[var(--stage-tested)] border border-[rgba(244,63,94,0.25)]",
+          "bg-[rgba(217,119,6,0.08)] text-[var(--stage-tested)] border border-[rgba(217,119,6,0.15)]",
         application:
-          "bg-gradient-to-r from-[rgba(249,115,22,0.15)] to-[rgba(249,115,22,0.08)] text-[var(--stage-application)] border border-[rgba(249,115,22,0.25)]",
+          "bg-[rgba(180,83,9,0.08)] text-[var(--stage-application)] border border-[rgba(180,83,9,0.15)]",
         applicant:
-          "bg-gradient-to-r from-[rgba(99,102,241,0.15)] to-[rgba(99,102,241,0.08)] text-indigo-600 dark:text-indigo-400 border border-[rgba(99,102,241,0.25)]",
+          "bg-[rgba(87,83,78,0.08)] text-[var(--text-secondary)] border border-[var(--border)]",
         payment:
-          "bg-gradient-to-r from-[rgba(16,185,129,0.15)] to-[rgba(16,185,129,0.08)] text-[var(--stage-payment)] border border-[rgba(16,185,129,0.25)]",
+          "bg-[rgba(22,163,74,0.08)] text-[var(--stage-payment)] border border-[rgba(22,163,74,0.15)]",
         enrolled:
-          "bg-gradient-to-r from-[rgba(5,150,105,0.15)] to-[rgba(5,150,105,0.08)] text-[var(--stage-enrolled)] border border-[rgba(5,150,105,0.25)]",
+          "bg-[rgba(21,128,61,0.08)] text-[var(--stage-enrolled)] border border-[rgba(21,128,61,0.15)]",
         withdraw:
-          "bg-gradient-to-r from-[rgba(239,68,68,0.15)] to-[rgba(239,68,68,0.08)] text-red-600 dark:text-red-400 border border-[rgba(239,68,68,0.25)]",
+          "bg-[var(--error-bg)] text-[var(--error)] border border-[rgba(220,38,38,0.15)]",
         lost:
-          "bg-gradient-to-r from-[rgba(113,113,122,0.15)] to-[rgba(113,113,122,0.08)] text-[var(--stage-lost)] border border-[rgba(113,113,122,0.25)]",
+          "bg-[rgba(220,38,38,0.08)] text-[var(--stage-lost)] border border-[rgba(220,38,38,0.15)]",
       },
       size: {
         xs: "h-5 px-1.5 text-[10px] rounded-md",
@@ -253,7 +251,7 @@ function CounterBadge({
 
 // Pipeline Stage Badge - specialized for CRM pipeline
 export interface PipelineBadgeProps extends Omit<BadgeProps, 'variant'> {
-  stage: "new" | "contacted" | "visit" | "appointment" | "test" | "application" | "applicant" | "enrolled" | "lost"
+  stage: "new" | "contacted" | "visit" | "test" | "application" | "applicant" | "enrolled" | "lost"
 }
 
 function PipelineBadge({ stage, className, children, ...props }: PipelineBadgeProps) {
@@ -261,9 +259,8 @@ function PipelineBadge({ stage, className, children, ...props }: PipelineBadgePr
     new: "New Lead",
     contacted: "Contacted",
     visit: "Visit",
-    appointment: "Appointment",
     test: "Test",
-    application: "Application",
+    application: "File",
     applicant: "Applicant",
     enrolled: "Enrolled",
     lost: "Lost",

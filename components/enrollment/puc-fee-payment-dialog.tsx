@@ -9,7 +9,6 @@ import {
   Send,
   ArrowLeft,
   AlertCircle,
-  Download,
   MessageCircle,
 } from "lucide-react"
 import {

@@ -10,7 +10,7 @@ import {
   Building2,
 } from "lucide-react"
 import type { Student } from "@/types"
-import { SF_ENROLLED_STAGES, SF_DOCUMENTS, PUC_DOCUMENTS } from "@/types"
+import { SF_DOCUMENTS, PUC_DOCUMENTS } from "@/types"
 
 interface EnrollmentStatusBadgeProps {
   student: Student
@@ -68,13 +68,12 @@ export function EnrollmentStatusBadge({
         case "withdrawn":
           return { status: "withdrawn", label: "Withdrawn", color: "destructive" }
         default:
-          return { status: "application", label: "Application", color: "secondary" }
+          return { status: "application", label: "File", color: "secondary" }
       }
     }
 
     // SF Status
     if (student.sf_enrolled_stage) {
-      const stageConfig = SF_ENROLLED_STAGES.find((s) => s.value === student.sf_enrolled_stage)
       if (student.sf_enrolled_stage === "400" || student.sf_enrolled_stage === "other") {
         return { status: "enrolled", label: "Enrolled", color: "success" }
       }

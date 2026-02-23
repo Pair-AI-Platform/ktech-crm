@@ -9,19 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Phone,
-  Mail,
-  MoreHorizontal,
   Undo2,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
   Loader2,
-  Search,
-  Calendar,
-  User,
   AlertTriangle,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
@@ -145,7 +138,6 @@ export function DeletedLeadsTable({
   const getStageColor = (stage: string | undefined) => {
     switch (stage) {
       case "new": return "bg-blue-500/10 text-blue-600 border-blue-500/20"
-      case "visit": return "bg-purple-500/10 text-purple-600 border-purple-500/20"
       case "test": return "bg-orange-500/10 text-orange-600 border-orange-500/20"
       case "application": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
       case "enrolled": return "bg-green-500/10 text-green-600 border-green-500/20"

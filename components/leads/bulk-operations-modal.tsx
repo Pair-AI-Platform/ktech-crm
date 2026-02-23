@@ -16,7 +16,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   UserPlus,
   Trash2,
-  Calendar,
   AlertTriangle,
   Loader2,
   CheckCircle2,
@@ -61,6 +60,7 @@ export function BulkAssignModal({
     }
 
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset state on dialog open
       setSelectedAgents([])
       fetchAgents()
     }
@@ -146,7 +146,7 @@ export function BulkAssignModal({
                       key={agent.id}
                       onClick={() => toggleAgent(agent.id)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-depth-2)]",
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-elevated)]",
                         isSelected && "bg-[var(--primary-muted)]"
                       )}
                     >
@@ -182,7 +182,7 @@ export function BulkAssignModal({
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-3 bg-[var(--bg-depth-3)] rounded-xl space-y-2"
+                  className="p-3 bg-[var(--bg-sunken)] rounded-xl space-y-2"
                 >
                   <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     Distribution

@@ -27,7 +27,7 @@ import {
   Building2,
   AlertCircle,
 } from "lucide-react"
-import { GOVERNORATES, type SchoolEntity, type Governorate } from "@/types"
+import { GOVERNORATES, SCHOOL_GENDERS, type SchoolEntity, type Governorate, type SchoolGender } from "@/types"
 import { createClient } from "@/lib/supabase/client"
 
 export function SchoolManagement() {
@@ -35,6 +35,7 @@ export function SchoolManagement() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [governorateFilter, setGovernorateFilter] = useState<string>("all")
+  const [genderFilter, setGenderFilter] = useState<string>("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -45,12 +46,14 @@ export function SchoolManagement() {
     name_en: "",
     name_ar: "",
     governorate: "" as Governorate | "",
+    gender: "" as SchoolGender | "",
   })
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchSchools()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchSchools = async () => {
@@ -75,6 +78,11 @@ export function SchoolManagement() {
       return
     }
 
+    if (!newSchool.gender) {
+      setError("Gender is required")
+      return
+    }
+
     setSaving(true)
     setError("")
 
@@ -86,6 +94,9 @@ export function SchoolManagement() {
       }
       if (newSchool.governorate) {
         insertData.governorate = newSchool.governorate
+      }
+      if (newSchool.gender) {
+        insertData.gender = newSchool.gender
       }
 
       const { data, error: insertError } = await supabase
@@ -103,7 +114,7 @@ export function SchoolManagement() {
         setSchools(prev => [...prev, data].sort((a, b) => a.name_ar.localeCompare(b.name_ar)))
       }
 
-      setNewSchool({ name_en: "", name_ar: "", governorate: "" })
+      setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "" })
       setShowAddModal(false)
       setSuccessMessage("School added successfully")
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -131,11 +142,15 @@ export function SchoolManagement() {
       s.name_en.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesGovernorate =
       governorateFilter === "all" || s.governorate === governorateFilter
-    return matchesSearch && matchesGovernorate
+    const matchesGender =
+      genderFilter === "all" || s.gender === genderFilter
+    return matchesSearch && matchesGovernorate && matchesGender
   })
 
   const activeCount = schools.filter(s => s.is_active).length
   const totalCount = schools.length
+  const maleCount = schools.filter(s => s.gender === 'male').length
+  const femaleCount = schools.filter(s => s.gender === 'female').length
 
   return (
     <>
@@ -159,18 +174,22 @@ export function SchoolManagement() {
         </CardHeader>
         <CardContent>
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="p-3 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] text-center">
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] text-center">
               <p className="text-2xl font-bold text-[var(--text-primary)]">{totalCount}</p>
               <p className="text-xs text-[var(--text-muted)]">Total Schools</p>
             </div>
-            <div className="p-3 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] text-center">
+            <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] text-center">
               <p className="text-2xl font-bold text-green-600">{activeCount}</p>
               <p className="text-xs text-[var(--text-muted)]">Active</p>
             </div>
-            <div className="p-3 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] text-center">
-              <p className="text-2xl font-bold text-[var(--text-muted)]">{totalCount - activeCount}</p>
-              <p className="text-xs text-[var(--text-muted)]">Inactive</p>
+            <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-blue-200 dark:border-blue-800/50 text-center">
+              <p className="text-2xl font-bold text-blue-600">{maleCount}</p>
+              <p className="text-xs text-[var(--text-muted)]">Male (بنين)</p>
+            </div>
+            <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-pink-200 dark:border-pink-800/50 text-center">
+              <p className="text-2xl font-bold text-pink-600">{femaleCount}</p>
+              <p className="text-xs text-[var(--text-muted)]">Female (بنات)</p>
             </div>
           </div>
 
@@ -200,6 +219,19 @@ export function SchoolManagement() {
                 className="pl-9"
               />
             </div>
+            <Select value={genderFilter} onValueChange={setGenderFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Genders" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Genders</SelectItem>
+                {SCHOOL_GENDERS.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>
+                    {g.labelAr} ({g.label})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={governorateFilter} onValueChange={setGovernorateFilter}>
               <SelectTrigger className="w-48">
                 <MapPin className="w-4 h-4 mr-2 text-[var(--text-muted)]" />
@@ -225,7 +257,7 @@ export function SchoolManagement() {
             <div className="text-center py-12">
               <Building2 className="w-10 h-10 mx-auto mb-3 text-[var(--text-muted)] opacity-50" />
               <p className="text-sm text-[var(--text-muted)]">
-                {searchQuery || governorateFilter !== "all"
+                {searchQuery || governorateFilter !== "all" || genderFilter !== "all"
                   ? "No schools match your search"
                   : "No schools added yet"}
               </p>
@@ -240,8 +272,8 @@ export function SchoolManagement() {
                   className={cn(
                     "flex items-center justify-between p-3 rounded-xl border transition-all",
                     school.is_active
-                      ? "border-[var(--border)] bg-[var(--bg-depth-3)]"
-                      : "border-[var(--border)] bg-[var(--bg-depth-3)] opacity-60"
+                      ? "border-[var(--border)] bg-[var(--bg-sunken)]"
+                      : "border-[var(--border)] bg-[var(--bg-sunken)] opacity-60"
                   )}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -249,7 +281,7 @@ export function SchoolManagement() {
                       "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
                       school.is_active
                         ? "bg-[var(--primary)]/10 text-[var(--primary)]"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <School className="w-5 h-5" />
                     </div>
@@ -262,6 +294,21 @@ export function SchoolManagement() {
                           <span className="text-xs text-[var(--text-muted)] truncate">
                             {school.name_en}
                           </span>
+                        )}
+                        {school.gender && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 shrink-0",
+                              school.gender === 'male'
+                                ? "border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30"
+                                : school.gender === 'female'
+                                ? "border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-950/30"
+                                : "border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30"
+                            )}
+                          >
+                            {SCHOOL_GENDERS.find(g => g.value === school.gender)?.labelAr || school.gender}
+                          </Badge>
                         )}
                         {school.governorate && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
@@ -396,14 +443,38 @@ export function SchoolManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Gender Field */}
+            <div className="space-y-2.5">
+              <Label required className="text-[var(--text-primary)]">Gender</Label>
+              <Select
+                value={newSchool.gender || "none"}
+                onValueChange={(value) => {
+                  setNewSchool(prev => ({ ...prev, gender: value === "none" ? "" : value as SchoolGender }))
+                  setError("")
+                }}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" disabled>Select gender</SelectItem>
+                  {SCHOOL_GENDERS.map((g) => (
+                    <SelectItem key={g.value} value={g.value}>
+                      {g.labelAr} ({g.label})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </DialogBody>
 
-          <DialogFooter className="px-7 py-5 bg-[var(--bg-depth-3)]/50">
+          <DialogFooter className="px-7 py-5 bg-[var(--bg-sunken)]/50">
             <Button
               variant="ghost"
               onClick={() => {
                 setShowAddModal(false)
-                setNewSchool({ name_en: "", name_ar: "", governorate: "" })
+                setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "" })
                 setError("")
               }}
             >
@@ -411,7 +482,7 @@ export function SchoolManagement() {
             </Button>
             <Button
               onClick={handleAddSchool}
-              disabled={saving || !newSchool.name_ar.trim()}
+              disabled={saving || !newSchool.name_ar.trim() || !newSchool.gender}
               variant="gradient"
               className="min-w-[140px] shadow-md shadow-[var(--primary)]/15"
             >

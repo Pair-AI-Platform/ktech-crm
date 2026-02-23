@@ -6,7 +6,7 @@ const supabase = createClient(
 )
 
 async function addColumn() {
-  const { data, error } = await supabase.rpc('exec_sql', {
+  const { error } = await supabase.rpc('exec_sql', {
     sql: 'ALTER TABLE leads ADD COLUMN IF NOT EXISTS parent_name TEXT;'
   })
   

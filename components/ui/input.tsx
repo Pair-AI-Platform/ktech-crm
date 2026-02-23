@@ -18,9 +18,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const hasError = Boolean(error)
 
     const sizeClasses = {
-      sm: "h-9 px-3 text-xs rounded-lg",
-      default: "h-11 px-4 text-sm rounded-xl",
-      lg: "h-13 px-5 text-base rounded-xl"
+      sm: "h-9 px-3 text-xs rounded-md",
+      default: "h-10 px-4 text-sm rounded-lg",
+      lg: "h-12 px-5 text-base rounded-lg"
     }
 
     const variantClasses = {
@@ -43,10 +43,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           : "hover:bg-[var(--bg-hover)] focus:bg-[var(--bg-sunken)] focus:ring-[var(--primary-muted)]"
       ),
       glass: cn(
-        "bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)] border",
+        "bg-[var(--bg-surface)] border",
         hasError
           ? "border-[var(--error)] focus:border-[var(--error)] focus:ring-[var(--error-muted)]"
-          : "border-[var(--glass-border)] hover:border-[var(--border-emphasis)] focus:border-[var(--primary)] focus:ring-[var(--primary-muted)]"
+          : "border-[var(--border)] hover:border-[var(--border-emphasis)] focus:border-[var(--primary)] focus:ring-[var(--primary-muted)]"
       )
     }
 
@@ -127,9 +127,9 @@ export interface SearchInputProps extends Omit<InputProps, 'icon' | 'suffix' | '
 const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
   ({ className, value, onClear, searchSize = 'default', ...props }, ref) => {
     const sizeClasses = {
-      sm: "h-9 pl-9 pr-9 text-xs rounded-lg",
-      default: "h-11 pl-11 pr-10 text-sm rounded-xl",
-      lg: "h-13 pl-12 pr-11 text-base rounded-xl"
+      sm: "h-9 pl-9 pr-9 text-xs rounded-md",
+      default: "h-10 pl-11 pr-10 text-sm rounded-lg",
+      lg: "h-12 pl-12 pr-11 text-base rounded-lg"
     }
 
     const iconLeftClasses = {
@@ -222,7 +222,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <textarea
         className={cn(
-          "flex min-h-[120px] w-full rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] transition-all duration-200 resize-none",
+          "flex min-h-[120px] w-full rounded-lg px-4 py-3 text-sm text-[var(--text-primary)] transition-all duration-200 resize-none",
           variantClasses[variant],
           "placeholder:text-[var(--text-muted)]",
           "focus:outline-none focus:ring-2 focus:ring-offset-0",

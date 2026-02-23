@@ -365,7 +365,6 @@ interface ConditionEditorProps {
 function ConditionEditor({
   condition,
   availableSteps,
-  integrations,
   onChange,
   onRemove,
 }: ConditionEditorProps) {

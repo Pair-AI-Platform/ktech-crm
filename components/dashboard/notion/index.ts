@@ -1,0 +1,10 @@
+// Notion-style dashboard components
+export { DashboardBlock, StaticBlock } from "./dashboard-block"
+export { StatBlock, StatGrid } from "./stat-block"
+export { ListBlock, AppointmentList, PriorityLeadsList } from "./list-block"
+export type { ListItem } from "./list-block"
+export { PipelineBlock, PipelineMini, PipelineVertical } from "./pipeline-block"
+export { QuickActionsBlock, QuickActionsBar, FAB } from "./quick-actions-block"
+export { DashboardGrid, SimpleGrid, MasonryGrid } from "./dashboard-grid"
+export { useDashboardLayout } from "./use-dashboard-layout"
+export type { BlockConfig } from "./use-dashboard-layout"

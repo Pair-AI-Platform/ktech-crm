@@ -36,9 +36,20 @@ export const BUSINESS_CONFIG = {
   // -- Pipeline --
   /** All pipeline stages in order */
   PIPELINE_STAGES: [
-    'new', 'contacted', 'visit', 'appointment', 'test',
+    'new', 'contacted', 'visit', 'test',
     'application', 'applicant', 'enrolled', 'lost', 'withdraw',
   ] as const,
+} as const
+
+// -- PUC SRJ Auto-Routing --
+// When ALL conditions are met, automatically set lead to PUC (funding_type = 'puc')
+export const PUC_SRJ_AUTO_ROUTE = {
+  /** Minimum actual GPA to qualify */
+  MIN_GPA: 70,
+  /** Maximum age (exclusive) - must be under this age */
+  MAX_AGE: 23,
+  /** Maximum years since graduation (graduation_year must be within this many years) */
+  MAX_GRADUATION_GAP_YEARS: 2,
 } as const
 
 // Re-export individual values for convenience

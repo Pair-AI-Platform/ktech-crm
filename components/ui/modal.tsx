@@ -17,7 +17,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/40 backdrop-blur-md",
+      "fixed inset-0 z-50 bg-[rgba(31,29,26,0.5)]",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
@@ -51,8 +51,8 @@ const DialogContent = React.forwardRef<
         ref={ref}
         className={cn(
           "fixed left-[50%] top-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%]",
-          "bg-[var(--glass-bg)] backdrop-blur-[20px] backdrop-saturate-[var(--glass-saturate)]",
-          "border border-[var(--glass-border)] rounded-2xl shadow-2xl",
+          "bg-[var(--bg-surface)]",
+          "border border-[var(--border)] rounded-xl shadow-2xl",
           "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -65,7 +65,7 @@ const DialogContent = React.forwardRef<
       >
         {children}
         {showClose && (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-depth-3)] transition-all opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]">
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] transition-all opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
@@ -188,7 +188,7 @@ function ConfirmDialog({
         <DialogFooter>
           <button
             onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-depth-3)] rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] rounded-lg transition-colors"
           >
             {cancelText}
           </button>

@@ -126,14 +126,14 @@ export function DemographicReports({ data }: DemographicReportsProps) {
           <Card hover glow className="relative overflow-hidden">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#445eb7] to-[#212e7f] shadow-lg">
+                <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
                   <Users className="w-5 h-5 text-white" />
                 </div>
               </div>
               <p className="text-sm text-[var(--text-secondary)] mb-1">Total Leads</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{totalLeads}</p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#445eb7] to-[#212e7f] opacity-50" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--bg-sunken)] opacity-50" />
           </Card>
         </motion.div>
       </div>

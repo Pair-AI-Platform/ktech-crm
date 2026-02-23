@@ -28,12 +28,12 @@ const ProgressBar = React.forwardRef<HTMLDivElement, ProgressBarProps>(
       success: "bg-[var(--success)]",
       warning: "bg-[var(--warning)]",
       error: "bg-[var(--error)]",
-      gradient: "bg-gradient-to-r from-[#36D1C4] to-[#5DCCB3]",
+      gradient: "bg-[var(--accent)]",
     }
 
     return (
       <div className={cn("w-full", className)} ref={ref} {...props}>
-        <div className={cn("w-full bg-[var(--bg-depth-4)] rounded-full overflow-hidden", sizeClasses[size])}>
+        <div className={cn("w-full bg-[var(--bg-sunken)] rounded-full overflow-hidden", sizeClasses[size])}>
           <div
             className={cn(
               "h-full rounded-full transition-all duration-500 ease-out",
@@ -126,7 +126,7 @@ const ProgressRing = React.forwardRef<SVGSVGElement, ProgressRingProps>(
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="var(--bg-depth-4)"
+            stroke="var(--bg-sunken)"
             strokeWidth={strokeWidth}
           />
           {/* Progress circle */}

@@ -3,7 +3,6 @@
 import { useSyncExternalStore } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { ProgressBar, ProgressRing } from "@/components/ui/progress"
 import {
   PieChart,
@@ -75,25 +74,25 @@ export function TestCenterReports({ data }: TestCenterReportsProps) {
       title: "Total Tested",
       value: data.totalTested,
       icon: Users,
-      gradient: "from-[#445eb7] to-[#212e7f]"
+      colorClass: "bg-[var(--bg-sunken)]"
     },
     {
       title: "Pass Rate",
       value: `${data.passRate}%`,
       icon: TrendingUp,
-      gradient: "from-[#22C55E] to-[#16A34A]"
+      colorClass: "bg-[var(--success)]"
     },
     {
       title: "Foundation 1",
       value: data.foundation1,
       icon: BookOpen,
-      gradient: "from-[#F59E0B] to-[#D97706]"
+      colorClass: "bg-[var(--warning)]"
     },
     {
       title: "Foundation 2",
       value: data.foundation2,
       icon: FileCheck,
-      gradient: "from-[#3B82F6] to-[#2563EB]"
+      colorClass: "bg-[var(--primary)]"
     },
   ]
 
@@ -111,14 +110,14 @@ export function TestCenterReports({ data }: TestCenterReportsProps) {
             <Card hover glow className="relative overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
+                  <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
               </CardContent>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.gradient} opacity-50`} />
+              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
             </Card>
           </motion.div>
         ))}
@@ -209,7 +208,7 @@ export function TestCenterReports({ data }: TestCenterReportsProps) {
               ))}
 
               {/* Pass Rate Ring */}
-              <div className="mt-6 p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+              <div className="mt-6 p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-[var(--text-secondary)]">Overall Pass Rate</p>
@@ -315,7 +314,7 @@ function InfoCard({
   description: string
 }) {
   return (
-    <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
       <div className="flex items-center gap-2 mb-2">
         <div
           className="w-3 h-3 rounded-full"

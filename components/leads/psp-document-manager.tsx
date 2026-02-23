@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   FileText,
@@ -17,7 +17,6 @@ import {
   X,
   Shield,
   ShieldCheck,
-  ShieldAlert,
   Calendar,
   Clock,
 } from "lucide-react"
@@ -29,11 +28,18 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import {
   type GraduateType,
   type DocumentTypeId,
+  type ConditionalDocumentFlags,
   getGraduateTypeConfig,
+  getDocumentsForGraduateType,
   validateFile,
   checkDocumentExpiration,
   getDocumentCompletionStatus,
 } from "@/lib/psp/document-rules"
+import {
+  getCachedDocuments,
+  preloadDocuments,
+  invalidateDocumentCache,
+} from "@/lib/psp/preloader"
 
 interface PSPDocumentFromDB {
   id: string
@@ -86,6 +92,7 @@ interface PSPDocumentManagerProps {
   documents: DocumentRequirement[]
   onDocumentsChange: (documents: DocumentRequirement[]) => void
   graduateType: string
+  conditionalFlags?: ConditionalDocumentFlags
   className?: string
   isAdmin?: boolean
 }
@@ -113,6 +120,7 @@ export function PSPDocumentManager({
   documents,
   onDocumentsChange,
   graduateType,
+  conditionalFlags,
   className,
   isAdmin = false,
 }: PSPDocumentManagerProps) {
@@ -130,56 +138,68 @@ export function PSPDocumentManager({
     loadDocuments()
   }, [leadId, graduateType]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const mergeDocuments = (dbDocs: PSPDocumentFromDB[]) => {
+    // Generate base document list from config (with conditional flags) instead
+    // of relying on the `documents` prop which may be stale due to closure timing
+    const configDocs = getDocumentsForGraduateType(graduateType as GraduateType, conditionalFlags)
+    const baseDocs: DocumentRequirement[] = configDocs.length > 0
+      ? configDocs.map((d) => ({
+          id: d.id,
+          name: d.name,
+          required: d.required,
+          hasExpiration: d.hasExpiration,
+        }))
+      : documents
+
+    const merged = baseDocs.map((doc) => {
+      const dbDoc = dbDocs.find(
+        (d: PSPDocumentFromDB) => d.document_type === doc.id
+      )
+      if (dbDoc) {
+        return {
+          ...doc,
+          file: {
+            id: dbDoc.id,
+            name: dbDoc.file_name,
+            type: dbDoc.file_type || "",
+            size: dbDoc.file_size || 0,
+            url: dbDoc.public_url || "",
+            uploaded_at: dbDoc.uploaded_at,
+            storage_path: dbDoc.storage_path,
+            is_verified: dbDoc.is_verified,
+            verified_by: dbDoc.verified_by_profile?.full_name || null,
+            verified_at: dbDoc.verified_at,
+            expiration_date: dbDoc.expiration_date,
+            is_expired: dbDoc.is_expired,
+          },
+        }
+      }
+      return doc
+    })
+
+    const expDates: Record<string, string> = {}
+    dbDocs.forEach((d: PSPDocumentFromDB) => {
+      if (d.expiration_date) {
+        expDates[d.document_type] = d.expiration_date
+      }
+    })
+    setExpirationDates(expDates)
+    onDocumentsChange(merged)
+  }
+
   const loadDocuments = async () => {
+    // Check preloaded cache first for instant load
+    const cached = getCachedDocuments(leadId, graduateType)
+    if (cached) {
+      mergeDocuments(cached as unknown as PSPDocumentFromDB[])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
-      const response = await fetch(
-        `/api/psp/documents?lead_id=${leadId}&graduate_type=${graduateType}`
-      )
-
-      if (!response.ok) {
-        throw new Error("Failed to load documents")
-      }
-
-      const { documents: dbDocs } = await response.json() as { documents: PSPDocumentFromDB[] }
-
-      // Merge database documents with document requirements
-      const merged = documents.map((doc) => {
-        const dbDoc = dbDocs.find(
-          (d: PSPDocumentFromDB) => d.document_type === doc.id
-        )
-        if (dbDoc) {
-          return {
-            ...doc,
-            file: {
-              id: dbDoc.id,
-              name: dbDoc.file_name,
-              type: dbDoc.file_type || "",
-              size: dbDoc.file_size || 0,
-              url: dbDoc.public_url || "",
-              uploaded_at: dbDoc.uploaded_at,
-              storage_path: dbDoc.storage_path,
-              is_verified: dbDoc.is_verified,
-              verified_by: dbDoc.verified_by_profile?.full_name || null,
-              verified_at: dbDoc.verified_at,
-              expiration_date: dbDoc.expiration_date,
-              is_expired: dbDoc.is_expired,
-            },
-          }
-        }
-        return doc
-      })
-
-      // Set expiration dates from loaded documents
-      const expDates: Record<string, string> = {}
-      dbDocs.forEach((d: PSPDocumentFromDB) => {
-        if (d.expiration_date) {
-          expDates[d.document_type] = d.expiration_date
-        }
-      })
-      setExpirationDates(expDates)
-
-      onDocumentsChange(merged)
+      const dbDocs = await preloadDocuments(leadId, graduateType) as unknown as PSPDocumentFromDB[]
+      mergeDocuments(dbDocs)
     } catch (err) {
       console.error("Failed to load documents:", err)
       // Fall back to localStorage for offline support
@@ -297,6 +317,9 @@ export function PSPDocumentManager({
       )
       onDocumentsChange(updatedDocs)
 
+      // Invalidate preload cache so next load fetches fresh data
+      invalidateDocumentCache(leadId, graduateType)
+
       // Also save to localStorage as backup
       const storageKey = `psp-documents-${leadId}-${graduateType}`
       localStorage.setItem(storageKey, JSON.stringify(updatedDocs))
@@ -330,6 +353,9 @@ export function PSPDocumentManager({
         d.id === docId ? { ...d, file: undefined } : d
       )
       onDocumentsChange(updatedDocs)
+
+      // Invalidate preload cache
+      invalidateDocumentCache(leadId, graduateType)
 
       // Update localStorage
       const storageKey = `psp-documents-${leadId}-${graduateType}`
@@ -429,6 +455,16 @@ export function PSPDocumentManager({
     document.body.removeChild(link)
   }
 
+  const handleDownloadAll = () => {
+    const uploadedDocs = documents.filter((d) => d.file)
+    if (uploadedDocs.length === 0) return
+    uploadedDocs.forEach((doc, index) => {
+      setTimeout(() => {
+        handleDownload(doc.file!)
+      }, index * 300)
+    })
+  }
+
   const handlePreview = (file: UploadedFile) => {
     if (file.type === "application/pdf") {
       setPdfPreview({ url: file.url, name: file.name })
@@ -448,7 +484,7 @@ export function PSPDocumentManager({
 
     const dragIcon = document.createElement("div")
     dragIcon.className =
-      "bg-white p-2 rounded-lg shadow-lg border flex items-center gap-2"
+      "bg-[var(--bg-surface)] p-2 rounded-lg shadow-lg border border-[var(--border)] flex items-center gap-2"
     dragIcon.innerHTML = `<span style="font-size: 12px;">📄 ${file.name}</span>`
     dragIcon.style.position = "absolute"
     dragIcon.style.top = "-1000px"
@@ -518,12 +554,23 @@ export function PSPDocumentManager({
         )}
       </div>
 
-      {/* Drag hint */}
+      {/* Drag hint + Download All */}
       <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-        <GripVertical className="w-4 h-4" />
-        <span>
+        <GripVertical className="w-4 h-4 shrink-0" />
+        <span className="flex-1">
           Drag uploaded files to other websites or download them directly
         </span>
+        {documents.some((d) => d.file) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadAll}
+            className="shrink-0 gap-1.5 bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
+          >
+            <Download className="w-4 h-4" />
+            Download All
+          </Button>
+        )}
       </div>
 
       {/* Document List */}
@@ -670,13 +717,16 @@ export function PSPDocumentManager({
                           <Eye className="w-4 h-4" />
                         </button>
                       )}
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleDownload(doc.file!)}
-                        className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                        className="gap-1.5"
                         title="Download"
                       >
                         <Download className="w-4 h-4" />
-                      </button>
+                        Download
+                      </Button>
                       {/* Admin verification toggle */}
                       {isAdmin && (
                         <button
@@ -745,7 +795,7 @@ export function PSPDocumentManager({
 
               {/* Expiration date input for documents that need it */}
               {hasExpirationField && hasFile && (
-                <div className="mx-3 mb-3 p-3 rounded-lg bg-white border border-[var(--border)]">
+                <div className="mx-3 mb-3 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)]">
                   <div className="flex items-center gap-3">
                     <Calendar className="w-4 h-4 text-[var(--text-muted)]" />
                     <label className="text-xs font-medium text-[var(--text-secondary)]">
@@ -772,7 +822,7 @@ export function PSPDocumentManager({
                   onDragStart={(e) => handleDragStart(e, doc.file!)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "mx-3 mb-3 p-3 rounded-lg bg-white border border-[var(--border)] cursor-grab active:cursor-grabbing hover:border-[var(--primary)] transition-colors",
+                    "mx-3 mb-3 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)] cursor-grab active:cursor-grabbing hover:border-[var(--border-emphasis)] transition-colors",
                     isDragging && "opacity-50"
                   )}
                 >
@@ -819,7 +869,7 @@ export function PSPDocumentManager({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-[rgba(31,29,26,0.85)] flex items-center justify-center p-4"
             onClick={() => setPreviewUrl(null)}
           >
             <motion.div
@@ -831,7 +881,7 @@ export function PSPDocumentManager({
             >
               <button
                 onClick={() => setPreviewUrl(null)}
-                className="absolute -top-4 -right-4 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+                className="absolute -top-4 -right-4 p-2 bg-[var(--bg-surface)] rounded-full shadow-lg hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

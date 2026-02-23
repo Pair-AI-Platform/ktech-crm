@@ -106,10 +106,8 @@ export function CampaignsCard() {
             <span className="font-medium text-[var(--text-primary)]">{totalLeads}</span> leads from{' '}
             <span className="tabular-nums">{(totalSent / 1000).toFixed(1)}k</span> messages
           </p>
-          <Link href="/campaigns">
-            <button className="text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
+          <Link href="/campaigns" className="text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
               View All →
-            </button>
           </Link>
         </div>
       </motion.div>

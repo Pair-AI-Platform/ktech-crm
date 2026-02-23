@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendSMS, formatKuwaitPhone, replaceTemplateVariables } from '@/lib/sms/provider'
+import { sendSMS, replaceTemplateVariables } from '@/lib/sms/provider'
 import { BUSINESS_CONFIG } from '@/lib/config/constants'
 
 // Use service role for scheduled job (no user context)
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
           )
         )
       `)
-      .in('status', ['scheduled', 'confirmed'])
+      .in('status', ['scheduled', 'confirmed', 'will_see'])
       .gte('scheduled_date', startDate)
       .lte('scheduled_date', endDate)
       .is(reminderType === '24h' ? 'reminder_24h_sent' : 'reminder_2h_sent', null)
@@ -85,9 +85,11 @@ export async function POST(request: Request) {
     }
 
     // Filter appointments by exact time range
-    const eligibleAppointments = (appointments || []).filter((apt: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const eligibleAppointments = (appointments || []).filter((apt: Record<string, any>) => {
       const aptDateTime = new Date(`${apt.scheduled_date}T${apt.scheduled_time}`)
-      const hasLeadWithPhone = apt.appointment_leads?.some((al: any) => al.lead?.phone)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hasLeadWithPhone = apt.appointment_leads?.some((al: Record<string, any>) => al.lead?.phone)
       return aptDateTime >= startTime && aptDateTime <= endTime && hasLeadWithPhone
     })
 
@@ -116,8 +118,11 @@ export async function POST(request: Request) {
 
     for (const apt of eligibleAppointments) {
       // Get all leads from junction table
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const leads = (apt as any).appointment_leads
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ?.map((al: any) => al.lead)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((l: any) => l?.phone) || []
 
       if (leads.length === 0) {

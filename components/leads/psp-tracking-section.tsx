@@ -4,9 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   FileText,
-  CheckCircle,
   Clock,
-  CreditCard,
   Shield,
   ShieldCheck,
   AlertCircle,
@@ -19,8 +17,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { PSPSubstageProgress } from "./psp-substage-progress"
-import type { Lead, SubmissionSubstage, SubmissionBlockedReason } from "@/types"
-import { SUBMISSION_SUBSTAGES, SUBMISSION_BLOCKED_REASONS } from "@/types"
+import type { Lead, SubmissionSubstage } from "@/types"
+import { SUBMISSION_SUBSTAGES } from "@/types"
+import { preloadAllForLead } from "@/lib/psp/preloader"
 
 interface PSPTrackingSectionProps {
   lead: Lead
@@ -45,10 +44,16 @@ export function PSPTrackingSection({
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Preload all PSP data (documents for all graduate types, schools, payment status)
+  // so the wizard opens instantly
+  useEffect(() => {
+    preloadAllForLead(lead.id)
+  }, [lead.id])
+
   // Fetch document status
   useEffect(() => {
     fetchDocumentStatus()
-  }, [lead.id])
+  }, [lead.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchDocumentStatus = async () => {
     try {
@@ -73,20 +78,8 @@ export function PSPTrackingSection({
   }
 
   // Get substage info
-  const substage = lead.submission_substage || 'pending'
+  const substage = lead.submission_substage || 'documents'
   const substageConfig = SUBMISSION_SUBSTAGES.find(s => s.value === substage)
-  const blockedReason = lead.submission_blocked_reason
-  const blockedReasonConfig = blockedReason
-    ? SUBMISSION_BLOCKED_REASONS.find(r => r.value === blockedReason)
-    : null
-
-  // Calculate progress indicators
-  const getOverallProgress = () => {
-    const stages = ['pending', 'documents', 'ready', 'submitted']
-    const currentIndex = stages.indexOf(substage)
-    if (currentIndex === -1) return 0 // blocked or lost
-    return Math.round(((currentIndex + 1) / stages.length) * 100)
-  }
 
   return (
     <motion.div
@@ -120,8 +113,7 @@ export function PSPTrackingSection({
           {/* Quick Status Badge */}
           <Badge
             variant={
-              substage === 'submitted' ? 'success' :
-              substage === 'blocked' ? 'warning' :
+              substage === 'submissions' ? 'success' :
               substage === 'lost' ? 'destructive' :
               'secondary'
             }
@@ -152,7 +144,6 @@ export function PSPTrackingSection({
           <div className="p-4 border-b border-[var(--border)]">
             <PSPSubstageProgress
               currentSubstage={substage as SubmissionSubstage}
-              blockedReason={blockedReason as SubmissionBlockedReason}
             />
           </div>
 
@@ -242,20 +233,6 @@ export function PSPTrackingSection({
               )}
             </div>
 
-            {/* Blocked Reason (if applicable) */}
-            {substage === 'blocked' && blockedReasonConfig && (
-              <div className="col-span-2 p-4 rounded-xl bg-orange-50 border border-orange-200 space-y-2">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-medium text-orange-800">
-                    Blocked Reason
-                  </span>
-                </div>
-                <p className="text-sm text-orange-700">
-                  {blockedReasonConfig.label}
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Actions */}
@@ -265,6 +242,7 @@ export function PSPTrackingSection({
                 variant="outline"
                 size="sm"
                 onClick={onOpenWizard}
+                onMouseEnter={() => preloadAllForLead(lead.id)}
                 className="gap-2"
               >
                 <FileText className="w-4 h-4" />

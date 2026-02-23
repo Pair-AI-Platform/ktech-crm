@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Send, Check, CheckCheck, Phone, MoreVertical } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import type { Lead, Student } from "@/types"
 
 interface Message {
@@ -69,7 +69,7 @@ export function WhatsAppChat({ lead, student, onCall }: WhatsAppChatProps) {
   const contact = lead || student
   const name = contact ? `${contact.first_name} ${contact.last_name}` : "Contact"
   const phone = contact?.phone || ""
-  const initials = contact ? `${contact.first_name?.[0] || ""}${contact.last_name?.[0] || ""}` : "?"
+  const initials = contact ? getInitials(contact.first_name || '', contact.last_name || '') || "?" : "?"
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -160,10 +160,10 @@ export function WhatsAppChat({ lead, student, onCall }: WhatsAppChatProps) {
   }, {} as Record<string, Message[]>)
 
   return (
-    <div className="flex flex-col h-[500px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg-surface)]">
+    <div className="flex flex-col h-[500px] rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg-surface)]">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] flex items-center justify-center text-white text-sm font-medium">
+        <div className="w-10 h-10 rounded-full bg-[var(--success)] flex items-center justify-center text-white text-sm font-medium">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
@@ -203,7 +203,7 @@ export function WhatsAppChat({ lead, student, onCall }: WhatsAppChatProps) {
             </div>
 
             {/* Messages */}
-            {msgs.map((msg, i) => (
+            {msgs.map((msg) => (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -218,8 +218,8 @@ export function WhatsAppChat({ lead, student, onCall }: WhatsAppChatProps) {
                   className={cn(
                     "relative max-w-[80%] px-3 py-2 rounded-lg shadow-sm",
                     msg.direction === "out"
-                      ? "bg-[#dcf8c6] dark:bg-[#005c4b] rounded-br-sm"
-                      : "bg-white dark:bg-[#202c33] rounded-bl-sm"
+                      ? "bg-[var(--success-bg)] dark:bg-[var(--success-bg)] rounded-br-sm"
+                      : "bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)] rounded-bl-sm"
                   )}
                 >
                   <p className="text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap">

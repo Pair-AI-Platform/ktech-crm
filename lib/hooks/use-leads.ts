@@ -3,18 +3,20 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads, getDemoLeadStats, saveDemoLeadUpdate, getDemoLeadById } from "@/lib/demo-data"
-import type { Lead, PipelineStage, LeadStatus } from "@/types"
+import type { Lead, PipelineStage, FundingType, LeadStatus } from "@/types"
 import { PIPELINE_STAGES, LEAD_STATUSES } from "@/types"
-import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
+import { GPA_SELF_FUNDED_THRESHOLD, PUC_SRJ_AUTO_ROUTE } from "@/lib/config/constants"
+import { executeAutomations } from "@/lib/automation/engine"
 
 interface UseLeadsOptions {
   stage?: PipelineStage | "all"
+  fundingType?: FundingType | "all"
   searchQuery?: string
   limit?: number
 }
 
 export function useLeads(options: UseLeadsOptions = {}) {
-  const { stage = "all", searchQuery = "", limit = 50 } = options
+  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50 } = options
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +31,10 @@ export function useLeads(options: UseLeadsOptions = {}) {
 
       if (stage !== "all") {
         demoLeads = demoLeads.filter(l => l.pipeline_stage === stage)
+      }
+
+      if (fundingType !== "all") {
+        demoLeads = demoLeads.filter(l => l.funding_type === fundingType)
       }
 
       if (searchQuery) {
@@ -65,6 +71,10 @@ export function useLeads(options: UseLeadsOptions = {}) {
         query = query.eq("pipeline_stage", stage)
       }
 
+      if (fundingType !== "all") {
+        query = query.eq("funding_type", fundingType)
+      }
+
       if (searchQuery) {
         query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,civil_id.ilike.%${searchQuery}%`)
       }
@@ -85,7 +95,7 @@ export function useLeads(options: UseLeadsOptions = {}) {
         setLoading(false)
       }
     }
-  }, [stage, searchQuery, limit])
+  }, [stage, fundingType, searchQuery, limit])
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -191,6 +201,43 @@ function shouldBeAutoSelfFunded(leadData: Partial<Lead>): boolean {
   return false
 }
 
+// Helper: calculate age from date of birth
+function calculateAge(dateOfBirth: string): number {
+  const dob = new Date(dateOfBirth)
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const monthDiff = today.getMonth() - dob.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--
+  }
+  return age
+}
+
+// Helper: check if a lead qualifies for automatic PUC SRJ routing
+// Conditions: Kuwaiti, actual_gpa >= 70, graduation within 2 years, age < 23, not an employee
+function shouldAutoRouteToPucSrj(leadData: Partial<Lead>): boolean {
+  // Must be Kuwaiti
+  const isKuwaiti = leadData.is_kuwaiti === true || leadData.nationality === 'Kuwaiti'
+  if (!isKuwaiti) return false
+
+  // Must have actual_gpa >= 70
+  if (leadData.actual_gpa === undefined || leadData.actual_gpa === null || leadData.actual_gpa < PUC_SRJ_AUTO_ROUTE.MIN_GPA) return false
+
+  // Graduation year must be within the last 2 years
+  const currentYear = new Date().getFullYear()
+  if (!leadData.graduation_year || leadData.graduation_year < currentYear - PUC_SRJ_AUTO_ROUTE.MAX_GRADUATION_GAP_YEARS) return false
+
+  // Must be under 23 years old
+  if (!leadData.date_of_birth) return false
+  const age = calculateAge(leadData.date_of_birth)
+  if (age >= PUC_SRJ_AUTO_ROUTE.MAX_AGE) return false
+
+  // Must NOT be an employee
+  if (leadData.is_employee === true) return false
+
+  return true
+}
+
 export function useLeadMutations() {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -225,6 +272,12 @@ export function useLeadMutations() {
         finalLeadData.funding_type = 'self_funded'
       }
 
+      // Auto-route to PUC SRJ if all conditions are met
+      const shouldRouteToPuc = shouldAutoRouteToPucSrj(finalLeadData)
+      if (shouldRouteToPuc && finalLeadData.funding_type !== 'puc') {
+        finalLeadData.funding_type = 'puc'
+      }
+
       const { data, error } = await supabase
         .from("leads")
         .insert({
@@ -237,6 +290,36 @@ export function useLeadMutations() {
         .single()
 
       if (error) throw error
+
+      // Log activity for auto PUC SRJ routing
+      if (shouldRouteToPuc && data) {
+        await supabase.from('activities').insert({
+          lead_id: data.id,
+          activity_type: 'funding_type_change',
+          title: 'Auto-Routed to PUC SRJ',
+          description: `${data.first_name} ${data.last_name} automatically routed to PUC SRJ (Kuwaiti, GPA: ${data.actual_gpa}, Age: under ${PUC_SRJ_AUTO_ROUTE.MAX_AGE}, Grad Year: ${data.graduation_year}, Not Employee)`,
+          metadata: {
+            old_funding_type: leadData.funding_type || null,
+            new_funding_type: 'puc',
+            reason: 'puc_srj_auto_route',
+            actual_gpa: data.actual_gpa,
+            graduation_year: data.graduation_year,
+            is_employee: data.is_employee,
+          },
+          created_by: user?.id,
+        })
+      }
+
+      // Fire automation triggers for new lead (fire-and-forget)
+      if (data) {
+        executeAutomations({
+          trigger: 'lead_created',
+          leadId: data.id,
+          leadData: data as unknown as Record<string, unknown>,
+          userId: user?.id,
+        }).catch(() => {}) // fire-and-forget
+      }
+
       return { data, error: null }
     } catch (err) {
       console.error("Error creating lead:", err)
@@ -252,9 +335,6 @@ export function useLeadMutations() {
       setLoading(true)
       await new Promise(resolve => setTimeout(resolve, 300))
 
-      // Get old values for activity logging
-      const oldLead = getDemoLeadById(id)
-
       saveDemoLeadUpdate(id, updates)
       const updatedLead = getDemoLeadById(id)
       setLoading(false)
@@ -269,7 +349,7 @@ export function useLeadMutations() {
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by")
+        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count")
         .eq("id", id)
         .single()
 
@@ -282,6 +362,21 @@ export function useLeadMutations() {
       const wasAutoSF = shouldBeAutoSelfFunded(mergedGpaData) && oldLead?.funding_type !== 'self_funded'
       if (wasAutoSF) {
         updates.funding_type = 'self_funded'
+      }
+
+      // Auto-route to PUC SRJ if all conditions are met (merge updates with old lead data)
+      const mergedLeadForPuc = {
+        nationality: updates.nationality ?? oldLead?.nationality,
+        is_kuwaiti: updates.is_kuwaiti ?? oldLead?.is_kuwaiti,
+        actual_gpa: updates.actual_gpa ?? oldLead?.actual_gpa,
+        graduation_year: updates.graduation_year ?? oldLead?.graduation_year,
+        date_of_birth: updates.date_of_birth ?? oldLead?.date_of_birth,
+        is_employee: updates.is_employee ?? oldLead?.is_employee,
+      }
+      const currentFundingType = updates.funding_type ?? oldLead?.funding_type
+      const wasAutoRoutedToPuc = shouldAutoRouteToPucSrj(mergedLeadForPuc) && currentFundingType !== 'puc'
+      if (wasAutoRoutedToPuc) {
+        updates.funding_type = 'puc'
       }
 
       // Check if this is a new GPA override (any override flag being turned on for the first time)
@@ -300,6 +395,13 @@ export function useLeadMutations() {
       // Assign next position when moving to a different stage
       if (updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage) {
         updates.position_in_stage = await getNextPosition(updates.pipeline_stage)
+      }
+
+      // Increment contact_count on stage change, status change, or any activity
+      const isStageChange = updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage
+      const isStatusChange = oldLead && updates.status !== undefined && updates.status !== oldLead.status
+      if (oldLead && (isStageChange || isStatusChange)) {
+        updates.contact_count = ((oldLead as unknown as Record<string, number>).contact_count || 0) + 1
       }
 
       const { data, error } = await supabase
@@ -348,6 +450,31 @@ export function useLeadMutations() {
           },
           created_by: user?.id,
         })
+
+        // Notify assigned agent of stage change (if changed by someone else)
+        if (oldLead.assigned_to && oldLead.assigned_to !== user?.id) {
+          supabase.from('notifications').insert({
+            user_id: oldLead.assigned_to,
+            type: 'stage_change',
+            title: `Lead moved to ${newStageLabel}`,
+            body: `${oldLead.first_name} ${oldLead.last_name} was moved from ${oldStageLabel} to ${newStageLabel}`,
+            lead_id: id,
+            action_url: `/leads/${id}`,
+            created_by: user?.id,
+          }).then(() => {}) // fire-and-forget
+        }
+
+        // Fire automation triggers for stage change (fire-and-forget)
+        executeAutomations({
+          trigger: 'stage_change',
+          leadId: id,
+          leadData: { ...oldLead, ...updates } as unknown as Record<string, unknown>,
+          userId: user?.id,
+          metadata: {
+            old_stage: oldLead.pipeline_stage,
+            new_stage: updates.pipeline_stage,
+          },
+        }).catch(() => {}) // fire-and-forget
       }
 
       // Log activity for status change
@@ -400,6 +527,25 @@ export function useLeadMutations() {
         })
       }
 
+      // Log activity for auto PUC SRJ routing
+      if (wasAutoRoutedToPuc && oldLead) {
+        await supabase.from('activities').insert({
+          lead_id: id,
+          activity_type: 'funding_type_change',
+          title: 'Auto-Routed to PUC SRJ',
+          description: `${oldLead.first_name} ${oldLead.last_name} automatically routed to PUC SRJ (Kuwaiti, GPA: ${mergedLeadForPuc.actual_gpa}, Grad Year: ${mergedLeadForPuc.graduation_year}, Not Employee)`,
+          metadata: {
+            old_funding_type: oldLead.funding_type,
+            new_funding_type: 'puc',
+            reason: 'puc_srj_auto_route',
+            actual_gpa: mergedLeadForPuc.actual_gpa,
+            graduation_year: mergedLeadForPuc.graduation_year,
+            is_employee: mergedLeadForPuc.is_employee,
+          },
+          created_by: user?.id,
+        })
+      }
+
       return { data, error: null }
     } catch (err) {
       console.error("Error updating lead:", err)
@@ -409,7 +555,7 @@ export function useLeadMutations() {
     }
   }
 
-  const updateLeadStage = async (id: string, stage: PipelineStage, lostReasonId?: string, lostReasonNotes?: string) => {
+  const updateLeadStage = async (id: string, stage: PipelineStage, lostReasonId?: string, lostReasonNotes?: string, withdrawalReason?: string, withdrawalNotes?: string) => {
     const updates: Partial<Lead> = { pipeline_stage: stage }
 
     if (stage === "lost" && lostReasonId) {
@@ -417,7 +563,17 @@ export function useLeadMutations() {
       updates.lost_reason_notes = lostReasonNotes
     }
 
+    if (stage === "withdraw" && withdrawalReason) {
+      updates.withdrawal_reason = withdrawalReason
+      updates.withdrawal_notes = withdrawalNotes
+    }
+
     updates.last_contacted_at = new Date().toISOString()
+
+    // Clear status when moving to enrolled (no longer relevant)
+    if (stage === "enrolled") {
+      updates.status = null as unknown as LeadStatus
+    }
 
     // Get old stage before update to check for test → application transition
     // and to track lost_at_stage when marking as lost
@@ -501,6 +657,8 @@ export function useLeadMutations() {
 
     setLoading(true)
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+
       const { error } = await supabase
         .from("leads")
         .update({
@@ -510,6 +668,17 @@ export function useLeadMutations() {
         .in("id", leadIds)
 
       if (error) throw error
+
+      // Notify the assigned agent
+      supabase.from('notifications').insert({
+        user_id: agentId,
+        type: 'new_assignment',
+        title: `${leadIds.length} lead${leadIds.length > 1 ? 's' : ''} assigned to you`,
+        body: `You have been assigned ${leadIds.length} new lead${leadIds.length > 1 ? 's' : ''}`,
+        action_url: '/leads',
+        created_by: currentUser?.id,
+      }).then(() => {}) // fire-and-forget
+
       return { error: null, count: leadIds.length }
     } catch (err) {
       console.error("Error bulk assigning leads:", err)
@@ -579,7 +748,15 @@ export function useLeadMutations() {
       // Get current max position in target stage
       let nextPos = await getNextPosition(stage)
 
-      // Update each lead individually with sequential positions
+      // Fetch current contact_count for all leads
+      const { data: currentLeads } = await supabase
+        .from("leads")
+        .select("id, contact_count")
+        .in("id", leadIds)
+
+      const countMap = new Map(currentLeads?.map(l => [l.id, (l as unknown as Record<string, number>).contact_count || 0]) || [])
+
+      // Update each lead individually with sequential positions and incremented contact_count
       const errors: string[] = []
       for (const id of leadIds) {
         const { error } = await supabase
@@ -587,7 +764,8 @@ export function useLeadMutations() {
           .update({
             pipeline_stage: stage,
             position_in_stage: nextPos,
-            last_contacted_at: new Date().toISOString()
+            last_contacted_at: new Date().toISOString(),
+            contact_count: (countMap.get(id) || 0) + 1
           })
           .eq("id", id)
 
@@ -608,6 +786,23 @@ export function useLeadMutations() {
     }
   }
 
+  const incrementContactCount = async (leadId: string) => {
+    try {
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("contact_count")
+        .eq("id", leadId)
+        .single()
+
+      await supabase
+        .from("leads")
+        .update({ contact_count: ((lead as unknown as Record<string, number>)?.contact_count || 0) + 1 })
+        .eq("id", leadId)
+    } catch (err) {
+      console.error("Error incrementing contact count:", err)
+    }
+  }
+
   return {
     createLead,
     updateLead,
@@ -616,6 +811,7 @@ export function useLeadMutations() {
     bulkAssignLeads,
     bulkDeleteLeads,
     bulkUpdateStage,
+    incrementContactCount,
     loading
   }
 }
@@ -652,7 +848,7 @@ export function useLeadStats() {
         const byStage: Record<string, number> = {}
         // Initialize all pipeline stages to 0
         const stages: PipelineStage[] = [
-          "new", "contacted", "visit", "appointment", "test", "application", "applicant", "enrolled", "lost"
+          "new", "contacted", "visit", "test", "application", "applicant", "enrolled", "lost"
         ]
 
         stages.forEach(stage => {

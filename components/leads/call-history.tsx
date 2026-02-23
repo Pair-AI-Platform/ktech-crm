@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -21,7 +21,6 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  MessageSquare,
   Target,
   Lightbulb,
   Volume2,
@@ -153,15 +152,6 @@ function CallCard({ call, index, isExpanded, onToggle, showArabic }: CallCardPro
     }
   }
 
-  const getSentimentColor = (sentiment: string | null) => {
-    switch (sentiment) {
-      case "positive": return "text-[var(--success)]"
-      case "negative": return "text-[var(--error)]"
-      case "neutral": return "text-[var(--text-muted)]"
-      default: return "text-[var(--text-muted)]"
-    }
-  }
-
   const getInterestBadge = (level: string | null) => {
     switch (level) {
       case "high": return <Badge variant="success" size="sm">High Interest</Badge>
@@ -180,7 +170,7 @@ function CallCard({ call, index, isExpanded, onToggle, showArabic }: CallCardPro
       <Card className="overflow-hidden">
         {/* Call Header - Always Visible */}
         <div
-          className="p-4 cursor-pointer hover:bg-[var(--bg-depth-3)] transition-colors"
+          className="p-4 cursor-pointer hover:bg-[var(--bg-sunken)] transition-colors"
           onClick={onToggle}
         >
           <div className="flex items-center justify-between">
@@ -378,7 +368,7 @@ function AudioPlayer({ url, duration }: AudioPlayerProps) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
-    <div className="bg-[var(--bg-depth-3)] rounded-xl p-4">
+    <div className="bg-[var(--bg-sunken)] rounded-xl p-4">
       <audio
         ref={audioRef}
         src={url}
@@ -428,7 +418,7 @@ function AudioPlayer({ url, duration }: AudioPlayerProps) {
 
         {/* Progress Bar */}
         <div className="flex-1 space-y-1">
-          <div className="relative h-2 bg-[var(--bg-depth-2)] rounded-full overflow-hidden">
+          <div className="relative h-2 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
             <div
               className="absolute inset-y-0 left-0 bg-[var(--primary)] rounded-full transition-all"
               style={{ width: `${progress}%` }}
@@ -526,7 +516,7 @@ function SummaryTab({ summary, showArabic }: SummaryTabProps) {
       {/* Metadata Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {summary.caller_sentiment && (
-          <div className="p-3 rounded-lg bg-[var(--bg-depth-3)]">
+          <div className="p-3 rounded-lg bg-[var(--bg-sunken)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">Sentiment</p>
             <p className={cn("font-medium capitalize", getSentimentColor(summary.caller_sentiment))}>
               {summary.caller_sentiment}
@@ -534,7 +524,7 @@ function SummaryTab({ summary, showArabic }: SummaryTabProps) {
           </div>
         )}
         {summary.call_intent && (
-          <div className="p-3 rounded-lg bg-[var(--bg-depth-3)]">
+          <div className="p-3 rounded-lg bg-[var(--bg-sunken)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">Intent</p>
             <p className="font-medium text-[var(--text-primary)] capitalize">
               {summary.call_intent.replace(/_/g, " ")}
@@ -542,7 +532,7 @@ function SummaryTab({ summary, showArabic }: SummaryTabProps) {
           </div>
         )}
         {summary.interest_level && (
-          <div className="p-3 rounded-lg bg-[var(--bg-depth-3)]">
+          <div className="p-3 rounded-lg bg-[var(--bg-sunken)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">Interest</p>
             <p className={cn(
               "font-medium capitalize",
@@ -555,7 +545,7 @@ function SummaryTab({ summary, showArabic }: SummaryTabProps) {
           </div>
         )}
         {summary.urgency_level && (
-          <div className="p-3 rounded-lg bg-[var(--bg-depth-3)]">
+          <div className="p-3 rounded-lg bg-[var(--bg-sunken)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">Urgency</p>
             <p className={cn(
               "font-medium capitalize",
@@ -665,7 +655,7 @@ function TranscriptTab({ transcript }: TranscriptTabProps) {
               "flex-1 p-3 rounded-xl max-w-[80%]",
               segment.speaker.toLowerCase().includes("agent") || segment.speaker.toLowerCase().includes("ai")
                 ? "bg-[var(--primary)]/5 rounded-tl-none"
-                : "bg-[var(--bg-depth-3)] rounded-tr-none"
+                : "bg-[var(--bg-sunken)] rounded-tr-none"
             )}>
               <p className="text-xs font-medium text-[var(--text-muted)] mb-1">
                 {segment.speaker}
@@ -682,7 +672,7 @@ function TranscriptTab({ transcript }: TranscriptTabProps) {
           <summary className="cursor-pointer text-sm text-[var(--primary)] hover:underline">
             View raw transcript
           </summary>
-          <pre className="mt-2 p-4 bg-[var(--bg-depth-3)] rounded-lg text-xs text-[var(--text-secondary)] whitespace-pre-wrap overflow-x-auto">
+          <pre className="mt-2 p-4 bg-[var(--bg-sunken)] rounded-lg text-xs text-[var(--text-secondary)] whitespace-pre-wrap overflow-x-auto">
             {transcript.full_text}
           </pre>
         </details>
@@ -738,7 +728,7 @@ function ActionsTab({ actionItems }: ActionsTabProps) {
       {actionItems.map((item) => (
         <div
           key={item.id}
-          className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]"
+          className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">

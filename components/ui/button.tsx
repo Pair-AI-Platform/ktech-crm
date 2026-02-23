@@ -27,7 +27,7 @@ const buttonVariants = cva(
         accent:
           "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm hover:bg-[var(--accent-hover)] hover:shadow-md active:scale-[0.98] focus-visible:ring-[var(--accent)]",
         gradient:
-          "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-[var(--primary-foreground)] shadow-sm hover:shadow-lg hover:shadow-[var(--primary)]/20 active:scale-[0.98] focus-visible:ring-[var(--primary)]",
+          "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm hover:bg-[var(--primary-hover)] hover:shadow-md active:scale-[0.98] focus-visible:ring-[var(--primary)]",
         soft:
           "bg-[var(--primary-muted)] text-[var(--primary)] hover:bg-[var(--primary-subtle)] active:scale-[0.98]",
         "soft-success":
@@ -37,18 +37,18 @@ const buttonVariants = cva(
         "soft-error":
           "bg-[var(--error-bg)] text-[var(--error)] hover:bg-[var(--error-muted)] active:scale-[0.98]",
         glass:
-          "bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)] border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/90 dark:hover:bg-white/10 shadow-sm active:scale-[0.98]",
+          "bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] shadow-sm active:scale-[0.98]",
       },
       size: {
-        default: "h-10 px-5 py-2 rounded-xl [&_svg]:size-4",
-        xs: "h-7 px-2.5 text-xs rounded-lg [&_svg]:size-3.5",
-        sm: "h-8 px-4 text-xs rounded-lg [&_svg]:size-4",
-        lg: "h-12 px-6 text-base rounded-xl [&_svg]:size-5",
-        xl: "h-14 px-8 text-lg rounded-2xl [&_svg]:size-5",
-        icon: "h-10 w-10 rounded-xl [&_svg]:size-[18px]",
-        "icon-xs": "h-7 w-7 rounded-lg [&_svg]:size-3.5",
-        "icon-sm": "h-8 w-8 rounded-lg [&_svg]:size-4",
-        "icon-lg": "h-12 w-12 rounded-xl [&_svg]:size-5",
+        default: "h-10 px-5 py-2 rounded-lg [&_svg]:size-4",
+        xs: "h-7 px-2.5 text-xs rounded-md [&_svg]:size-3.5",
+        sm: "h-8 px-4 text-xs rounded-md [&_svg]:size-4",
+        lg: "h-12 px-6 text-base rounded-lg [&_svg]:size-5",
+        xl: "h-14 px-8 text-lg rounded-xl [&_svg]:size-5",
+        icon: "h-10 w-10 rounded-lg [&_svg]:size-[18px]",
+        "icon-xs": "h-7 w-7 rounded-md [&_svg]:size-3.5",
+        "icon-sm": "h-8 w-8 rounded-md [&_svg]:size-4",
+        "icon-lg": "h-12 w-12 rounded-lg [&_svg]:size-5",
         pill: "h-10 px-5 py-2 rounded-full [&_svg]:size-4",
         "pill-sm": "h-8 px-4 text-xs rounded-full [&_svg]:size-4",
         "pill-lg": "h-12 px-6 text-base rounded-full [&_svg]:size-5",

@@ -156,6 +156,8 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
 
   // Client-side filtering for advanced filters
   const filteredLeads = leads.filter((lead) => {
+    // Exclude lost/withdraw leads from "all" view (they have their own sidebar tabs)
+    if (stageFilter === "all" && (lead.pipeline_stage === "lost" || lead.pipeline_stage === "withdraw")) return false
     // Status filter
     if (filters.statuses.length > 0 && (!lead.status || !filters.statuses.includes(lead.status))) {
       return false

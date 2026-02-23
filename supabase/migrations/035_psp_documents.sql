@@ -89,8 +89,8 @@ CREATE POLICY "Users can delete psp documents"
 
 -- Comments for documentation
 COMMENT ON TABLE psp_documents IS 'Stores PSP submission documents with verification workflow';
-COMMENT ON COLUMN psp_documents.document_type IS 'Type of document: passport, civil_id, parent_civil_id, hs_certificate, nationality, puc_receipt, acceptance_letter, transcript_moh, sequence_letter, gcse, a_level, equivalency, photo, shahada';
-COMMENT ON COLUMN psp_documents.graduate_type IS 'Graduate type: GOV, US, UK, KSA';
+COMMENT ON COLUMN psp_documents.document_type IS 'Type of document: passport, civil_id, parent_civil_id, hs_certificate, nationality, puc_receipt, acceptance_letter, transcript_moh, sequence_letter, gcse, a_level, equivalency, photo, shahada, transcript, qiyas';
+COMMENT ON COLUMN psp_documents.graduate_type IS 'Graduate type: GOV, US, UK, KSA, OTHER';
 COMMENT ON COLUMN psp_documents.is_verified IS 'Whether the document has been verified by an admin';
 COMMENT ON COLUMN psp_documents.expiration_date IS 'Expiration date for documents like passports and civil IDs';
 COMMENT ON COLUMN psp_documents.is_expired IS 'True if document has expired based on expiration_date';

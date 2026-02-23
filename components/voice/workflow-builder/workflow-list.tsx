@@ -4,7 +4,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { VoiceWorkflow, WorkflowStatus } from "@/types"
 import { Button } from "@/components/ui/button"
-import { Input, SearchInput } from "@/components/ui/input"
+import { SearchInput } from "@/components/ui/input"
 import { WorkflowCard } from "./workflow-card"
 import {
   Plus,

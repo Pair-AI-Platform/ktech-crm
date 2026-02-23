@@ -155,6 +155,92 @@ export interface DemographicReportData {
   discountAnalysis: Array<{ discountType: DiscountType; label: string; count: number; totalDiscount: number }>
 }
 
+export interface AgentComparisonData {
+  agentId: string
+  agentName: string
+  avatarUrl: string | null
+  totalLeads: number
+  contacted: number
+  appointments: number
+  applications: number
+  enrolled: number
+  lost: number
+  contactRate: number
+  appointmentRate: number
+  enrollmentRate: number
+}
+
+export interface TimeToConversionData {
+  stage: string
+  stageLabel: string
+  avgDays: number
+  count: number
+}
+
+// =============================================
+// DETAILED ANALYTICS TYPES
+// =============================================
+
+export interface EnrollmentFromApplicationsData {
+  totalApplications: number
+  totalEnrolled: number
+  conversionRate: number
+  sfApplications: number
+  sfEnrolled: number
+  sfConversionRate: number
+  pucApplications: number
+  pucEnrolled: number
+  pucConversionRate: number
+}
+
+export interface WithdrawalsByAgentData {
+  totalWithdrawnSF: number
+  totalWithdrawnPUC: number
+  byAgent: Array<{
+    agentId: string
+    agentName: string
+    avatarUrl: string | null
+    sfWithdrawn: number
+    pucWithdrawn: number
+    total: number
+  }>
+}
+
+export interface EnrolledByGenderData {
+  totalMale: number
+  totalFemale: number
+  byAgent: Array<{
+    agentId: string
+    agentName: string
+    avatarUrl: string | null
+    male: number
+    female: number
+    total: number
+  }>
+}
+
+export interface FoundationLevelData {
+  foundation1: number
+  foundation2: number
+  totalFoundation: number
+  totalStudents: number
+  foundationPercent: number
+}
+
+export interface EnrolledByBreakdownData {
+  byGovernorate: Array<{ label: string; sf: number; puc: number; total: number }>
+  bySchool: Array<{ label: string; sf: number; puc: number; total: number }>
+  byGraduationYear: Array<{ label: string; sf: number; puc: number; total: number }>
+}
+
+export interface DetailedAnalyticsData {
+  enrollmentFromApplications: EnrollmentFromApplicationsData
+  withdrawalsByAgent: WithdrawalsByAgentData
+  enrolledByGender: EnrolledByGenderData
+  foundationLevel: FoundationLevelData
+  enrolledByBreakdown: EnrolledByBreakdownData
+}
+
 export interface ReportData {
   payment: PaymentReportData
   testCenter: TestCenterReportData
@@ -165,6 +251,9 @@ export interface ReportData {
   leaderboard: LeaderboardData[]
   demographics: DemographicReportData
   targetMode: TargetMode
+  agentComparison: AgentComparisonData[]
+  timeToConversion: TimeToConversionData[]
+  detailedAnalytics: DetailedAnalyticsData
 }
 
 // =============================================
@@ -627,9 +716,9 @@ function calculateReports(
 
   // Executive Dashboard
   const totalTarget = agents.reduce((sum, a) => sum + (a.monthly_target || 0), 0)
-  const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'appointment', 'test', 'application', 'applicant', 'enrolled', 'withdraw', 'lost']
+  const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'test', 'application', 'applicant', 'enrolled', 'withdraw', 'lost']
   const stageLabels: Record<PipelineStage, string> = {
-    new: 'New', contacted: 'Contacted', visit: 'Visit', appointment: 'Appointment', test: 'Test', application: 'Application', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost'
+    new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'Application', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost'
   }
 
   // Generate weekly trend (last 7 days)
@@ -694,11 +783,6 @@ function calculateReports(
   const categoryLabels: Record<LeadSourceCategory, string> = {
     direct: 'Direct', events: 'Events', digital: 'Digital', referrals: 'Referrals', outreach: 'Outreach'
   }
-  const schoolLabels: Record<School, string> = SCHOOLS.reduce((acc, school) => {
-    acc[school.value] = school.label
-    return acc
-  }, {} as Record<School, string>)
-
   // Group leads by source
   const sourceGroups: Record<string, Lead[]> = {}
   leads.forEach(lead => {
@@ -937,6 +1021,250 @@ function calculateReports(
     })).sort((a, b) => b.count - a.count)
   }
 
+  // Agent Comparison - multi-metric comparison across agents
+  const agentComparison: AgentComparisonData[] = agents.map(agent => {
+    const agentLeads = leads.filter(l => {
+      if (typeof l.assigned_agent === 'object' && l.assigned_agent) {
+        return (l.assigned_agent as { id: string }).id === agent.id
+      }
+      return false
+    })
+    const total = agentLeads.length
+    const contacted = agentLeads.filter(l => l.pipeline_stage !== 'new').length
+    const appts = agentLeads.filter(l => ['test', 'application', 'applicant', 'enrolled'].includes(l.pipeline_stage)).length
+    const apps = agentLeads.filter(l => ['application', 'applicant', 'enrolled'].includes(l.pipeline_stage)).length
+    const enrolled = agentLeads.filter(l => l.pipeline_stage === 'enrolled').length
+    const lost = agentLeads.filter(l => l.pipeline_stage === 'lost').length
+
+    return {
+      agentId: agent.id,
+      agentName: agent.full_name || agent.email,
+      avatarUrl: agent.avatar_url || null,
+      totalLeads: total,
+      contacted,
+      appointments: appts,
+      applications: apps,
+      enrolled,
+      lost,
+      contactRate: total > 0 ? Math.round((contacted / total) * 100) : 0,
+      appointmentRate: total > 0 ? Math.round((appts / total) * 100) : 0,
+      enrollmentRate: total > 0 ? Math.round((enrolled / total) * 100) : 0,
+    }
+  }).filter(a => a.totalLeads > 0).sort((a, b) => b.enrollmentRate - a.enrollmentRate)
+
+  // Time-to-Conversion - average days leads spend before reaching each stage
+  // Computed from lead created_at vs stage (approximation since we don't have per-stage timestamps in leads)
+  const stageOrder: Array<{ stage: string; label: string }> = [
+    { stage: 'contacted', label: 'Contacted' },
+    { stage: 'test', label: 'Test' },
+    { stage: 'application', label: 'Application' },
+    { stage: 'enrolled', label: 'Enrolled' },
+  ]
+
+  const timeToConversion: TimeToConversionData[] = stageOrder.map(({ stage, label }) => {
+    // For enrolled leads, compute days from created_at to enrolled_at
+    if (stage === 'enrolled') {
+      const enrolledStudents = students.filter(s => s.enrolled_at && s.created_at)
+      if (enrolledStudents.length === 0) return { stage, stageLabel: label, avgDays: 0, count: 0 }
+      const totalDays = enrolledStudents.reduce((sum, s) => {
+        const days = Math.max(0, (new Date(s.enrolled_at!).getTime() - new Date(s.created_at).getTime()) / (1000 * 60 * 60 * 24))
+        return sum + days
+      }, 0)
+      return { stage, stageLabel: label, avgDays: Math.round(totalDays / enrolledStudents.length), count: enrolledStudents.length }
+    }
+
+    // For other stages, estimate from leads currently at or past that stage
+    const stageIndex = stageOrder.findIndex(s => s.stage === stage)
+    const leadsAtOrPastStage = leads.filter(l => {
+      const leadStageIdx = stageOrder.findIndex(s => s.stage === l.pipeline_stage)
+      return leadStageIdx >= stageIndex && l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'new'
+    })
+
+    if (leadsAtOrPastStage.length === 0) return { stage, stageLabel: label, avgDays: 0, count: 0 }
+
+    const totalDays = leadsAtOrPastStage.reduce((sum, l) => {
+      const days = Math.max(0, (Date.now() - new Date(l.created_at).getTime()) / (1000 * 60 * 60 * 24))
+      return sum + days
+    }, 0)
+
+    return {
+      stage,
+      stageLabel: label,
+      avgDays: Math.round(totalDays / leadsAtOrPastStage.length),
+      count: leadsAtOrPastStage.length,
+    }
+  }).filter(t => t.count > 0)
+
+  // =============================================
+  // DETAILED ANALYTICS
+  // =============================================
+
+  // 1. Enrollment from Applications
+  const applicationStageLeads = leads.filter(l =>
+    ['application', 'applicant', 'enrolled'].includes(l.pipeline_stage)
+  )
+  const enrolledLeads = leads.filter(l => l.pipeline_stage === 'enrolled')
+  const sfAppLeads = applicationStageLeads.filter(l => l.funding_type === 'self_funded')
+  const pucAppLeads = applicationStageLeads.filter(l => l.funding_type === 'puc')
+  const sfEnrolledLeads = enrolledLeads.filter(l => l.funding_type === 'self_funded')
+  const pucEnrolledLeads = enrolledLeads.filter(l => l.funding_type === 'puc')
+
+  const enrollmentFromApplications: EnrollmentFromApplicationsData = {
+    totalApplications: applicationStageLeads.length,
+    totalEnrolled: enrolledLeads.length,
+    conversionRate: applicationStageLeads.length > 0
+      ? Math.round((enrolledLeads.length / applicationStageLeads.length) * 100)
+      : 0,
+    sfApplications: sfAppLeads.length,
+    sfEnrolled: sfEnrolledLeads.length,
+    sfConversionRate: sfAppLeads.length > 0
+      ? Math.round((sfEnrolledLeads.length / sfAppLeads.length) * 100)
+      : 0,
+    pucApplications: pucAppLeads.length,
+    pucEnrolled: pucEnrolledLeads.length,
+    pucConversionRate: pucAppLeads.length > 0
+      ? Math.round((pucEnrolledLeads.length / pucAppLeads.length) * 100)
+      : 0,
+  }
+
+  // 2. Withdrawals by Agent (SF vs PUC)
+  const sfWithdrawn = withdrawnStudents.filter(s => s.funding_type === 'self_funded')
+  const pucWithdrawn = withdrawnStudents.filter(s => s.funding_type === 'puc')
+
+  const withdrawalsByAgent: WithdrawalsByAgentData = {
+    totalWithdrawnSF: sfWithdrawn.length,
+    totalWithdrawnPUC: pucWithdrawn.length,
+    byAgent: agents.map(agent => {
+      const agentWithdrawn = withdrawnStudents.filter(s => s.assigned_to === agent.id)
+      return {
+        agentId: agent.id,
+        agentName: agent.full_name,
+        avatarUrl: agent.avatar_url || null,
+        sfWithdrawn: agentWithdrawn.filter(s => s.funding_type === 'self_funded').length,
+        pucWithdrawn: agentWithdrawn.filter(s => s.funding_type === 'puc').length,
+        total: agentWithdrawn.length,
+      }
+    }).filter(a => a.total > 0).sort((a, b) => b.total - a.total),
+  }
+
+  // 3. Enrolled by Gender per Agent
+  const enrolledMale = enrolledLeads.filter(l => l.gender === 'male')
+  const enrolledFemale = enrolledLeads.filter(l => l.gender === 'female')
+
+  const enrolledByGender: EnrolledByGenderData = {
+    totalMale: enrolledMale.length,
+    totalFemale: enrolledFemale.length,
+    byAgent: agents.map(agent => {
+      const agentEnrolled = enrolledLeads.filter(l => l.assigned_to === agent.id)
+      return {
+        agentId: agent.id,
+        agentName: agent.full_name,
+        avatarUrl: agent.avatar_url || null,
+        male: agentEnrolled.filter(l => l.gender === 'male').length,
+        female: agentEnrolled.filter(l => l.gender === 'female').length,
+        total: agentEnrolled.length,
+      }
+    }).filter(a => a.total > 0).sort((a, b) => b.total - a.total),
+  }
+
+  // 4. Foundation Level Totals
+  const foundationStudents1 = students.filter(s => s.placement_level === 'foundation_1')
+  const foundationStudents2 = students.filter(s => s.placement_level === 'foundation_2')
+  const totalFoundation = foundationStudents1.length + foundationStudents2.length
+
+  const foundationLevel: FoundationLevelData = {
+    foundation1: foundationStudents1.length,
+    foundation2: foundationStudents2.length,
+    totalFoundation,
+    totalStudents: students.length,
+    foundationPercent: students.length > 0
+      ? Math.round((totalFoundation / students.length) * 100)
+      : 0,
+  }
+
+  // 5. Enrolled Breakdown by Governorate, School, Graduation Year (SF vs PUC)
+  // By Governorate
+  const enrolledByGovernorate = GOVERNORATES.map(gov => {
+    const govSchools = SCHOOLS.filter(s => s.governorate === gov.value).map(s => s.value)
+    const govLeads = enrolledLeads.filter(l => {
+      if (typeof l.school === 'string' && l.school) {
+        return govSchools.includes(l.school as School)
+      }
+      if (l.school && typeof l.school === 'object' && 'governorate' in l.school) {
+        return (l.school as { governorate?: Governorate }).governorate === gov.value
+      }
+      return false
+    })
+    return {
+      label: gov.label,
+      sf: govLeads.filter(l => l.funding_type === 'self_funded').length,
+      puc: govLeads.filter(l => l.funding_type === 'puc').length,
+      total: govLeads.length,
+    }
+  }).filter(g => g.total > 0).sort((a, b) => b.total - a.total)
+
+  // By School
+  const enrolledSchoolGroups: Record<string, { label: string; leads: Lead[] }> = {}
+  enrolledLeads.forEach(lead => {
+    if (typeof lead.school === 'string' && lead.school) {
+      const schoolKey = lead.school as string
+      if (!enrolledSchoolGroups[schoolKey]) {
+        const schoolInfo = SCHOOLS.find(s => s.value === schoolKey)
+        enrolledSchoolGroups[schoolKey] = { label: schoolInfo?.label || schoolKey, leads: [] }
+      }
+      enrolledSchoolGroups[schoolKey].leads.push(lead)
+    } else if (lead.school_id && lead.school) {
+      if (!enrolledSchoolGroups[lead.school_id]) {
+        enrolledSchoolGroups[lead.school_id] = {
+          label: (lead.school as { name_en?: string })?.name_en || 'Unknown',
+          leads: [],
+        }
+      }
+      enrolledSchoolGroups[lead.school_id].leads.push(lead)
+    }
+  })
+  const enrolledBySchool = Object.values(enrolledSchoolGroups)
+    .map(group => ({
+      label: group.label,
+      sf: group.leads.filter(l => l.funding_type === 'self_funded').length,
+      puc: group.leads.filter(l => l.funding_type === 'puc').length,
+      total: group.leads.length,
+    }))
+    .filter(s => s.total > 0)
+    .sort((a, b) => b.total - a.total)
+
+  // By Graduation Year
+  const enrolledYearGroups: Record<string, { sf: number; puc: number }> = {}
+  enrolledLeads.forEach(lead => {
+    const year = lead.graduation_year ? String(lead.graduation_year) : 'Unknown'
+    if (!enrolledYearGroups[year]) enrolledYearGroups[year] = { sf: 0, puc: 0 }
+    if (lead.funding_type === 'self_funded') enrolledYearGroups[year].sf++
+    else if (lead.funding_type === 'puc') enrolledYearGroups[year].puc++
+  })
+  const enrolledByGraduationYear = Object.entries(enrolledYearGroups)
+    .map(([year, counts]) => ({
+      label: year,
+      sf: counts.sf,
+      puc: counts.puc,
+      total: counts.sf + counts.puc,
+    }))
+    .filter(y => y.total > 0)
+    .sort((a, b) => b.label.localeCompare(a.label))
+
+  const enrolledByBreakdown: EnrolledByBreakdownData = {
+    byGovernorate: enrolledByGovernorate,
+    bySchool: enrolledBySchool,
+    byGraduationYear: enrolledByGraduationYear,
+  }
+
+  const detailedAnalytics: DetailedAnalyticsData = {
+    enrollmentFromApplications,
+    withdrawalsByAgent,
+    enrolledByGender,
+    foundationLevel,
+    enrolledByBreakdown,
+  }
+
   return {
     payment,
     testCenter,
@@ -946,7 +1274,10 @@ function calculateReports(
     channel,
     leaderboard,
     demographics,
-    targetMode
+    targetMode,
+    agentComparison,
+    timeToConversion,
+    detailedAnalytics,
   }
 }
 

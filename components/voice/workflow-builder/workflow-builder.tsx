@@ -19,14 +19,11 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
-import { cn } from "@/lib/utils"
 import {
   VoiceWorkflow,
   VoiceWorkflowStep,
   VoiceWorkflowCondition,
   VoiceWorkflowIntegration,
-  WorkflowNode,
-  WorkflowEdge,
 } from "@/types"
 import { WorkflowHeader } from "./workflow-header"
 import { StepEditor } from "./step-editor"
@@ -34,16 +31,9 @@ import { StepNode } from "./step-node"
 import { Button } from "@/components/ui/button"
 import {
   Plus,
-  Undo2,
-  Redo2,
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Download,
-  Upload,
-  List,
-  LayoutGrid,
-  Loader2,
   MessageSquare,
 } from "lucide-react"
 

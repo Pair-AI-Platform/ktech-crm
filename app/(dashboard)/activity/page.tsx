@@ -86,7 +86,7 @@ const generateDemoLogs = (): AuditLog[] => {
     if (action === "UPDATE") {
       log.changed_fields = ["pipeline_stage", "notes", "assigned_to"].slice(0, Math.floor(Math.random() * 3) + 1)
       log.old_values = { pipeline_stage: "new", notes: "Initial contact" }
-      log.new_values = { pipeline_stage: "visit", notes: "Campus visit completed" }
+      log.new_values = { pipeline_stage: "contacted", notes: "Initial contact completed" }
     } else if (action === "INSERT") {
       log.new_values = {
         first_name: "New",
@@ -359,7 +359,7 @@ export default function ActivityPage() {
                     >
                       {/* Date Header */}
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-[var(--bg-depth-3)] flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-[var(--bg-sunken)] flex items-center justify-center">
                           <Calendar className="w-5 h-5 text-[var(--text-muted)]" />
                         </div>
                         <div>
@@ -398,12 +398,12 @@ export default function ActivityPage() {
                               {/* Timeline dot */}
                               <div
                                 className={cn(
-                                  "absolute -left-[29px] w-4 h-4 rounded-full border-2 border-[var(--bg-depth-2)]",
+                                  "absolute -left-[29px] w-4 h-4 rounded-full border-2 border-[var(--bg-elevated)]",
                                   actionConfig.bg
                                 )}
                               />
 
-                              <div className="p-4 rounded-lg bg-[var(--bg-depth-3)] hover:bg-[var(--bg-depth-2)] transition-colors">
+                              <div className="p-4 rounded-lg bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)] transition-colors">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-start gap-3">
                                     <div

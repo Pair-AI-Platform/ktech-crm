@@ -13,7 +13,7 @@ interface WhatsAppComposerProps {
   onSent?: () => void
 }
 
-export function WhatsAppComposer({ lead, student, agent, onSent }: WhatsAppComposerProps) {
+export function WhatsAppComposer({ lead, student, onSent }: WhatsAppComposerProps) {
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -68,9 +68,9 @@ export function WhatsAppComposer({ lead, student, agent, onSent }: WhatsAppCompo
     <div className="relative">
       <div
         className={cn(
-          "flex items-end gap-2 p-3 rounded-2xl border transition-all duration-200",
+          "flex items-end gap-2 p-3 rounded-xl border transition-all duration-200",
           "bg-[var(--bg-surface)] border-[var(--border)]",
-          message && "border-[#25D366]/50 shadow-sm shadow-[#25D366]/10"
+          message && "border-[var(--border-emphasis)] shadow-sm"
         )}
       >
         {/* Input */}

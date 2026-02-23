@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     console.log(`[WhatsApp] Message sent, SID: ${twilioMessage.sid}`)
 
     // Log the message to database
-    const { data: messageRecord, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from("whatsapp_messages")
       .insert({
         twilio_message_sid: twilioMessage.sid,

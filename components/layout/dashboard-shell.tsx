@@ -4,6 +4,7 @@ import { useState, createContext, useContext, useSyncExternalStore, useCallback 
 import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNav, QuickActions } from "@/components/layout/mobile-nav"
+import { QuickFind, useQuickFind } from "@/components/layout/quick-find"
 import { cn } from "@/lib/utils"
 import type { Profile } from "@/types"
 
@@ -24,7 +25,8 @@ const DEMO_USER: Profile = {
 const SidebarContext = createContext<{
   collapsed: boolean
   setCollapsed: (collapsed: boolean) => void
-}>({ collapsed: false, setCollapsed: () => {} })
+  openQuickFind: () => void
+}>({ collapsed: false, setCollapsed: () => {}, openQuickFind: () => {} })
 
 export const useSidebar = () => useContext(SidebarContext)
 
@@ -56,6 +58,7 @@ interface DashboardShellProps {
 export function DashboardShell({ user, children }: DashboardShellProps) {
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const quickFind = useQuickFind()
   const router = useRouter()
   const isDemoMode = useDemoMode()
 
@@ -74,7 +77,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   }
 
   return (
-    <SidebarContext.Provider value={{ collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed }}>
+    <SidebarContext.Provider value={{ collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed, openQuickFind: quickFind.open }}>
       <div className="h-screen bg-[var(--background)] overflow-hidden">
         <Sidebar user={activeUser} />
         <main className={cn(
@@ -92,6 +95,12 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           isOpen={showQuickActions}
           onClose={() => setShowQuickActions(false)}
           onAction={handleQuickAction}
+        />
+
+        {/* Quick Find Modal (⌘K) */}
+        <QuickFind
+          isOpen={quickFind.isOpen}
+          onClose={quickFind.close}
         />
       </div>
     </SidebarContext.Provider>

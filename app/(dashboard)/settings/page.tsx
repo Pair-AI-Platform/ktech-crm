@@ -15,6 +15,7 @@ import { LeadAssignmentRules } from "@/components/settings/lead-assignment-rules
 import { StageSettings } from "@/components/settings/stage-settings"
 import { TargetSettings } from "@/components/settings/target-settings"
 import { SchoolManagement } from "@/components/settings/school-management"
+import { AutomationRulesManager } from "@/components/settings/automation-rules-manager"
 import {
   Select,
   SelectContent,
@@ -42,7 +43,6 @@ import {
   Lock,
   ChevronRight,
   MessageSquare,
-  Send,
   Clock,
   Zap,
   ExternalLink,
@@ -54,7 +54,7 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets" | "schools"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets" | "schools" | "automations"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -65,6 +65,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "targets", label: "Targets", icon: Target, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "sms", label: "SMS", icon: MessageSquare, adminOnly: true },
+  { id: "automations", label: "Automations", icon: Zap, adminOnly: true },
   { id: "team", label: "Team", icon: Users, adminOnly: true },
 ]
 
@@ -211,7 +212,7 @@ export default function SettingsPage() {
                             "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all",
                             isActive
                               ? "bg-[var(--primary)] text-white"
-                              : "hover:bg-[var(--bg-depth-3)] text-[var(--text-secondary)]"
+                              : "hover:bg-[var(--bg-sunken)] text-[var(--text-secondary)]"
                           )}
                         >
                           <Icon className="w-5 h-5" />
@@ -336,7 +337,7 @@ export default function SettingsPage() {
                             <label className="text-sm font-medium text-[var(--text-secondary)]">
                               Role
                             </label>
-                            <div className="flex items-center gap-2 h-10 px-3 rounded-lg bg-[var(--bg-depth-3)] border border-[var(--border)]">
+                            <div className="flex items-center gap-2 h-10 px-3 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
                               <Badge variant={isAdmin ? "info" : "secondary"}>
                                 {profile?.role || "agent"}
                               </Badge>
@@ -532,7 +533,7 @@ export default function SettingsPage() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
                               <Key className="w-6 h-6 text-[var(--primary)]" />
@@ -549,7 +550,7 @@ export default function SettingsPage() {
                           <Button variant="outline">Update</Button>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-[#5a71c4]/15 flex items-center justify-center">
                               <Lock className="w-6 h-6 text-[#5a71c4]" />
@@ -566,7 +567,7 @@ export default function SettingsPage() {
                           <Button variant="outline">Enable</Button>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-[#8992c8]/15 flex items-center justify-center">
                               <Settings className="w-6 h-6 text-[#8992c8]" />
@@ -628,7 +629,7 @@ export default function SettingsPage() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
@@ -641,7 +642,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
                                 <Check className="w-5 h-5 text-[var(--success)]" />
@@ -652,7 +653,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
                                 <Phone className="w-5 h-5 text-[var(--success)]" />
@@ -663,7 +664,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-lg bg-[var(--warning)]/10 flex items-center justify-center">
                                 <Clock className="w-5 h-5 text-[var(--warning)]" />
@@ -712,11 +713,11 @@ export default function SettingsPage() {
                           />
                         </div>
 
-                        <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
                           <p className="text-sm text-[var(--text-secondary)] mb-3">
                             Reminders are sent automatically via scheduled jobs. Set up a cron job to call:
                           </p>
-                          <code className="block p-3 rounded-lg bg-[var(--bg-depth-1)] text-xs font-mono text-[var(--text-primary)]">
+                          <code className="block p-3 rounded-lg bg-[var(--bg-surface)] text-xs font-mono text-[var(--text-primary)]">
                             POST /api/sms/reminders {"{"} type: &quot;24h&quot; | &quot;2h&quot; {"}"}
                           </code>
                         </div>
@@ -767,6 +768,19 @@ export default function SettingsPage() {
                   </motion.div>
                 )}
 
+                {/* Automations Tab */}
+                {activeTab === "automations" && isAdmin && (
+                  <motion.div
+                    key="automations"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <AutomationRulesManager />
+                  </motion.div>
+                )}
+
                 {/* Team Tab */}
                 {activeTab === "team" && isAdmin && (
                   <motion.div
@@ -802,7 +816,7 @@ function NotificationToggle({
   onCheckedChange: (checked: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)]">
+    <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
       <div>
         <p className="font-medium text-[var(--text-primary)]">{title}</p>
         <p className="text-sm text-[var(--text-muted)]">{description}</p>
@@ -815,13 +829,12 @@ function NotificationToggle({
 function ThemeOption({
   icon: Icon,
   label,
-  value,
   selected,
   onClick,
 }: {
   icon: typeof Sun
   label: string
-  value: string
+  value?: string
   selected: boolean
   onClick: () => void
 }) {
@@ -841,7 +854,7 @@ function ThemeOption({
         <div
           className={cn(
             "w-12 h-12 rounded-xl flex items-center justify-center",
-            selected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-depth-3)]"
+            selected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-sunken)]"
           )}
         >
           <Icon className="w-6 h-6" />

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/modal"
+import { cn, toDateString } from "@/lib/utils"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,7 +20,6 @@ import {
   Clock,
   User,
   Phone,
-  MapPin,
   Check,
   ChevronRight,
   ChevronLeft,
@@ -28,13 +27,12 @@ import {
   Building2,
   FileText,
   GraduationCap,
-  Sparkles,
   AlertCircle,
   UserCircle,
   Video,
   XCircle
 } from "lucide-react"
-import type { AppointmentType, AppointmentModality, Lead, Student } from "@/types"
+import type { AppointmentType, AppointmentModality, Lead } from "@/types"
 import { APPOINTMENT_TYPES, APPOINTMENT_MODALITIES } from "@/types"
 import { useLeads } from "@/lib/hooks/use-leads"
 import { useAppointmentMutations } from "@/lib/hooks/use-appointments"
@@ -112,7 +110,7 @@ export function AppointmentBooking({
 
   const { leads, loading: leadsLoading } = useLeads({ searchQuery, limit: 20 })
   const { createAppointment } = useAppointmentMutations()
-  const { agents, loading: agentsLoading } = useAgents()
+  const { agents } = useAgents()
   const { profile } = useUser()
 
   // Reset on close
@@ -238,12 +236,13 @@ export function AppointmentBooking({
         modality: selectedModality,
         lead_ids: selectedLeads.map(l => l.id),
         lead_id: selectedLeads[0]?.id,
-        scheduled_date: selectedDate.toISOString().split("T")[0],
+        scheduled_date: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
         scheduled_time: selectedTime,
         duration_minutes: maxDuration,
         status: "scheduled",
         notes,
         assigned_agent: selectedAgent || undefined,
+        ...(callbackMode && { is_callback: true, callback_reason: "Callback scheduled" }),
       })
 
       if (error) {
@@ -258,14 +257,15 @@ export function AppointmentBooking({
         }, 2500)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create appointment")
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        "Failed to create appointment"
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }
   }
-
-  // Helper to get first selected type for display purposes
-  const selectedType = selectedTypes[0] || null
 
   const getTypeColor = (type: AppointmentType) => {
     switch (type) {
@@ -286,7 +286,7 @@ export function AppointmentBooking({
 
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-2xl">
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-xl">
           {currentStep === "success" ? (
             <motion.div
               key="success"
@@ -298,7 +298,7 @@ export function AppointmentBooking({
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
-                className="w-20 h-20 rounded-full bg-gradient-to-br from-[var(--success)] to-[#22c55e] flex items-center justify-center shadow-xl shadow-[var(--success)]/30 mb-5"
+                className="w-20 h-20 rounded-full bg-[var(--success)] flex items-center justify-center shadow-md mb-5"
               >
                 <motion.div
                   initial={{ scale: 0, rotate: -45 }}
@@ -318,10 +318,10 @@ export function AppointmentBooking({
           ) : (
             <>
               {/* Header */}
-              <div className="p-5 pb-4 border-b border-[var(--border)] bg-gradient-to-br from-[var(--bg-sunken)] to-[var(--bg-surface)]">
+              <div className="p-5 pb-4 border-b border-[var(--border)] bg-[var(--bg-sunken)]">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
+                    <div className="w-10 h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-sm">
                       <Calendar className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -354,7 +354,7 @@ export function AppointmentBooking({
                           key={lead.id}
                           className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--primary-muted)] border border-[var(--primary)]/20"
                         >
-                          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                          <div className="w-6 h-6 rounded-md bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                             <span className="text-[10px] font-semibold text-[var(--primary)]">
                               {lead.first_name[0]}{lead.last_name[0]}
                             </span>
@@ -412,7 +412,7 @@ export function AppointmentBooking({
                                 }}
                                 className="w-full p-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-3"
                               >
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                                <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                                   <span className="text-xs font-semibold text-[var(--primary)]">
                                     {lead.first_name[0]}{lead.last_name[0]}
                                   </span>
@@ -443,9 +443,9 @@ export function AppointmentBooking({
                     </label>
                     <Input
                       type="date"
-                      value={selectedDate?.toISOString().split("T")[0] || ""}
+                      value={selectedDate ? toDateString(selectedDate) : ""}
                       onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                      min={new Date().toISOString().split("T")[0]}
+                      min={toDateString(new Date())}
                       className="h-10 rounded-lg"
                     />
                   </div>
@@ -615,13 +615,13 @@ export function AppointmentBooking({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[620px] p-0 overflow-hidden rounded-2xl">
+      <DialogContent className="sm:max-w-[620px] p-0 overflow-hidden rounded-xl">
         {/* Header with Progress - Hidden during success state */}
         {currentStep !== "success" && (
-        <div className="p-6 pb-5 border-b border-[var(--border)] bg-gradient-to-br from-[var(--bg-sunken)] to-[var(--bg-surface)]">
+        <div className="p-6 pb-5 border-b border-[var(--border)] bg-[var(--bg-sunken)]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
+              <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-sm">
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -666,9 +666,9 @@ export function AppointmentBooking({
                         scale: isActive ? 1.05 : 1,
                       }}
                       className={cn(
-                        "w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all duration-300",
+                        "w-12 h-12 rounded-xl flex items-center justify-center border-2 transition-all duration-300",
                         isCompleted
-                          ? "border-[var(--primary)] bg-[var(--primary)] shadow-md shadow-[var(--primary)]/30"
+                          ? "border-[var(--primary)] bg-[var(--primary)] shadow-md"
                           : isActive
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
                           : "border-[var(--border)] bg-[var(--bg-surface)]"
@@ -891,7 +891,7 @@ export function AppointmentBooking({
                         key={lead.id}
                         className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--primary-muted)] border border-[var(--primary)]/20"
                       >
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                        <div className="w-6 h-6 rounded-md bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                           <span className="text-[10px] font-semibold text-[var(--primary)]">
                             {lead.first_name[0]}{lead.last_name[0]}
                           </span>
@@ -967,7 +967,7 @@ export function AppointmentBooking({
                             <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--primary)] rounded-r-full" />
                           )}
                           <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                            <div className="w-11 h-11 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                               <span className="text-sm font-semibold text-[var(--primary)]">
                                 {lead.first_name[0]}{lead.last_name[0]}
                               </span>
@@ -1029,9 +1029,9 @@ export function AppointmentBooking({
                   </label>
                   <Input
                     type="date"
-                    value={selectedDate?.toISOString().split("T")[0] || ""}
+                    value={selectedDate ? toDateString(selectedDate) : ""}
                     onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                    min={new Date().toISOString().split("T")[0]}
+                    min={toDateString(new Date())}
                     className="h-11 rounded-xl"
                   />
                 </div>
@@ -1195,7 +1195,7 @@ export function AppointmentBooking({
                       className="space-y-2"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
                           <User className="w-5 h-5 text-[var(--primary)]" />
                         </div>
                         <div className="flex-1">
@@ -1207,7 +1207,7 @@ export function AppointmentBooking({
                       <div className="ml-16 space-y-1.5">
                         {selectedLeads.map((lead) => (
                           <div key={lead.id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-surface)]">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                            <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                               <span className="text-[10px] font-semibold text-[var(--primary)]">
                                 {lead.first_name[0]}{lead.last_name[0]}
                               </span>

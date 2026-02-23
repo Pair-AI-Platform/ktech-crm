@@ -145,6 +145,7 @@ export function WhatsAppHistory({ leadId, studentId, limit = 20 }: WhatsAppHisto
 
   useEffect(() => {
     fetchMessages()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId, studentId])
 
   useEffect(() => {
@@ -254,8 +255,8 @@ export function WhatsAppHistory({ leadId, studentId, limit = 20 }: WhatsAppHisto
                         className={cn(
                           "relative max-w-[85%] px-3 py-2 rounded-lg shadow-sm",
                           isOutgoing
-                            ? "bg-[#dcf8c6] dark:bg-[#005c4b] rounded-br-sm"
-                            : "bg-white dark:bg-[#202c33] rounded-bl-sm"
+                            ? "bg-[var(--success-bg)] dark:bg-[var(--success-bg)] rounded-br-sm"
+                            : "bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)] rounded-bl-sm"
                         )}
                       >
                         <p className="text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap">

@@ -3,7 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 // This endpoint runs the payment_transactions migration
 // Only accessible by admins when ENABLE_MIGRATION_API=true
-export async function POST(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function POST(_request: NextRequest) {
   // Gate behind environment variable — must never be enabled in production
   if (process.env.ENABLE_MIGRATION_API !== 'true') {
     return NextResponse.json(

@@ -48,7 +48,7 @@ DECLARE
   majors TEXT[] := ARRAY['cyber_security', 'cis', 'marketing', 'accounting', 'mis', 'network_security', 'other'];
   funding_types TEXT[] := ARRAY['self_funded', 'puc'];
   contact_statuses TEXT[] := ARRAY['uncontacted', 'interested', 'not_interested', 'no_answer', 'callback', 'will_see'];
-  submission_substages TEXT[] := ARRAY['pending', 'submitted', 'blocked', 'ready', 'documents', 'lost'];
+  submission_substages TEXT[] := ARRAY['documents', 'submissions', 'lost'];
   ministry_reasons TEXT[] := ARRAY['ku', 'paaet', 'abroad', 'aasu', 'paci', 'puc', 'gpa'];
 
   school_ids UUID[];
@@ -185,10 +185,6 @@ BEGIN
     min_reasons := NULL;
     IF stage = 'application' THEN
       sub_substage := submission_substages[1 + floor(random() * array_length(submission_substages, 1))::INT];
-      IF sub_substage = 'blocked' THEN
-        min_blocked := true;
-        min_reasons := ARRAY[ministry_reasons[1 + floor(random() * array_length(ministry_reasons, 1))::INT]];
-      END IF;
       fund := 'puc';
     END IF;
 

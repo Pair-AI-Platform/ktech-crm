@@ -15,6 +15,7 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ({ className, hover, glow, glass, gradient, elevated, flat, interactive, padding, ...props }, ref) => {
     const paddingClasses = {
       none: "",
@@ -27,14 +28,12 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] transition-all duration-200",
+          "rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] transition-all duration-200",
           !flat && "shadow-[var(--shadow-card)]",
           flat && "shadow-none",
           elevated && "shadow-[var(--shadow-lg)] border-transparent",
-          hover && "hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-emphasis)] hover:-translate-y-0.5 cursor-pointer",
-          glow && "hover:shadow-[var(--shadow-card-hover),var(--shadow-glow)] hover:border-[var(--primary)]",
-          glass && "bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)] border-[var(--glass-border)]",
-          gradient && "relative before:absolute before:inset-0 before:rounded-2xl before:p-[1px] before:bg-gradient-to-br before:from-[var(--primary)] before:to-[var(--accent)] before:-z-10 before:opacity-0 hover:before:opacity-100 before:transition-opacity",
+          hover && "hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-emphasis)] cursor-pointer",
+          glow && "hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-emphasis)]",
           interactive && "cursor-pointer active:scale-[0.99]",
           padding && paddingClasses[padding],
           className
@@ -181,8 +180,8 @@ const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
             )}
           </div>
         </CardContent>
-        {/* Decorative gradient line at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-30" />
+        {/* Decorative line at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--border-emphasis)] opacity-30" />
       </Card>
     )
   }

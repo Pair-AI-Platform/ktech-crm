@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { cn, toDateString } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -11,17 +11,14 @@ import {
   Clock,
   Phone,
   CheckCircle2,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
   Calendar as CalendarIcon,
   Plus,
-  User,
   PhoneMissed,
   PhoneOff,
   Car,
   UserCircle,
-  Table2
+  Table2,
+  Eye
 } from "lucide-react"
 import type { Appointment, AppointmentType } from "@/types"
 import { APPOINTMENT_TYPES } from "@/types"
@@ -105,7 +102,6 @@ export function CalendarView({
   onAppointmentClick,
   onSlotClick,
   calendarMode = "all",
-  onCalendarModeChange
 }: CalendarViewProps) {
   // Track current time for "now" indicator
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -193,12 +189,12 @@ export function CalendarView({
   }
 
   const getAppointmentsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0]
+    const dateStr = toDateString(date)
     return filteredAppointments.filter((apt) => apt.scheduled_date === dateStr)
   }
 
   const getAppointmentsForSlot = (date: Date, time: string) => {
-    const dateStr = date.toISOString().split("T")[0]
+    const dateStr = toDateString(date)
     const hour = time.split(":")[0]
     return filteredAppointments.filter(
       (apt) => apt.scheduled_date === dateStr && apt.scheduled_time?.startsWith(hour)
@@ -239,6 +235,8 @@ export function CalendarView({
         return <PhoneMissed className="w-3 h-3 text-[var(--warning)]" />
       case "cant_reach":
         return <PhoneOff className="w-3 h-3 text-[var(--error)]" />
+      case "will_see":
+        return <Eye className="w-3 h-3 text-[var(--info)]" />
       default:
         return null
     }
@@ -461,7 +459,7 @@ export function CalendarView({
                     <tr>
                       <td colSpan={8} className="p-8 text-center">
                         <div className="flex flex-col items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-[var(--bg-depth-3)] flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-xl bg-[var(--bg-sunken)] flex items-center justify-center">
                             <CalendarIcon className="w-6 h-6 text-[var(--text-muted)]" />
                           </div>
                           <p className="text-sm text-[var(--text-muted)]">No appointments found</p>
@@ -476,8 +474,6 @@ export function CalendarView({
                         return (a.scheduled_time || "").localeCompare(b.scheduled_time || "")
                       })
                       .map((apt, idx) => {
-                        const primaryType = apt.appointment_type?.[0] || "new_appointment"
-                        const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
                         const agentName = getAgentName(apt)
                         const statusConfig = {
                           scheduled: { label: "Scheduled", color: "bg-[var(--secondary)]" },
@@ -486,6 +482,7 @@ export function CalendarView({
                           postponed: { label: "Postponed", color: "bg-[var(--primary)]" },
                           no_answer: { label: "No Answer", color: "bg-[var(--warning)]" },
                           cant_reach: { label: "Can't Reach", color: "bg-[var(--error)]" },
+                          will_see: { label: "Will See", color: "bg-[var(--info)]" },
                           cancelled: { label: "Cancelled", color: "bg-[var(--error)]" },
                           not_interested: { label: "Canceled", color: "bg-[var(--text-muted)]" },
                           callback: { label: "Callback", color: "bg-[var(--info)]" },
@@ -518,7 +515,7 @@ export function CalendarView({
                             </td>
                             <td className="p-3">
                               <div className="flex flex-wrap gap-1">
-                                {(apt.appointment_type || []).map((type, i) => {
+                                {(apt.appointment_type || []).map((type) => {
                                   const typeColors = APPOINTMENT_COLORS[type] || APPOINTMENT_COLORS.new_appointment
                                   return (
                                     <Badge
@@ -740,7 +737,7 @@ export function CalendarView({
                     {currentDate.toLocaleDateString("en-US", { weekday: "long" })}
                   </p>
                   <p className="text-sm text-[var(--text-muted)]">
-                    {filteredAppointments.filter(a => a.scheduled_date === currentDate.toISOString().split("T")[0]).length} {calendarMode === "callbacks" ? "callbacks" : calendarMode === "appointments" ? "appointments" : "appointments"} scheduled
+                    {filteredAppointments.filter(a => a.scheduled_date === toDateString(currentDate)).length} {calendarMode === "callbacks" ? "callbacks" : calendarMode === "appointments" ? "appointments" : "appointments"} scheduled
                   </p>
                 </div>
               </div>

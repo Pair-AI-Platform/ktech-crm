@@ -59,12 +59,18 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     intended_major: lead.intended_major || "",
   })
 
-  // Filter schools based on search (supports Arabic)
-  const filteredSchools = SCHOOLS.filter(school =>
-    school.label.includes(schoolSearch) ||
-    school.labelAr.includes(schoolSearch) ||
-    school.value.toLowerCase().includes(schoolSearch.toLowerCase())
-  )
+  // Filter schools based on search (supports Arabic) and student gender
+  const filteredSchools = SCHOOLS.filter(school => {
+    // Gender filter: male students → boys schools, female students → girls schools
+    if (formData.gender === 'male' && school.gender !== 'boys') return false
+    if (formData.gender === 'female' && school.gender !== 'girls') return false
+    // Search filter
+    return (
+      school.label.includes(schoolSearch) ||
+      school.labelAr.includes(schoolSearch) ||
+      school.value.toLowerCase().includes(schoolSearch.toLowerCase())
+    )
+  })
 
   // Check GPA and set error state
   useEffect(() => {
@@ -156,7 +162,21 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   }
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    // If changing gender, clear school if it doesn't match the new gender
+    if (field === 'gender') {
+      setFormData(prev => {
+        const currentSchool = SCHOOLS.find(s => s.value === prev.school)
+        const genderMismatch = value === 'male' && currentSchool?.gender !== 'boys'
+          || value === 'female' && currentSchool?.gender !== 'girls'
+        return {
+          ...prev,
+          gender: value,
+          school: genderMismatch ? "" : prev.school,
+        }
+      })
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }))
+    }
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
@@ -423,7 +443,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         value={schoolSearch}
                         onChange={(e) => setSchoolSearch(e.target.value)}
                         placeholder="Search schools..."
-                        className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-depth-2)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                        className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
                         autoFocus
                       />
                     </div>

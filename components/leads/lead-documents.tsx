@@ -11,7 +11,6 @@ import {
   Image,
   File,
   Loader2,
-  X,
   Eye,
   ChevronDown
 } from "lucide-react"
@@ -99,7 +98,7 @@ export function LeadDocuments({ leadId, className }: LeadDocumentsProps) {
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
         const storagePath = `leads/${leadId}/documents/${timestamp}-${safeName}`
 
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
           .from('documents')
           .upload(storagePath, file, {
             cacheControl: '3600',

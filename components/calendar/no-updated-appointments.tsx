@@ -20,12 +20,12 @@ import {
   PhoneMissed,
   PhoneOff,
   Car,
-  User,
   ChevronRight,
   Loader2,
   AlertTriangle,
   XCircle,
   PhoneCall,
+  Eye,
 } from "lucide-react"
 import type { Appointment } from "@/types"
 import { APPOINTMENT_TYPES } from "@/types"
@@ -46,6 +46,7 @@ const STATUS_ACTIONS: Array<{ value: string; label: string; icon: React.ElementT
   { value: "postponed", label: "Postponed", icon: Calendar, color: "bg-[var(--primary)] hover:bg-[var(--primary)]/90" },
   { value: "no_answer", label: "No Answer", icon: PhoneMissed, color: "bg-[var(--warning)] hover:bg-[var(--warning)]/90" },
   { value: "cant_reach", label: "Can't Reach", icon: PhoneOff, color: "bg-[var(--error)] hover:bg-[var(--error)]/90" },
+  { value: "will_see", label: "Will See", icon: Eye, color: "bg-[var(--info)] hover:bg-[var(--info)]/90" },
   { value: "not_interested", label: "Canceled", icon: XCircle, color: "bg-red-500 hover:bg-red-500/90", isLeadAction: true },
   { value: "callback", label: "Callback", icon: PhoneCall, color: "bg-[var(--accent)] hover:bg-[var(--accent)]/90", isLeadAction: true },
 ]
@@ -61,6 +62,9 @@ export function NoUpdatedAppointments({
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [cancelAppointment, setCancelAppointment] = useState<Appointment | null>(null)
   const [cancelNotes, setCancelNotes] = useState("")
+  const [postponeTarget, setPostponeTarget] = useState<Appointment | null>(null)
+  const [postponeDate, setPostponeDate] = useState("")
+  const [postponeTime, setPostponeTime] = useState("")
 
   const {
     markNA,
@@ -85,15 +89,13 @@ export function NoUpdatedAppointments({
           await markOnTheWay(appointment.id)
           break
         case "postponed":
-          // Postpone to tomorrow at same time
-          const tomorrow = new Date()
-          tomorrow.setDate(tomorrow.getDate() + 1)
-          await postponeAppointment(
-            appointment.id,
-            tomorrow.toISOString().split("T")[0],
-            appointment.scheduled_time
-          )
-          break
+          // Open postpone popup to let user pick date/time
+          setPostponeTarget(appointment)
+          setPostponeDate("")
+          setPostponeTime(appointment.scheduled_time?.slice(0, 5) || "")
+          setLoadingId(null)
+          setLoadingAction(null)
+          return
         case "no_answer":
           await markNA(appointment.id)
           break
@@ -150,6 +152,24 @@ export function NoUpdatedAppointments({
       setLoadingAction(null)
       setCancelAppointment(null)
       setCancelNotes("")
+    }
+  }
+
+  const handlePostponeConfirm = async () => {
+    if (!postponeTarget || !postponeDate || !postponeTime) return
+    setLoadingId(postponeTarget.id)
+    setLoadingAction("postponed")
+    try {
+      await postponeAppointment(postponeTarget.id, postponeDate, postponeTime)
+      onUpdate?.()
+    } catch (error) {
+      console.error("Error postponing:", error)
+    } finally {
+      setLoadingId(null)
+      setLoadingAction(null)
+      setPostponeTarget(null)
+      setPostponeDate("")
+      setPostponeTime("")
     }
   }
 
@@ -265,7 +285,7 @@ export function NoUpdatedAppointments({
                           exit={{ opacity: 0, x: -100, height: 0 }}
                           transition={{ delay: index * 0.05 }}
                           className={cn(
-                            "p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-3)]",
+                            "p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)]",
                             isLoading && "opacity-50"
                           )}
                         >
@@ -388,6 +408,61 @@ export function NoUpdatedAppointments({
                 className="rounded-lg bg-red-500 hover:bg-red-600 text-white"
               >
                 {loadingId === cancelAppointment?.id ? "Saving..." : "Confirm Cancel"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Postpone Reschedule Dialog */}
+      <Dialog open={!!postponeTarget} onOpenChange={() => { setPostponeTarget(null); setPostponeDate(""); setPostponeTime("") }}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[var(--primary)]">
+              <Calendar className="w-5 h-5" />
+              Postpone — Reschedule
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-[var(--text-muted)]">
+              Pick a new date and time for this appointment.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-[var(--text-secondary)] mb-1.5 block">New Date</label>
+                <input
+                  type="date"
+                  value={postponeDate}
+                  onChange={(e) => setPostponeDate(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[var(--text-secondary)] mb-1.5 block">New Time</label>
+                <input
+                  type="time"
+                  value={postponeTime}
+                  onChange={(e) => setPostponeTime(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setPostponeTarget(null); setPostponeDate(""); setPostponeTime("") }}
+                className="rounded-lg"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handlePostponeConfirm}
+                disabled={!postponeDate || !postponeTime || loadingId === postponeTarget?.id}
+                className="rounded-lg bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white"
+              >
+                {loadingId === postponeTarget?.id ? "Saving..." : "Confirm Postpone"}
               </Button>
             </div>
           </div>

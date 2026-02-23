@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,19 +19,11 @@ import {
 } from "@/components/ui/select"
 import {
   Users,
-  Plus,
   Search,
-  Mail,
-  Phone,
-  Shield,
   ShieldCheck,
-  MoreVertical,
   Edit,
-  Trash2,
   UserPlus,
   Target,
-  Calendar,
-  TrendingUp,
   Check
 } from "lucide-react"
 import type { Profile } from "@/types"
@@ -52,6 +44,7 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
 
   useEffect(() => {
     fetchTeamMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchTeamMembers = async () => {
@@ -207,7 +200,7 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="p-4 hover:bg-[var(--bg-depth-3)] transition-colors"
+                  className="p-4 hover:bg-[var(--bg-sunken)] transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -224,7 +217,7 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                         </Avatar>
                         <div
                           className={cn(
-                            "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[var(--bg-depth-2)]",
+                            "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[var(--bg-elevated)]",
                             member.is_active ? "bg-[var(--success)]" : "bg-[#212e7f]"
                           )}
                         />
@@ -492,7 +485,7 @@ function EditMemberModal({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-depth-3)]">
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)]">
             <Avatar className="w-12 h-12">
               <AvatarImage src={member.avatar_url} />
               <AvatarFallback className="bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 text-[var(--primary)]">

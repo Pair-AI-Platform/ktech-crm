@@ -2,7 +2,7 @@
 // Used when a lead completes enrollment payment
 
 import { SupabaseClient } from '@supabase/supabase-js'
-import type { Lead, Student, PipelineStage } from '@/types'
+import type { Student, PipelineStage } from '@/types'
 
 export interface ConversionResult {
   success: boolean

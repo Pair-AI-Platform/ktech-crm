@@ -7,13 +7,6 @@ import { Input, SearchInput } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   X,
   Filter,
   RotateCcw,
@@ -28,9 +21,10 @@ import {
   SlidersHorizontal,
   GraduationCap,
   Ban,
-  MessageSquareText
+  MessageSquareText,
+  CreditCard
 } from "lucide-react"
-import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, MAJORS, LEAD_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus } from "@/types"
+import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus } from "@/types"
 import { cn } from "@/lib/utils"
 
 export interface LeadFilters {
@@ -50,8 +44,10 @@ export interface LeadFilters {
   hasPhone: boolean | null
   gpaMin: number | null
   gpaMax: number | null
+  isKuwaiti: boolean | null
   ministryBlocked: "all" | "blocked" | "not_blocked"
   hasNotes: "all" | "with_notes" | "without_notes"
+  paymentStatus: "all" | "pending" | "seat_reserved" | "full_tuition"
 }
 
 interface LeadFiltersProps {
@@ -78,12 +74,56 @@ const defaultFilters: LeadFilters = {
   hasPhone: null,
   gpaMin: null,
   gpaMax: null,
+  isKuwaiti: null,
   ministryBlocked: "all",
   hasNotes: "all",
+  paymentStatus: "all",
 }
 
 // Stages that leads can be lost at (excludes 'lost' and 'enrolled')
 const LOST_AT_STAGES = PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value !== 'enrolled')
+
+// Allowed statuses per stage (matches lead-table.tsx logic)
+const STAGE_ALLOWED_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none'> = {
+  new: 'none',
+  contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential'],
+  visit: ['no_answer', 'cant_reach', 'interested', 'not_interested'],
+  test: ['online', 'on_campus'],
+  application: 'none',
+  lost: 'all',
+  applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
+  enrolled: 'none',
+  withdraw: 'all',
+}
+
+function getStatusesForStages(stages: PipelineStage[]) {
+  // When no stages selected, show all statuses EXCEPT applicant-only ones
+  if (stages.length === 0) return LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+
+  const allowedValues = new Set<LeadStatus>()
+  let hasAll = false
+  const hasApplicant = stages.includes('applicant')
+
+  for (const stage of stages) {
+    const allowed = STAGE_ALLOWED_STATUSES[stage]
+    if (allowed === 'all') {
+      hasAll = true
+      break
+    }
+    if (Array.isArray(allowed)) {
+      allowed.forEach(s => allowedValues.add(s))
+    }
+  }
+
+  if (hasAll) {
+    // If 'all' but applicant not selected, exclude applicant-only statuses
+    if (!hasApplicant) return LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+    return LEAD_STATUSES
+  }
+  if (allowedValues.size === 0) return [] as typeof LEAD_STATUSES
+
+  return LEAD_STATUSES.filter(s => allowedValues.has(s.value))
+}
 
 export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFiltersProps) {
   const [localFilters, setLocalFilters] = useState<LeadFilters>(filters)
@@ -102,12 +142,18 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
   }
 
   const toggleStage = (stage: PipelineStage) => {
-    setLocalFilters(prev => ({
-      ...prev,
-      stages: prev.stages.includes(stage)
+    setLocalFilters(prev => {
+      const newStages = prev.stages.includes(stage)
         ? prev.stages.filter(s => s !== stage)
         : [...prev.stages, stage]
-    }))
+
+      // Clear any status selections that are no longer valid for the new stages
+      const available = getStatusesForStages(newStages)
+      const availableValues = new Set(available.map(s => s.value))
+      const newStatuses = prev.statuses.filter(s => availableValues.has(s))
+
+      return { ...prev, stages: newStages, statuses: newStatuses }
+    })
   }
 
   const toggleLostAtStage = (stage: PipelineStage) => {
@@ -183,6 +229,9 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     onChange(defaultFilters)
   }
 
+  // Filter statuses based on selected stages
+  const availableStatuses = getStatusesForStages(localFilters.stages)
+
   const activeFiltersCount =
     localFilters.stages.length +
     localFilters.lostAtStages.length +
@@ -195,7 +244,8 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     (localFilters.fundingType !== "all" ? 1 : 0) +
     (localFilters.dateRange !== "all" ? 1 : 0) +
     (localFilters.assignedTo ? 1 : 0) +
-    (localFilters.hasNotes !== "all" ? 1 : 0)
+    (localFilters.hasNotes !== "all" ? 1 : 0) +
+    (localFilters.paymentStatus !== "all" ? 1 : 0)
 
   return (
     <AnimatePresence>
@@ -206,7 +256,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-[rgba(31,29,26,0.5)] z-40"
             onClick={onClose}
           />
 
@@ -216,7 +266,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[var(--bg-depth-2)] border-l border-[var(--border)] shadow-2xl z-50 overflow-hidden flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[var(--bg-elevated)] border-l border-[var(--border)] shadow-2xl z-50 overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
@@ -240,44 +290,6 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Pipeline Stages */}
-              <FilterSection
-                title="Pipeline Stage"
-                icon={<Sparkles className="w-4 h-4" />}
-                isExpanded={expandedSections.includes("stage")}
-                onToggle={() => toggleSection("stage")}
-                count={localFilters.stages.length}
-              >
-                <div className="grid grid-cols-2 gap-2">
-                  {PIPELINE_STAGES.map((stage) => (
-                    <button
-                      key={stage.value}
-                      onClick={() => toggleStage(stage.value)}
-                      className={cn(
-                        "flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
-                        localFilters.stages.includes(stage.value)
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-4 h-4 rounded border flex items-center justify-center shrink-0",
-                        localFilters.stages.includes(stage.value)
-                          ? "border-[var(--primary)] bg-[var(--primary)]"
-                          : "border-[var(--border)]"
-                      )}>
-                        {localFilters.stages.includes(stage.value) && (
-                          <Check className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                      <Badge variant={stage.value} size="sm">
-                        {stage.label}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              </FilterSection>
-
               {/* Lost At Stage - Filter lost leads by the stage they were lost at */}
               <FilterSection
                 title="Lost At Stage"
@@ -327,32 +339,38 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 onToggle={() => toggleSection("status")}
                 count={localFilters.statuses.length}
               >
-                <div className="grid grid-cols-2 gap-2">
-                  {LEAD_STATUSES.map((status) => (
-                    <button
-                      key={status.value}
-                      onClick={() => toggleStatus(status.value)}
-                      className={cn(
-                        "flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
-                        localFilters.statuses.includes(status.value)
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-4 h-4 rounded border flex items-center justify-center shrink-0",
-                        localFilters.statuses.includes(status.value)
-                          ? "border-[var(--primary)] bg-[var(--primary)]"
-                          : "border-[var(--border)]"
-                      )}>
-                        {localFilters.statuses.includes(status.value) && (
-                          <Check className="w-3 h-3 text-white" />
+                {availableStatuses.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableStatuses.map((status) => (
+                      <button
+                        key={status.value}
+                        onClick={() => toggleStatus(status.value)}
+                        className={cn(
+                          "flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                          localFilters.statuses.includes(status.value)
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
                         )}
-                      </div>
-                      <span className="truncate">{status.label}</span>
-                    </button>
-                  ))}
-                </div>
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                          localFilters.statuses.includes(status.value)
+                            ? "border-[var(--primary)] bg-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        )}>
+                          {localFilters.statuses.includes(status.value) && (
+                            <Check className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <span className="truncate">{status.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--text-muted)] py-2">
+                    No statuses available for the selected stage{localFilters.stages.length > 1 ? 's' : ''}
+                  </p>
+                )}
               </FilterSection>
 
               {/* Lead Sources */}
@@ -565,6 +583,44 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
+              {/* Payment Status Filter (Self-Funded) */}
+              <FilterSection
+                title="Payment Status"
+                icon={<CreditCard className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("paymentStatus")}
+                onToggle={() => toggleSection("paymentStatus")}
+                count={localFilters.paymentStatus !== "all" ? 1 : 0}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "pending", label: "No Payment" },
+                    { value: "seat_reserved", label: "Seat Reserved" },
+                    { value: "full_tuition", label: "Full Tuition" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setLocalFilters(prev => ({ ...prev, paymentStatus: option.value as LeadFilters["paymentStatus"] }))}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-sm text-center transition-all",
+                        localFilters.paymentStatus === option.value
+                          ? option.value === "pending"
+                            ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                            : option.value === "full_tuition"
+                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-2">
+                  Pending: &lt;150 KD · Seat Reserved: 150–549 KD · Full Tuition: 550+ KD. Only applies to self-funded leads.
+                </p>
+              </FilterSection>
+
               {/* Ministry Blocked Filter */}
               <FilterSection
                 title="Ministry Blocked"
@@ -707,6 +763,44 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                   ))}
                 </div>
               </FilterSection>
+
+              {/* Pipeline Stages */}
+              <FilterSection
+                title="Pipeline Stage"
+                icon={<Sparkles className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("stage")}
+                onToggle={() => toggleSection("stage")}
+                count={localFilters.stages.length}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {PIPELINE_STAGES.map((stage) => (
+                    <button
+                      key={stage.value}
+                      onClick={() => toggleStage(stage.value)}
+                      className={cn(
+                        "flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                        localFilters.stages.includes(stage.value)
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                        localFilters.stages.includes(stage.value)
+                          ? "border-[var(--primary)] bg-[var(--primary)]"
+                          : "border-[var(--border)]"
+                      )}>
+                        {localFilters.stages.includes(stage.value) && (
+                          <Check className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                      <Badge variant={stage.value} size="sm">
+                        {stage.label}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
             </div>
 
             {/* Footer */}
@@ -748,7 +842,7 @@ function FilterSection({ title, icon, isExpanded, onToggle, count, children }: F
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-3 hover:bg-[var(--bg-depth-3)] transition-colors"
+        className="w-full flex items-center justify-between p-3 hover:bg-[var(--bg-sunken)] transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className="text-[var(--text-muted)]">{icon}</span>
@@ -814,7 +908,7 @@ export function QuickFilters({
             onChange={(e) => onSearchChange(e.target.value)}
             onClear={() => onSearchChange("")}
             placeholder="Search leads by name, phone, or email..."
-            className="bg-[var(--bg-depth-3)]"
+            className="bg-[var(--bg-sunken)]"
           />
         </div>
         <Button variant="outline" onClick={onOpenAdvanced} className="shrink-0">
@@ -833,10 +927,10 @@ export function QuickFilters({
         >
           All Stages
           <Badge variant="secondary" size="sm" className="ml-2">
-            {total}
+            {total - (stats.lost || 0) - (stats.withdraw || 0)}
           </Badge>
         </Button>
-        {PIPELINE_STAGES.map((stage) => {
+        {PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value !== 'withdraw').map((stage) => {
           const count = stats[stage.value] || 0
           return (
             <Button

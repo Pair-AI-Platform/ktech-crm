@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
       .eq("id", document_id)
       .select(`
         *,
-        verified_by_profile:profiles!psp_documents_verified_by_fkey(id, full_name, email),
-        uploaded_by_profile:profiles!psp_documents_uploaded_by_fkey(id, full_name, email)
+        verified_by_profile:profiles!verified_by(id, full_name, email),
+        uploaded_by_profile:profiles!uploaded_by(id, full_name, email)
       `)
       .single()
 
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         verified_at,
         verified_by,
         verification_notes,
-        verified_by_profile:profiles!psp_documents_verified_by_fkey(id, full_name)
+        verified_by_profile:profiles!verified_by(id, full_name)
       `)
       .eq("lead_id", leadId)
 

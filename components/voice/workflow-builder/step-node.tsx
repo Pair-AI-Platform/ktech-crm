@@ -10,7 +10,6 @@ import {
   Play,
   Flag,
   MoreHorizontal,
-  GripVertical,
   ChevronRight,
 } from "lucide-react"
 

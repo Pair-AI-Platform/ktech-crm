@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Phone,
@@ -15,19 +15,13 @@ import {
   Hash,
   User,
   Users,
-  Clock,
   History,
   Settings,
-  Volume2,
-  VolumeX,
   ChevronDown,
   X,
   Search,
-  MoreVertical,
   ArrowRightLeft,
-  UserPlus,
   Headphones,
-  Circle,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -40,7 +34,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -55,7 +48,6 @@ import {
   AgentPBXStatus,
   PBXExtension,
   CallQueue,
-  Call,
   AGENT_PBX_STATUSES,
 } from "@/types"
 

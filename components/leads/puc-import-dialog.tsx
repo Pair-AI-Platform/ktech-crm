@@ -11,7 +11,6 @@ import {
   DialogFooter,
 } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
-import { ProgressBar } from "@/components/ui/progress"
 import {
   Upload,
   FileSpreadsheet,
@@ -19,7 +18,6 @@ import {
   XCircle,
   AlertTriangle,
   Loader2,
-  Download,
   GraduationCap,
   Users,
 } from "lucide-react"
@@ -46,7 +44,7 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
   const [file, setFile] = useState<File | null>(null)
   const [records, setRecords] = useState<PUCRecord[]>([])
   const [invalidRecords, setInvalidRecords] = useState<{ record: PUCRecord; reason: string }[]>([])
-  const [importing, setImporting] = useState(false)
+  const [, setImporting] = useState(false)
   const [result, setResult] = useState<PUCImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

@@ -24,7 +24,7 @@ try {
       process.env[key.trim()] = valueParts.join('=').trim()
     }
   })
-} catch (e) {
+} catch {
   // .env.local not found, continue
 }
 

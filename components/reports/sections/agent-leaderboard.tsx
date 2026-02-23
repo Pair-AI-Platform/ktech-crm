@@ -4,15 +4,12 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { ProgressBar } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Trophy,
   Medal,
   Users,
-  Calendar,
-  FileText,
   GraduationCap,
   TrendingUp,
   ArrowUpDown,
@@ -233,22 +230,22 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
         <Card>
           <CardContent className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-3 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
                 <Users className="w-5 h-5 mx-auto mb-2 text-[var(--primary)]" />
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{data.length}</p>
                 <p className="text-xs text-[var(--text-muted)]">Active Agents</p>
               </div>
-              <div className="text-center p-3 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
                 <Users className="w-5 h-5 mx-auto mb-2 text-[var(--info)]" />
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{totalLeads}</p>
                 <p className="text-xs text-[var(--text-muted)]">Total Leads</p>
               </div>
-              <div className="text-center p-3 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
                 <GraduationCap className="w-5 h-5 mx-auto mb-2 text-[var(--success)]" />
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{totalEnrolled}</p>
                 <p className="text-xs text-[var(--text-muted)]">Total Enrolled</p>
               </div>
-              <div className="text-center p-3 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
                 <TrendingUp className="w-5 h-5 mx-auto mb-2 text-[var(--accent)]" />
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{avgConversion}%</p>
                 <p className="text-xs text-[var(--text-muted)]">Avg Conversion</p>
@@ -283,21 +280,21 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
                     <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)]">
                       Agent
                     </th>
-                    <SortHeader label="Leads" sortKey="leads" currentSort={sortBy} order={sortOrder} onSort={handleSort} />
-                    <SortHeader label="Appointments" sortKey="appointments" currentSort={sortBy} order={sortOrder} onSort={handleSort} />
-                    <SortHeader label="Applications" sortKey="applications" currentSort={sortBy} order={sortOrder} onSort={handleSort} />
-                    <SortHeader label="Enrolled" sortKey="enrolled" currentSort={sortBy} order={sortOrder} onSort={handleSort} />
-                    <SortHeader label="Conv %" sortKey="conversionRate" currentSort={sortBy} order={sortOrder} onSort={handleSort} />
+                    <SortHeader label="Leads" sortKey="leads" currentSort={sortBy} onSort={handleSort} />
+                    <SortHeader label="Appointments" sortKey="appointments" currentSort={sortBy} onSort={handleSort} />
+                    <SortHeader label="Applications" sortKey="applications" currentSort={sortBy} onSort={handleSort} />
+                    <SortHeader label="Enrolled" sortKey="enrolled" currentSort={sortBy} onSort={handleSort} />
+                    <SortHeader label="Conv %" sortKey="conversionRate" currentSort={sortBy} onSort={handleSort} />
                     <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)]">
                       App. Target
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedData.map((agent, index) => (
+                  {sortedData.map((agent) => (
                     <tr
                       key={agent.agentId}
-                      className="border-b border-[var(--border)] hover:bg-[var(--bg-depth-3)] transition-colors"
+                      className="border-b border-[var(--border)] hover:bg-[var(--bg-sunken)] transition-colors"
                     >
                       <td className="py-3 px-4">
                         <RankBadge rank={agent.rank} />
@@ -426,7 +423,7 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="text-center p-2 rounded-lg bg-[var(--bg-depth-3)]">
+    <div className="text-center p-2 rounded-lg bg-[var(--bg-sunken)]">
       <p className="text-lg font-bold text-[var(--text-primary)]">{value}</p>
       <p className="text-xs text-[var(--text-muted)]">{label}</p>
     </div>
@@ -456,7 +453,7 @@ function RankBadge({ rank }: { rank: number }) {
     )
   }
   return (
-    <div className="w-8 h-8 rounded-full bg-[var(--bg-depth-3)] flex items-center justify-center">
+    <div className="w-8 h-8 rounded-full bg-[var(--bg-sunken)] flex items-center justify-center">
       <span className="text-xs font-bold text-[var(--text-muted)]">{rank}</span>
     </div>
   )
@@ -466,13 +463,11 @@ function SortHeader({
   label,
   sortKey,
   currentSort,
-  order,
   onSort,
 }: {
   label: string
   sortKey: SortKey
   currentSort: SortKey
-  order: 'asc' | 'desc'
   onSort: (key: SortKey) => void
 }) {
   const isActive = currentSort === sortKey

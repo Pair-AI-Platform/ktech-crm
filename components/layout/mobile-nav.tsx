@@ -9,12 +9,11 @@ import {
   Users,
   Calendar,
   Plus,
-  Settings
 } from "lucide-react"
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Leads", href: "/leads", icon: Users },
+  { name: "Contacts", href: "/leads", icon: Users },
   { name: "Add", href: "#add", icon: Plus, isAction: true },
   { name: "Calendar", href: "/calendar", icon: Calendar },
 ]
@@ -28,8 +27,8 @@ export function MobileNav({ onAddClick }: MobileNavProps) {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden">
-      {/* Blur background */}
-      <div className="absolute inset-0 bg-[var(--bg-depth-2)]/80 backdrop-blur-xl border-t border-[var(--border)]" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-[var(--bg-surface)] border-t border-[var(--border)]" />
 
       {/* Safe area for notched phones */}
       <div className="relative flex items-center justify-around px-2 py-2 pb-safe">
@@ -47,9 +46,9 @@ export function MobileNav({ onAddClick }: MobileNavProps) {
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/30"
+                  className="w-14 h-14 rounded-full bg-[var(--primary)] flex items-center justify-center shadow-lg"
                 >
-                  <Icon className="w-6 h-6 text-white" />
+                  <Icon className="w-6 h-6 text-[var(--primary-foreground)]" />
                 </motion.div>
               </button>
             )
@@ -107,8 +106,8 @@ export function QuickActions({ isOpen, onClose, onAction }: QuickActionsProps) {
   if (!isOpen) return null
 
   const actions = [
-    { id: "lead", label: "Add Lead", icon: Users, color: "from-[#445eb7] to-[#212e7f]" },
-    { id: "appointment", label: "Book Appointment", icon: Calendar, color: "from-[#8992c8] to-[#5a71c4]" },
+    { id: "lead", label: "Add Lead", icon: Users, color: "bg-[var(--primary)]" },
+    { id: "appointment", label: "Book Appointment", icon: Calendar, color: "bg-[var(--text-secondary)]" },
   ]
 
   return (
@@ -118,7 +117,7 @@ export function QuickActions({ isOpen, onClose, onAction }: QuickActionsProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-[var(--bg-depth-0)]/80 backdrop-blur-sm z-50 lg:hidden"
+        className="fixed inset-0 bg-[rgba(31,29,26,0.5)] z-50 lg:hidden"
         onClick={onClose}
       />
 
@@ -143,11 +142,11 @@ export function QuickActions({ isOpen, onClose, onAction }: QuickActionsProps) {
           >
             <div
               className={cn(
-                "w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg",
+                "w-14 h-14 rounded-xl flex items-center justify-center shadow-lg",
                 action.color
               )}
             >
-              <action.icon className="w-6 h-6 text-white" />
+              <action.icon className="w-6 h-6 text-[var(--primary-foreground)]" />
             </div>
             <span className="text-xs font-medium text-[var(--text-primary)]">
               {action.label}

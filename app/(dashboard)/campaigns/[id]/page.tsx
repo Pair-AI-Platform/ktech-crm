@@ -12,14 +12,11 @@ import {
   Play,
   Pause,
   Clock,
-  Users,
   TrendingUp,
   Calendar,
   CheckCircle2,
   MoreHorizontal,
   Edit,
-  Trash2,
-  RefreshCw,
   Layers,
   ArrowRight,
   PhoneCall,
@@ -244,7 +241,7 @@ function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const percentage = max > 0 ? (value / max) * 100 : 0
   return (
-    <div className="h-2 rounded-full bg-[var(--bg-depth-2)] overflow-hidden">
+    <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
       <motion.div
         className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)]"
         initial={{ width: 0 }}

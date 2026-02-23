@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -8,13 +8,11 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { InlineTagSelect, type TagOption, type RowVariant } from "@/components/ui/notion-tag-select"
+import { InlineTagSelect, type RowVariant } from "@/components/ui/notion-tag-select"
 import {
   Phone,
   Mail,
   Calendar,
-  MoreHorizontal,
-  Edit,
   Trash2,
   UserPlus,
   ChevronLeft,
@@ -29,19 +27,24 @@ import {
   Flame,
   Thermometer,
   Snowflake,
-  FileText,
-  Plus,
   Lock,
-  Send,
   BookOpen,
-  Check
+  Check,
+  PhoneForwarded
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
-import { PIPELINE_STAGES, LEAD_SOURCES, SCHOOLS, LEAD_STATUSES, LOCKED_STAGES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SF_DOCUMENTS, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus } from "@/types"
-import { formatKuwaitPhone, getRelativeTime } from "@/lib/utils"
+import { PIPELINE_STAGES, SCHOOLS, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, LOCKED_STAGES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SF_DOCUMENTS, PUC_DOCUMENT_STATUSES, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus, type PUCDocumentStatus } from "@/types"
+import { computePUCDocumentStatus } from "@/lib/psp/document-status"
+import { formatKuwaitPhone, getRelativeTime, getInitials } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
+import { CallbackScheduler } from "@/components/leads/callback-scheduler"
 import { createClient } from "@/lib/supabase/client"
+import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
+import { ContactedStatusDialog } from "@/components/leads/contacted-status-dialog"
+import { BlockedReasonDialog } from "@/components/leads/blocked-reason-dialog"
+import { WithdrawReasonDialog } from "@/components/leads/withdraw-reason-dialog"
+import type { SubmissionBlockedReason } from "@/types"
 
 interface LeadTableProps {
   leads: Lead[]
@@ -52,6 +55,7 @@ interface LeadTableProps {
   onLeadClick?: (lead: Lead) => void
   onEditLead?: (lead: Lead) => void
   currentStageFilter?: PipelineStage | "all"
+  fundingTypeFilter?: "all" | "self_funded" | "puc"
 }
 
 type SortField = "name" | "updated_at" | "pipeline_stage" | "source" | "school"
@@ -69,7 +73,7 @@ function getLeadTemperature(lead: Lead): { temperature: LeadTemperature; descrip
   if (
     daysSinceContact !== null &&
     daysSinceContact <= 3 &&
-    ["visit", "test", "application"].includes(lead.pipeline_stage)
+    ["test", "application"].includes(lead.pipeline_stage)
   ) {
     return {
       temperature: "hot",
@@ -81,7 +85,7 @@ function getLeadTemperature(lead: Lead): { temperature: LeadTemperature; descrip
   if (
     daysSinceContact !== null &&
     daysSinceContact <= 7 &&
-    ["visit", "test"].includes(lead.pipeline_stage)
+    ["test"].includes(lead.pipeline_stage)
   ) {
     return {
       temperature: "warm",
@@ -135,45 +139,60 @@ const temperatureConfig = {
   }
 }
 
-// Document requirements by graduate type (must match PSP wizard)
+// Document requirements by graduate type (must match PSP wizard / document-rules.ts)
 const DOCUMENTS_BY_TYPE: Record<string, { id: string; required: boolean }[]> = {
   gov: [
     { id: "passport", required: true },
     { id: "civil_id", required: true },
     { id: "parent_civil_id", required: true },
-    { id: "high_school_cert", required: true },
-    { id: "student_nationality", required: true },
-    { id: "puc_payment_receipt", required: true },
+    { id: "hs_certificate", required: true },
+    { id: "nationality", required: true },
+    { id: "puc_receipt", required: true },
     { id: "acceptance_letter", required: true },
   ],
   us: [
     { id: "civil_id", required: true },
     { id: "passport", required: true },
-    { id: "hs_transcript_moh_equivalency", required: true },
-    { id: "sequence_letter", required: true },
+    { id: "nationality", required: true },
+    { id: "transcript_moh", required: true },
+    { id: "sequence", required: true },
+    { id: "equivalency", required: true },
+    { id: "puc_receipt", required: true },
+    { id: "acceptance_letter", required: true },
   ],
   uk: [
     { id: "civil_id", required: true },
-    { id: "gcse_cert", required: true },
-    { id: "a_level_cert", required: true },
-    { id: "passport", required: true },
+    { id: "gcse", required: true },
     { id: "equivalency", required: true },
-    { id: "photo", required: true },
+    { id: "passport", required: true },
+    { id: "nationality", required: true },
+    { id: "puc_receipt", required: true },
+    { id: "acceptance_letter", required: true },
   ],
   ksa: [
     { id: "civil_id", required: true },
-    { id: "high_school_cert", required: true },
-    { id: "transcript", required: true },
+    { id: "shahada", required: true },
+    { id: "qiyas", required: true },
     { id: "passport", required: true },
+    { id: "nationality", required: true },
+    { id: "puc_receipt", required: true },
+    { id: "acceptance_letter", required: true },
+  ],
+  other: [
+    { id: "civil_id", required: true },
+    { id: "hs_certificate", required: true },
     { id: "equivalency", required: true },
-    { id: "photo", required: true },
+    { id: "passport", required: true },
+    { id: "nationality", required: true },
+    { id: "puc_receipt", required: true },
+    { id: "acceptance_letter", required: true },
   ],
 }
 
 // Check if all required documents are uploaded for a lead
 function checkAllDocumentsUploaded(leadId: string): boolean {
   // Check all graduate types to find which one has documents
-  const graduateTypes = ['gov', 'us', 'uk', 'ksa']
+  const graduateTypes = ['gov', 'us', 'uk', 'ksa', 'other']
 
   for (const graduateType of graduateTypes) {
     const storageKey = `psp-documents-${leadId}-${graduateType}`
@@ -209,27 +228,35 @@ export function LeadTable({
   onSelectLead,
   onSelectAll,
   onLeadClick,
-  onEditLead,
-  currentStageFilter
+  currentStageFilter,
+  fundingTypeFilter
 }: LeadTableProps) {
-  const { updateLeadStage, updateLead, deleteLead, loading: mutationLoading } = useLeadMutations()
+  const { updateLeadStage, updateLead, incrementContactCount } = useLeadMutations()
   const [sortField, setSortField] = useState<SortField>("updated_at")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   const [editingStage, setEditingStage] = useState<string | null>(null)
-  const [editingSource, setEditingSource] = useState<string | null>(null)
   const [editingSchool, setEditingSchool] = useState<string | null>(null)
   const [editingStatus, setEditingStatus] = useState<string | null>(null)
   const [editingSubmissionSubstage, setEditingSubmissionSubstage] = useState<string | null>(null)
   const [editingSubmissionStatus, setEditingSubmissionStatus] = useState<string | null>(null)
   const [bookingLead, setBookingLead] = useState<Lead | null>(null)
-  const [bookingSimpleMode, setBookingSimpleMode] = useState(false)
+  const [, setBookingSimpleMode] = useState(false)
   const [bookingCallbackMode, setBookingCallbackMode] = useState(false)
+  const [callbackLead, setCallbackLead] = useState<Lead | null>(null)
+  const [callbackFromStage, setCallbackFromStage] = useState<PipelineStage | undefined>(undefined)
   const [documentCompleteLeads, setDocumentCompleteLeads] = useState<Set<string>>(new Set())
-  const [sfGreenLeads, setSfGreenLeads] = useState<Set<string>>(new Set())
+  const [, setSfGreenLeads] = useState<Set<string>>(new Set())
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
+  const [lostDialogLead, setLostDialogLead] = useState<Lead | null>(null)
+  const [contactedDialogLead, setContactedDialogLead] = useState<Lead | null>(null)
+  const [blockedDialogLead, setBlockedDialogLead] = useState<Lead | null>(null)
+  const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
+  const [pucPaymentLeads, setPucPaymentLeads] = useState<Set<string>>(new Set())
+  const [editingDocumentStatus, setEditingDocumentStatus] = useState<string | null>(null)
 
   // Check if we're viewing submission stage
   const isSubmissionView = currentStageFilter === 'applicant'
+  const isPucSrjView = fundingTypeFilter === 'puc'
 
   // Function to refresh document completion status
   const refreshDocumentStatus = React.useCallback(() => {
@@ -304,8 +331,38 @@ export function LeadTable({
   }, [leads])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggers data fetch on mount
     refreshSfGreenStatus()
   }, [refreshSfGreenStatus])
+
+  // Fetch PUC payment status for PUC leads
+  const refreshPucPaymentStatus = useCallback(async () => {
+    if (!isPucSrjView) {
+      setPucPaymentLeads(new Set())
+      return
+    }
+    const pucLeads = leads.filter(l => l.funding_type === 'puc')
+    if (pucLeads.length === 0) {
+      setPucPaymentLeads(new Set())
+      return
+    }
+    const supabase = createClient()
+    const pucLeadIds = pucLeads.map(l => l.id)
+    const { data: transactions } = await supabase
+      .from('payment_transactions')
+      .select('lead_id')
+      .in('lead_id', pucLeadIds)
+      .eq('status', 'completed')
+      .eq('notes', 'PSP Fee Payment')
+    if (transactions) {
+      setPucPaymentLeads(new Set(transactions.map(t => t.lead_id)))
+    }
+  }, [leads, isPucSrjView])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggers data fetch on mount
+    refreshPucPaymentStatus()
+  }, [refreshPucPaymentStatus])
 
   // Optimistic updates - store pending changes locally
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, Partial<Lead>>>({})
@@ -345,9 +402,36 @@ export function LeadTable({
   })
 
   const handleStageChange = async (leadId: string, newStage: PipelineStage) => {
+    // Intercept "lost" stage change - show dialog to pick reasons
+    if (newStage === 'lost') {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead) {
+        setLostDialogLead(lead)
+      }
+      return
+    }
+
+    // Intercept "withdraw" stage change - show dialog to pick withdrawal reason
+    if (newStage === 'withdraw') {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead) {
+        setWithdrawDialogLead(lead)
+      }
+      return
+    }
+
+    // Intercept "contacted" stage change - require status selection
+    if (newStage === 'contacted') {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead) {
+        setContactedDialogLead(lead)
+      }
+      return
+    }
+
     // Optimistic update - immediately show the new value
-    // If changing to 'new', 'visit', 'test', or 'appointment' stage, also clear the status
-    const shouldClearStatus = newStage === 'new' || newStage === 'visit' || newStage === 'test' || newStage === 'appointment'
+    // If changing to 'new' stage, also clear the status
+    const shouldClearStatus = newStage === 'new'
     if (shouldClearStatus) {
       setPendingUpdates(prev => ({
         ...prev,
@@ -358,7 +442,7 @@ export function LeadTable({
     }
     setEditingStage(leadId)
 
-    // If changing to 'new' or 'test' stage, update both stage and clear status
+    // If changing to a stage with no status, update both stage and clear status
     let result
     if (shouldClearStatus) {
       result = await updateLead(leadId, { pipeline_stage: newStage, status: undefined as unknown as LeadStatus })
@@ -384,32 +468,93 @@ export function LeadTable({
         }
         return updated
       })
-    } else {
-      // If stage changed to appointment, open appointment booking popup in simple mode (date/time only)
-      if (newStage === 'appointment') {
-        const lead = leads.find(l => l.id === leadId)
-        if (lead) {
-          setBookingSimpleMode(true)
-          setBookingCallbackMode(false)
-          setBookingLead(lead)
-        }
-      }
     }
   }
 
-  const handleSourceChange = async (leadId: string, newSource: string) => {
+  const handleLostConfirm = async (reasonId: string, notes?: string) => {
+    if (!lostDialogLead) return
+
+    const leadId = lostDialogLead.id
     // Optimistic update
-    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], source: newSource as Lead['source'] } }))
-    setEditingSource(leadId)
+    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'lost' as PipelineStage } }))
+    setEditingStage(leadId)
 
-    const result = await updateLead(leadId, { source: newSource as Lead['source'] })
+    const result = await updateLeadStage(leadId, 'lost' as PipelineStage, reasonId, notes)
 
-    setEditingSource(null)
+    setEditingStage(null)
+    setLostDialogLead(null)
     if (result.error) {
       setPendingUpdates(prev => {
         const updated = { ...prev }
         if (updated[leadId]) {
-          delete updated[leadId].source
+          delete updated[leadId].pipeline_stage
+          if (Object.keys(updated[leadId]).length === 0) {
+            delete updated[leadId]
+          }
+        }
+        return updated
+      })
+    }
+  }
+
+  const handleContactedConfirm = async (status: LeadStatus) => {
+    if (!contactedDialogLead) return
+
+    const leadId = contactedDialogLead.id
+    // Optimistic update - set both stage and status
+    setPendingUpdates(prev => ({
+      ...prev,
+      [leadId]: { ...prev[leadId], pipeline_stage: 'contacted' as PipelineStage, status }
+    }))
+    setEditingStage(leadId)
+
+    const result = await updateLead(leadId, { pipeline_stage: 'contacted' as PipelineStage, status })
+
+    setEditingStage(null)
+    setContactedDialogLead(null)
+    if (result.error) {
+      setPendingUpdates(prev => {
+        const updated = { ...prev }
+        if (updated[leadId]) {
+          delete updated[leadId].pipeline_stage
+          delete updated[leadId].status
+          if (Object.keys(updated[leadId]).length === 0) {
+            delete updated[leadId]
+          }
+        }
+        return updated
+      })
+    }
+  }
+
+
+  const handleBlockedConfirm = async (reason: SubmissionBlockedReason, notes?: string) => {
+    if (!blockedDialogLead) return
+    const leadId = blockedDialogLead.id
+    await updateLead(leadId, {
+      submission_blocked_reason: reason,
+      submission_blocked_reason_notes: notes || undefined,
+    })
+    setBlockedDialogLead(null)
+  }
+
+  const handleWithdrawConfirm = async (reason: string, notes?: string) => {
+    if (!withdrawDialogLead) return
+
+    const leadId = withdrawDialogLead.id
+    // Optimistic update
+    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'withdraw' as PipelineStage } }))
+    setEditingStage(leadId)
+
+    const result = await updateLeadStage(leadId, 'withdraw' as PipelineStage, undefined, undefined, reason, notes)
+
+    setEditingStage(null)
+    setWithdrawDialogLead(null)
+    if (result.error) {
+      setPendingUpdates(prev => {
+        const updated = { ...prev }
+        if (updated[leadId]) {
+          delete updated[leadId].pipeline_stage
           if (Object.keys(updated[leadId]).length === 0) {
             delete updated[leadId]
           }
@@ -442,8 +587,17 @@ export function LeadTable({
   }
 
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
-    // Optimistic update
-    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], status: newStatus } }))
+    // Optimistic update - increment contact_count on every status change
+    const lead = leads.find(l => l.id === leadId)
+    const currentCount = lead ? (getEffectiveValue(leadId, 'contact_count', lead.contact_count) || 0) : 0
+    setPendingUpdates(prev => ({
+      ...prev,
+      [leadId]: {
+        ...prev[leadId],
+        status: newStatus,
+        ...(lead ? { contact_count: currentCount + 1 } : {}),
+      },
+    }))
     setEditingStatus(leadId)
 
     const result = await updateLead(leadId, { status: newStatus })
@@ -454,6 +608,7 @@ export function LeadTable({
         const updated = { ...prev }
         if (updated[leadId]) {
           delete updated[leadId].status
+          delete updated[leadId].contact_count
           if (Object.keys(updated[leadId]).length === 0) {
             delete updated[leadId]
           }
@@ -461,11 +616,19 @@ export function LeadTable({
         return updated
       })
     } else {
-      // If status changed to Callback, open appointment booking popup (full wizard for callback type)
+      // If status changed to Callback, open dedicated callback scheduler popup
       if (newStatus === 'callback') {
         const lead = leads.find(l => l.id === leadId)
         if (lead) {
-          setBookingSimpleMode(false)
+          setCallbackFromStage(lead.pipeline_stage)
+          setCallbackLead(lead)
+        }
+      }
+      // If status changed to Postponed, open appointment booking popup to reschedule
+      if (newStatus === 'postponed') {
+        const lead = leads.find(l => l.id === leadId)
+        if (lead) {
+          setBookingSimpleMode(true)
           setBookingCallbackMode(false)
           setBookingLead(lead)
         }
@@ -514,16 +677,28 @@ export function LeadTable({
         }
         return updated
       })
-    } else {
-      // If status changed to Appointment or CB, open appointment booking popup
-      if (newStatus === 'appointment' || newStatus === 'cb') {
-        const lead = leads.find(l => l.id === leadId)
-        if (lead) {
-          setBookingSimpleMode(true)
-          setBookingCallbackMode(newStatus === 'cb')
-          setBookingLead(lead)
+    }
+  }
+
+  const handleDocumentStatusOverride = async (leadId: string, value: string) => {
+    const overrideValue = value === 'auto' ? null : value as PUCDocumentStatus
+    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], puc_document_status_override: overrideValue } }))
+    setEditingDocumentStatus(leadId)
+
+    const result = await updateLead(leadId, { puc_document_status_override: overrideValue } as Partial<Lead>)
+
+    setEditingDocumentStatus(null)
+    if (result.error) {
+      setPendingUpdates(prev => {
+        const updated = { ...prev }
+        if (updated[leadId]) {
+          delete updated[leadId].puc_document_status_override
+          if (Object.keys(updated[leadId]).length === 0) {
+            delete updated[leadId]
+          }
         }
-      }
+        return updated
+      })
     }
   }
 
@@ -584,10 +759,10 @@ export function LeadTable({
           className="flex flex-col items-center gap-4"
         >
           <div className="relative">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--primary-muted)] to-[var(--bg-sunken)] flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
               <Loader2 className="w-7 h-7 animate-spin text-[var(--primary)]" />
             </div>
-            <div className="absolute inset-0 rounded-2xl bg-[var(--primary)] opacity-20 animate-ping" />
+            <div className="absolute inset-0 rounded-xl bg-[var(--primary)] opacity-20 animate-ping" />
           </div>
           <div className="text-center">
             <p className="text-sm font-medium text-[var(--text-primary)]">Loading leads</p>
@@ -606,7 +781,7 @@ export function LeadTable({
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--bg-sunken)] to-[var(--bg-surface)] flex items-center justify-center mb-5 mx-auto border border-[var(--border)]">
+          <div className="w-20 h-20 rounded-xl bg-[var(--bg-sunken)] flex items-center justify-center mb-5 mx-auto border border-[var(--border)]">
             <Search className="w-9 h-9 text-[var(--text-muted)]" />
           </div>
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">No leads found</h3>
@@ -624,7 +799,7 @@ export function LeadTable({
       <div className="overflow-auto flex-1 min-h-0 h-full">
         <table className="w-full h-full">
           <thead>
-            <tr className="border-b border-[var(--border)] bg-gradient-to-r from-[var(--bg-sunken)] to-[var(--bg-surface)]">
+            <tr className="border-b border-[var(--border)] bg-[var(--bg-sunken)]">
               <th className="p-4 text-left w-12">
                 <div className="flex items-center justify-center">
                   <input
@@ -657,14 +832,16 @@ export function LeadTable({
                       Stage
                     </span>
                   </th>
+                  {!isPucSrjView && (
+                    <th className="p-4 text-left">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        Substage
+                      </span>
+                    </th>
+                  )}
                   <th className="p-4 text-left">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      Substage
-                    </span>
-                  </th>
-                  <th className="p-4 text-left">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      Status
+                      {isPucSrjView ? "Document Status" : "Status"}
                     </span>
                   </th>
                   <th className="p-4 text-left">
@@ -675,15 +852,6 @@ export function LeadTable({
                 </>
               ) : (
                 <>
-                  <th className="p-4 text-left">
-                    <button
-                      onClick={() => handleSort("source")}
-                      className="flex items-center text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group"
-                    >
-                      Source
-                      <span className="group-hover:scale-110 transition-transform">{getSortIcon("source")}</span>
-                    </button>
-                  </th>
                   <th className="p-4 text-left">
                     <button
                       onClick={() => handleSort("pipeline_stage")}
@@ -740,9 +908,6 @@ export function LeadTable({
           </thead>
           <tbody>
             {sortedLeads.map((lead, index) => {
-              const stageInfo = PIPELINE_STAGES.find((s) => s.value === lead.pipeline_stage)
-              const sourceInfo = LEAD_SOURCES.find((s) => s.value === lead.source)
-              const schoolInfo = SCHOOLS.find((s) => s.value === lead.school)
               const isSelected = selectedLeads.includes(lead.id)
 
               // Determine row variant for substage/status tag coloring
@@ -750,17 +915,13 @@ export function LeadTable({
               const effectiveSubstage = getEffectiveValue(lead.id, 'submission_substage', lead.submission_substage)
               const isInSubmissionStage = lead.pipeline_stage === 'applicant'
               const isSubmissionLost = isInSubmissionStage && effectiveSubstage === 'lost'
-              const isSubmissionReady = isInSubmissionStage && effectiveSubstage === 'ready'
-              const isSubmissionBlocked = isInSubmissionStage && effectiveSubstage === 'blocked'
-              const isSubmissionPending = isInSubmissionStage && effectiveSubstage === 'pending'
-              const isSubmissionSubmitted = isInSubmissionStage && effectiveSubstage === 'submitted'
-              const isSubmissionDocuments = isInSubmissionStage && effectiveSubstage === 'documents'
+              const isSubmissionSubmitted = isInSubmissionStage && effectiveSubstage === 'submissions'
 
               const rowVariant: RowVariant = lead.pipeline_stage === 'lost' || isSubmissionLost
                 ? 'lost'
-                : (lead.ministry_blocked || isSubmissionBlocked)
+                : lead.ministry_blocked
                   ? 'blocked'
-                  : isSubmissionReady || documentCompleteLeads.has(lead.id)
+                  : isSubmissionSubmitted || documentCompleteLeads.has(lead.id)
                     ? 'documents-complete'
                     : isInSubmissionStage
                       ? 'submission'
@@ -774,35 +935,11 @@ export function LeadTable({
                   transition={{ delay: index * 0.015 }}
                   onClick={() => isSubmissionView && onLeadClick?.(lead)}
                   className={cn(
-                    "border-b border-[var(--border)] transition-all duration-150 group/row",
+                    "border-b border-[var(--border)] transition-all duration-150 group/row bg-white dark:bg-[var(--bg-surface)]",
                     isSubmissionView && "cursor-pointer",
-                    // Lost stage OR submission with lost substage = RED background
-                    lead.pipeline_stage === 'lost' || isSubmissionLost
-                      ? "bg-red-100 dark:bg-red-900/50 border-l-4 border-l-red-500"
-                      // Blocked substage OR ministry blocked = ORANGE (entire row)
-                      : (lead.ministry_blocked || isSubmissionBlocked)
-                        ? "bg-orange-100 dark:bg-orange-900/50 border-l-4 border-l-orange-500"
-                        // SF lead paid > 150 KD + all SF documents done = FULL GREEN background
-                        : sfGreenLeads.has(lead.id)
-                          ? "bg-green-500 dark:bg-green-600 border-l-4 border-l-green-700 text-white [&_a]:text-white [&_p]:text-white [&_span]:text-white"
-                          // Ready substage OR all documents uploaded = GREEN background
-                          : isSubmissionReady || documentCompleteLeads.has(lead.id)
-                            ? "bg-green-100 dark:bg-green-900/40 border-l-4 border-l-green-500"
-                            // Pending substage = WHITE background
-                            : isSubmissionPending
-                              ? "bg-white dark:bg-gray-800 border-l-4 border-l-gray-300"
-                              // Submitted substage = BLUE
-                              : isSubmissionSubmitted
-                                ? "bg-blue-100 dark:bg-blue-900/50 border-l-4 border-l-blue-500"
-                                // Documents substage = WHITE background
-                                : isSubmissionDocuments
-                                  ? "bg-white dark:bg-gray-800 border-l-4 border-l-gray-300"
-                                  // Default submission stage (no substage selected)
-                                  : lead.pipeline_stage === 'applicant'
-                                    ? "bg-white dark:bg-gray-950/40 border-l-2 border-l-gray-300"
-                                    : isSelected
-                                        ? "bg-[var(--primary-muted)] border-l-2 border-l-[var(--primary)]"
-                                        : "hover:bg-[var(--bg-hover)] border-l-2 border-l-transparent hover:border-l-[var(--border-emphasis)]"
+                    isSelected
+                      ? "border-l-2 border-l-[var(--primary)]"
+                      : "hover:bg-[var(--bg-hover)] border-l-2 border-l-transparent hover:border-l-[var(--border-emphasis)]"
                   )}
                 >
                   <td className="p-4">
@@ -822,7 +959,7 @@ export function LeadTable({
                       const Icon = config.icon
                       const tempLabel = temperature === "hot" ? "Hot" : temperature === "warm" ? "Warm" : "Cold"
                       return (
-                        <Link href={`/leads/${lead.id}${currentStageFilter && currentStageFilter !== "all" ? `?stage=${currentStageFilter}` : ""}`} className="flex items-center gap-3 group">
+                        <Link href={`/leads/${lead.id}${currentStageFilter && currentStageFilter !== "all" ? `?stage=${currentStageFilter}` : ""}`} className="flex items-center gap-3 group" onClick={isSubmissionView ? (e: React.MouseEvent) => e.preventDefault() : undefined}>
                           <SimpleTooltip
                             content={
                               <div className="max-w-[250px]">
@@ -835,17 +972,21 @@ export function LeadTable({
                             }
                             side="right"
                           >
-                            <div className="relative cursor-help">
-                              <Avatar size="sm" className={cn(
-                                "ring-[3px] transition-all",
-                                config.ring,
-                                "group-hover:ring-4"
-                              )}>
-                                <AvatarFallback className="bg-gradient-to-br from-[var(--bg-sunken)] to-[var(--bg-surface)] text-[var(--text-secondary)] font-semibold text-xs">
-                                  {lead.first_name?.[0]}{lead.last_name?.[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                            </div>
+                            {(() => {
+                              const effectiveCount = getEffectiveValue(lead.id, 'contact_count', lead.contact_count) || 0
+                              return (
+                                <div className={cn(
+                                  "relative cursor-help flex items-center justify-center w-8 h-8 rounded-full ring-[3px] transition-all font-bold text-xs",
+                                  config.ring,
+                                  "group-hover:ring-4",
+                                  effectiveCount > 0
+                                    ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                                    : "bg-[var(--bg-sunken)] text-[var(--text-muted)]"
+                                )}>
+                                  {effectiveCount}
+                                </div>
+                              )
+                            })()}
                           </SimpleTooltip>
                           <div className="min-w-0">
                             <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate">
@@ -931,8 +1072,20 @@ export function LeadTable({
                   {isSubmissionView ? (
                     <>
                       {/* Stage column */}
-                      <td className="p-4">
-                        {(() => {
+                      <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                        {isPucSrjView ? (
+                          <InlineTagSelect
+                            value={getEffectiveValue(lead.id, 'submission_substage', lead.submission_substage) || 'documents'}
+                            options={SUBMISSION_SUBSTAGES.map((substage) => ({
+                              value: substage.value,
+                              label: substage.label,
+                              color: substage.value === 'lost' ? 'lost' : substage.value === 'submissions' ? 'application' : 'new',
+                            }))}
+                            onChange={(value) => handleSubmissionSubstageChange(lead.id, value as SubmissionSubstage)}
+                            disabled={editingSubmissionSubstage === lead.id}
+                            loading={editingSubmissionSubstage === lead.id}
+                          />
+                        ) : (() => {
                           const currentStage = getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage) as PipelineStage
                           const isStageLocked = LOCKED_STAGES.includes(currentStage)
                           const stageInfo = PIPELINE_STAGES.find(s => s.value === currentStage)
@@ -940,7 +1093,7 @@ export function LeadTable({
                           if (isStageLocked && stageInfo) {
                             return (
                               <SimpleTooltip content="This stage is locked and cannot be changed">
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-depth-2)] border border-[var(--border)]">
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
                                   <Lock className="w-3 h-3 text-[var(--text-muted)]" />
                                   <span className="text-xs font-medium text-[var(--text-secondary)]">{stageInfo.label}</span>
                                 </div>
@@ -963,34 +1116,67 @@ export function LeadTable({
                           )
                         })()}
                       </td>
-                      {/* Substage column */}
+                      {/* Substage column - hidden for PUC SRJ view */}
+                      {!isPucSrjView && (
+                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                          <InlineTagSelect
+                            value={getEffectiveValue(lead.id, 'submission_substage', lead.submission_substage) || ''}
+                            options={SUBMISSION_SUBSTAGES.map((substage) => ({
+                              value: substage.value,
+                              label: substage.label,
+                              color: "gray",
+                            }))}
+                            onChange={(value) => handleSubmissionSubstageChange(lead.id, value as SubmissionSubstage)}
+                            disabled={editingSubmissionSubstage === lead.id}
+                            loading={editingSubmissionSubstage === lead.id}
+                          />
+                        </td>
+                      )}
+                      {/* Status / Document Status column */}
                       <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                        <InlineTagSelect
-                          value={getEffectiveValue(lead.id, 'submission_substage', lead.submission_substage) || ''}
-                          options={SUBMISSION_SUBSTAGES.map((substage) => ({
-                            value: substage.value,
-                            label: substage.label,
-                            color: substage.color,
-                          }))}
-                          onChange={(value) => handleSubmissionSubstageChange(lead.id, value as SubmissionSubstage)}
-                          disabled={editingSubmissionSubstage === lead.id}
-                          loading={editingSubmissionSubstage === lead.id}
-                        />
-                      </td>
-                      {/* Submission Status column */}
-                      <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                        <InlineTagSelect
-                          value={getEffectiveValue(lead.id, 'submission_status', lead.submission_status) || ''}
-                          options={SUBMISSION_STATUSES.map((status) => ({
-                            value: status.value,
-                            label: status.label,
-                            color: status.color,
-                          }))}
-                          onChange={(value) => handleSubmissionStatusChange(lead.id, value as SubmissionStatus)}
-                          disabled={editingSubmissionStatus === lead.id}
-                          loading={editingSubmissionStatus === lead.id}
-                          rowVariant={rowVariant}
-                        />
+                        {isPucSrjView ? (
+                          (() => {
+                            const sub = getEffectiveValue(lead.id, 'submission_substage', lead.submission_substage) as SubmissionSubstage | null
+                            const allDocsComplete = documentCompleteLeads.has(lead.id)
+                            const paymentComplete = pucPaymentLeads.has(lead.id)
+                            const isBlocked = !!lead.submission_blocked_reason
+                            const computedStatus = computePUCDocumentStatus(sub, allDocsComplete, paymentComplete, isBlocked)
+                            const override = getEffectiveValue(lead.id, 'puc_document_status_override', lead.puc_document_status_override) as PUCDocumentStatus | null | undefined
+                            const status = override || computedStatus
+
+                            const docStatusColorMap: Record<string, string> = {
+                              red: 'red', amber: 'warning', green: 'green', blue: 'blue', orange: 'orange'
+                            }
+                            const docStatusOptions = [
+                              { value: 'auto', label: computedStatus ? `Auto (${PUC_DOCUMENT_STATUSES.find(s => s.value === computedStatus)?.label || computedStatus})` : 'Auto', color: 'gray' },
+                              ...PUC_DOCUMENT_STATUSES.map(s => ({ value: s.value, label: s.label, color: docStatusColorMap[s.color] || s.color }))
+                            ]
+
+                            return (
+                              <InlineTagSelect
+                                value={override ? override : (status || 'auto')}
+                                options={docStatusOptions}
+                                onChange={(value) => handleDocumentStatusOverride(lead.id, value)}
+                                disabled={editingDocumentStatus === lead.id}
+                                loading={editingDocumentStatus === lead.id}
+                                rowVariant={rowVariant}
+                              />
+                            )
+                          })()
+                        ) : (
+                          <InlineTagSelect
+                            value={getEffectiveValue(lead.id, 'submission_status', lead.submission_status) || ''}
+                            options={SUBMISSION_STATUSES.map((status) => ({
+                              value: status.value,
+                              label: status.label,
+                              color: "gray",
+                            }))}
+                            onChange={(value) => handleSubmissionStatusChange(lead.id, value as SubmissionStatus)}
+                            disabled={editingSubmissionStatus === lead.id}
+                            loading={editingSubmissionStatus === lead.id}
+                            rowVariant={rowVariant}
+                          />
+                        )}
                       </td>
                       {/* Agent column */}
                       <td className="p-4">
@@ -1000,7 +1186,7 @@ export function LeadTable({
                               <Avatar size="xs">
                                 <AvatarImage src={lead.assigned_agent.avatar_url} />
                                 <AvatarFallback className="text-[10px] bg-[var(--primary-muted)] text-[var(--primary)]">
-                                  {lead.assigned_agent.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  {getInitials(lead.assigned_agent.full_name || '')}
                                 </AvatarFallback>
                               </Avatar>
                               <span className="text-sm text-[var(--text-secondary)] truncate max-w-[100px]">
@@ -1016,18 +1202,6 @@ export function LeadTable({
                   ) : (
                     <>
                       <td className="p-4">
-                        <InlineTagSelect
-                          value={getEffectiveValue(lead.id, 'source', lead.source)}
-                          options={LEAD_SOURCES.map((source, index) => ({
-                            value: source.value,
-                            label: source.label,
-                          }))}
-                          onChange={(value) => handleSourceChange(lead.id, value)}
-                          disabled={editingSource === lead.id}
-                          loading={editingSource === lead.id}
-                        />
-                      </td>
-                      <td className="p-4">
                         {(() => {
                           const currentStage = getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage) as PipelineStage
                           const isStageLocked = LOCKED_STAGES.includes(currentStage)
@@ -1036,7 +1210,7 @@ export function LeadTable({
                           if (isStageLocked && stageInfo) {
                             return (
                               <SimpleTooltip content="This stage is locked and cannot be changed">
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-depth-2)] border border-[var(--border)]">
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
                                   <Lock className="w-3 h-3 text-[var(--text-muted)]" />
                                   <span className="text-xs font-medium text-[var(--text-secondary)]">{stageInfo.label}</span>
                                 </div>
@@ -1062,19 +1236,29 @@ export function LeadTable({
                       <td className="p-4">
                         {(() => {
                           const effectiveStage = getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage)
-                          const isStatusDisabled = effectiveStage === 'new' || effectiveStage === 'test' || effectiveStage === 'appointment'
 
                           // Filter statuses based on stage
-                          const contactedStatuses: LeadStatus[] = ['no_answer', 'switched_off', 'callback', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done']
-                          const visitStatuses: LeadStatus[] = ['no_answer', 'not_interested', 'switched_off', 'callback']
-                          const availableStatuses = effectiveStage === 'contacted'
-                            ? LEAD_STATUSES.filter(s => contactedStatuses.includes(s.value))
-                            : effectiveStage === 'visit'
-                            ? LEAD_STATUSES.filter(s => visitStatuses.includes(s.value))
-                            : LEAD_STATUSES
+                          const STAGE_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none'> = {
+                            new: 'none',
+                            contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential'],
+                            visit: ['no_answer', 'cant_reach', 'interested', 'not_interested'],
+                            test: ['online', 'on_campus'],
+                            application: 'none',
+                            lost: 'all',
+                            applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
+                            enrolled: 'none',
+                            withdraw: 'all',
+                          }
+                          const stageConfig = effectiveStage ? STAGE_STATUSES[effectiveStage as PipelineStage] : 'all'
+                          const isStatusDisabled = stageConfig === 'none'
+                          const availableStatuses = stageConfig === 'none'
+                            ? []
+                            : stageConfig === 'all'
+                            ? LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+                            : LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
 
                           return isStatusDisabled ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-depth-2)] border border-[var(--border)] text-[var(--text-muted)]">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]">
                               <span className="text-xs">—</span>
                             </div>
                           ) : (
@@ -1083,7 +1267,7 @@ export function LeadTable({
                               options={availableStatuses.map((status) => ({
                                 value: status.value,
                                 label: status.label,
-                                color: status.color,
+                                color: "gray",
                               }))}
                               onChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}
                               disabled={editingStatus === lead.id}
@@ -1098,6 +1282,7 @@ export function LeadTable({
                           options={SCHOOLS.map((school) => ({
                             value: school.value,
                             label: school.label,
+                            color: "gray",
                           }))}
                           onChange={(value) => handleSchoolChange(lead.id, value)}
                           disabled={editingSchool === lead.id}
@@ -1135,27 +1320,17 @@ export function LeadTable({
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                      {/* Create Application button - replaces View when stage is test */}
-                      {getEffectiveValue(lead.id, 'pipeline_stage', lead.pipeline_stage) === 'test' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStageChange(lead.id, 'application' as PipelineStage)}
-                          className="text-xs gap-1.5 bg-[var(--primary-muted)] border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white"
-                          title="Create Application"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Application
-                        </Button>
-                      ) : null}
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() => onEditLead?.(lead)}
                         className="hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-                        title="Edit lead"
+                        onClick={() => {
+                          setCallbackFromStage(lead.pipeline_stage)
+                          setCallbackLead(lead)
+                        }}
+                        title="Schedule callback"
                       >
-                        <Edit className="w-4 h-4" />
+                        <PhoneForwarded className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -1197,7 +1372,7 @@ export function LeadTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="flex items-center justify-between p-4 border-t border-[var(--border)] bg-gradient-to-r from-[var(--bg-sunken)] to-[var(--bg-surface)]">
+      <div className="flex items-center justify-between p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)]">
             <span className="text-2xl font-bold text-[var(--primary)]">{leads.length}</span>
@@ -1238,6 +1413,64 @@ export function LeadTable({
       callbackMode={bookingCallbackMode}
     />
 
+    {/* Callback Scheduler Popup */}
+    <CallbackScheduler
+      isOpen={!!callbackLead}
+      onClose={() => {
+        setCallbackLead(null)
+        setCallbackFromStage(undefined)
+      }}
+      onSuccess={() => {
+        if (callbackLead) {
+          incrementContactCount(callbackLead.id)
+        }
+        setCallbackLead(null)
+        setCallbackFromStage(undefined)
+      }}
+      lead={callbackLead}
+      fromStage={callbackFromStage}
+    />
+
+    {/* Mark Lost Dialog */}
+    <MarkLostDialog
+      open={!!lostDialogLead}
+      onOpenChange={(open) => {
+        if (!open) setLostDialogLead(null)
+      }}
+      leadName={lostDialogLead ? `${lostDialogLead.first_name} ${lostDialogLead.last_name}` : ''}
+      onConfirm={handleLostConfirm}
+    />
+
+    {/* Contacted Status Required Dialog */}
+    <ContactedStatusDialog
+      open={!!contactedDialogLead}
+      onOpenChange={(open) => {
+        if (!open) setContactedDialogLead(null)
+      }}
+      leadName={contactedDialogLead ? `${contactedDialogLead.first_name} ${contactedDialogLead.last_name}` : ''}
+      onConfirm={handleContactedConfirm}
+    />
+
+    {/* Withdraw Reason Dialog */}
+    <WithdrawReasonDialog
+      open={!!withdrawDialogLead}
+      onOpenChange={(open) => {
+        if (!open) setWithdrawDialogLead(null)
+      }}
+      leadName={withdrawDialogLead ? `${withdrawDialogLead.first_name} ${withdrawDialogLead.last_name}` : ''}
+      onConfirm={handleWithdrawConfirm}
+    />
+
+    {/* Blocked Reason Dialog (PUC SRJ) */}
+    <BlockedReasonDialog
+      open={!!blockedDialogLead}
+      onOpenChange={(open) => {
+        if (!open) setBlockedDialogLead(null)
+      }}
+      leadName={blockedDialogLead ? `${blockedDialogLead.first_name} ${blockedDialogLead.last_name}` : ''}
+      onConfirm={handleBlockedConfirm}
+    />
+
     </>
   )
 }
@@ -1263,10 +1496,10 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onDelete, onCl
       transition={{ type: "spring", damping: 25, stiffness: 300 }}
       className="fixed bottom-6 left-1/2 -translate-x-1/2 lg:left-[calc(50%+130px)] z-40"
     >
-      <div className="flex items-center gap-4 px-5 py-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-2xl shadow-black/20 backdrop-blur-sm">
+      <div className="flex items-center gap-4 px-5 py-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-md">
         {/* Selected count */}
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] flex items-center justify-center shadow-sm">
+          <div className="w-9 h-9 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-sm">
             <CheckCircle2 className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
@@ -1275,7 +1508,7 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onDelete, onCl
           </div>
         </div>
 
-        <div className="w-px h-8 bg-gradient-to-b from-transparent via-[var(--border)] to-transparent" />
+        <div className="w-px h-8 bg-[var(--border)]" />
 
         {/* Actions */}
         <div className="flex items-center gap-1">
@@ -1304,7 +1537,7 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onDelete, onCl
           </Button>
         </div>
 
-        <div className="w-px h-8 bg-gradient-to-b from-transparent via-[var(--border)] to-transparent" />
+        <div className="w-px h-8 bg-[var(--border)]" />
 
         {/* Clear */}
         <Button

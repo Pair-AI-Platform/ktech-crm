@@ -26,12 +26,16 @@ import type { Lead } from "@/types"
 import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
 
 type Step = "select" | "finance" | "cash" | "link-sent" | "success" | "error"
+type DialogMode = "enrollment" | "sf_downpayment"
 
 interface EnrollmentPaymentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   lead: Lead
-  onSuccess: (studentId: string) => Promise<void>
+  onSuccess?: (studentId?: string) => Promise<void>
+  mode?: DialogMode
+  /** Start directly on a specific step (e.g. "cash" or "finance") */
+  initialStep?: "select" | "finance" | "cash"
 }
 
 export function EnrollmentPaymentDialog({
@@ -39,8 +43,13 @@ export function EnrollmentPaymentDialog({
   onOpenChange,
   lead,
   onSuccess,
+  mode: modeProp,
+  initialStep = "select",
 }: EnrollmentPaymentDialogProps) {
-  const [step, setStep] = useState<Step>("select")
+  // Auto-detect mode from lead if not provided
+  const mode: DialogMode = modeProp ?? (lead.funding_type === "self_funded" ? "sf_downpayment" : "enrollment")
+  const isSF = mode === "sf_downpayment"
+  const [step, setStep] = useState<Step>(initialStep)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,7 +68,7 @@ export function EnrollmentPaymentDialog({
   const handleClose = () => {
     if (!loading) {
       // Reset state
-      setStep("select")
+      setStep(initialStep)
       setError(null)
       setCivilId(lead.civil_id || "")
       setInvoiceNumber("")
@@ -172,8 +181,8 @@ export function EnrollmentPaymentDialog({
   }
 
   const handleSuccessClose = async () => {
-    if (studentId) {
-      await onSuccess(studentId)
+    if (onSuccess) {
+      await onSuccess(studentId || undefined)
     }
     handleClose()
   }
@@ -195,11 +204,15 @@ export function EnrollmentPaymentDialog({
             </div>
             <div>
               <DialogTitle>
-                {step === "success" ? "Enrollment Complete!" : "Enrollment Payment"}
+                {step === "success"
+                  ? (isSF ? "Payment Recorded!" : "Enrollment Complete!")
+                  : (isSF ? "Down Payment" : "Enrollment Payment")}
               </DialogTitle>
               <DialogDescription>
                 {step === "success"
-                  ? `${lead.first_name} ${lead.last_name} is now enrolled`
+                  ? (isSF
+                    ? `${lead.first_name} ${lead.last_name} has been moved to Applicant`
+                    : `${lead.first_name} ${lead.last_name} is now enrolled`)
                   : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${lead.first_name} ${lead.last_name}`}
               </DialogDescription>
             </div>
@@ -211,7 +224,7 @@ export function EnrollmentPaymentDialog({
           {step === "select" && (
             <div className="space-y-4">
               <p className="text-sm text-[var(--text-secondary)]">
-                How will the student pay the {ENROLLMENT_PAYMENT_AMOUNT} KWD enrollment fee?
+                How will the student pay the {ENROLLMENT_PAYMENT_AMOUNT} KWD {isSF ? "down payment" : "enrollment fee"}?
               </p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -298,8 +311,10 @@ export function EnrollmentPaymentDialog({
 
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-left">
                 <p className="text-sm text-amber-700">
-                  <strong>Note:</strong> The student will be automatically enrolled once payment is confirmed.
-                  You can close this dialog - no further action needed.
+                  <strong>Note:</strong> {isSF
+                    ? "The lead will be automatically moved to Applicant once payment is confirmed."
+                    : "The student will be automatically enrolled once payment is confirmed."}
+                  {" "}You can close this dialog - no further action needed.
                 </p>
               </div>
 
@@ -379,7 +394,7 @@ export function EnrollmentPaymentDialog({
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <p className="text-sm text-emerald-700">
                   Recording cash payment of <strong>{ENROLLMENT_PAYMENT_AMOUNT} KWD</strong>.
-                  The student will be enrolled immediately.
+                  {isSF ? " The lead will move to Applicant." : " The student will be enrolled immediately."}
                 </p>
               </div>
             </div>
@@ -393,15 +408,20 @@ export function EnrollmentPaymentDialog({
               </div>
 
               <div>
-                <h3 className="font-medium text-[var(--text-primary)]">Student Enrolled!</h3>
+                <h3 className="font-medium text-[var(--text-primary)]">
+                  {isSF ? "Payment Recorded!" : "Student Enrolled!"}
+                </h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  {lead.first_name} {lead.last_name} has been successfully enrolled.
+                  {isSF
+                    ? `${lead.first_name} ${lead.last_name} has been moved to Applicant.`
+                    : `${lead.first_name} ${lead.last_name} has been successfully enrolled.`}
                 </p>
               </div>
 
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <p className="text-sm text-emerald-700">
-                  Payment of {ENROLLMENT_PAYMENT_AMOUNT} KWD recorded. A student record has been created.
+                  Payment of {ENROLLMENT_PAYMENT_AMOUNT} KWD recorded.
+                  {isSF ? "" : " A student record has been created."}
                 </p>
               </div>
             </div>
@@ -456,7 +476,7 @@ export function EnrollmentPaymentDialog({
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Confirm Payment & Enroll
+                    {isSF ? "Confirm Down Payment" : "Confirm Payment & Enroll"}
                   </>
                 )}
               </Button>

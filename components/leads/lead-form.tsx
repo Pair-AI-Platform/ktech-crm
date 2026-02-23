@@ -38,12 +38,29 @@ import {
   Trophy,
   Briefcase,
   Users,
-  Percent
+  Percent,
+  PhoneMissed,
+  PhoneOff,
+  Eye,
+  Calendar,
+  XCircle,
+  Car,
+  Clock,
+  ThumbsDown,
+  TrendingDown,
+  BookOpen,
+  Unplug,
+  Info,
+  Plane,
+  AlertTriangle,
+  type LucideIcon
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
-import { SCHOOLS, LEAD_SOURCES, MAJORS, PIPELINE_STAGES, PLACEMENT_LEVELS, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, NATIONALITIES, EDUCATION_TYPES, DISCOUNT_TYPES, type Lead, type School, type IntendedMajor, type LeadSourceCategory, type LeadSource, type FundingType, type PipelineStage, type PlacementLevel, type LeadStatus, type MinistryBlockReason, type EducationType, type AcademicTrack, type DiscountType } from "@/types"
+import { SCHOOLS, LEAD_SOURCES, MAJORS, PIPELINE_STAGES, PLACEMENT_LEVELS, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, NATIONALITIES, EDUCATION_TYPES, DISCOUNT_TYPES, type Lead, type School, type IntendedMajor, type LeadSourceCategory, type LeadSource, type FundingType, type PipelineStage, type PlacementLevel, type LeadStatus, type MinistryBlockReason, type EducationType, type AcademicTrack, type DiscountType } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { useDuplicateCheck } from "@/lib/hooks/use-duplicate-check"
+import { DuplicateWarningDialog } from "./duplicate-warning-dialog"
 
 interface LeadFormProps {
   lead?: Lead | null
@@ -59,8 +76,52 @@ const SOURCE_CATEGORIES = [
   { value: "outreach", label: "Outreach", icon: "📣" },
 ]
 
+const LEAD_STATUS_ICONS: Record<LeadStatus, LucideIcon> = {
+  no_answer: PhoneMissed,
+  callback: RefreshCw,
+  not_interested: ThumbsDown,
+  switched_off: PhoneOff,
+  busy: Clock,
+  confirmed: CheckCircle2,
+  wrong_number: Ban,
+  will_see: Eye,
+  postponed: Calendar,
+  by_mistake: AlertCircle,
+  disconnected: Unplug,
+  hanged_up: PhoneOff,
+  interested: Heart,
+  high_gpa: Trophy,
+  low_gpa: TrendingDown,
+  already_done: CheckCircle2,
+  cancelled: XCircle,
+  online: Globe,
+  on_campus: Building2,
+  on_the_way: Car,
+  cant_reach: PhoneOff,
+  contacted: Phone,
+  seeking_job: Briefcase,
+  current_student: GraduationCap,
+  asking_bachelors: SchoolIcon,
+  courses_masters: BookOpen,
+  potential: Heart,
+  rude: Ban,
+  informed: Info,
+  travelling: Plane,
+  might_withdraw: AlertTriangle,
+}
+
+const LEAD_STATUS_COLORS: Record<string, string> = {
+  warning: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
+  accent: "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30",
+  destructive: "bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/30",
+  secondary: "bg-[var(--text-muted)]/10 text-[var(--text-muted)] border-[var(--text-muted)]/30",
+  success: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30",
+}
+
 export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const { createLead, updateLead, loading } = useLeadMutations()
+  const { duplicates, checking: duplicateChecking, checkDuplicates, clearDuplicates } = useDuplicateCheck()
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [schoolSearch, setSchoolSearch] = useState("")
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
@@ -124,12 +185,18 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     discount_notes: lead?.discount_notes || "",
   })
 
-  // Filter schools based on search (supports Arabic)
-  const filteredSchools = SCHOOLS.filter(school =>
-    school.label.includes(schoolSearch) ||
-    school.labelAr.includes(schoolSearch) ||
-    school.value.toLowerCase().includes(schoolSearch.toLowerCase())
-  )
+  // Filter schools based on search (supports Arabic) and student gender
+  const filteredSchools = SCHOOLS.filter(school => {
+    // Gender filter: male students → boys schools, female students → girls schools
+    if (formData.gender === 'male' && school.gender !== 'boys') return false
+    if (formData.gender === 'female' && school.gender !== 'girls') return false
+    // Search filter
+    return (
+      school.label.includes(schoolSearch) ||
+      school.labelAr.includes(schoolSearch) ||
+      school.value.toLowerCase().includes(schoolSearch.toLowerCase())
+    )
+  })
 
   // Filter nationalities based on search (supports Arabic)
   const filteredNationalities = NATIONALITIES.filter(n =>
@@ -171,17 +238,24 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   // Check if lead is at test stage (placement test not completed yet)
   const isAtTestStage = formData.pipeline_stage === 'test'
 
-  // Status is always editable in the edit form so agents can update it freely
-  const isStatusDisabled = false
-
   // Filter statuses based on stage
-  const contactedStatuses: LeadStatus[] = ['no_answer', 'switched_off', 'callback', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done']
-  const visitStatuses: LeadStatus[] = ['no_answer', 'not_interested', 'switched_off', 'callback']
-  const availableStatuses = formData.pipeline_stage === 'contacted'
-    ? LEAD_STATUSES.filter(s => contactedStatuses.includes(s.value))
-    : formData.pipeline_stage === 'visit'
-    ? LEAD_STATUSES.filter(s => visitStatuses.includes(s.value))
-    : LEAD_STATUSES
+  const STAGE_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none'> = {
+    new: 'none',
+    contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential'],
+    visit: ['no_answer', 'cant_reach', 'interested', 'not_interested'],
+    test: ['online', 'on_campus'],
+    application: 'none',
+    lost: 'all',
+    applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
+    enrolled: 'none',
+    withdraw: 'all',
+  }
+  const stageConfig = formData.pipeline_stage ? STAGE_STATUSES[formData.pipeline_stage as PipelineStage] : 'all'
+  const availableStatuses = stageConfig === 'none'
+    ? []
+    : stageConfig === 'all'
+    ? LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+    : LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
 
   // Check if source is walk-in
   const isWalkIn = formData.source === 'walk_in'
@@ -241,11 +315,8 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      return
-    }
-
+  // Performs the actual lead creation/update (called directly or after duplicate check)
+  const performSubmit = async () => {
     const leadData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
@@ -318,6 +389,35 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     }
   }
 
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      return
+    }
+
+    // Skip duplicate check when editing an existing lead
+    if (isEditing) {
+      await performSubmit()
+      return
+    }
+
+    // Check for duplicates before creating
+    const phone = formData.phone.replace(/\D/g, "")
+    const civilId = formData.civil_id ? formData.civil_id.replace(/\D/g, "") : undefined
+    const matches = await checkDuplicates({
+      phone,
+      civil_id: civilId,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+    })
+
+    if (matches.length > 0) {
+      setShowDuplicateWarning(true)
+      return
+    }
+
+    await performSubmit()
+  }
+
   const handleChange = (field: string, value: string) => {
     // If changing to 'new' stage, clear status (status is blank for new leads)
     if (field === 'pipeline_stage' && value === 'new') {
@@ -325,6 +425,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
         ...prev,
         [field]: value,
         status: "", // Clear status when stage is 'new'
+      }))
+    // If changing to enrolled stage, clear status (no longer relevant)
+    } else if (field === 'pipeline_stage' && value === 'enrolled') {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+        status: "",
       }))
     // If changing to test stage, clear all placement test data and status
     } else if (field === 'pipeline_stage' && value === 'test') {
@@ -364,6 +471,18 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
           pipeline_stage: needsReset ? 'test' : prev.pipeline_stage,
         }
       })
+    // If changing gender, clear school if it doesn't match the new gender
+    } else if (field === 'gender') {
+      setFormData(prev => {
+        const currentSchool = SCHOOLS.find(s => s.value === prev.school)
+        const genderMismatch = value === 'male' && currentSchool?.gender !== 'boys'
+          || value === 'female' && currentSchool?.gender !== 'girls'
+        return {
+          ...prev,
+          gender: value,
+          school: genderMismatch ? "" : prev.school,
+        }
+      })
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
@@ -385,6 +504,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   })
 
   return (
+    <>
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-[var(--border)]">
@@ -482,7 +602,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               </div>
 
               {/* Nationality */}
-              <div className={cn("space-y-2", isNationalityDropdownOpen && "relative z-20")}>
+              <div className={cn("space-y-2", isNationalityDropdownOpen && "relative z-50")}>
                 <Label>Nationality</Label>
                 <div className="relative">
                   <div
@@ -512,7 +632,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                               value={nationalitySearch}
                               onChange={(e) => setNationalitySearch(e.target.value)}
                               placeholder="Search nationalities..."
-                              className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-depth-2)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                              className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
                               autoFocus
                             />
                           </div>
@@ -570,7 +690,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.is_transfer_student
                         ? "bg-blue-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <UserCheck className="w-4 h-4" />
                     </div>
@@ -601,7 +721,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.is_special_needs
                         ? "bg-rose-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <Heart className="w-4 h-4" />
                     </div>
@@ -627,7 +747,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.is_diplomatic
                         ? "bg-amber-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <Globe className="w-4 h-4" />
                     </div>
@@ -653,7 +773,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.is_athlete
                         ? "bg-orange-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <Trophy className="w-4 h-4" />
                     </div>
@@ -679,7 +799,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.is_married
                         ? "bg-pink-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <Users className="w-4 h-4" />
                     </div>
@@ -705,7 +825,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.is_employee
                         ? "bg-indigo-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <Briefcase className="w-4 h-4" />
                     </div>
@@ -826,7 +946,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
 
             <div className="space-y-4 pl-10">
               <div className="space-y-2">
-                <Label>Source Category *</Label>
+                <Label>Source Category</Label>
                 <div className="grid grid-cols-5 gap-2">
                   {SOURCE_CATEGORIES.map((cat) => (
                     <button
@@ -858,7 +978,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Source *</Label>
+                <Label>Source</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {filteredSources.map((source) => (
                     <button
@@ -903,7 +1023,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               {/* Walk-in Stage Selector - Only shown when walk_in source is selected */}
               {isWalkIn && (
                 <div className="space-y-2">
-                  <Label>Walk-in Stage *</Label>
+                  <Label>Walk-in Stage</Label>
                   <p className="text-xs text-[var(--text-muted)] mb-2">Select where this walk-in lead should start</p>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -920,7 +1040,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                         "w-10 h-10 rounded-lg flex items-center justify-center",
                         formData.pipeline_stage === "test"
                           ? "bg-blue-500 text-white"
-                          : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                          : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                       )}>
                         <ClipboardCheck className="w-5 h-5" />
                       </div>
@@ -943,13 +1063,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                         "w-10 h-10 rounded-lg flex items-center justify-center",
                         formData.pipeline_stage === "application"
                           ? "bg-green-500 text-white"
-                          : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                          : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                       )}>
                         <FileText className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <p className="font-medium text-[var(--text-primary)]">Application</p>
-                        <p className="text-xs text-[var(--text-muted)]">Direct to application</p>
+                        <p className="font-medium text-[var(--text-primary)]">File</p>
+                        <p className="text-xs text-[var(--text-muted)]">Direct to file</p>
                       </div>
                     </button>
                   </div>
@@ -997,7 +1117,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                             value={schoolSearch}
                             onChange={(e) => setSchoolSearch(e.target.value)}
                             placeholder="Search schools..."
-                            className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-depth-2)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                            className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
                             autoFocus
                           />
                         </div>
@@ -1084,7 +1204,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Funding Type *</Label>
+                <Label>Funding Type</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -1100,7 +1220,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-10 h-10 rounded-lg flex items-center justify-center",
                       formData.funding_type === "self_funded"
                         ? "bg-[var(--primary)] text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <CreditCard className="w-5 h-5" />
                     </div>
@@ -1123,7 +1243,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-10 h-10 rounded-lg flex items-center justify-center",
                       formData.funding_type === "puc"
                         ? "bg-[var(--accent)] text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <GraduationCap className="w-5 h-5" />
                     </div>
@@ -1175,7 +1295,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                               "px-3 py-1.5 text-sm rounded-lg border transition-all",
                               isSelected
                                 ? "bg-orange-500 text-white border-orange-500"
-                                : "bg-[var(--bg-depth-2)] text-[var(--text-primary)] border-[var(--border)] hover:border-orange-500/50"
+                                : "bg-[var(--bg-elevated)] text-[var(--text-primary)] border-[var(--border)] hover:border-orange-500/50"
                             )}
                           >
                             {reason.label}
@@ -1298,52 +1418,61 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Pipeline Stage</Label>
-                  {LOCKED_STAGES.includes(formData.pipeline_stage as PipelineStage) ? (
-                    <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-depth-2)] rounded-lg border border-[var(--border)] text-[var(--text-muted)]">
-                      <Lock className="w-4 h-4" />
-                      <span className="text-sm">{PIPELINE_STAGES.find(s => s.value === formData.pipeline_stage)?.label}</span>
-                      <span className="text-xs ml-auto">(Locked)</span>
-                    </div>
-                  ) : (
-                    <Select
-                      value={formData.pipeline_stage}
-                      onValueChange={(value) => handleChange("pipeline_stage", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select stage" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePipelineStages.map((stage) => (
-                          <SelectItem key={stage.value} value={stage.value}>
-                            {stage.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
+              <div className="space-y-2">
+                <Label>Pipeline Stage</Label>
+                {LOCKED_STAGES.includes(formData.pipeline_stage as PipelineStage) ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] text-[var(--text-muted)]">
+                    <Lock className="w-4 h-4" />
+                    <span className="text-sm">{PIPELINE_STAGES.find(s => s.value === formData.pipeline_stage)?.label}</span>
+                    <span className="text-xs ml-auto">(Locked)</span>
+                  </div>
+                ) : (
                   <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleChange("status", value)}
+                    value={formData.pipeline_stage}
+                    onValueChange={(value) => handleChange("pipeline_stage", value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
+                      <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableStatuses.map((status) => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
+                      {availablePipelineStages.map((stage) => (
+                        <SelectItem key={stage.value} value={stage.value}>
+                          {stage.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                )}
               </div>
+
+              {availableStatuses.length > 0 && <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+                  Lead Status
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {availableStatuses.map((status) => {
+                    const isActive = formData.status === status.value
+                    const Icon = LEAD_STATUS_ICONS[status.value]
+                    const colorClass = LEAD_STATUS_COLORS[status.color] || LEAD_STATUS_COLORS.secondary
+                    return (
+                      <button
+                        key={status.value}
+                        type="button"
+                        onClick={() => handleChange("status", status.value)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5",
+                          isActive
+                            ? cn(colorClass, "ring-2 ring-offset-1 ring-current/30 scale-105")
+                            : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        <Icon className="w-3 h-3" />
+                        {status.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>}
             </div>
           </div>
 
@@ -1444,7 +1573,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               {isAtTestStage ? (
                 /* Show blank state when at test stage */
                 <div className="space-y-4">
-                  <div className="p-6 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-depth-2)] text-center">
+                  <div className="p-6 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] text-center">
                     <ClipboardCheck className="w-10 h-10 mx-auto mb-3 text-[var(--text-muted)] opacity-50" />
                     <p className="text-sm text-[var(--text-muted)]">Placement test not completed yet</p>
                     <p className="text-xs text-[var(--text-muted)] mt-1">Results will appear here after the test is taken</p>
@@ -1502,7 +1631,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData.has_ielts_toefl
                         ? "bg-green-500 text-white"
-                        : "bg-[var(--bg-depth-4)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
@@ -1547,7 +1676,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-depth-2)] rounded-lg border border-[var(--border)]">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                             <span className="text-sm text-[var(--text-muted)]">Score:</span>
                             <span className="text-sm font-medium text-[var(--text-primary)]">
                               {formData.placement_english_score || "—"}
@@ -1582,7 +1711,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-depth-2)] rounded-lg border border-[var(--border)]">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                             <span className="text-sm text-[var(--text-muted)]">Score:</span>
                             <span className="text-sm font-medium text-[var(--text-primary)]">
                               {formData.placement_math_score || "—"}
@@ -1616,7 +1745,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-depth-2)] rounded-lg border border-[var(--border)]">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                             <span className="text-sm text-[var(--text-muted)]">Score:</span>
                             <span className="text-sm font-medium text-[var(--text-primary)]">
                               {formData.placement_computer_score || "—"}
@@ -1672,11 +1801,11 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
             Cancel
           </Button>
 
-          <Button onClick={handleSubmit} disabled={loading} className="px-6">
-            {loading ? (
+          <Button onClick={handleSubmit} disabled={loading || duplicateChecking} className="px-6">
+            {loading || duplicateChecking ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {isEditing ? "Saving..." : "Creating..."}
+                {duplicateChecking ? "Checking duplicates..." : isEditing ? "Saving..." : "Creating..."}
               </>
             ) : (
               <>
@@ -1688,5 +1817,22 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
         </div>
       </DialogContent>
     </Dialog>
+
+    <DuplicateWarningDialog
+      open={showDuplicateWarning}
+      onOpenChange={setShowDuplicateWarning}
+      duplicates={duplicates}
+      loading={loading}
+      onCreateAnyway={async () => {
+        setShowDuplicateWarning(false)
+        clearDuplicates()
+        await performSubmit()
+      }}
+      onCancel={() => {
+        setShowDuplicateWarning(false)
+        clearDuplicates()
+      }}
+    />
+    </>
   )
 }

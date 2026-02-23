@@ -51,13 +51,13 @@ export function EnrollmentFlowDiagram({
   const pucProgress = getPUCProgress()
 
   const sfStages = [
-    { id: "application", label: "Application", labelAr: "الطلب" },
+    { id: "application", label: "File", labelAr: "الطلب" },
     { id: "seat_reserved", label: "Seat Reserved", labelAr: "حجز مقعد", subLabel: "150 KWD" },
     { id: "enrolled", label: "Enrolled", labelAr: "مسجل", subLabel: "400 KWD+" },
   ]
 
   const pucStages = [
-    { id: "application", label: "Application", labelAr: "الطلب" },
+    { id: "application", label: "File", labelAr: "الطلب" },
     { id: "paci_verification", label: "PACI Verification", labelAr: "تحقق الهيئة" },
     { id: "puc_submission", label: "PUC Submission", labelAr: "تقديم ديوان الخدمة" },
     { id: "puc_decision", label: "PUC Decision", labelAr: "قرار ديوان الخدمة" },

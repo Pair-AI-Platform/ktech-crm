@@ -3,7 +3,7 @@
  * Defines file types, max sizes, required documents, and expiration tracking per graduate type
  */
 
-export type GraduateType = 'GOV' | 'US' | 'UK' | 'KSA'
+export type GraduateType = 'GOV' | 'US' | 'UK' | 'KSA' | 'OTHER'
 
 export type DocumentTypeId =
   | 'passport'
@@ -14,13 +14,15 @@ export type DocumentTypeId =
   | 'puc_receipt'
   | 'acceptance_letter'
   | 'transcript_moh'
-  | 'sequence_letter'
+  | 'sequence'
   | 'gcse'
-  | 'a_level'
-  | 'equivalency'
-  | 'photo'
   | 'shahada'
-  | 'transcript'
+  | 'qiyas'
+  | 'equivalency'
+  | 'special_needs_certificate'
+  | 'ministry_foreign_affairs'
+  | 'extra_document_1'
+  | 'extra_document_2'
 
 export interface DocumentRule {
   id: DocumentTypeId
@@ -43,8 +45,6 @@ export interface GraduateTypeConfig {
 
 // Common file type configurations
 const DOCUMENT_FILE_TYPES = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.gif', '.webp']
-const IMAGE_FILE_TYPES = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-const PDF_ONLY = ['.pdf']
 
 // Common document definitions
 const PASSPORT: DocumentRule = {
@@ -96,7 +96,7 @@ const HS_CERTIFICATE: DocumentRule = {
 
 const NATIONALITY: DocumentRule = {
   id: 'nationality',
-  name: 'Nationality Document',
+  name: 'Proof of Nationality',
   nameAr: 'شهادة الجنسية',
   required: true,
   acceptedFileTypes: DOCUMENT_FILE_TYPES,
@@ -127,26 +127,48 @@ const ACCEPTANCE_LETTER: DocumentRule = {
   description: 'Ktech acceptance letter'
 }
 
-const PHOTO: DocumentRule = {
-  id: 'photo',
-  name: 'Personal Photo',
-  nameAr: 'صورة شخصية',
-  required: true,
-  acceptedFileTypes: IMAGE_FILE_TYPES,
-  maxSizeMB: 5,
-  hasExpiration: false,
-  description: 'Recent passport-sized photo with white background'
-}
-
-const EQUIVALENCY: DocumentRule = {
-  id: 'equivalency',
-  name: 'Equivalency Certificate',
-  nameAr: 'شهادة المعادلة',
+const SPECIAL_NEEDS_CERTIFICATE: DocumentRule = {
+  id: 'special_needs_certificate',
+  name: 'Special Needs Certificate',
+  nameAr: 'شهادة ذوي الاحتياجات الخاصة',
   required: true,
   acceptedFileTypes: DOCUMENT_FILE_TYPES,
   maxSizeMB: 10,
   hasExpiration: false,
-  description: 'Ministry of Education equivalency certificate'
+  description: 'Certificate for students with special needs'
+}
+
+const MINISTRY_FOREIGN_AFFAIRS: DocumentRule = {
+  id: 'ministry_foreign_affairs',
+  name: 'Ministry of Foreign Affairs',
+  nameAr: 'وزارة الخارجية',
+  required: true,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Ministry of Foreign Affairs document for diplomatic students'
+}
+
+const EXTRA_DOCUMENT_1: DocumentRule = {
+  id: 'extra_document_1',
+  name: 'Extra Document 1',
+  nameAr: 'مستند إضافي 1',
+  required: false,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Optional additional document'
+}
+
+const EXTRA_DOCUMENT_2: DocumentRule = {
+  id: 'extra_document_2',
+  name: 'Extra Document 2',
+  nameAr: 'مستند إضافي 2',
+  required: false,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Optional additional document'
 }
 
 // Graduate type configurations
@@ -172,6 +194,7 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
     documents: [
       CIVIL_ID,
       PASSPORT,
+      NATIONALITY,
       {
         id: 'transcript_moh',
         name: 'HS Transcript (MOH Equivalency)',
@@ -183,15 +206,27 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
         description: 'High school transcript with Ministry of Education equivalency'
       },
       {
-        id: 'sequence_letter',
-        name: 'Sequence Letter',
-        nameAr: 'خطاب التسلسل الدراسي',
+        id: 'sequence',
+        name: 'Sequence',
+        nameAr: 'التسلسل',
         required: true,
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'Official letter showing academic sequence/continuity'
-      }
+        description: 'Academic sequence document'
+      },
+      {
+        id: 'equivalency',
+        name: 'Equivalency',
+        nameAr: 'المعادلة',
+        required: true,
+        acceptedFileTypes: DOCUMENT_FILE_TYPES,
+        maxSizeMB: 10,
+        hasExpiration: false,
+        description: 'Ministry of Education equivalency certificate'
+      },
+      PUC_RECEIPT,
+      ACCEPTANCE_LETTER
     ]
   },
   {
@@ -211,18 +246,19 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
         description: 'GCSE or IGCSE exam certificates'
       },
       {
-        id: 'a_level',
-        name: 'A-Level Certificates',
-        nameAr: 'شهادات A-Level',
+        id: 'equivalency',
+        name: 'Equivalency',
+        nameAr: 'المعادلة',
         required: true,
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'A-Level exam certificates'
+        description: 'Ministry of Education equivalency certificate'
       },
       PASSPORT,
-      EQUIVALENCY,
-      PHOTO
+      NATIONALITY,
+      PUC_RECEIPT,
+      ACCEPTANCE_LETTER
     ]
   },
   {
@@ -242,18 +278,42 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
         description: 'Saudi high school certificate (Shahada)'
       },
       {
-        id: 'transcript',
-        name: 'Academic Transcript',
-        nameAr: 'كشف الدرجات',
+        id: 'qiyas',
+        name: 'Qiyas (Equivalency)',
+        nameAr: 'قياس (المعادلة)',
         required: true,
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'Complete academic transcript'
+        description: 'Qiyas standardized test result certificate'
       },
       PASSPORT,
-      EQUIVALENCY,
-      PHOTO
+      NATIONALITY,
+      PUC_RECEIPT,
+      ACCEPTANCE_LETTER
+    ]
+  },
+  {
+    type: 'OTHER',
+    label: 'Other Curriculum Graduate',
+    labelAr: 'خريج منهج آخر',
+    documents: [
+      CIVIL_ID,
+      HS_CERTIFICATE,
+      {
+        id: 'equivalency',
+        name: 'Equivalency',
+        nameAr: 'المعادلة',
+        required: true,
+        acceptedFileTypes: DOCUMENT_FILE_TYPES,
+        maxSizeMB: 10,
+        hasExpiration: false,
+        description: 'Ministry of Education equivalency certificate'
+      },
+      PASSPORT,
+      NATIONALITY,
+      PUC_RECEIPT,
+      ACCEPTANCE_LETTER
     ]
   }
 ]
@@ -335,17 +395,51 @@ export function checkDocumentExpiration(expirationDate: Date, warningDays: numbe
   }
 }
 
+// Conditional document flags
+export interface ConditionalDocumentFlags {
+  isSpecialNeeds?: boolean
+  isDiplomatic?: boolean
+}
+
+/**
+ * Returns the full document list for a graduate type, including any conditional documents.
+ */
+export function getDocumentsForGraduateType(
+  type: GraduateType,
+  flags?: ConditionalDocumentFlags
+): DocumentRule[] {
+  const config = getGraduateTypeConfig(type)
+  if (!config) return []
+
+  const docs = [...config.documents]
+
+  if (flags?.isSpecialNeeds) {
+    docs.push(SPECIAL_NEEDS_CERTIFICATE)
+  }
+  if (flags?.isDiplomatic) {
+    docs.push(MINISTRY_FOREIGN_AFFAIRS)
+  }
+
+  // Always include optional extra document slots
+  docs.push(EXTRA_DOCUMENT_1)
+  docs.push(EXTRA_DOCUMENT_2)
+
+  return docs
+}
+
 export function getMissingDocuments(
   graduateType: GraduateType,
-  uploadedDocumentIds: DocumentTypeId[]
+  uploadedDocumentIds: DocumentTypeId[],
+  flags?: ConditionalDocumentFlags
 ): DocumentRule[] {
-  const requiredDocs = getRequiredDocuments(graduateType)
+  const requiredDocs = getDocumentsForGraduateType(graduateType, flags).filter(doc => doc.required)
   return requiredDocs.filter(doc => !uploadedDocumentIds.includes(doc.id))
 }
 
 export function getDocumentCompletionStatus(
   graduateType: GraduateType,
-  uploadedDocumentIds: DocumentTypeId[]
+  uploadedDocumentIds: DocumentTypeId[],
+  flags?: ConditionalDocumentFlags
 ): {
   total: number
   uploaded: number
@@ -353,7 +447,7 @@ export function getDocumentCompletionStatus(
   percentage: number
   isComplete: boolean
 } {
-  const requiredDocs = getRequiredDocuments(graduateType)
+  const requiredDocs = getDocumentsForGraduateType(graduateType, flags).filter(doc => doc.required)
   const uploadedRequired = requiredDocs.filter(doc => uploadedDocumentIds.includes(doc.id))
 
   return {

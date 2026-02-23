@@ -23,8 +23,6 @@ import {
   Mail,
   Phone,
   Headphones,
-  FileText,
-  Video,
   Keyboard,
   Zap,
   Shield,
@@ -193,7 +191,7 @@ export default function HelpPage() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-3xl mx-auto text-center"
         >
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-[var(--primary)] flex items-center justify-center">
             <HelpCircle className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-4">
@@ -305,7 +303,7 @@ export default function HelpPage() {
                       exit={{ opacity: 0 }}
                     >
                       <button
-                        className="w-full p-4 text-left hover:bg-[var(--bg-depth-3)] transition-colors"
+                        className="w-full p-4 text-left hover:bg-[var(--bg-sunken)] transition-colors"
                         onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -365,13 +363,13 @@ export default function HelpPage() {
                 {SHORTCUTS.map((shortcut, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--bg-depth-3)]"
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--bg-sunken)]"
                   >
                     <span className="text-[var(--text-secondary)]">{shortcut.description}</span>
                     <div className="flex items-center gap-1">
                       {shortcut.keys.map((key, i) => (
                         <span key={i}>
-                          <kbd className="px-2 py-1 bg-[var(--bg-depth-3)] rounded text-xs font-mono">
+                          <kbd className="px-2 py-1 bg-[var(--bg-sunken)] rounded text-xs font-mono">
                             {key}
                           </kbd>
                           {i < shortcut.keys.length - 1 && (
@@ -398,7 +396,7 @@ export default function HelpPage() {
             <CardContent className="space-y-4">
               <a
                 href="mailto:support@ktech.edu.kw"
-                className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-depth-3)] hover:bg-[var(--bg-depth-2)] transition-colors"
+                className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
                 <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
                   <Mail className="w-6 h-6 text-[var(--primary)]" />
@@ -412,7 +410,7 @@ export default function HelpPage() {
 
               <a
                 href="tel:+96522222222"
-                className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-depth-3)] hover:bg-[var(--bg-depth-2)] transition-colors"
+                className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
                 <div className="w-12 h-12 rounded-xl bg-[var(--success)]/10 flex items-center justify-center">
                   <Phone className="w-6 h-6 text-[var(--success)]" />
@@ -447,7 +445,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-sunken)]">
                 <CheckCircle2 className="w-5 h-5 text-[var(--success)] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-[var(--text-primary)] mb-1">
@@ -458,7 +456,7 @@ export default function HelpPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-sunken)]">
                 <CheckCircle2 className="w-5 h-5 text-[var(--success)] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-[var(--text-primary)] mb-1">
@@ -469,7 +467,7 @@ export default function HelpPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-depth-3)]">
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-sunken)]">
                 <CheckCircle2 className="w-5 h-5 text-[var(--success)] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-[var(--text-primary)] mb-1">

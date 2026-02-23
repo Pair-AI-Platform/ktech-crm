@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, getTodayAppointments as getDemoTodayAppointments, saveDemoAppointmentUpdate } from "@/lib/demo-data"
-import type { Appointment, AppointmentLead, AppointmentType, AppointmentStatus } from "@/types"
+import { toDateString } from "@/lib/utils"
+import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, saveDemoAppointmentUpdate } from "@/lib/demo-data"
+import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
 
 interface UseAppointmentsOptions {
   date?: string
@@ -28,6 +29,8 @@ export function isAppointmentNeedsAttention(apt: Appointment): boolean {
   return aptDateTime < now
 }
 
+let channelCounter = 0
+
 export function useAppointments(options: UseAppointmentsOptions = {}) {
   const { date, startDate, endDate, type = "all", status = "all", leadId, studentId, agentId, needsAttention, noUpdated, limit = 100 } = options
   // noUpdated is an alias for needsAttention - both filter past appointments with no status update
@@ -35,6 +38,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const channelIdRef = useRef(`appointments-${++channelCounter}-${Date.now()}`)
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true)
@@ -87,7 +91,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         .from("appointments")
         .select(`
           *,
-          appointment_leads(id, lead_id, created_at, lead:leads(id, first_name, last_name, phone)),
+          appointment_leads(id, lead_id, created_at, lead:leads(id, first_name, last_name, phone, status, pipeline_stage)),
           student:students(id, first_name, last_name, ktech_id),
           assigned_agent_profile:profiles!assigned_agent(id, full_name, email),
           created_by_profile:profiles!created_by(id, full_name, email)
@@ -135,7 +139,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
 
       // For noUpdated/needsAttention, filter for scheduled status and past dates
       if (filterNoUpdated) {
-        const today = new Date().toISOString().split("T")[0]
+        const today = toDateString(new Date())
         query = query.eq("status", "scheduled").lte("scheduled_date", today)
       }
 
@@ -144,11 +148,12 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       if (error) throw error
 
       // Backfill legacy lead/lead_id from junction table for backward compat
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const processedData = (data || []).map((apt: any) => ({
         ...apt,
         lead: apt.appointment_leads?.[0]?.lead || apt.lead || null,
         lead_id: apt.appointment_leads?.[0]?.lead_id || apt.lead_id || null,
-      }))
+      })) as Appointment[]
 
       // For noUpdated/needsAttention, do additional client-side filtering for time
       let filteredData = processedData
@@ -159,7 +164,11 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       setAppointments(filteredData)
     } catch (err) {
       console.error("Error fetching appointments:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch appointments")
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        "Failed to fetch appointments"
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -174,8 +183,9 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
     if (isDemoMode()) return
 
     const supabase = createClient()
+    const id = channelIdRef.current
     const channel = supabase
-      .channel("appointments-changes")
+      .channel(`${id}-changes`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments" },
@@ -186,7 +196,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       .subscribe()
 
     const junctionChannel = supabase
-      .channel("appointment-leads-changes")
+      .channel(`${id}-leads-changes`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointment_leads" },
@@ -206,7 +216,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
 }
 
 export function useTodayAppointments() {
-  const today = new Date().toISOString().split("T")[0]
+  const today = toDateString(new Date())
   return useAppointments({ date: today })
 }
 
@@ -236,11 +246,35 @@ export function useAppointmentMutations() {
   const createAppointment = async (appointmentData: Partial<Appointment> & { lead_ids?: string[] }) => {
     setLoading(true)
     try {
+      // Handle demo mode
+      if (isDemoMode()) {
+        const leadIds = appointmentData.lead_ids ||
+          (appointmentData.lead_id ? [appointmentData.lead_id] : [])
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { lead_ids: _leadIds, ...insertData } = appointmentData
+        const demoAppointment: Appointment = {
+          id: `demo-apt-${Date.now()}`,
+          ...insertData,
+          lead_id: leadIds[0] || insertData.lead_id || null,
+          created_by: "demo-user",
+          assigned_agent: insertData.assigned_agent || "demo-user",
+          status: insertData.status || "scheduled",
+          scheduled_date: insertData.scheduled_date || toDateString(new Date()),
+          scheduled_time: insertData.scheduled_time || "09:00",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as Appointment
+        saveDemoAppointmentUpdate(demoAppointment.id, demoAppointment)
+        setLoading(false)
+        return { data: demoAppointment, error: null }
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
 
       // Extract lead_ids from the payload (not a DB column)
       const leadIds = appointmentData.lead_ids ||
         (appointmentData.lead_id ? [appointmentData.lead_id] : [])
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { lead_ids: _leadIds, ...insertData } = appointmentData
 
       const { data, error } = await supabase
@@ -280,11 +314,11 @@ export function useAppointmentMutations() {
           .single()
 
         if (lead?.pipeline_stage === "new") {
-          // Get next position in "visit" stage
+          // Get next position in "contacted" stage
           const { data: maxPosRow } = await supabase
             .from("leads")
             .select("position_in_stage")
-            .eq("pipeline_stage", "visit")
+            .eq("pipeline_stage", "contacted")
             .order("position_in_stage", { ascending: false })
             .limit(1)
             .single()
@@ -292,15 +326,20 @@ export function useAppointmentMutations() {
 
           await supabase
             .from("leads")
-            .update({ pipeline_stage: "visit", position_in_stage: nextPos })
+            .update({ pipeline_stage: "contacted", position_in_stage: nextPos })
             .eq("id", lid)
         }
       }
 
       return { data, error: null }
-    } catch (err) {
-      console.error("Error creating appointment:", err)
-      return { data: null, error: err instanceof Error ? err.message : "Failed to create appointment" }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        typeof err === 'string' ? err :
+        "Failed to create appointment"
+      console.error("Error creating appointment:", message, err)
+      return { data: null, error: message }
     } finally {
       setLoading(false)
     }
@@ -329,7 +368,11 @@ export function useAppointmentMutations() {
       return { data, error: null }
     } catch (err) {
       console.error("Error updating appointment:", err)
-      return { data: null, error: err instanceof Error ? err.message : "Failed to update appointment" }
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        "Failed to update appointment"
+      return { data: null, error: message }
     } finally {
       setLoading(false)
     }
@@ -437,12 +480,41 @@ export function useAppointmentMutations() {
     })
   }
 
+  // Delete appointment (حذف الموعد)
+  const deleteAppointment = async (id: string) => {
+    setLoading(true)
+    try {
+      if (isDemoMode()) {
+        // In demo mode, just return success
+        return { error: null }
+      }
+
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+      return { error: null }
+    } catch (err) {
+      console.error("Error deleting appointment:", err)
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        "Failed to delete appointment"
+      return { error: message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Legacy methods for backwards compatibility
   const markNoShow = markNA
 
   return {
     createAppointment,
     updateAppointment,
+    deleteAppointment,
     // New status methods
     confirmAppointment,
     markNA,
@@ -467,6 +539,7 @@ export function useAppointmentStats() {
     cantReach: 0,
     onTheWay: 0,
     cancelled: 0,
+    willSee: 0,
     needsAttention: 0, // Past appointments still in "scheduled" status (legacy name)
     noUpdated: 0, // غير محدث - Past appointments with no status update (same as needsAttention)
     // Legacy stats for backwards compatibility
@@ -491,6 +564,7 @@ export function useAppointmentStats() {
           cantReach: 0,
           onTheWay: 0,
           cancelled: 0,
+          willSee: 0,
           needsAttention: noUpdatedCount, // legacy
           noUpdated: noUpdatedCount, // غير محدث
           noShow: demoStats.noShow,
@@ -502,7 +576,7 @@ export function useAppointmentStats() {
       const supabase = createClient()
 
       try {
-        const today = new Date().toISOString().split("T")[0]
+        const today = toDateString(new Date())
         const startOfWeek = new Date()
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
         const endOfWeek = new Date(startOfWeek)
@@ -512,8 +586,8 @@ export function useAppointmentStats() {
         const { data: appointments, error } = await supabase
           .from("appointments")
           .select("scheduled_date, scheduled_time, status")
-          .gte("scheduled_date", startOfWeek.toISOString().split("T")[0])
-          .lte("scheduled_date", endOfWeek.toISOString().split("T")[0])
+          .gte("scheduled_date", toDateString(startOfWeek))
+          .lte("scheduled_date", toDateString(endOfWeek))
 
         if (error) throw error
 
@@ -540,6 +614,7 @@ export function useAppointmentStats() {
         let cantReach = 0
         let onTheWay = 0
         let cancelled = 0
+        let willSee = 0
 
         appointments?.forEach(apt => {
           if (apt.scheduled_date === today) todayCount++
@@ -563,6 +638,9 @@ export function useAppointmentStats() {
             case "cancelled":
               cancelled++
               break
+            case "will_see":
+              willSee++
+              break
           }
         })
 
@@ -575,6 +653,7 @@ export function useAppointmentStats() {
           cantReach,
           onTheWay,
           cancelled,
+          willSee,
           needsAttention: needsAttentionCount, // legacy
           noUpdated: needsAttentionCount, // غير محدث - past appointments with no status update
           // Legacy mapping

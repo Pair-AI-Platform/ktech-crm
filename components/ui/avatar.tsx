@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 
 const Avatar = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Root>,
@@ -125,7 +125,7 @@ function AvatarGroup({ avatars, max = 4, size = "md", className }: AvatarGroupPr
             <AvatarImage src={avatar.src} alt={avatar.name} />
           ) : null}
           <AvatarFallback>
-            {avatar.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+            {getInitials(avatar.name)}
           </AvatarFallback>
         </Avatar>
       ))}
@@ -158,7 +158,7 @@ function UserAvatar({ user, size = "md", showEmail, className }: UserAvatarProps
       <Avatar size={size}>
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.name} /> : null}
         <AvatarFallback>
-          {user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+          {getInitials(user.name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">

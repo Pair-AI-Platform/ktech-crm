@@ -264,7 +264,7 @@ export function SMSTemplatesManager() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           className={cn(
-                            "p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-depth-2)]",
+                            "p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)]",
                             !template.is_active && "opacity-60"
                           )}
                         >
@@ -422,7 +422,7 @@ export function SMSTemplatesManager() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-[var(--bg-depth-3)] rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-[var(--bg-sunken)] rounded-lg">
               <Label htmlFor="is_active">Active</Label>
               <Switch
                 id="is_active"

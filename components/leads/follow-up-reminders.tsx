@@ -75,7 +75,7 @@ function createDemoReminders(leadId?: string, agentId?: string): FollowUpReminde
 
 export function FollowUpReminders({ leadId, agentId, showCompleted = false }: FollowUpRemindersProps) {
   const [reminders, setReminders] = useState<FollowUpReminder[]>(() => createDemoReminders(leadId, agentId))
-  const [loading, setLoading] = useState(false)
+  const [loading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
@@ -85,14 +85,6 @@ export function FollowUpReminders({ leadId, agentId, showCompleted = false }: Fo
     notes: "",
   })
 
-  // Refresh handler - can be used for manual refresh
-  const refreshReminders = useCallback(async () => {
-    setLoading(true)
-    // Simulated API delay - would be replaced with real API call
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    setReminders(createDemoReminders(leadId, agentId))
-    setLoading(false)
-  }, [leadId, agentId])
 
   const handleComplete = (id: string) => {
     setReminders((prev) =>
@@ -213,10 +205,10 @@ export function FollowUpReminders({ leadId, agentId, showCompleted = false }: Fo
                       className={cn(
                         "p-3 rounded-xl border",
                         reminder.status === "completed"
-                          ? "bg-[var(--bg-depth-3)] border-[var(--border)] opacity-60"
+                          ? "bg-[var(--bg-sunken)] border-[var(--border)] opacity-60"
                           : isOverdue
                           ? "bg-[var(--error-bg)] border-[var(--error)]/30"
-                          : "bg-[var(--bg-depth-2)] border-[var(--border)]"
+                          : "bg-[var(--bg-elevated)] border-[var(--border)]"
                       )}
                     >
                       <div className="flex items-start gap-3">
@@ -226,7 +218,7 @@ export function FollowUpReminders({ leadId, agentId, showCompleted = false }: Fo
                             "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                             reminder.status === "completed"
                               ? "bg-[var(--success)]/10"
-                              : "bg-[var(--bg-depth-3)]"
+                              : "bg-[var(--bg-sunken)]"
                           )}
                         >
                           {reminder.status === "completed" ? (
@@ -364,14 +356,14 @@ export function FollowUpReminders({ leadId, agentId, showCompleted = false }: Fo
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 p-6 pt-4 border-t border-[var(--border)] bg-[var(--bg-depth-3)]/50">
+          <div className="flex justify-end gap-3 p-6 pt-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/50">
             <Button variant="ghost" onClick={() => setModalOpen(false)} className="px-5">
               Cancel
             </Button>
             <Button
               onClick={handleCreate}
               disabled={saving || !formData.reminder_date}
-              className="px-6 shadow-lg shadow-[var(--primary)]/20"
+              className="px-6 shadow-sm"
             >
               {saving ? (
                 <>

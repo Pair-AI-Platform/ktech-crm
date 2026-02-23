@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
-// Test leads to showcase green row feature (Submission stage with Ready substage)
+// Test leads to showcase submission stages
 const TEST_LEADS = [
   {
     first_name: "سارة",
@@ -13,7 +13,7 @@ const TEST_LEADS = [
     source: "instagram",
     source_category: "digital",
     pipeline_stage: "applicant",
-    submission_substage: "ready", // GREEN - Ready substage
+    submission_substage: "submissions",
     funding_type: "puc",
     gpa_grade_10: 85.5,
     gpa_grade_11: 87.2,
@@ -29,7 +29,7 @@ const TEST_LEADS = [
     source: "school_visit",
     source_category: "events",
     pipeline_stage: "applicant",
-    submission_substage: "ready", // GREEN - Ready substage
+    submission_substage: "submissions",
     funding_type: "puc",
     gpa_grade_10: 90.0,
     gpa_grade_11: 89.5,
@@ -45,7 +45,7 @@ const TEST_LEADS = [
     source: "current_student_referral",
     source_category: "referrals",
     pipeline_stage: "applicant",
-    submission_substage: "ready", // GREEN - Ready substage
+    submission_substage: "documents",
     funding_type: "puc",
     gpa_grade_10: 82.0,
     gpa_grade_11: 84.5,
@@ -61,7 +61,7 @@ const TEST_LEADS = [
     source: "walk_in",
     source_category: "direct",
     pipeline_stage: "applicant",
-    submission_substage: "pending", // BLUE - Pending substage (for comparison)
+    submission_substage: "documents",
     funding_type: "puc",
     gpa_grade_10: 78.0,
     gpa_grade_11: 80.0,
@@ -77,7 +77,7 @@ const TEST_LEADS = [
     source: "exhibitions",
     source_category: "events",
     pipeline_stage: "applicant",
-    submission_substage: "documents", // BLUE - Documents substage (for comparison)
+    submission_substage: "documents",
     funding_type: "puc",
     gpa_grade_10: 75.0,
     gpa_grade_11: 77.5,

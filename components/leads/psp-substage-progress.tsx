@@ -2,45 +2,38 @@
 
 import { motion } from "framer-motion"
 import {
-  Clock,
   FileText,
   CheckCircle,
   Send,
-  Ban,
   XCircle,
-  AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { SubmissionSubstage, SubmissionBlockedReason } from "@/types"
-import { SUBMISSION_SUBSTAGES, SUBMISSION_BLOCKED_REASONS } from "@/types"
+import type { SubmissionSubstage } from "@/types"
+import { SUBMISSION_SUBSTAGES } from "@/types"
 
 interface PSPSubstageProgressProps {
   currentSubstage: SubmissionSubstage
-  blockedReason?: SubmissionBlockedReason | null
+  blockedReason?: string | null
   className?: string
   compact?: boolean
 }
 
-// Main substages in order (excluding blocked and lost which are branches)
-const MAIN_SUBSTAGES: SubmissionSubstage[] = ['pending', 'documents', 'ready', 'submitted']
+// Main substages in order (excluding lost which is a branch)
+const MAIN_SUBSTAGES: SubmissionSubstage[] = ['documents', 'submissions']
 
 // Map substages to their icons
-const SUBSTAGE_ICONS: Record<SubmissionSubstage, typeof Clock> = {
-  pending: Clock,
+const SUBSTAGE_ICONS: Record<SubmissionSubstage, typeof FileText> = {
   documents: FileText,
-  ready: CheckCircle,
-  submitted: Send,
-  blocked: Ban,
+  submissions: Send,
+  sf_srj: FileText,
   lost: XCircle,
 }
 
-// Map substages to colors (gradient)
+// Map substages to colors
 const SUBSTAGE_COLORS: Record<SubmissionSubstage, { from: string; to: string; bg: string }> = {
-  pending: { from: '#6B7280', to: '#4B5563', bg: 'bg-gray-100' },
   documents: { from: '#F59E0B', to: '#D97706', bg: 'bg-amber-100' },
-  ready: { from: '#10B981', to: '#059669', bg: 'bg-emerald-100' },
-  submitted: { from: '#3B82F6', to: '#2563EB', bg: 'bg-blue-100' },
-  blocked: { from: '#F97316', to: '#EA580C', bg: 'bg-orange-100' },
+  submissions: { from: '#3B82F6', to: '#2563EB', bg: 'bg-blue-100' },
+  sf_srj: { from: '#6366F1', to: '#4F46E5', bg: 'bg-indigo-100' },
   lost: { from: '#EF4444', to: '#DC2626', bg: 'bg-red-100' },
 }
 
@@ -51,18 +44,11 @@ function getSubstageIndex(substage: SubmissionSubstage): number {
 
 export function PSPSubstageProgress({
   currentSubstage,
-  blockedReason,
   className,
   compact = false,
 }: PSPSubstageProgressProps) {
-  const isBlocked = currentSubstage === 'blocked'
   const isLost = currentSubstage === 'lost'
   const currentIndex = getSubstageIndex(currentSubstage)
-
-  // Get blocked reason label
-  const blockedLabel = blockedReason
-    ? SUBMISSION_BLOCKED_REASONS.find(r => r.value === blockedReason)?.label
-    : null
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -77,7 +63,7 @@ export function PSPSubstageProgress({
 
             const isCompleted = currentIndex > idx
             const isCurrent = currentSubstage === substage
-            const isPending = currentIndex < idx && !isBlocked && !isLost
+            const isPending = currentIndex < idx && !isLost
 
             return (
               <div
@@ -98,7 +84,7 @@ export function PSPSubstageProgress({
                     isCompleted && "border-transparent",
                     isCurrent && "border-transparent ring-4 ring-offset-2",
                     isPending && "border-[var(--border)] bg-[var(--bg-surface)]",
-                    (isBlocked || isLost) && idx >= currentIndex && "border-[var(--border)] bg-[var(--bg-surface)] opacity-50"
+                    isLost && idx >= currentIndex && "border-[var(--border)] bg-[var(--bg-surface)] opacity-50"
                   )}
                   style={{
                     background: isCompleted || isCurrent
@@ -170,7 +156,7 @@ export function PSPSubstageProgress({
             <motion.div
               initial={{ width: 0 }}
               animate={{
-                width: isBlocked || isLost
+                width: isLost
                   ? '0%'
                   : `${(currentIndex / (MAIN_SUBSTAGES.length - 1)) * 100}%`
               }}
@@ -181,46 +167,21 @@ export function PSPSubstageProgress({
         </div>
       </div>
 
-      {/* Blocked/Lost Branch Indicator */}
-      {(isBlocked || isLost) && (
+      {/* Lost Branch Indicator */}
+      {isLost && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn(
-            "flex items-center gap-3 p-3 rounded-xl border",
-            isBlocked
-              ? "bg-orange-50 border-orange-200"
-              : "bg-red-50 border-red-200"
-          )}
+          className="flex items-center gap-3 p-3 rounded-xl border bg-red-50 border-red-200"
         >
-          <div
-            className={cn(
-              "flex items-center justify-center w-10 h-10 rounded-lg",
-              isBlocked ? "bg-orange-500" : "bg-red-500"
-            )}
-          >
-            {isBlocked ? (
-              <Ban className="w-5 h-5 text-white" />
-            ) : (
-              <XCircle className="w-5 h-5 text-white" />
-            )}
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-red-500">
+            <XCircle className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
-            <p className={cn(
-              "font-medium text-sm",
-              isBlocked ? "text-orange-800" : "text-red-800"
-            )}>
-              {isBlocked ? 'Submission Blocked' : 'Submission Lost'}
+            <p className="font-medium text-sm text-red-800">
+              Submission Lost
             </p>
-            {blockedLabel && (
-              <p className="text-xs text-orange-600">
-                Reason: {blockedLabel}
-              </p>
-            )}
           </div>
-          {isBlocked && (
-            <AlertTriangle className="w-5 h-5 text-orange-500" />
-          )}
         </motion.div>
       )}
     </div>

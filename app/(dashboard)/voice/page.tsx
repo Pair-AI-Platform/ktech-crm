@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion"
+import { useSearchParams } from "next/navigation"
+import { motion, AnimatePresence, useMotionValue, animate } from "framer-motion"
 import {
   Phone,
   PhoneOff,
@@ -18,10 +18,8 @@ import {
   Clock,
   Sparkles,
   History,
-  Users,
   BarChart3,
   PhoneIncoming,
-  TrendingUp,
   Play,
   ArrowRight,
   X,
@@ -103,22 +101,22 @@ function KadiPresence({
   const getColors = () => {
     if (state === "celebrating") {
       return {
-        primary: "from-amber-400 via-yellow-400 to-orange-400",
+        primary: "bg-[var(--warning)]",
         glow: "rgba(251, 191, 36, 0.4)",
-        particles: "#F59E0B"
+        particles: "var(--warning)"
       }
     }
     if (sentiment === "concerned") {
       return {
-        primary: "from-amber-400 via-orange-400 to-amber-500",
+        primary: "bg-[var(--warning)]",
         glow: "rgba(251, 146, 60, 0.3)",
-        particles: "#FB923C"
+        particles: "var(--warning)"
       }
     }
     return {
-      primary: "from-[#2d3a6d] via-[#3d4a7d] to-[#2d3a6d]",
+      primary: "bg-[var(--primary)]",
       glow: "rgba(45, 58, 109, 0.35)",
-      particles: "#2d3a6d"
+      particles: "var(--primary)"
     }
   }
 
@@ -141,7 +139,6 @@ function KadiPresence({
       <motion.div
         className={cn(
           "absolute inset-0 rounded-full",
-          "bg-gradient-to-br",
           colors.primary
         )}
         style={{ opacity: 0.1 }}
@@ -156,7 +153,6 @@ function KadiPresence({
       <motion.div
         className={cn(
           "absolute rounded-full",
-          "bg-gradient-to-br",
           colors.primary
         )}
         style={{
@@ -169,8 +165,7 @@ function KadiPresence({
       {/* Core orb */}
       <motion.div
         className={cn(
-          "absolute rounded-full shadow-2xl",
-          "bg-gradient-to-br",
+          "absolute rounded-full shadow-md",
           colors.primary
         )}
         style={{
@@ -292,7 +287,7 @@ function ConversationFlow({
       className="w-full max-w-xl mx-auto space-y-6 overflow-y-auto max-h-[300px] px-4 hide-scrollbar"
     >
       <AnimatePresence mode="popLayout">
-        {messages.map((message, index) => (
+        {messages.map((message) => (
           <motion.div
             key={message.id}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -308,7 +303,7 @@ function ConversationFlow({
               <div className="relative inline-block">
                 <motion.p
                   className={cn(
-                    "text-lg leading-relaxed text-[#2d3a6d] font-medium",
+                    "text-lg leading-relaxed text-[var(--primary)] font-medium",
                     message.language === "ar" && "font-arabic text-xl"
                   )}
                   style={{ direction: message.language === "ar" ? "rtl" : "ltr" }}
@@ -316,7 +311,7 @@ function ConversationFlow({
                   &quot;{message.text}&quot;
                 </motion.p>
                 <motion.div
-                  className="absolute -left-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gradient-to-br from-[#2d3a6d] to-[#3d4a7d] flex items-center justify-center"
+                  className="absolute -left-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[var(--primary)] flex items-center justify-center"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2 }}
@@ -349,7 +344,7 @@ function ConversationFlow({
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="w-2 h-2 rounded-full bg-[#2d3a6d]"
+              className="w-2 h-2 rounded-full bg-[var(--primary)]"
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
@@ -371,7 +366,7 @@ function ActivityWhisper({ activities }: { activities: RecentActivity[] }) {
     switch (type) {
       case "enrolled": return <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
       case "booked": return <Calendar className="w-3.5 h-3.5 text-blue-500" />
-      case "callback": return <Phone className="w-3.5 h-3.5 text-[#2d3a6d]" />
+      case "callback": return <Phone className="w-3.5 h-3.5 text-[var(--primary)]" />
       default: return <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
     }
   }
@@ -432,7 +427,7 @@ function LeadContext({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 400, opacity: 0 }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
-          className="fixed right-0 top-0 bottom-0 w-80 bg-white/95 backdrop-blur-xl border-l border-slate-200 shadow-2xl z-40 p-6"
+          className="fixed right-0 top-0 bottom-0 w-80 bg-[var(--bg-surface)] border-l border-slate-200 shadow-md z-40 p-6"
         >
           <button
             onClick={onClose}
@@ -444,8 +439,8 @@ function LeadContext({
           <div className="space-y-6 mt-8">
             {/* Lead info */}
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#2d3a6d]/10 to-[#3d4a7d]/10 mx-auto mb-4 flex items-center justify-center">
-                <span className="text-2xl font-semibold text-[#2d3a6d]">
+              <div className="w-20 h-20 rounded-full bg-[var(--primary)]/10 mx-auto mb-4 flex items-center justify-center">
+                <span className="text-2xl font-semibold text-[var(--primary)]">
                   {call.leadName.split(' ').map(n => n[0]).join('')}
                 </span>
               </div>
@@ -457,7 +452,7 @@ function LeadContext({
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-slate-100">
                 <span className="text-slate-500">Status</span>
-                <span className="text-[#2d3a6d] font-medium">Ready to enroll</span>
+                <span className="text-[var(--primary)] font-medium">Ready to enroll</span>
               </div>
               <div className="flex justify-between py-2 border-b border-slate-100">
                 <span className="text-slate-500">Interest</span>
@@ -548,7 +543,7 @@ function CallControls({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={onTakeOver}
-        className="h-14 px-6 rounded-full bg-[#2d3a6d] hover:bg-[#3d4a7d] text-white flex items-center gap-2 shadow-lg shadow-[#2d3a6d]/30"
+        className="h-14 px-6 rounded-full bg-[var(--primary)] hover:bg-[var(--primary)] text-white flex items-center gap-2 shadow-lg shadow-sm"
       >
         <Hand className="w-5 h-5" />
         <span className="font-medium">Take over</span>
@@ -560,8 +555,6 @@ function CallControls({
 // ============================================================================
 // Expanded View Panels
 // ============================================================================
-
-type ViewType = "home" | "history" | "queue" | "analytics"
 
 // Call History Panel
 function CallHistoryPanel({
@@ -581,7 +574,7 @@ function CallHistoryPanel({
     switch (outcome) {
       case "enrolled": return "text-amber-600 bg-amber-50"
       case "booked": return "text-blue-600 bg-blue-50"
-      case "callback": return "text-[#2d3a6d] bg-[#2d3a6d]/10"
+      case "callback": return "text-[var(--primary)] bg-[var(--primary)]/10"
       default: return "text-slate-500 bg-slate-50"
     }
   }
@@ -595,7 +588,7 @@ function CallHistoryPanel({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-slate-900/20 z-40"
             onClick={onClose}
           />
           {/* Panel */}
@@ -604,7 +597,7 @@ function CallHistoryPanel({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-2xl z-50 flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-[480px] bg-[var(--bg-surface)] shadow-md z-50 flex flex-col"
           >
             {/* Header */}
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
@@ -671,7 +664,7 @@ function CallHistoryPanel({
                     </span>
                   </div>
                   <div className="ml-13 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="text-xs text-[#2d3a6d] hover:text-[#3d4a7d] font-medium flex items-center gap-1">
+                    <button className="text-xs text-[var(--primary)] hover:text-[var(--primary)] font-medium flex items-center gap-1">
                       <Play className="w-3 h-3" /> Play recording
                     </button>
                     <button className="text-xs text-slate-500 hover:text-slate-700 font-medium">
@@ -714,7 +707,7 @@ function QueuePanel({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-slate-900/20 z-40"
             onClick={onClose}
           />
           <motion.div
@@ -727,8 +720,8 @@ function QueuePanel({
             {/* Header */}
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#2d3a6d]/10 flex items-center justify-center">
-                  <PhoneIncoming className="w-5 h-5 text-[#2d3a6d]" />
+                <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
+                  <PhoneIncoming className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-800">Call Queue</h2>
@@ -786,7 +779,7 @@ function QueuePanel({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex-1 py-2 rounded-lg bg-[#2d3a6d]/100 hover:bg-[#2d3a6d] text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                      <button className="flex-1 py-2 rounded-lg bg-[var(--primary)]/100 hover:bg-[var(--primary)] text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
                         <Hand className="w-4 h-4" />
                         Take Call
                       </button>
@@ -811,14 +804,14 @@ function QueuePanel({
                     <span className="text-sm font-medium text-slate-700">10:00 AM</span>
                     <span className="text-sm text-slate-500">Fatima Hassan</span>
                   </div>
-                  <button className="text-xs text-[#2d3a6d] hover:text-[#3d4a7d] font-medium">Call now</button>
+                  <button className="text-xs text-[var(--primary)] hover:text-[var(--primary)] font-medium">Call now</button>
                 </div>
                 <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-700">11:30 AM</span>
                     <span className="text-sm text-slate-500">Khalid Al-Rashid</span>
                   </div>
-                  <button className="text-xs text-[#2d3a6d] hover:text-[#3d4a7d] font-medium">Call now</button>
+                  <button className="text-xs text-[var(--primary)] hover:text-[var(--primary)] font-medium">Call now</button>
                 </div>
               </div>
             </div>
@@ -856,7 +849,7 @@ function AnalyticsPanel({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-slate-900/20 z-40"
             onClick={onClose}
           />
           <motion.div
@@ -889,12 +882,12 @@ function AnalyticsPanel({
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Key Metrics */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-gradient-to-br from-[#2d3a6d]/10 to-[#3d4a7d]/10 border border-[#2d3a6d]/20">
-                  <p className="text-xs text-[#2d3a6d] font-medium mb-1">AI Resolution Rate</p>
-                  <p className="text-3xl font-bold text-[#2d3a6d]">78%</p>
-                  <p className="text-xs text-[#2d3a6d] mt-1">↑ 5% from last week</p>
+                <div className="p-4 rounded-xl bg-[var(--primary)]/10 border border-[#2d3a6d]/20">
+                  <p className="text-xs text-[var(--primary)] font-medium mb-1">AI Resolution Rate</p>
+                  <p className="text-3xl font-bold text-[var(--primary)]">78%</p>
+                  <p className="text-xs text-[var(--primary)] mt-1">↑ 5% from last week</p>
                 </div>
-                <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
+                <div className="p-4 rounded-xl bg-[var(--warning)]/10 border border-[var(--warning)]/20">
                   <p className="text-xs text-amber-600 font-medium mb-1">Enrollment Rate</p>
                   <p className="text-3xl font-bold text-amber-700">23%</p>
                   <p className="text-xs text-amber-600 mt-1">↑ 3% from last week</p>
@@ -908,7 +901,7 @@ function AnalyticsPanel({
                   {weeklyData.map((day, i) => (
                     <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
                       <motion.div
-                        className="w-full bg-gradient-to-t from-[#2d3a6d] to-[#3d4a7d] rounded-t-lg"
+                        className="w-full bg-[var(--primary)] rounded-t-lg"
                         initial={{ height: 0 }}
                         animate={{ height: `${(day.calls / maxCalls) * 100}%` }}
                         transition={{ delay: 0.1 + i * 0.05, duration: 0.5 }}
@@ -951,7 +944,7 @@ function AnalyticsPanel({
                       </div>
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <motion.div
-                          className="h-full bg-gradient-to-r from-slate-400 to-slate-500 rounded-full"
+                          className="h-full bg-slate-400 rounded-full"
                           initial={{ width: 0 }}
                           animate={{ width: `${item.percentage}%` }}
                           transition={{ delay: 0.3 + i * 0.1, duration: 0.5 }}
@@ -968,7 +961,7 @@ function AnalyticsPanel({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[#2d3a6d] to-[#3d4a7d]" />
+                      <div className="w-3 h-3 rounded-full bg-[var(--primary)]" />
                       <span className="text-sm text-slate-600">Kadi AI</span>
                     </div>
                     <div className="space-y-1 text-sm">
@@ -1055,7 +1048,7 @@ function QuickAccessCards({
     switch (outcome) {
       case "enrolled": return "text-amber-600 bg-amber-50"
       case "booked": return "text-blue-600 bg-blue-50"
-      case "callback": return "text-[#2d3a6d] bg-[#2d3a6d]/10"
+      case "callback": return "text-[var(--primary)] bg-[var(--primary)]/10"
       default: return "text-slate-500 bg-slate-50"
     }
   }
@@ -1081,7 +1074,7 @@ function QuickAccessCards({
         {stats.map((stat, i) => (
           <motion.div
             key={stat.label}
-            className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-slate-100 hover:border-slate-200 hover:shadow-lg hover:shadow-slate-100 transition-all cursor-default"
+            className="bg-[var(--bg-surface)] rounded-xl p-4 border border-slate-100 hover:border-slate-200 hover:shadow-lg hover:shadow-slate-100 transition-all cursor-default"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 + i * 0.1 }}
@@ -1109,7 +1102,7 @@ function QuickAccessCards({
       <div className="grid grid-cols-5 gap-4">
         {/* Recent Calls - Takes 3 columns */}
         <motion.div
-          className="col-span-3 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 overflow-hidden"
+          className="col-span-3 bg-[var(--bg-surface)] rounded-xl border border-slate-100 overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
@@ -1121,7 +1114,7 @@ function QuickAccessCards({
             </div>
             <button
               onClick={onViewHistory}
-              className="text-xs text-[#2d3a6d] hover:text-[#3d4a7d] font-medium flex items-center gap-1"
+              className="text-xs text-[var(--primary)] hover:text-[var(--primary)] font-medium flex items-center gap-1"
             >
               View all <ArrowRight className="w-3 h-3" />
             </button>
@@ -1165,20 +1158,20 @@ function QuickAccessCards({
           {/* Queue Card */}
           <button
             onClick={onViewQueue}
-            className="w-full bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 p-4 text-left hover:border-[#2d3a6d]/30 hover:shadow-lg hover:shadow-[#2d3a6d]/10 transition-all group"
+            className="w-full bg-[var(--bg-surface)] rounded-xl border border-slate-100 p-4 text-left hover:border-[var(--primary)]/30 hover:shadow-lg hover:shadow-md transition-all group"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#2d3a6d]/10 flex items-center justify-center">
-                  <PhoneIncoming className="w-4 h-4 text-[#2d3a6d]" />
+                <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
+                  <PhoneIncoming className="w-4 h-4 text-[var(--primary)]" />
                 </div>
                 <span className="font-medium text-slate-700">Queue</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#2d3a6d] transition-colors" />
+              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[var(--primary)] transition-colors" />
             </div>
             {queueCount > 0 ? (
               <p className="text-sm text-slate-500">
-                <span className="text-[#2d3a6d] font-semibold">{queueCount}</span> waiting ·
+                <span className="text-[var(--primary)] font-semibold">{queueCount}</span> waiting ·
                 <span className="text-slate-400"> ~2 min avg</span>
               </p>
             ) : (
@@ -1189,7 +1182,7 @@ function QuickAccessCards({
           {/* Analytics Card */}
           <button
             onClick={onViewAnalytics}
-            className="w-full bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 p-4 text-left hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50 transition-all group"
+            className="w-full bg-[var(--bg-surface)] rounded-xl border border-slate-100 p-4 text-left hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50 transition-all group"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -1207,7 +1200,7 @@ function QuickAccessCards({
           </button>
 
           {/* Callbacks Card */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 p-4">
+          <div className="bg-[var(--warning)]/10 rounded-xl border border-[var(--warning)]/20 p-4">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-amber-600" />
               <span className="font-medium text-amber-800">Upcoming Callbacks</span>
@@ -1348,7 +1341,7 @@ function KadiCallCenter() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-b from-slate-50 via-white to-slate-50/50 relative overflow-y-auto">
+    <div className="h-full bg-[var(--bg-base)] relative overflow-y-auto">
       {/* Subtle background pattern */}
       <div
         className="absolute inset-0 opacity-[0.015]"
@@ -1364,7 +1357,7 @@ function KadiCallCenter() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowContext(!showContext)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-[#2d3a6d]/40 hover:text-[#2d3a6d] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-[var(--primary)]/40 hover:text-[var(--primary)] transition-colors"
             >
               <User className="w-4 h-4" />
               <span className="text-sm font-medium">{activeCall.leadName}</span>
@@ -1457,7 +1450,7 @@ function KadiCallCenter() {
                   animate={{ opacity: 1, y: 0 }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#2d3a6d]/100 animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-[var(--primary)]/100 animate-pulse" />
                     <span className="font-mono text-sm text-slate-600">{formatDuration(callDuration)}</span>
                   </div>
                 </motion.div>
@@ -1542,7 +1535,6 @@ function KadiCallCenter() {
 // ============================================================================
 
 function AgentBuilder() {
-  const router = useRouter()
   const [workflows, setWorkflows] = useState<VoiceWorkflow[]>([])
   const [selectedWorkflow, setSelectedWorkflow] = useState<VoiceWorkflow | null>(null)
   const [integrations, setIntegrations] = useState<VoiceWorkflowIntegration[]>([])
@@ -1675,7 +1667,6 @@ function AgentBuilder() {
 
 export default function VoicePage() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const defaultTab = searchParams.get("tab") || "kadi"
 
   return (

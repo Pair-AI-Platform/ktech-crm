@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Phone,
   MessageSquare,
@@ -13,29 +12,23 @@ import {
   Plus,
   Play,
   Pause,
-  MoreHorizontal,
   ChevronRight,
   Clock,
   Users,
   TrendingUp,
   Calendar,
   CheckCircle2,
-  XCircle,
   Search,
   Filter,
   Sparkles,
   Target,
-  Zap,
-  BarChart3,
   Edit,
   Trash2,
-  Copy,
   RefreshCw,
   Send,
   FileText,
   Layers,
   Globe,
-  Settings,
   Upload,
   X,
   Mail,
@@ -338,7 +331,7 @@ function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const percentage = max > 0 ? (value / max) * 100 : 0
   return (
-    <div className="h-2 rounded-full bg-[var(--bg-depth-2)] overflow-hidden">
+    <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
       <motion.div
         className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)]"
         initial={{ width: 0 }}
@@ -441,7 +434,7 @@ function CampaignCard({ campaign, onView }: { campaign: Campaign; onView: () => 
       </div>
 
       {/* Actions */}
-      <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-depth-1)]/50">
+      <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-surface)]/50">
         <div className="flex items-center gap-2">
           {campaign.status === "active" && (
             <Button variant="outline" size="sm" className="gap-2">
@@ -533,7 +526,6 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
     useTemplate: false,
   })
 
-  const selectedTypeConfig = CAMPAIGN_TYPE_CONFIG[formData.type]
   const selectedFilter = AUDIENCE_FILTERS.find(f => f.id === formData.audienceFilter)
   const validContacts = formData.uploadedContacts.filter(c => c.valid)
   const invalidContacts = formData.uploadedContacts.filter(c => !c.valid)
@@ -683,7 +675,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                 {step === 4 && "Compose your message"}
               </p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-depth-1)] text-[var(--text-muted)]">
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)]">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -696,14 +688,14 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
                   s < step ? "bg-emerald-500 text-white" :
                   s === step ? "bg-[var(--primary)] text-white" :
-                  "bg-[var(--bg-depth-2)] text-[var(--text-muted)]"
+                  "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
                 )}>
                   {s < step ? <Check className="w-4 h-4" /> : s}
                 </div>
                 {s < 4 && (
                   <div className={cn(
                     "flex-1 h-1 rounded-full transition-all",
-                    s < step ? "bg-emerald-500" : "bg-[var(--bg-depth-2)]"
+                    s < step ? "bg-emerald-500" : "bg-[var(--bg-elevated)]"
                   )} />
                 )}
               </div>
@@ -727,7 +719,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       "p-6 rounded-2xl border-2 text-left transition-all hover:shadow-lg",
                       formData.type === type
                         ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50 bg-[var(--bg-depth-1)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50 bg-[var(--bg-surface)]"
                     )}
                   >
                     <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-4", config.color)}>
@@ -753,7 +745,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g., Re-enrollment Push - Spring 2026"
-                  className="w-full h-12 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-1)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
+                  className="w-full h-12 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
                 />
               </div>
 
@@ -771,7 +763,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       "flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors",
                       formData.scheduleType === option.id
                         ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                        : "border-[var(--border)] bg-[var(--bg-depth-1)] hover:border-[var(--primary)]/50"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
                     )}>
                       <input
                         type="radio"
@@ -796,7 +788,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                         type="date"
                         value={formData.scheduledDate || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
-                        className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--bg-depth-1)] text-[var(--text-primary)]"
+                        className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
                       />
                     </div>
                     <div className="flex-1">
@@ -805,7 +797,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                         type="time"
                         value={formData.scheduledTime || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, scheduledTime: e.target.value }))}
-                        className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--bg-depth-1)] text-[var(--text-primary)]"
+                        className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
                       />
                     </div>
                   </div>
@@ -818,7 +810,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
           {step === 3 && (
             <div className="space-y-6">
               {/* Audience Source Tabs */}
-              <div className="flex gap-2 p-1 rounded-xl bg-[var(--bg-depth-1)]">
+              <div className="flex gap-2 p-1 rounded-xl bg-[var(--bg-surface)]">
                 <button
                   onClick={() => setFormData(prev => ({ ...prev, audienceSource: "filter" }))}
                   className={cn(
@@ -853,7 +845,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors",
                       formData.audienceFilter === filter.id
                         ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                        : "border-[var(--border)] bg-[var(--bg-depth-1)] hover:border-[var(--primary)]/50"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
                     )}>
                       <div className="flex items-center gap-3">
                         <input
@@ -884,7 +876,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all",
                       isDragging
                         ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50 bg-[var(--bg-depth-1)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50 bg-[var(--bg-surface)]"
                     )}
                   >
                     <input
@@ -894,7 +886,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                       className="hidden"
                     />
-                    <div className="w-16 h-16 rounded-2xl bg-[var(--bg-depth-2)] flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center mx-auto mb-4">
                       <FileSpreadsheet className="w-8 h-8 text-[var(--text-muted)]" />
                     </div>
                     <h3 className="font-medium text-[var(--text-primary)] mb-1">
@@ -912,7 +904,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   {/* Upload Results */}
                   {formData.uploadedContacts.length > 0 && (
                     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-                      <div className="p-4 bg-[var(--bg-depth-1)] border-b border-[var(--border)]">
+                      <div className="p-4 bg-[var(--bg-surface)] border-b border-[var(--border)]">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 text-emerald-600">
@@ -939,7 +931,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       {/* Contact Preview */}
                       <div className="max-h-48 overflow-y-auto">
                         <table className="w-full text-sm">
-                          <thead className="bg-[var(--bg-depth-1)] sticky top-0">
+                          <thead className="bg-[var(--bg-surface)] sticky top-0">
                             <tr>
                               <th className="text-left p-3 text-[var(--text-muted)] font-medium">Name</th>
                               <th className="text-left p-3 text-[var(--text-muted)] font-medium">Contact</th>
@@ -971,7 +963,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                           </tbody>
                         </table>
                         {formData.uploadedContacts.length > 10 && (
-                          <div className="p-3 text-center text-sm text-[var(--text-muted)] bg-[var(--bg-depth-1)]">
+                          <div className="p-3 text-center text-sm text-[var(--text-muted)] bg-[var(--bg-surface)]">
                             +{formData.uploadedContacts.length - 10} more contacts
                           </div>
                         )}
@@ -983,7 +975,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
               {/* Audience Summary */}
               {getAudienceCount() > 0 && (
-                <div className="p-4 rounded-xl bg-[var(--bg-depth-1)] border border-[var(--border)]">
+                <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border)]">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
                       <Users className="w-5 h-5 text-[var(--primary)]" />
@@ -1024,7 +1016,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                         "flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors",
                         formData.voiceWorkflowId === workflow.id
                           ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                          : "border-[var(--border)] bg-[var(--bg-depth-1)] hover:border-[var(--primary)]/50"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
                       )}>
                         <input
                           type="radio"
@@ -1054,7 +1046,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                     value={formData.subject || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
                     placeholder="e.g., Your Journey to KTECH Starts Here"
-                    className="w-full h-12 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-1)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
+                    className="w-full h-12 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
                   />
                 </div>
               )}
@@ -1090,7 +1082,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       : "Hello {{first_name}}! I wanted to reach out..."}
                     rows={formData.type === 'email' ? 8 : 4}
                     className={cn(
-                      "w-full p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-1)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50 resize-none",
+                      "w-full p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50 resize-none",
                       showArabic && "text-right font-arabic"
                     )}
                   />
@@ -1108,7 +1100,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                             [field]: (prev[field as keyof CampaignFormData] || '') + ' ' + variable
                           }))
                         }}
-                        className="px-2 py-1 rounded-md text-xs bg-[var(--bg-depth-2)] text-[var(--text-secondary)] hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]"
+                        className="px-2 py-1 rounded-md text-xs bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]"
                       >
                         {variable}
                       </button>
@@ -1170,7 +1162,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-depth-1)]/50 shrink-0">
+        <div className="px-8 py-6 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-surface)]/50 shrink-0">
           <Button variant="ghost" onClick={() => step === 1 ? onClose() : setStep(step - 1)}>
             <ChevronLeft className="w-4 h-4 mr-2" />
             {step === 1 ? "Cancel" : "Back"}
@@ -1275,7 +1267,7 @@ export default function CampaignsPage() {
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-depth-1)]">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-surface)]">
             {CAMPAIGN_VIEWS.map((view) => (
               <button
                 key={view.id}
@@ -1301,7 +1293,7 @@ export default function CampaignsPage() {
                 placeholder="Search campaigns..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 pl-11 pr-4 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-1)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
+                className="w-full h-10 pl-11 pr-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
               />
             </div>
           )}
@@ -1380,7 +1372,7 @@ export default function CampaignsPage() {
               {/* Campaign List */}
               {filteredCampaigns.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <div className="w-16 h-16 rounded-full bg-[var(--bg-depth-2)] flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mb-4">
                     <Layers className="w-8 h-8 text-[var(--text-muted)]" />
                   </div>
                   <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">No campaigns found</h3>

@@ -6,10 +6,7 @@ import {
   X,
   ZoomIn,
   ZoomOut,
-  RotateCw,
   Download,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   ExternalLink,
   Maximize2,
@@ -74,7 +71,7 @@ export function PDFViewer({ url, fileName, onClose, className }: PDFViewerProps)
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className={cn(
-          "fixed inset-0 z-50 bg-black/80 flex flex-col",
+          "fixed inset-0 z-50 bg-[rgba(31,29,26,0.85)] flex flex-col",
           className
         )}
         onClick={(e) => {
@@ -173,10 +170,10 @@ export function PDFViewer({ url, fileName, onClose, className }: PDFViewerProps)
         {/* PDF Content */}
         <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-[rgba(31,29,26,0.6)] z-10">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-white" />
-                <span className="text-white text-sm">Loading PDF...</span>
+                <Loader2 className="w-8 h-8 animate-spin text-[#FAF9F7]" />
+                <span className="text-[#FAF9F7] text-sm">Loading PDF...</span>
               </div>
             </div>
           )}
@@ -206,7 +203,7 @@ export function PDFViewer({ url, fileName, onClose, className }: PDFViewerProps)
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className={cn(
-                "bg-white rounded-lg shadow-2xl overflow-hidden",
+                "bg-[var(--bg-surface)] rounded-xl shadow-[var(--shadow-xl)] overflow-hidden",
                 isFullscreen ? "w-full h-full" : "max-w-[90vw] max-h-[80vh]"
               )}
               style={{

@@ -98,7 +98,7 @@ export async function fetchGPAForLead(
     }
 
     // Check if we're on the dashboard/results page
-    const dashboardSelector = await waitForSelector(
+    await waitForSelector(
       page,
       MOE_CONFIG.SELECTORS.DASHBOARD,
       MOE_CONFIG.ELEMENT_WAIT_TIMEOUT

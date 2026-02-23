@@ -34,9 +34,7 @@ import {
   Mail,
   X,
   RotateCcw,
-  GraduationCap,
   Building,
-  CreditCard,
   CalendarDays,
   UserCircle,
   Sparkles,
@@ -46,9 +44,11 @@ import {
   CircleDot,
   Ban,
   ClipboardList,
+  StickyNote,
+  Send,
 } from "lucide-react"
-import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, MAJORS, MINISTRY_BLOCK_REASONS, type PipelineStage, type AppointmentStatus } from "@/types"
-import { formatKuwaitPhone, formatCivilId, formatDate, cn } from "@/lib/utils"
+import { PIPELINE_STAGES, SCHOOLS, MINISTRY_BLOCK_REASONS, type PipelineStage } from "@/types"
+import { formatKuwaitPhone, formatDate, cn, getInitials } from "@/lib/utils"
 import { useLead, useLeadMutations } from "@/lib/hooks/use-leads"
 import { useLeadAppointments } from "@/lib/hooks/use-appointments"
 import { useUser } from "@/lib/hooks/use-user"
@@ -58,6 +58,7 @@ import { LeadForm } from "@/components/leads/lead-form"
 import { StudentInfoForm } from "@/components/leads/student-info-form"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
+import { SFDownPaymentCard } from "@/components/leads/sf-down-payment-card"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { SMSComposer, SMSHistory } from "@/components/sms"
 import { WhatsAppTemplateSelector, WhatsAppHistory } from "@/components/whatsapp"
@@ -65,11 +66,12 @@ import { FollowUpReminders } from "@/components/leads/follow-up-reminders"
 import { LeadDocuments } from "@/components/leads/lead-documents"
 import { CallHistory } from "@/components/leads/call-history"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
+import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { useCallHistory } from "@/lib/hooks/use-calls"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 
 // Simplified stage order for the pipeline
-const STAGE_ORDER = ["new", "contacted", "visit", "appointment", "test", "application", "applicant", "enrolled", "withdraw", "lost"] as const
+const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "applicant", "enrolled", "withdraw", "lost"] as const
 
 // Lead Heat Configuration
 type LeadHeat = "hot" | "warm" | "cold"
@@ -85,7 +87,7 @@ function calculateLeadHeat(lead: { last_contacted_at?: string; pipeline_stage: s
   const lastContact = lead.last_contacted_at ? new Date(lead.last_contacted_at) : null
   const daysSinceContact = lastContact ? Math.floor((now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24)) : Infinity
 
-  const advancedStages = ["visit", "test", "application"]
+  const advancedStages = ["test", "application"]
   if (daysSinceContact <= 3 || appointmentCount > 0 || advancedStages.includes(lead.pipeline_stage)) {
     return "hot"
   }
@@ -233,14 +235,14 @@ function groupNotesByDate(notes: ParsedNote[]): { label: string; notes: ParsedNo
 
 // Stage gradient colors
 const STAGE_GRADIENT: Record<string, { from: string; to: string; text: string }> = {
-  new: { from: '#6366F1', to: '#8B5CF6', text: 'white' },
-  contacted: { from: '#3B82F6', to: '#6366F1', text: 'white' },
-  appointment: { from: '#0EA5E9', to: '#3B82F6', text: 'white' },
-  visit: { from: '#06B6D4', to: '#0EA5E9', text: 'white' },
-  test: { from: '#10B981', to: '#14B8A6', text: 'white' },
-  application: { from: '#22C55E', to: '#10B981', text: 'white' },
-  enrolled: { from: '#059669', to: '#047857', text: 'white' },
-  lost: { from: '#64748B', to: '#475569', text: 'white' },
+  new: { from: 'var(--primary)', to: 'var(--primary)', text: 'white' },
+  contacted: { from: 'var(--primary)', to: 'var(--primary)', text: 'white' },
+  appointment: { from: 'var(--accent, var(--primary))', to: 'var(--accent, var(--primary))', text: 'white' },
+  visit: { from: 'var(--accent, var(--primary))', to: 'var(--accent, var(--primary))', text: 'white' },
+  test: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
+  application: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
+  enrolled: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
+  lost: { from: 'var(--text-muted)', to: 'var(--text-muted)', text: 'white' },
 }
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -277,9 +279,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [showReactivateMenu, setShowReactivateMenu] = useState(false)
   const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
+  const [showSFPaymentDialog, setShowSFPaymentDialog] = useState(false)
+  const [sfDialogInitialStep, setSfDialogInitialStep] = useState<"select" | "cash" | "finance">("select")
   const [noteFilter, setNoteFilter] = useState<NoteType>('all')
-  const [pinnedNoteIds, setPinnedNoteIds] = useState<Set<string>>(new Set())
+  const [pinnedNoteIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'calls' | 'activity' | 'psp'>('details')
+  const [showPSPWizard, setShowPSPWizard] = useState(false)
   const messagingMenuRef = useRef<HTMLDivElement>(null)
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -328,6 +333,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (stage === 'enrolled' && lead.pipeline_stage === 'application') {
       console.log('[Stage Click] Intercepting enrolled click - showing payment dialog')
       setShowEnrollmentDialog(true)
+      return
+    }
+
+    // Intercept SF lead clicking "applicant" from "application" - require down payment
+    if (stage === 'applicant' && lead.pipeline_stage === 'application' && lead.funding_type === 'self_funded') {
+      console.log('[Stage Click] Intercepting SF applicant click - showing SF payment dialog')
+      setSfDialogInitialStep("select")
+      setShowSFPaymentDialog(true)
       return
     }
 
@@ -397,7 +410,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   // Allowed stages for reactivating a lost lead
   const LOST_LEAD_REACTIVATE_STAGES: { value: PipelineStage; label: string }[] = [
-    { value: 'application', label: 'Application' },
+    { value: 'application', label: 'File' },
     { value: 'contacted', label: 'Contacted' },
   ]
 
@@ -464,7 +477,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             className="flex flex-col items-center gap-4"
           >
             <div className="relative">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] opacity-20" />
+              <div className="w-16 h-16 rounded-xl bg-[var(--primary)] opacity-20" />
               <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
             </div>
             <p className="text-[var(--text-muted)] text-sm">Loading lead details...</p>
@@ -483,8 +496,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center justify-center h-[60vh] gap-4"
         >
-          <div className="w-20 h-20 rounded-2xl bg-red-500/10 flex items-center justify-center">
-            <XCircle className="w-10 h-10 text-red-500" />
+          <div className="w-20 h-20 rounded-xl bg-[var(--error-bg)] flex items-center justify-center">
+            <XCircle className="w-10 h-10 text-[var(--error)]" />
           </div>
           <h2 className="text-xl font-semibold text-[var(--text-primary)]">Lead Not Found</h2>
           <p className="text-[var(--text-secondary)] text-sm text-center max-w-sm">
@@ -502,9 +515,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const stageInfo = PIPELINE_STAGES.find((s) => s.value === lead.pipeline_stage)
-  const sourceInfo = LEAD_SOURCES.find((s) => s.value === lead.source)
   const schoolInfo = SCHOOLS.find((s) => s.value === lead.school)
-  const majorInfo = MAJORS.find((m) => m.value === lead.intended_major)
   const currentStageIndex = activeStageOrder.indexOf(lead.pipeline_stage as typeof STAGE_ORDER[number])
 
   const upcomingAppointments = appointments
@@ -582,18 +593,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[var(--bg-surface)] via-[var(--bg-surface)] to-[var(--bg-elevated)] border border-[var(--border)]/60 shadow-2xl shadow-black/5"
+          className="relative overflow-hidden rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] shadow-md"
         >
-          {/* Background gradient accent - enhanced */}
-          <div
-            className="absolute -top-32 -right-32 w-[500px] h-[500px] opacity-[0.07] blur-[100px] pointer-events-none"
-            style={{ background: `radial-gradient(circle, ${stageGradient.from}, ${stageGradient.to})` }}
-          />
-          <div
-            className="absolute -bottom-20 -left-20 w-64 h-64 opacity-[0.04] blur-[80px] pointer-events-none"
-            style={{ background: `radial-gradient(circle, ${stageGradient.to}, transparent)` }}
-          />
-
           {/* Subtle noise texture overlay */}
           <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }} />
 
@@ -606,17 +607,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 whileHover={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
-                {/* Outer glow ring */}
+                {/* Outer ring */}
                 <div
-                  className="absolute -inset-1.5 rounded-[1.75rem] opacity-40 blur-md"
-                  style={{ background: `linear-gradient(135deg, ${stageGradient.from}, ${stageGradient.to})` }}
+                  className="absolute -inset-1.5 rounded-xl opacity-30"
+                  style={{ background: stageGradient.from }}
                 />
-                <Avatar className="relative w-[88px] h-[88px] sm:w-[100px] sm:h-[100px] ring-[3px] ring-white/80 dark:ring-white/20 shadow-2xl rounded-[1.5rem]">
+                <Avatar className="relative w-[88px] h-[88px] sm:w-[100px] sm:h-[100px] ring-[3px] ring-white/80 dark:ring-white/20 shadow-md rounded-xl">
                   <AvatarFallback
-                    className="text-[1.75rem] sm:text-[2rem] font-semibold text-white tracking-tight rounded-[1.5rem]"
-                    style={{ background: `linear-gradient(145deg, ${stageGradient.from}, ${stageGradient.to})` }}
+                    className="text-[1.75rem] sm:text-[2rem] font-semibold text-white tracking-tight rounded-xl"
+                    style={{ background: stageGradient.from }}
                   >
-                    {lead.first_name?.[0]}{lead.last_name?.[0]}
+                    {getInitials(lead.first_name || '', lead.last_name || '')}
                   </AvatarFallback>
                 </Avatar>
                 {/* Heat indicator badge - refined (hide for lost leads) */}
@@ -631,10 +632,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.3, type: "spring", stiffness: 400 }}
                       className={cn(
-                        "w-9 h-9 rounded-xl flex items-center justify-center shadow-xl ring-[3px] ring-white dark:ring-[var(--bg-surface)] cursor-help",
-                        leadHeat === 'hot' && "bg-gradient-to-br from-orange-400 via-orange-500 to-red-500",
-                        leadHeat === 'warm' && "bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500",
-                        leadHeat === 'cold' && "bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600"
+                        "w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ring-[3px] ring-white dark:ring-[var(--bg-surface)] cursor-help",
+                        leadHeat === 'hot' && "bg-[var(--error)]",
+                        leadHeat === 'warm' && "bg-[var(--warning)]",
+                        leadHeat === 'cold' && "bg-[var(--text-muted)]"
                       )}
                     >
                       <HeatIcon className="w-[18px] h-[18px] text-white drop-shadow-sm" />
@@ -1024,6 +1025,96 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
         </AnimatePresence>
 
+        {/* Quick Notes */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mt-6 bg-[var(--bg-surface)] border border-[var(--border)] rounded-3xl overflow-hidden"
+        >
+          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <StickyNote className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-[var(--text-primary)]">Notes</h3>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {parsedNotes.length > 0 ? `${parsedNotes.length} note${parsedNotes.length !== 1 ? 's' : ''}` : 'No notes yet'}
+                </p>
+              </div>
+            </div>
+            {parsedNotes.length > 3 && (
+              <button
+                onClick={() => setActiveTab('activity')}
+                className="text-xs text-[var(--primary)] hover:underline font-medium"
+              >
+                View all
+              </button>
+            )}
+          </div>
+          <div className="p-5">
+            {/* Add Note Input */}
+            <div className="flex items-end gap-2 mb-4">
+              <Textarea
+                placeholder="Add a quick note..."
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                className="flex-1 min-h-[60px] resize-none text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    handleAddNote()
+                  }
+                }}
+              />
+              <Button
+                onClick={handleAddNote}
+                disabled={!newNote.trim() || mutationLoading}
+                size="sm"
+                className="shrink-0 h-10 w-10 p-0"
+              >
+                {mutationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+
+            {/* Recent Notes */}
+            {parsedNotes.length > 0 ? (
+              <div className="space-y-2">
+                {parsedNotes.slice(0, 3).map((note) => {
+                  const config = NOTE_TYPE_CONFIG[note.type] || NOTE_TYPE_CONFIG.note
+                  const NoteIcon = config.icon
+                  return (
+                    <div
+                      key={note.id}
+                      className="flex items-start gap-3 p-3 rounded-xl bg-[var(--bg-sunken)]"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-hover)] flex items-center justify-center shrink-0">
+                        <NoteIcon className={cn("w-3.5 h-3.5", config.color)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] text-[var(--text-muted)]">{note.timestamp}</span>
+                          {note.createdByName && (
+                            <>
+                              <span className="text-[10px] text-[var(--text-muted)]">·</span>
+                              <span className="text-[10px] text-[var(--text-primary)] font-medium">{note.createdByName}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-sm text-[var(--text-primary)] line-clamp-2">{note.content}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-xs text-[var(--text-muted)]">Add your first note above</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
         {/* Pipeline Progress - Visual Stepper */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1163,6 +1254,28 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </motion.div>
 
+        {/* SF Down Payment Card */}
+        {lead.funding_type === 'self_funded' && (lead.pipeline_stage === 'application' || lead.pipeline_stage === 'applicant') && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mt-4"
+          >
+            <SFDownPaymentCard
+              lead={lead}
+              onRecordCash={() => {
+                setSfDialogInitialStep("cash")
+                setShowSFPaymentDialog(true)
+              }}
+              onSendLink={() => {
+                setSfDialogInitialStep("finance")
+                setShowSFPaymentDialog(true)
+              }}
+            />
+          </motion.div>
+        )}
+
         {/* Follow-up Reminders */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1172,6 +1285,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         >
           <FollowUpReminders leadId={lead.id} agentId={profile?.id} />
         </motion.div>
+
 
         {/* Tabbed Content Section */}
         <motion.div
@@ -1373,7 +1487,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 exit={{ opacity: 0, x: 10 }}
                 className="p-5"
               >
-                <PSPTrackingSection lead={lead} />
+                <PSPTrackingSection lead={lead} onOpenWizard={() => setShowPSPWizard(true)} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1410,8 +1524,32 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         open={showEnrollmentDialog}
         onOpenChange={setShowEnrollmentDialog}
         lead={lead}
+        mode="enrollment"
         onSuccess={async () => {
           await refetchLead()
+        }}
+      />
+
+      {/* SF Down Payment Dialog */}
+      <EnrollmentPaymentDialog
+        open={showSFPaymentDialog}
+        onOpenChange={setShowSFPaymentDialog}
+        lead={lead}
+        mode="sf_downpayment"
+        initialStep={sfDialogInitialStep}
+        onSuccess={async () => {
+          await refetchLead()
+        }}
+      />
+
+      {/* PSP Submission Wizard */}
+      <PSPSubmissionWizard
+        isOpen={showPSPWizard}
+        onClose={() => setShowPSPWizard(false)}
+        lead={lead}
+        onSuccess={() => {
+          setShowPSPWizard(false)
+          refetchLead()
         }}
       />
 

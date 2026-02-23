@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -26,25 +25,25 @@ export function PUCReports({ data }: PUCReportsProps) {
       title: "Total Applied",
       value: data.totalApplied,
       icon: Users,
-      gradient: "from-[#445eb7] to-[#212e7f]"
+      colorClass: "bg-[var(--bg-sunken)]"
     },
     {
       title: "Accepted",
       value: data.accepted,
       icon: CheckCircle2,
-      gradient: "from-[#22C55E] to-[#16A34A]"
+      colorClass: "bg-[var(--success)]"
     },
     {
       title: "Rejected",
       value: data.rejected,
       icon: XCircle,
-      gradient: "from-[#EF4444] to-[#DC2626]"
+      colorClass: "bg-[var(--error)]"
     },
     {
       title: "Pending",
       value: data.pending,
       icon: Clock,
-      gradient: "from-[#F59E0B] to-[#D97706]"
+      colorClass: "bg-[var(--warning)]"
     },
   ]
 
@@ -62,14 +61,14 @@ export function PUCReports({ data }: PUCReportsProps) {
             <Card hover glow className="relative overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
+                  <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
               </CardContent>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.gradient} opacity-50`} />
+              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
             </Card>
           </motion.div>
         ))}
@@ -203,7 +202,7 @@ export function PUCReports({ data }: PUCReportsProps) {
                 { step: 5, title: "Enrolled", desc: "Documents collected" },
               ].map((item, index) => (
                 <div key={item.step} className="relative">
-                  <div className="p-4 rounded-xl bg-[var(--bg-depth-3)] border border-[var(--border)] text-center">
+                  <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] text-center">
                     <div className="w-8 h-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">
                       {item.step}
                     </div>

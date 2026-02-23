@@ -41,7 +41,7 @@ const TAG_COLORS: Record<string, { bg: string; text: string; border: string; hov
   submission: { bg: "rgba(147, 197, 253, 0.3)", text: "#1d4ed8", border: "rgba(59, 130, 246, 0.4)", hover: "rgba(147, 197, 253, 0.4)" },
   payment: { bg: "rgba(34, 197, 94, 0.1)", text: "#16a34a", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
   enrolled: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669", border: "rgba(16, 185, 129, 0.2)", hover: "rgba(16, 185, 129, 0.18)" },
-  lost: { bg: "rgba(113, 113, 122, 0.1)", text: "#52525b", border: "rgba(113, 113, 122, 0.2)", hover: "rgba(113, 113, 122, 0.18)" },
+  lost: { bg: "rgba(220, 38, 38, 0.1)", text: "#DC2626", border: "rgba(220, 38, 38, 0.2)", hover: "rgba(220, 38, 38, 0.18)" },
 }
 
 // Color rotation for options without explicit colors
@@ -160,7 +160,7 @@ export function NotionTagSelect({
         disabled={disabled || loading}
         className={cn(
           "group flex items-center gap-1 min-h-[32px] px-1.5 py-1 rounded-md transition-colors",
-          "hover:bg-[var(--bg-depth-3)] focus:outline-none",
+          "hover:bg-[var(--bg-sunken)] focus:outline-none",
           disabled && "opacity-50 cursor-not-allowed",
           triggerClassName
         )}
@@ -169,7 +169,7 @@ export function NotionTagSelect({
           <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
         ) : selectedOptions.length > 0 ? (
           <div className="flex flex-wrap gap-1">
-            {selectedOptions.map((opt, idx) => {
+            {selectedOptions.map((opt) => {
               const colorStyle = getTagColor(opt.value, opt.color, options.indexOf(opt))
               return (
                 <span
@@ -205,14 +205,14 @@ export function NotionTagSelect({
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              "absolute z-50 mt-1 w-64 rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-xl",
+              "absolute z-50 mt-1 w-64 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] shadow-xl",
               "overflow-hidden"
             )}
           >
             {/* Search input with selected tags */}
             <div className="p-2 border-b border-[var(--border)]">
               <div className="flex flex-wrap items-center gap-1 min-h-[28px] px-2 py-1 rounded-md bg-[var(--bg-sunken)] border border-transparent">
-                {selectedOptions.map((opt, idx) => {
+                {selectedOptions.map((opt) => {
                   const colorStyle = getTagColor(opt.value, opt.color, options.indexOf(opt))
                   return (
                     <span
@@ -265,8 +265,8 @@ export function NotionTagSelect({
                       className={cn(
                         "flex items-center gap-2 px-2 py-1.5 mx-1 rounded-md cursor-pointer transition-colors",
                         isSelected
-                          ? "bg-[var(--bg-depth-3)]"
-                          : "hover:bg-[var(--bg-depth-3)]"
+                          ? "bg-[var(--bg-sunken)]"
+                          : "hover:bg-[var(--bg-sunken)]"
                       )}
                     >
                       {/* Tag */}
@@ -408,11 +408,11 @@ export function InlineTagSelect({
     if (isOpen && inputRef.current) {
       setTimeout(() => {
         inputRef.current?.focus()
-        // Set initial highlighted index to selected option
         const selectedIdx = filteredOptions.findIndex(opt => opt.value === value)
         setHighlightedIndex(selectedIdx >= 0 ? selectedIdx : 0)
       }, 50)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   const handleSelect = (optionValue: string) => {
@@ -452,7 +452,8 @@ export function InlineTagSelect({
         setHighlightedIndex(-1)
         break
     }
-  }, [isOpen, highlightedIndex, filteredOptions, handleSelect])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, highlightedIndex, filteredOptions])
 
   // Scroll highlighted option into view
   useEffect(() => {
@@ -470,7 +471,7 @@ export function InlineTagSelect({
         type="button"
         onClick={(e) => {
           e.stopPropagation()
-          !disabled && !loading && setIsOpen(!isOpen)
+          if (!disabled && !loading) { setIsOpen(!isOpen) }
         }}
         disabled={disabled || loading}
         className={cn(
@@ -479,7 +480,7 @@ export function InlineTagSelect({
           "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
           "focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2",
           disabled && "opacity-50 cursor-not-allowed hover:scale-100 hover:shadow-sm",
-          !colorStyle && "bg-[var(--bg-depth-2)] text-[var(--text-muted)] border-[var(--border)]"
+          !colorStyle && "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border)]"
         )}
         style={
           colorStyle
@@ -516,9 +517,9 @@ export function InlineTagSelect({
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
               "fixed z-[9999] w-72 rounded-xl",
-              "border border-[var(--border)] bg-[var(--card)]",
+              "border border-[var(--border)] bg-[var(--bg-surface)]",
               "shadow-2xl shadow-black/10",
-              "overflow-hidden backdrop-blur-sm"
+              "overflow-hidden"
             )}
             style={{
               top: dropdownPosition.top,
@@ -526,7 +527,7 @@ export function InlineTagSelect({
             }}
           >
             {/* Search input with icon */}
-            <div className="p-3 border-b border-[var(--border)] bg-[var(--bg-depth-1)]/50">
+            <div className="p-3 border-b border-[var(--border)] bg-[var(--bg-surface)]/50">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                 <input
@@ -543,7 +544,7 @@ export function InlineTagSelect({
                     "w-full pl-10 pr-4 py-2.5 rounded-lg",
                     "bg-[var(--bg-sunken)] border-2 border-transparent",
                     "text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
-                    "focus:outline-none focus:border-[var(--primary)]/50 focus:bg-[var(--card)]",
+                    "focus:outline-none focus:border-[var(--primary)]/50 focus:bg-[var(--bg-surface)]",
                     "transition-all duration-200"
                   )}
                 />
@@ -551,7 +552,7 @@ export function InlineTagSelect({
             </div>
 
             {/* Prompt text */}
-            <div className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] bg-[var(--bg-depth-1)]/30">
+            <div className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] bg-[var(--bg-surface)]/30">
               Select an option
             </div>
 
@@ -559,7 +560,7 @@ export function InlineTagSelect({
             <div ref={listRef} className="max-h-72 min-h-[100px] overflow-y-auto py-2 px-2 scroll-smooth">
               {filteredOptions.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--bg-depth-2)] flex items-center justify-center">
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center">
                     <Search className="w-5 h-5 text-[var(--text-muted)]" />
                   </div>
                   <p className="text-sm font-medium text-[var(--text-muted)]">No options found</p>
@@ -581,8 +582,8 @@ export function InlineTagSelect({
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150",
                         "group/option",
                         isSelected && "bg-[var(--primary-muted)] ring-1 ring-[var(--primary)]/20",
-                        !isSelected && isHighlighted && "bg-[var(--bg-depth-2)]",
-                        !isSelected && !isHighlighted && "hover:bg-[var(--bg-depth-2)]"
+                        !isSelected && isHighlighted && "bg-[var(--bg-elevated)]",
+                        !isSelected && !isHighlighted && "hover:bg-[var(--bg-elevated)]"
                       )}
                     >
                       {/* Tag with enhanced styling */}
@@ -617,18 +618,18 @@ export function InlineTagSelect({
             </div>
 
             {/* Footer hint */}
-            <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--bg-depth-1)]/30">
+            <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--bg-surface)]/30">
               <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-depth-2)] font-mono">↑↓</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">↑↓</kbd>
                   navigate
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-depth-2)] font-mono">↵</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">↵</kbd>
                   select
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-depth-2)] font-mono">esc</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">esc</kbd>
                   close
                 </span>
               </div>

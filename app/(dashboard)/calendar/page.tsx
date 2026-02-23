@@ -18,14 +18,14 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  Settings,
   Filter,
   Users,
   Phone,
   Car,
   PhoneMissed,
   PhoneOff,
-  XCircle
+  XCircle,
+  Eye
 } from "lucide-react"
 import { APPOINTMENT_TYPES, APPOINTMENT_STATUSES } from "@/types"
 import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
@@ -36,7 +36,7 @@ import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { AppointmentDetail } from "@/components/calendar/appointment-detail"
 import { SlotManager } from "@/components/calendar/slot-manager"
 import { NoUpdatedAppointments } from "@/components/calendar/no-updated-appointments"
-import { cn } from "@/lib/utils"
+import { cn, toDateString } from "@/lib/utils"
 
 type TimeRange = "day" | "week" | "month"
 type DisplayMode = "calendar" | "table"
@@ -47,7 +47,7 @@ const INITIAL_DATE = new Date(2026, 0, 5) // January 5, 2026
 
 export default function CalendarPage() {
   const { profile } = useUser()
-  const { agents, loading: agentsLoading } = useAgents()
+  const { agents } = useAgents()
   const [timeRange, setTimeRange] = useState<TimeRange>("week")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar")
   const [currentDate, setCurrentDate] = useState<Date>(() => {
@@ -70,16 +70,16 @@ export default function CalendarPage() {
   // Get date range based on time range
   const dateRange = useMemo(() => {
     if (timeRange === "day") {
-      const dateStr = currentDate.toISOString().split("T")[0]
+      const dateStr = toDateString(currentDate)
       return { startDate: dateStr, endDate: dateStr }
     } else if (timeRange === "week") {
       const start = new Date(currentDate)
       start.setDate(start.getDate() - start.getDay())
       const end = new Date(start)
-      end.setDate(end.getDate() + 4)
+      end.setDate(end.getDate() + 6)
       return {
-        startDate: start.toISOString().split("T")[0],
-        endDate: end.toISOString().split("T")[0]
+        startDate: toDateString(start),
+        endDate: toDateString(end)
       }
     } else {
       const year = currentDate.getFullYear()
@@ -87,8 +87,8 @@ export default function CalendarPage() {
       const start = new Date(year, month, 1)
       const end = new Date(year, month + 1, 0)
       return {
-        startDate: start.toISOString().split("T")[0],
-        endDate: end.toISOString().split("T")[0]
+        startDate: toDateString(start),
+        endDate: toDateString(end)
       }
     }
   }, [currentDate, timeRange])
@@ -129,6 +129,8 @@ export default function CalendarPage() {
         return <PhoneMissed className="w-3 h-3 text-[var(--warning)]" />
       case "cant_reach":
         return <PhoneOff className="w-3 h-3 text-[var(--error)]" />
+      case "will_see":
+        return <Eye className="w-3 h-3 text-[var(--info)]" />
       default:
         return null
     }
@@ -477,7 +479,7 @@ export default function CalendarPage() {
                   </div>
                 ) : todayAppointments.length === 0 ? (
                   <div className="text-center py-8">
-                    <div className="w-12 h-12 rounded-xl bg-[var(--bg-depth-3)] flex items-center justify-center mx-auto mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-[var(--bg-sunken)] flex items-center justify-center mx-auto mb-3">
                       <Calendar className="w-6 h-6 text-[var(--text-muted)]" />
                     </div>
                     <p className="text-sm text-[var(--text-muted)]">
@@ -495,7 +497,7 @@ export default function CalendarPage() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
                           onClick={() => setSelectedAppointment(apt)}
-                          className="p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-depth-3)] hover:border-[var(--primary)]/50 transition-all cursor-pointer group"
+                          className="p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50 transition-all cursor-pointer group"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2">
@@ -585,7 +587,7 @@ export default function CalendarPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.03 }}
                             onClick={() => setSelectedAppointment(apt)}
-                            className="p-3 rounded-xl border border-[var(--warning)]/30 bg-[var(--bg-depth-3)] hover:border-[var(--warning)] transition-all cursor-pointer group"
+                            className="p-3 rounded-xl border border-[var(--warning)]/30 bg-[var(--bg-sunken)] hover:border-[var(--warning)] transition-all cursor-pointer group"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-2">
@@ -636,32 +638,6 @@ export default function CalendarPage() {
               </Card>
             )}
 
-            {/* Appointment Types Legend */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Appointment Types</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {APPOINTMENT_TYPES.map((type) => (
-                  <div
-                    key={type.value}
-                    className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--bg-depth-3)] transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-3 h-3 rounded-full",
-                        getAppointmentColor(type.value)
-                      )} />
-                      <span className="text-sm text-[var(--text-secondary)]">{type.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                      <Clock className="w-3 h-3" />
-                      <span>{type.duration}min</span>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
 
           </motion.div>
         </div>

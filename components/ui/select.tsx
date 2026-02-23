@@ -18,14 +18,14 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-lg border bg-[var(--card)] px-3 py-2 text-sm transition-all duration-200",
-      "placeholder:text-[var(--muted-foreground)]",
+      "flex h-10 w-full items-center justify-between rounded-lg border bg-[var(--bg-surface)] px-3 py-2 text-sm transition-all duration-200",
+      "placeholder:text-[var(--text-muted)]",
       "focus:outline-none focus:ring-2 focus:ring-offset-0",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "[&>span]:line-clamp-1",
       error
-        ? "border-[var(--error)] focus:border-[var(--error)] focus:ring-[var(--error-light)]"
-        : "border-[var(--border)] focus:border-[var(--primary)] focus:ring-[var(--primary-light)]",
+        ? "border-[var(--error)] focus:border-[var(--error)] focus:ring-[var(--error-muted)]"
+        : "border-[var(--border)] hover:border-[var(--border-emphasis)] focus:border-[var(--primary)] focus:ring-[var(--primary-muted)]",
       className
     )}
     {...props}
@@ -84,8 +84,8 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl",
-        "bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)]",
-        "border border-[var(--glass-border)] text-[var(--text-primary)] shadow-xl",
+        "bg-[var(--bg-surface)]",
+        "border border-[var(--border)] text-[var(--text-primary)] shadow-xl",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
@@ -117,7 +117,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold text-[var(--muted-foreground)]", className)}
+    className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold text-[var(--text-muted)]", className)}
     {...props}
   />
 ))
@@ -131,7 +131,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex w-full cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-2 text-sm outline-none",
-      "focus:bg-[var(--muted)] focus:text-[var(--foreground)]",
+      "focus:bg-[var(--bg-hover)] focus:text-[var(--text-primary)]",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}

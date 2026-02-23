@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import twilio from "twilio"
 import { getPaymentStatus, verifyWebhookSignature } from "@/lib/myfatoorah/client"
+
+// Initialize Twilio client for sending receipts
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+)
 
 // Use service role for webhook (no user session)
 function createServiceClient() {
@@ -288,7 +295,7 @@ export async function POST(request: NextRequest) {
         .from("psp_documents")
         .select("id")
         .eq("lead_id", lead.id)
-        .eq("document_type", "psp_payment_receipt")
+        .eq("document_type", "puc_receipt")
         .single()
 
       if (existingDoc) {
@@ -311,7 +318,7 @@ export async function POST(request: NextRequest) {
           .from("psp_documents")
           .insert({
             lead_id: lead.id,
-            document_type: "psp_payment_receipt",
+            document_type: "puc_receipt",
             graduate_type: "GOV", // Default, will be updated by wizard
             file_name: `${invoiceNumber}.html`,
             file_type: "text/html",
@@ -339,11 +346,69 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      // Auto-send receipt to student via WhatsApp
+      try {
+        let formattedPhone = lead.phone.replace(/\D/g, "")
+        if (!formattedPhone.startsWith("965") && !formattedPhone.startsWith("+")) {
+          formattedPhone = `965${formattedPhone}`
+        }
+        const whatsappTo = `whatsapp:+${formattedPhone}`
+        const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
+
+        const receiptMessage = `مرحباً ${lead.first_name}،
+
+تم استلام دفعتكم بنجاح ✅
+
+رقم الإيصال: ${invoiceNumber}
+المبلغ: ${transaction.amount} د.ك
+الطريقة: دفع إلكتروني (MyFatoorah)
+
+${urlData?.publicUrl ? `رابط الإيصال: ${urlData.publicUrl}` : ""}
+
+---
+
+Hello ${lead.first_name},
+
+Your payment has been received successfully ✅
+
+Receipt Number: ${invoiceNumber}
+Amount: ${transaction.amount} KD
+Method: Online Payment (MyFatoorah)
+
+${urlData?.publicUrl ? `Receipt Link: ${urlData.publicUrl}` : ""}
+
+شكراً لكم / Thank you
+Kuwait Technical College`
+
+        const twilioMessage = await twilioClient.messages.create({
+          body: receiptMessage,
+          from: whatsappFrom,
+          to: whatsappTo,
+        })
+
+        // Log the WhatsApp receipt message
+        await supabase.from("whatsapp_messages").insert({
+          twilio_message_sid: twilioMessage.sid,
+          direction: "outbound",
+          from_number: process.env.TWILIO_WHATSAPP_NUMBER,
+          to_number: formattedPhone,
+          message_body: receiptMessage,
+          status: twilioMessage.status,
+          lead_id: lead.id,
+          sent_at: new Date().toISOString(),
+        })
+
+        console.log("[PSP Payment Webhook] Receipt sent via WhatsApp, SID:", twilioMessage.sid)
+      } catch (whatsappError) {
+        // Don't fail the webhook if WhatsApp sending fails
+        console.error("[PSP Payment Webhook] Failed to send receipt via WhatsApp:", whatsappError)
+      }
+
       console.log("[PSP Payment Webhook] Successfully processed payment for lead:", lead.id)
 
       return NextResponse.json({
         success: true,
-        message: "Payment processed and invoice generated",
+        message: "Payment processed, invoice generated, and receipt sent via WhatsApp",
         invoiceNumber,
       })
     } else if (statusResult.invoiceStatus === "Failed" || statusResult.invoiceStatus === "Expired") {

@@ -58,13 +58,9 @@ export default function LoginPage() {
   ]
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-depth-0)] relative overflow-hidden">
-      {/* Animated Background */}
+    <div className="min-h-screen flex bg-[var(--bg-base)] relative overflow-hidden">
+      {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Gradient Orbs */}
-        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-[var(--primary)]/5 rounded-full blur-[128px] animate-float" />
-        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[var(--accent)]/4 rounded-full blur-[128px] animate-float" style={{ animationDelay: "1s" }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--secondary)]/3 rounded-full blur-[150px]" />
 
         {/* Grid Pattern */}
         <div
@@ -79,13 +75,13 @@ export default function LoginPage() {
         {mounted && (
           <>
             <motion.div
-              className="absolute top-0 left-1/3 w-px h-full bg-gradient-to-b from-transparent via-[var(--primary)]/[0.03] to-transparent"
+              className="absolute top-0 left-1/3 w-px h-full bg-[var(--primary)]/[0.03]"
               initial={{ opacity: 0, scaleY: 0 }}
               animate={{ opacity: 1, scaleY: 1 }}
               transition={{ duration: 1.5, delay: 0.5 }}
             />
             <motion.div
-              className="absolute top-0 right-1/4 w-px h-full bg-gradient-to-b from-transparent via-[var(--accent)]/[0.02] to-transparent"
+              className="absolute top-0 right-1/4 w-px h-full bg-[var(--accent)]/[0.02]"
               initial={{ opacity: 0, scaleY: 0 }}
               animate={{ opacity: 1, scaleY: 1 }}
               transition={{ duration: 1.5, delay: 0.8 }}
@@ -109,7 +105,7 @@ export default function LoginPage() {
                   <img
                     src="/ktech-logo.jpeg"
                     alt="ktech"
-                    className="w-14 h-14 rounded-2xl shadow-2xl shadow-[var(--primary)]/30"
+                    className="w-14 h-14 rounded-xl shadow-md"
                   />
                   <motion.div
                     className="absolute -top-1 -right-1"
@@ -206,7 +202,7 @@ export default function LoginPage() {
               <img
                 src="/ktech-logo.jpeg"
                 alt="ktech"
-                className="w-12 h-12 rounded-xl shadow-lg shadow-[var(--primary)]/20"
+                className="w-12 h-12 rounded-xl shadow-sm"
               />
               <div>
                 <h1 className="text-xl font-bold text-[var(--text-primary)]">ktech CRM</h1>
@@ -215,7 +211,7 @@ export default function LoginPage() {
             </div>
 
             {/* Login Card */}
-            <div className="glass-card rounded-2xl p-8 border border-[var(--border)]">
+            <div className="bg-[var(--bg-surface)] rounded-xl p-8 border border-[var(--border)]">
               <div className="mb-8">
                 <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h2>
                 <p className="text-[var(--text-secondary)]">Sign in to access your dashboard</p>
@@ -317,25 +313,6 @@ export default function LoginPage() {
       </div>
 
       {/* Floating Elements */}
-      {mounted && (
-        <>
-          <motion.div
-            className="absolute top-20 right-20 w-2 h-2 bg-[var(--primary)] rounded-full hidden xl:block"
-            animate={{ y: [0, -20, 0], opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute bottom-32 left-20 w-3 h-3 bg-[var(--accent)] rounded-full hidden xl:block"
-            animate={{ y: [0, 20, 0], opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 4, repeat: Infinity, delay: 1 }}
-          />
-          <motion.div
-            className="absolute top-1/2 right-32 w-1.5 h-1.5 bg-[var(--warning)] rounded-full hidden xl:block"
-            animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-          />
-        </>
-      )}
     </div>
   )
 }
