@@ -1240,10 +1240,10 @@ export function LeadTable({
                           // Filter statuses based on stage
                           const STAGE_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none'> = {
                             new: 'none',
-                            contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'low_gpa', 'wrong_number', 'already_done', 'will_see', 'potential'],
+                            contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'wrong_number', 'will_see'],
                             visit: ['no_answer', 'cant_reach', 'interested', 'not_interested'],
                             test: ['online', 'on_campus'],
-                            application: 'none',
+                            application: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'wrong_number', 'will_see'],
                             lost: 'all',
                             applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
                             enrolled: 'none',
@@ -1527,12 +1527,18 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
               Fetch GPA
             </Button>
           )}
+        </div>
+
+        <div className="w-px h-8 bg-[var(--border)]" />
+
+        {/* Destructive Actions */}
+        <div className="flex items-center gap-1">
           {onLost && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onLost}
-              className="rounded-lg text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+              className="rounded-lg text-[var(--error)] hover:bg-[var(--error-bg)]"
             >
               <XCircle className="w-4 h-4 mr-1.5" />
               Lost
