@@ -12,7 +12,6 @@ import { createClient } from "@/lib/supabase/client"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
 import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
-import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,11 +34,16 @@ import {
 type TopTab = "puc" | "sf_srj" | "self_fund"
 type GPASortMode = "none" | "gpa_desc" | "gpa_asc"
 
-const SUBSTAGE_CONFIG: Record<string, { label: string }> = {
-  documents: { label: "Documents" },
-  submissions: { label: "Submissions" },
-  sf_srj: { label: "SF SRJ" },
-  lost: { label: "Lost" },
+// PUC pipeline stage pills (the stages a PUC lead progresses through)
+const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
+  new: { label: "New" },
+  contacted: { label: "Contacted" },
+  visit: { label: "Visit" },
+  test: { label: "Test" },
+  application: { label: "File" },
+  applicant: { label: "Applicant" },
+  enrolled: { label: "Enrolled" },
+  withdraw: { label: "Withdraw" },
 }
 
 // Pipeline stages for Self Fund tab (same as Contacts)
@@ -65,7 +69,7 @@ export default function PUCSRJPage() {
   }, [tabParam])
   const [searchQuery, setSearchQuery] = useState("")
   const [stageFilter, setStageFilter] = useState<string>("all")
-  const [sfSrjStageFilter, setSfSrjStageFilter] = useState<string>("all")
+  const [sfSrjStageFilter, setSfSrjStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSrjSearchQuery, setSfSrjSearchQuery] = useState("")
   const [sfStageFilter, setSfStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSearchQuery, setSfSearchQuery] = useState("")
@@ -77,11 +81,10 @@ export default function PUCSRJPage() {
   const [wizardLead, setWizardLead] = useState<Lead | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [showLostModal, setShowLostModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
-  const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
+  const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
 
   // PUC leads
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
@@ -90,10 +93,10 @@ export default function PUCSRJPage() {
     limit: 200,
   })
 
-  // SF SRJ leads (self-funded applicants)
+  // SF SRJ leads (self-funded, all stages like contacts)
   const { leads: sfSrjLeads, loading: sfSrjLoading, refetch: sfSrjRefetch } = useLeads({
     fundingType: "self_funded",
-    stage: "applicant",
+    stage: sfSrjStageFilter,
     searchQuery: sfSrjSearchQuery,
     limit: 200,
   })
@@ -203,7 +206,7 @@ export default function PUCSRJPage() {
     } else if (stageFilter === "all") {
       result = [...pucLeads]
     } else {
-      result = pucLeads.filter((lead) => (lead.submission_substage || "documents") === stageFilter)
+      result = pucLeads.filter((lead) => lead.pipeline_stage === stageFilter)
     }
 
     if (gpaSortMode !== "none") {
@@ -217,13 +220,12 @@ export default function PUCSRJPage() {
     return result
   }, [pucLeads, stageFilter, linkSentLeadIds, gpaSortMode])
 
-  // SF SRJ filtered leads (self-funded applicants with substage filters)
+  // SF SRJ filtered leads (self-funded, filtered by pipeline stage like contacts)
   const sfSrjFilteredLeads = useMemo(() => {
-    let result: Lead[]
+    let result = [...sfSrjLeads]
+    // Exclude lost from "all" view (same as contacts)
     if (sfSrjStageFilter === "all") {
-      result = [...sfSrjLeads]
-    } else {
-      result = sfSrjLeads.filter((lead) => (lead.submission_substage || "documents") === sfSrjStageFilter)
+      result = result.filter(lead => lead.pipeline_stage !== "lost")
     }
     if (gpaSortMode !== "none") {
       result.sort((a, b) => {
@@ -253,19 +255,23 @@ export default function PUCSRJPage() {
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { all: pucLeads.length }
     for (const lead of pucLeads) {
-      const stage = lead.submission_substage || "documents"
-      counts[stage] = (counts[stage] || 0) + 1
+      counts[lead.pipeline_stage] = (counts[lead.pipeline_stage] || 0) + 1
     }
     return counts
   }, [pucLeads])
 
-  // SF SRJ stage counts
+  // SF SRJ stage counts (by pipeline stage, like contacts)
   const sfSrjStageCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: sfSrjLeads.length }
+    // "all" count excludes lost (same as contacts)
+    let allCount = 0
+    const counts: Record<string, number> = {}
     for (const lead of sfSrjLeads) {
-      const stage = lead.submission_substage || "documents"
-      counts[stage] = (counts[stage] || 0) + 1
+      counts[lead.pipeline_stage] = (counts[lead.pipeline_stage] || 0) + 1
+      if (lead.pipeline_stage !== "lost") {
+        allCount++
+      }
     }
+    counts.all = allCount
     return counts
   }, [sfSrjLeads])
 
@@ -352,17 +358,6 @@ export default function PUCSRJPage() {
     window.location.href = `/calendar?book=${leadIds}`
   }
 
-  const handleBulkLostConfirm = async (reasonId: string, notes?: string) => {
-    const result = await bulkUpdateStage(selectedLeads, "lost" as PipelineStage)
-    if (!result.error) {
-      setShowLostModal(false)
-      setSelectedLeads([])
-      setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} marked as lost`)
-      setShowSuccessToast(true)
-      refetch()
-    }
-  }
-
   const handleExportCSV = () => {
     const csvContent = exportLeadsToCSV(filteredLeads)
     const prefix = topTab === "puc" ? "puc" : "self_fund"
@@ -376,113 +371,12 @@ export default function PUCSRJPage() {
     <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0">
       <Header
         user={profile}
-        title="PUC SRJ"
-        subtitle={topTab === "puc" ? "PSP Submission Wizard" : topTab === "sf_srj" ? "Self Funded SRJ" : "Self Fund Leads"}
+        title={topTab === "puc" ? "PUC SRJ" : topTab === "sf_srj" ? "Self Funded SRJ" : "Self Fund"}
       />
 
       <div className="p-6 gap-6 page-enter flex flex-col flex-1 min-h-0 h-full">
-        {/* Top Tab Switcher */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex items-center p-1 bg-[var(--bg-surface)] rounded-lg border border-[var(--border)]">
-              <button
-                onClick={() => setTopTab("puc")}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                  topTab === "puc"
-                    ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-                )}
-              >
-                <GraduationCap className="w-4 h-4" />
-                PUC
-              </button>
-              <button
-                onClick={() => setTopTab("sf_srj")}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                  topTab === "sf_srj"
-                    ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-                )}
-              >
-                <Wallet className="w-4 h-4" />
-                Self Funded SRJ
-              </button>
-              <button
-                onClick={() => setTopTab("self_fund")}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                  topTab === "self_fund"
-                    ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-                )}
-              >
-                <Wallet className="w-4 h-4" />
-                Self Fund
-              </button>
-            </div>
-
-            {/* Stats (PUC only) */}
-            {topTab === "puc" && (
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge variant="info" size="sm">PUC</Badge>
-                <span className="text-sm text-[var(--text-muted)]">
-                  {filteredLeads.length} leads
-                </span>
-                {paymentStats.totalPaid > 0 && (
-                  <>
-                    <div className="w-px h-4 bg-[var(--border)]" />
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
-                        Seat ({'\u2265'}150 KD): {paymentStats.seatReservationCount}
-                        {pucLeads.length > 0 && <span className="opacity-70"> ({Math.round((paymentStats.seatReservationCount / pucLeads.length) * 100)}%)</span>}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
-                        Full ({'\u2265'}400 KD): {paymentStats.fullDownpaymentCount}
-                        {pucLeads.length > 0 && <span className="opacity-70"> ({Math.round((paymentStats.fullDownpaymentCount / pucLeads.length) * 100)}%)</span>}
-                      </span>
-                    </div>
-                  </>
-                )}
-                {placementStats.total > 0 && (
-                  <>
-                    <div className="w-px h-4 bg-[var(--border)]" />
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
-                        F1: {placementStats.foundation1}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-medium">
-                        F2: {placementStats.foundation2}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium">
-                        Direct: {placementStats.directEntry}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Stats (SF SRJ) */}
-            {topTab === "sf_srj" && (
-              <div className="flex items-center gap-3">
-                <Badge variant="accent" size="sm">SF SRJ</Badge>
-                <span className="text-sm text-[var(--text-muted)]">
-                  {filteredLeads.length} leads
-                </span>
-              </div>
-            )}
-
-            {/* Stats (SF only) */}
-            {topTab === "self_fund" && (
-              <div className="flex items-center gap-3">
-                <Badge variant="accent" size="sm">SF</Badge>
-                <span className="text-sm text-[var(--text-muted)]">
-                  {filteredLeads.length} leads
-                </span>
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -564,7 +458,7 @@ export default function PUCSRJPage() {
                     {stageCounts.all || 0}
                   </Badge>
                 </Button>
-                {Object.entries(SUBSTAGE_CONFIG).map(([key, config]) => {
+                {Object.entries(PUC_STAGE_CONFIG).map(([key, config]) => {
                   const count = stageCounts[key] || 0
                   if (count === 0 && stageFilter !== key) return null
                   return (
@@ -607,23 +501,22 @@ export default function PUCSRJPage() {
                   onClick={() => setSfSrjStageFilter("all")}
                   className="shrink-0"
                 >
-                  All
+                  All Stages
                   <Badge variant="secondary" size="sm" className="ml-2">
                     {sfSrjStageCounts.all || 0}
                   </Badge>
                 </Button>
-                {Object.entries(SUBSTAGE_CONFIG).map(([key, config]) => {
-                  const count = sfSrjStageCounts[key] || 0
-                  if (count === 0 && sfSrjStageFilter !== key) return null
+                {PIPELINE_STAGES.filter(s => s.value !== 'lost').map((stage) => {
+                  const count = sfSrjStageCounts[stage.value] || 0
                   return (
                     <Button
-                      key={key}
-                      variant={sfSrjStageFilter === key ? "default" : "ghost"}
+                      key={stage.value}
+                      variant={sfSrjStageFilter === stage.value ? "default" : "ghost"}
                       size="sm"
-                      onClick={() => setSfSrjStageFilter(sfSrjStageFilter === key ? "all" : key)}
+                      onClick={() => setSfSrjStageFilter(stage.value)}
                       className="shrink-0"
                     >
-                      {config.label}
+                      {stage.label}
                       {count > 0 && (
                         <Badge variant="secondary" size="sm" className="ml-2">
                           {count}
@@ -672,14 +565,17 @@ export default function PUCSRJPage() {
             onSelectLead={toggleSelectLead}
             onSelectAll={toggleSelectAll}
             onLeadClick={(lead) => {
-              if (topTab === "puc" || topTab === "sf_srj") {
+              if (topTab === "puc") {
+                preloadAllForLead(lead.id)
+                setWizardLead(lead)
+              } else if (topTab === "sf_srj" && lead.pipeline_stage === "applicant") {
                 preloadAllForLead(lead.id)
                 setWizardLead(lead)
               } else {
                 router.push(`/leads/${lead.id}`)
               }
             }}
-            currentStageFilter={topTab === "puc" || topTab === "sf_srj" ? "applicant" : sfStageFilter}
+            currentStageFilter={topTab === "puc" ? (stageFilter === "link_sent" ? "all" : stageFilter as PipelineStage | "all") : topTab === "sf_srj" ? sfSrjStageFilter : sfStageFilter}
             fundingTypeFilter={topTab === "puc" ? "puc" : "self_funded"}
           />
         </motion.div>
@@ -691,7 +587,6 @@ export default function PUCSRJPage() {
               selectedCount={selectedLeads.length}
               onAssign={() => setShowAssignModal(true)}
               onBook={handleBulkBook}
-              onLost={() => setShowLostModal(true)}
               onDelete={() => setShowDeleteModal(true)}
               onClear={() => setSelectedLeads([])}
             />
@@ -736,14 +631,6 @@ export default function PUCSRJPage() {
         selectedCount={selectedLeads.length}
         onConfirm={handleBulkDeleteConfirm}
         loading={mutationLoading}
-      />
-
-      {/* Bulk Mark Lost Dialog */}
-      <MarkLostDialog
-        open={showLostModal}
-        onOpenChange={setShowLostModal}
-        onConfirm={handleBulkLostConfirm}
-        leadName={`${selectedLeads.length} lead${selectedLeads.length !== 1 ? "s" : ""}`}
       />
 
       {/* Success Toast */}
