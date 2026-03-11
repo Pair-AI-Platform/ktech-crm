@@ -78,12 +78,12 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
 
       // Check if we have minimum required columns
       if (!headerMap.has("civil_id")) {
-        setError("Could not find Civil ID column. Please ensure your file has a 'Civil ID' or 'الرقم المدني' column.")
+        setError("Could not find Civil ID column. Please ensure your file has a 'Civil ID' column.")
         return
       }
 
       if (!headerMap.has("gpa")) {
-        setError("Could not find GPA column. Please ensure your file has a 'GPA', 'المعدل', or 'النسبة' column.")
+        setError("Could not find GPA column. Please ensure your file has a 'GPA' column.")
         return
       }
 

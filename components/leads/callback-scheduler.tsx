@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Phone, Check, User } from "lucide-react"
+import { Phone, Check, User, CreditCard } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import type { Lead, PipelineStage } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
 import { useAppointmentMutations } from "@/lib/hooks/use-appointments"
@@ -24,6 +25,7 @@ interface CallbackSchedulerProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: () => void
+  onUpdateLead?: (id: string, updates: Partial<Lead>) => Promise<unknown>
   lead: Lead | null
   fromStage?: PipelineStage
 }
@@ -40,12 +42,14 @@ export function CallbackScheduler({
   isOpen,
   onClose,
   onSuccess,
+  onUpdateLead,
   lead,
   fromStage,
 }: CallbackSchedulerProps) {
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [selectedTime, setSelectedTime] = useState<string>("")
   const [notes, setNotes] = useState("")
+  const [requiresPayment, setRequiresPayment] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
 
@@ -58,6 +62,7 @@ export function CallbackScheduler({
         setSelectedDate("")
         setSelectedTime("")
         setNotes("")
+        setRequiresPayment(false)
         setShowSuccess(false)
         setIsSubmitting(false)
       })
@@ -115,10 +120,16 @@ export function CallbackScheduler({
         notes: notes || undefined,
         is_callback: true,
         callback_reason: `Callback from ${stageName} stage`,
+        requires_payment: requiresPayment,
         appointment_type: ["new_appointment"],
         modality: "campus",
         status: "scheduled",
       })
+
+      // Save callback date on the lead
+      if (onUpdateLead) {
+        await onUpdateLead(lead.id, { callback_date: selectedDate })
+      }
 
       setShowSuccess(true)
       setTimeout(() => {
@@ -255,6 +266,28 @@ export function CallbackScheduler({
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Payment Toggle */}
+                <div className="flex items-center justify-between px-3 py-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                      requiresPayment
+                        ? "bg-[var(--success)] text-white"
+                        : "bg-[var(--bg-sunken)] text-[var(--text-muted)]"
+                    )}>
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">Payment Required</p>
+                      <p className="text-xs text-[var(--text-muted)]">Payment required upon arrival</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={requiresPayment}
+                    onCheckedChange={setRequiresPayment}
+                  />
                 </div>
 
                 {/* Notes */}

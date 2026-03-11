@@ -11,8 +11,8 @@ import type { Profile } from "@/types"
 // Demo user profile for testing
 const DEMO_USER: Profile = {
   id: "demo-user-id",
-  email: "demo@ktech.edu.kw",
-  full_name: "Demo Admin",
+  email: "adel@ktech.edu.kw",
+  full_name: "Adel",
   role: "admin",
   avatar_url: undefined,
   is_active: true,
@@ -81,8 +81,8 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
       <div className="h-screen bg-[var(--background)] overflow-hidden">
         <Sidebar user={activeUser} />
         <main className={cn(
-          "h-screen pb-20 lg:pb-0 transition-all duration-300 flex flex-col overflow-y-auto",
-          sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[260px]"
+          "h-screen pb-20 lg:pb-0 transition-all duration-300 flex flex-col overflow-y-auto overflow-x-hidden hide-scrollbar",
+          sidebarCollapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"
         )}>
           {children}
         </main>

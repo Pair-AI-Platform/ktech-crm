@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { escapeHtml } from "@/lib/utils"
 
 export async function GET(
   request: NextRequest,
@@ -90,7 +91,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Receipt - ${lead.first_name} ${lead.last_name}</title>
+  <title>Payment Receipt - ${escapeHtml(lead.first_name)} ${escapeHtml(lead.last_name)}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -422,15 +423,15 @@ export async function GET(
         <div class="receipt-meta">
           <div class="meta-item">
             <div class="meta-label">Receipt No.</div>
-            <div class="meta-value">${receiptNumber}</div>
+            <div class="meta-value">${escapeHtml(receiptNumber)}</div>
           </div>
           <div class="meta-item">
             <div class="meta-label">Date</div>
-            <div class="meta-value">${paymentDate}</div>
+            <div class="meta-value">${escapeHtml(paymentDate)}</div>
           </div>
           <div class="meta-item">
             <div class="meta-label">Method</div>
-            <div class="meta-value">${paymentMethodLabel}</div>
+            <div class="meta-value">${escapeHtml(paymentMethodLabel)}</div>
           </div>
         </div>
 
@@ -439,19 +440,19 @@ export async function GET(
           <div class="details-card">
             <div class="detail-row">
               <span class="detail-label">Name</span>
-              <span class="detail-value">${lead.first_name} ${lead.last_name}</span>
+              <span class="detail-value">${escapeHtml(lead.first_name)} ${escapeHtml(lead.last_name)}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Civil ID</span>
-              <span class="detail-value" style="font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 0.5px;">${lead.civil_id || "N/A"}</span>
+              <span class="detail-value" style="font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 0.5px;">${escapeHtml(lead.civil_id || "N/A")}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Phone</span>
-              <span class="detail-value">${lead.phone || "N/A"}</span>
+              <span class="detail-value">${escapeHtml(lead.phone || "N/A")}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Email</span>
-              <span class="detail-value">${lead.email || "N/A"}</span>
+              <span class="detail-value">${escapeHtml(lead.email || "N/A")}</span>
             </div>
           </div>
         </div>

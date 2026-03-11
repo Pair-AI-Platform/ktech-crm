@@ -38,10 +38,16 @@ const TAG_COLORS: Record<string, { bg: string; text: string; border: string; hov
   visit: { bg: "rgba(8, 145, 178, 0.1)", text: "#0e7490", border: "rgba(8, 145, 178, 0.2)", hover: "rgba(8, 145, 178, 0.18)" },
   test: { bg: "rgba(139, 92, 246, 0.1)", text: "#7c3aed", border: "rgba(139, 92, 246, 0.2)", hover: "rgba(139, 92, 246, 0.18)" },
   application: { bg: "rgba(168, 85, 247, 0.1)", text: "#9333ea", border: "rgba(168, 85, 247, 0.2)", hover: "rgba(168, 85, 247, 0.18)" },
+  documents: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706", border: "rgba(245, 158, 11, 0.2)", hover: "rgba(245, 158, 11, 0.18)" },
+  submissions: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb", border: "rgba(59, 130, 246, 0.2)", hover: "rgba(59, 130, 246, 0.18)" },
   submission: { bg: "rgba(147, 197, 253, 0.3)", text: "#1d4ed8", border: "rgba(59, 130, 246, 0.4)", hover: "rgba(147, 197, 253, 0.4)" },
   payment: { bg: "rgba(34, 197, 94, 0.1)", text: "#16a34a", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
+  applicant: { bg: "rgba(34, 197, 94, 0.1)", text: "#16a34a", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
   enrolled: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669", border: "rgba(16, 185, 129, 0.2)", hover: "rgba(16, 185, 129, 0.18)" },
+  withdraw: { bg: "rgba(239, 68, 68, 0.1)", text: "#b91c1c", border: "rgba(239, 68, 68, 0.2)", hover: "rgba(239, 68, 68, 0.18)" },
   lost: { bg: "rgba(220, 38, 38, 0.1)", text: "#DC2626", border: "rgba(220, 38, 38, 0.2)", hover: "rgba(220, 38, 38, 0.18)" },
+  puc_document_submission: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706", border: "rgba(245, 158, 11, 0.2)", hover: "rgba(245, 158, 11, 0.18)" },
+  puc_application_submission: { bg: "rgba(168, 85, 247, 0.1)", text: "#9333ea", border: "rgba(168, 85, 247, 0.2)", hover: "rgba(168, 85, 247, 0.18)" },
 }
 
 // Color rotation for options without explicit colors
@@ -261,7 +267,7 @@ export function NotionTagSelect({
                   return (
                     <div
                       key={option.value}
-                      onClick={() => handleSelect(option.value)}
+                      onClick={(e) => { e.stopPropagation(); handleSelect(option.value) }}
                       className={cn(
                         "flex items-center gap-2 px-2 py-1.5 mx-1 rounded-md cursor-pointer transition-colors",
                         isSelected
@@ -305,6 +311,7 @@ interface InlineTagSelectProps {
   loading?: boolean
   className?: string
   rowVariant?: RowVariant // When provided, uses row-based coloring instead of tag-specific colors
+  compact?: boolean // When true, renders a simple dropdown without search/footer
 }
 
 export function InlineTagSelect({
@@ -315,6 +322,7 @@ export function InlineTagSelect({
   loading = false,
   className,
   rowVariant,
+  compact = false,
 }: InlineTagSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -464,7 +472,7 @@ export function InlineTagSelect({
   }, [highlightedIndex])
 
   return (
-    <div ref={containerRef} className={cn("relative inline-block", className)}>
+    <div ref={containerRef} className={cn("relative inline-block max-w-full", className)}>
       {/* Trigger - the tag itself */}
       <button
         ref={triggerRef}
@@ -475,7 +483,7 @@ export function InlineTagSelect({
         }}
         disabled={disabled || loading}
         className={cn(
-          "group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200",
+          "group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 max-w-full",
           "border shadow-sm",
           "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
           "focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2",
@@ -496,9 +504,9 @@ export function InlineTagSelect({
           <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ) : (
           <>
-            <span className="truncate max-w-[180px]">{selectedOption?.label || "Select"}</span>
+            <span className="truncate">{selectedOption?.label || "Select"}</span>
             <ChevronDown className={cn(
-              "w-3.5 h-3.5 opacity-60 transition-transform duration-200",
+              "w-3.5 h-3.5 shrink-0 opacity-60 transition-transform duration-200",
               isOpen && "rotate-180"
             )} />
           </>
@@ -526,35 +534,39 @@ export function InlineTagSelect({
               left: dropdownPosition.left,
             }}
           >
-            {/* Search input with icon */}
-            <div className="p-3 border-b border-[var(--border)] bg-[var(--bg-surface)]/50">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value)
-                    setHighlightedIndex(0)
-                  }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Search..."
-                  className={cn(
-                    "w-full pl-10 pr-4 py-2.5 rounded-lg",
-                    "bg-[var(--bg-sunken)] border-2 border-transparent",
-                    "text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
-                    "focus:outline-none focus:border-[var(--primary)]/50 focus:bg-[var(--bg-surface)]",
-                    "transition-all duration-200"
-                  )}
-                />
+            {/* Search input with icon - hidden in compact mode */}
+            {!compact && (
+              <div className="p-3 border-b border-[var(--border)] bg-[var(--bg-surface)]/50">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value)
+                      setHighlightedIndex(0)
+                    }}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Search..."
+                    className={cn(
+                      "w-full pl-10 pr-4 py-2.5 rounded-lg",
+                      "bg-[var(--bg-sunken)] border-2 border-transparent",
+                      "text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
+                      "focus:outline-none focus:border-[var(--primary)]/50 focus:bg-[var(--bg-surface)]",
+                      "transition-all duration-200"
+                    )}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Prompt text */}
-            <div className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] bg-[var(--bg-surface)]/30">
-              Select an option
-            </div>
+            {/* Prompt text - hidden in compact mode */}
+            {!compact && (
+              <div className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] bg-[var(--bg-surface)]/30">
+                Select an option
+              </div>
+            )}
 
             {/* Options list */}
             <div ref={listRef} className="max-h-72 min-h-[100px] overflow-y-auto py-2 px-2 scroll-smooth">
@@ -576,7 +588,7 @@ export function InlineTagSelect({
                     <div
                       key={option.value}
                       data-option
-                      onClick={() => handleSelect(option.value)}
+                      onClick={(e) => { e.stopPropagation(); handleSelect(option.value) }}
                       onMouseEnter={() => setHighlightedIndex(index)}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150",
@@ -617,23 +629,25 @@ export function InlineTagSelect({
               )}
             </div>
 
-            {/* Footer hint */}
-            <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--bg-surface)]/30">
-              <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">↑↓</kbd>
-                  navigate
-                </span>
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">↵</kbd>
-                  select
-                </span>
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">esc</kbd>
-                  close
-                </span>
+            {/* Footer hint - hidden in compact mode */}
+            {!compact && (
+              <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--bg-surface)]/30">
+                <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">↑↓</kbd>
+                    navigate
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">↵</kbd>
+                    select
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] font-mono">esc</kbd>
+                    close
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         </AnimatePresence>,
         document.body

@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads, getDemoStudents, getDemoAppointments, DEMO_AGENTS } from "@/lib/demo-data"
 import type {
@@ -314,15 +315,9 @@ function getTwoWeeksAgo(): Date {
 // =============================================
 
 export function useReports(filters: ReportFilters = defaultFilters) {
-  const [data, setData] = useState<ReportData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchReports = useCallback(async (abortSignal?: AbortSignal) => {
-    setLoading(true)
-    setError(null)
-
-    try {
+  const { data = null, isLoading: loading, error: queryError, refetch } = useQuery<ReportData | null>({
+    queryKey: ['reports', filters],
+    queryFn: async () => {
       const { start, end } = filters.dateRange.start && filters.dateRange.end
         ? { start: new Date(filters.dateRange.start), end: new Date(filters.dateRange.end) }
         : getDateRange(filters.dateRange.preset)
@@ -398,7 +393,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           return enrolledAt >= twoWeeksAgo && enrolledAt < weekAgo
         })
 
-        const reportData = calculateReports(
+        return calculateReports(
           leadsData,
           studentsData,
           appointmentsData,
@@ -411,10 +406,6 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           end,
           targetMode
         )
-
-        setData(reportData)
-        setLoading(false)
-        return
       }
 
       const supabase = createClient()
@@ -537,8 +528,6 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         }
       }
 
-      if (abortSignal?.aborted) return
-
       if (leadsError) throw leadsError
       if (studentsError) throw studentsError
       if (appointmentsError) throw appointmentsError
@@ -552,7 +541,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
       const lostReasonsData = (lostReasons || []) as LostReason[]
 
       // Calculate reports
-      const reportData = calculateReports(
+      return calculateReports(
         leadsData,
         studentsData,
         appointmentsData,
@@ -565,26 +554,13 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         end,
         targetMode
       )
+    },
+    staleTime: 60_000,
+  })
 
-      setData(reportData)
-    } catch (err) {
-      if (abortSignal?.aborted) return
-      console.error("Error fetching reports:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch reports")
-    } finally {
-      if (!abortSignal?.aborted) {
-        setLoading(false)
-      }
-    }
-  }, [filters])
+  const error = queryError ? (queryError instanceof Error ? queryError.message : "Failed to fetch reports") : null
 
-  useEffect(() => {
-    const abortController = new AbortController()
-    fetchReports(abortController.signal)
-    return () => abortController.abort()
-  }, [fetchReports])
-
-  return { data, loading, error, refetch: fetchReports }
+  return { data, loading, error, refetch }
 }
 
 // =============================================
@@ -718,7 +694,7 @@ function calculateReports(
   const totalTarget = agents.reduce((sum, a) => sum + (a.monthly_target || 0), 0)
   const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'test', 'application', 'applicant', 'enrolled', 'withdraw', 'lost']
   const stageLabels: Record<PipelineStage, string> = {
-    new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'Application', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost'
+    new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'File', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost', puc_document_submission: 'Doc Submission', puc_application_submission: 'App Submission'
   }
 
   // Generate weekly trend (last 7 days)
@@ -944,10 +920,10 @@ function calculateReports(
     accounting: 'Accounting', mis: 'MIS', network_security: 'Network Security', other: 'Other'
   }
   const discountLabels: Record<DiscountType, string> = {
-    kuwaiti_student: 'Kuwaiti Student', non_kuwaiti: 'Non-Kuwaiti (37%)',
+    kuwaiti_new_certificate: 'Kuwaiti New Certificate (25%)', kuwaiti_old_certificate: 'Kuwaiti Old Certificate (20%)', non_kuwaiti: 'Non-Kuwaiti (37.5%)',
     athletes: 'Athletes (60%)', marketing: 'Marketing (70%)', employee: 'Employee (50%)',
     athletes_full: 'Athletes Full', president: 'President', charity: 'Charity',
-    non_kuwaiti_ministry: 'Ministry', service_civil_commission: 'SCC'
+    non_kuwaiti_ministry: 'Ministry', service_civil_commission: 'SCC', employee_full: 'Employee Full'
   }
 
   const genderCounts = { male: 0, female: 0, other: 0 }
@@ -1286,11 +1262,9 @@ function calculateReports(
 // =============================================
 
 export function useAgents() {
-  const [agents, setAgents] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchAgents() {
+  const { data: agents = [], isLoading: loading } = useQuery<Profile[]>({
+    queryKey: ['agents'],
+    queryFn: async () => {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("profiles")
@@ -1298,13 +1272,11 @@ export function useAgents() {
         .eq("is_active", true)
         .order("full_name")
 
-      if (!error && data) {
-        setAgents(data)
-      }
-      setLoading(false)
-    }
-    fetchAgents()
-  }, [])
+      if (error) throw error
+      return (data || []) as Profile[]
+    },
+    staleTime: 60_000,
+  })
 
   return { agents, loading }
 }
@@ -1313,6 +1285,17 @@ export function useAgents() {
 // AGENT MONTHLY TARGET PROGRESS HOOK
 // =============================================
 
+export interface WeeklyTarget {
+  weekNumber: number // 1-based week of the month
+  weekLabel: string // e.g., "Week 1 (Mar 1-7)"
+  target: number
+  applications: number
+  progress: number // percentage
+  isCurrent: boolean
+  startDate: Date
+  endDate: Date
+}
+
 export interface AgentTargetProgress {
   agentId: string
   agentName: string
@@ -1320,6 +1303,9 @@ export interface AgentTargetProgress {
   applications: number
   progress: number // percentage
   remaining: number
+  // Weekly breakdown
+  weeklyTargets?: WeeklyTarget[]
+  currentWeek?: WeeklyTarget
   // Categorized targets (when mode is 'gender' or 'funding')
   categories?: {
     male?: { target: number; applications: number; progress: number }
@@ -1331,22 +1317,80 @@ export interface AgentTargetProgress {
 
 export type TargetMode = 'simple' | 'gender' | 'funding'
 
-export function useAgentTargetProgress(agentId?: string) {
-  const [progress, setProgress] = useState<AgentTargetProgress | null>(null)
-  const [allAgentsProgress, setAllAgentsProgress] = useState<AgentTargetProgress[]>([])
-  const [loading, setLoading] = useState(true)
-  const [targetMode, setTargetMode] = useState<TargetMode>('simple')
+// Helper: get weekly breakdown for a given month
+function getWeeksInMonth(year: number, month: number): { start: Date; end: Date; label: string; weekNum: number }[] {
+  const weeks: { start: Date; end: Date; label: string; weekNum: number }[] = []
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const monthName = firstDay.toLocaleDateString('en-US', { month: 'short' })
 
-  useEffect(() => {
-    // Get target mode from localStorage
-    if (typeof window !== 'undefined') {
-      const storedMode = localStorage.getItem('ktech-target-mode') as TargetMode
-      if (storedMode) {
-        setTargetMode(storedMode)
-      }
+  let weekStart = new Date(firstDay)
+  let weekNum = 1
+
+  while (weekStart <= lastDay) {
+    // End of this week = next Saturday or end of month
+    const weekEnd = new Date(weekStart)
+    // Move to Saturday (6)
+    const daysUntilSat = (6 - weekStart.getDay() + 7) % 7
+    weekEnd.setDate(weekStart.getDate() + daysUntilSat)
+    // Cap at end of month
+    if (weekEnd > lastDay) weekEnd.setTime(lastDay.getTime())
+
+    weeks.push({
+      start: new Date(weekStart),
+      end: new Date(weekEnd),
+      label: `Week ${weekNum} (${monthName} ${weekStart.getDate()}-${weekEnd.getDate()})`,
+      weekNum,
+    })
+
+    // Next week starts on Sunday
+    weekStart = new Date(weekEnd)
+    weekStart.setDate(weekStart.getDate() + 1)
+    weekNum++
+  }
+
+  return weeks
+}
+
+function computeWeeklyTargets(
+  monthlyTarget: number,
+  leads: { created_at: string }[],
+  year: number,
+  month: number,
+  now: Date
+): WeeklyTarget[] {
+  const weeks = getWeeksInMonth(year, month)
+  const totalWeeks = weeks.length
+
+  // Distribute target across weeks (remainder goes to last week)
+  const basePerWeek = Math.floor(monthlyTarget / totalWeeks)
+  const remainder = monthlyTarget - basePerWeek * totalWeeks
+
+  return weeks.map((week, i) => {
+    const weekTarget = basePerWeek + (i === totalWeeks - 1 ? remainder : 0)
+    const weekLeads = leads.filter(l => {
+      const d = new Date(l.created_at)
+      return d >= week.start && d <= new Date(week.end.getFullYear(), week.end.getMonth(), week.end.getDate(), 23, 59, 59)
+    })
+    const isCurrent = now >= week.start && now <= new Date(week.end.getFullYear(), week.end.getMonth(), week.end.getDate(), 23, 59, 59)
+
+    return {
+      weekNumber: week.weekNum,
+      weekLabel: week.label,
+      target: weekTarget,
+      applications: weekLeads.length,
+      progress: weekTarget > 0 ? Math.min(100, Math.round((weekLeads.length / weekTarget) * 100)) : 0,
+      isCurrent,
+      startDate: week.start,
+      endDate: week.end,
     }
+  })
+}
 
-    async function fetchProgress() {
+export function useAgentTargetProgress(agentId?: string) {
+  const { data: queryData, isLoading: loading } = useQuery<{ allProgress: AgentTargetProgress[]; targetMode: TargetMode }>({
+    queryKey: ['agent-target-progress', agentId],
+    queryFn: async () => {
       // Get target mode
       const mode = (typeof window !== 'undefined' ? localStorage.getItem('ktech-target-mode') : 'simple') as TargetMode || 'simple'
 
@@ -1422,6 +1466,16 @@ export function useAgentTargetProgress(agentId?: string) {
 
           const progressPercent = target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0
 
+          // Compute weekly breakdown
+          const weeklyTargets = computeWeeklyTargets(
+            target,
+            agentLeads.map(l => ({ created_at: l.created_at })),
+            now.getFullYear(),
+            now.getMonth(),
+            now
+          )
+          const currentWeek = weeklyTargets.find(w => w.isCurrent)
+
           return {
             agentId: agent.id,
             agentName: agent.full_name,
@@ -1429,128 +1483,266 @@ export function useAgentTargetProgress(agentId?: string) {
             applications,
             progress: progressPercent,
             remaining: Math.max(0, target - applications),
+            weeklyTargets,
+            currentWeek,
             categories
           }
         })
 
-        setAllAgentsProgress(allProgress)
-
-        if (agentId) {
-          const agentProgress = allProgress.find(p => p.agentId === agentId)
-          setProgress(agentProgress || null)
-        }
-
-        setLoading(false)
-        return
+        return { allProgress, targetMode: mode }
       }
 
       const supabase = createClient()
 
-      try {
-        // Get current month range
-        const now = new Date()
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+      // Get current month range
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
 
-        // Fetch all agents with categorized targets
-        const { data: agents, error: agentsError } = await supabase
-          .from("profiles")
-          .select("id, full_name, monthly_target, target_male, target_female, target_puc, target_sf")
-          .eq("is_active", true)
+      // Fetch all agents with categorized targets
+      const { data: agents, error: agentsError } = await supabase
+        .from("profiles")
+        .select("id, full_name, monthly_target, target_male, target_female, target_puc, target_sf")
+        .eq("is_active", true)
 
-        if (agentsError) throw agentsError
+      if (agentsError) throw agentsError
 
-        // Fetch leads that reached application stages this month (with gender and funding_type)
-        const applicationStages: PipelineStage[] = ['test', 'application']
-        const { data: leads, error: leadsError } = await supabase
-          .from("leads")
-          .select("id, assigned_to, pipeline_stage, created_at, gender, funding_type")
-          .in("pipeline_stage", applicationStages)
-          .gte("created_at", startOfMonth)
-          .lte("created_at", endOfMonth + "T23:59:59")
+      // Fetch leads that reached application stages this month (with gender and funding_type)
+      const applicationStages: PipelineStage[] = ['test', 'application']
+      const { data: leads, error: leadsError } = await supabase
+        .from("leads")
+        .select("id, assigned_to, pipeline_stage, created_at, gender, funding_type")
+        .in("pipeline_stage", applicationStages)
+        .gte("created_at", startOfMonth)
+        .lte("created_at", endOfMonth + "T23:59:59")
 
-        if (leadsError) throw leadsError
+      if (leadsError) throw leadsError
 
-        const allProgress: AgentTargetProgress[] = (agents || []).map(agent => {
-          const agentLeads = (leads || []).filter(l => l.assigned_to === agent.id)
-          const applications = agentLeads.length
+      const allProgress: AgentTargetProgress[] = (agents || []).map(agent => {
+        const agentLeads = (leads || []).filter(l => l.assigned_to === agent.id)
+        const applications = agentLeads.length
 
-          // Calculate categorized stats
-          const maleLeads = agentLeads.filter(l => l.gender === 'male')
-          const femaleLeads = agentLeads.filter(l => l.gender === 'female')
-          const pucLeads = agentLeads.filter(l => l.funding_type === 'puc')
-          const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded')
+        // Calculate categorized stats
+        const maleLeads = agentLeads.filter(l => l.gender === 'male')
+        const femaleLeads = agentLeads.filter(l => l.gender === 'female')
+        const pucLeads = agentLeads.filter(l => l.funding_type === 'puc')
+        const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded')
 
-          // Get agent targets based on mode
-          let target = 0
-          let categories: AgentTargetProgress['categories'] = undefined
+        // Get agent targets based on mode
+        let target = 0
+        let categories: AgentTargetProgress['categories'] = undefined
 
-          if (mode === 'simple') {
-            target = agent.monthly_target || 0
-          } else if (mode === 'gender') {
-            const targetMale = agent.target_male || 0
-            const targetFemale = agent.target_female || 0
-            target = targetMale + targetFemale
+        if (mode === 'simple') {
+          target = agent.monthly_target || 0
+        } else if (mode === 'gender') {
+          const targetMale = agent.target_male || 0
+          const targetFemale = agent.target_female || 0
+          target = targetMale + targetFemale
 
-            categories = {
-              male: {
-                target: targetMale,
-                applications: maleLeads.length,
-                progress: targetMale > 0 ? Math.min(100, Math.round((maleLeads.length / targetMale) * 100)) : 0
-              },
-              female: {
-                target: targetFemale,
-                applications: femaleLeads.length,
-                progress: targetFemale > 0 ? Math.min(100, Math.round((femaleLeads.length / targetFemale) * 100)) : 0
-              }
-            }
-          } else if (mode === 'funding') {
-            const targetPuc = agent.target_puc || 0
-            const targetSf = agent.target_sf || 0
-            target = targetPuc + targetSf
-
-            categories = {
-              puc: {
-                target: targetPuc,
-                applications: pucLeads.length,
-                progress: targetPuc > 0 ? Math.min(100, Math.round((pucLeads.length / targetPuc) * 100)) : 0
-              },
-              sf: {
-                target: targetSf,
-                applications: sfLeads.length,
-                progress: targetSf > 0 ? Math.min(100, Math.round((sfLeads.length / targetSf) * 100)) : 0
-              }
+          categories = {
+            male: {
+              target: targetMale,
+              applications: maleLeads.length,
+              progress: targetMale > 0 ? Math.min(100, Math.round((maleLeads.length / targetMale) * 100)) : 0
+            },
+            female: {
+              target: targetFemale,
+              applications: femaleLeads.length,
+              progress: targetFemale > 0 ? Math.min(100, Math.round((femaleLeads.length / targetFemale) * 100)) : 0
             }
           }
+        } else if (mode === 'funding') {
+          const targetPuc = agent.target_puc || 0
+          const targetSf = agent.target_sf || 0
+          target = targetPuc + targetSf
 
-          const progressPercent = target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0
-
-          return {
-            agentId: agent.id,
-            agentName: agent.full_name,
-            target,
-            applications,
-            progress: progressPercent,
-            remaining: Math.max(0, target - applications),
-            categories
+          categories = {
+            puc: {
+              target: targetPuc,
+              applications: pucLeads.length,
+              progress: targetPuc > 0 ? Math.min(100, Math.round((pucLeads.length / targetPuc) * 100)) : 0
+            },
+            sf: {
+              target: targetSf,
+              applications: sfLeads.length,
+              progress: targetSf > 0 ? Math.min(100, Math.round((sfLeads.length / targetSf) * 100)) : 0
+            }
           }
-        })
-
-        setAllAgentsProgress(allProgress)
-
-        if (agentId) {
-          const agentProgress = allProgress.find(p => p.agentId === agentId)
-          setProgress(agentProgress || null)
         }
-      } catch (err) {
-        console.error("Error fetching agent target progress:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
 
-    fetchProgress()
-  }, [agentId])
+        const progressPercent = target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0
+
+        // Compute weekly breakdown
+        const now = new Date()
+        const weeklyTargets = computeWeeklyTargets(
+          target,
+          agentLeads.map(l => ({ created_at: l.created_at })),
+          now.getFullYear(),
+          now.getMonth(),
+          now
+        )
+        const currentWeek = weeklyTargets.find(w => w.isCurrent)
+
+        return {
+          agentId: agent.id,
+          agentName: agent.full_name,
+          target,
+          applications,
+          progress: progressPercent,
+          remaining: Math.max(0, target - applications),
+          weeklyTargets,
+          currentWeek,
+          categories
+        }
+      })
+
+      return { allProgress, targetMode: mode }
+    },
+    staleTime: 60_000,
+  })
+
+  const allAgentsProgress = queryData?.allProgress ?? []
+  const targetMode = queryData?.targetMode ?? 'simple'
+  const progress = useMemo(() => {
+    if (!agentId) return null
+    return allAgentsProgress.find(p => p.agentId === agentId) ?? null
+  }, [agentId, allAgentsProgress])
 
   return { progress, allAgentsProgress, loading, targetMode }
+}
+
+// =============================================
+// AGENT TARGET HISTORY HOOK (past months)
+// =============================================
+
+export interface MonthlyTargetHistory {
+  month: string // e.g., "2026-02"
+  monthLabel: string // e.g., "February 2026"
+  target: number
+  applications: number
+  progress: number
+  weeklyTargets: WeeklyTarget[]
+}
+
+export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) {
+  const { data: history = [], isLoading: loading } = useQuery<MonthlyTargetHistory[]>({
+    queryKey: ['agent-target-history', agentId, monthsBack],
+    queryFn: async () => {
+      const mode = (typeof window !== 'undefined' ? localStorage.getItem('ktech-target-mode') : 'simple') as TargetMode || 'simple'
+
+      if (isDemoMode()) {
+        // Generate demo history
+        const demoHistory: MonthlyTargetHistory[] = []
+        const now = new Date()
+        for (let i = 1; i <= monthsBack; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+          const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+          const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          const target = 20
+          const applications = Math.floor(Math.random() * 25)
+          const weeks = getWeeksInMonth(d.getFullYear(), d.getMonth())
+          const basePerWeek = Math.floor(target / weeks.length)
+          const remainder = target - basePerWeek * weeks.length
+
+          const weeklyTargets: WeeklyTarget[] = weeks.map((w, idx) => {
+            const wTarget = basePerWeek + (idx === weeks.length - 1 ? remainder : 0)
+            const wApps = Math.floor(Math.random() * (wTarget + 3))
+            return {
+              weekNumber: w.weekNum,
+              weekLabel: w.label,
+              target: wTarget,
+              applications: wApps,
+              progress: wTarget > 0 ? Math.min(100, Math.round((wApps / wTarget) * 100)) : 0,
+              isCurrent: false,
+              startDate: w.start,
+              endDate: w.end,
+            }
+          })
+
+          demoHistory.push({
+            month: monthKey,
+            monthLabel,
+            target,
+            applications,
+            progress: target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0,
+            weeklyTargets,
+          })
+        }
+        return demoHistory
+      }
+
+      const supabase = createClient()
+
+      // Fetch agent profile for current targets
+      const { data: agent } = await supabase
+        .from("profiles")
+        .select("monthly_target, target_male, target_female, target_puc, target_sf")
+        .eq("id", agentId!)
+        .single()
+
+      if (!agent) return []
+
+      let monthlyTarget = 0
+      if (mode === 'simple') {
+        monthlyTarget = agent.monthly_target || 0
+      } else if (mode === 'gender') {
+        monthlyTarget = (agent.target_male || 0) + (agent.target_female || 0)
+      } else if (mode === 'funding') {
+        monthlyTarget = (agent.target_puc || 0) + (agent.target_sf || 0)
+      }
+
+      const now = new Date()
+      const applicationStages: PipelineStage[] = ['test', 'application']
+
+      // Fetch leads for all historical months at once
+      const oldestDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1)
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+      const { data: leads } = await supabase
+        .from("leads")
+        .select("id, created_at")
+        .eq("assigned_to", agentId!)
+        .in("pipeline_stage", applicationStages)
+        .gte("created_at", oldestDate.toISOString().split('T')[0])
+        .lt("created_at", currentMonthStart.toISOString().split('T')[0])
+
+      const monthlyHistory: MonthlyTargetHistory[] = []
+      for (let i = 1; i <= monthsBack; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+        const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+        const monthLeads = (leads || []).filter(l => {
+          const ld = new Date(l.created_at)
+          return ld >= d && ld <= monthEnd
+        })
+
+        const weeklyTargets = computeWeeklyTargets(
+          monthlyTarget,
+          monthLeads.map(l => ({ created_at: l.created_at })),
+          d.getFullYear(),
+          d.getMonth(),
+          d // past month, no "current" week
+        )
+        // Mark none as current since these are past months
+        weeklyTargets.forEach(w => w.isCurrent = false)
+
+        monthlyHistory.push({
+          month: monthKey,
+          monthLabel,
+          target: monthlyTarget,
+          applications: monthLeads.length,
+          progress: monthlyTarget > 0 ? Math.min(100, Math.round((monthLeads.length / monthlyTarget) * 100)) : 0,
+          weeklyTargets,
+        })
+      }
+
+      return monthlyHistory
+    },
+    enabled: !!agentId,
+    staleTime: 60_000,
+  })
+
+  return { history, loading }
 }

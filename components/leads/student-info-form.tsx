@@ -27,9 +27,10 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react"
-import { SCHOOLS, MAJORS, type Lead, type School, type IntendedMajor } from "@/types"
+import { SCHOOLS, MAJORS, type Lead, type School, type IntendedMajor, type SchoolEntity } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { createClient } from "@/lib/supabase/client"
 import type { MOEFetchResponse } from "@/lib/moe/types"
 
 interface StudentInfoFormProps {
@@ -45,6 +46,20 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [hasGpaError, setHasGpaError] = useState(false)
   const [moeFetching, setMoeFetching] = useState(false)
   const [moeFetchResult, setMoeFetchResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
+
+  // Fetch schools from database
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from("schools")
+      .select("*")
+      .eq("is_active", true)
+      .order("name_ar", { ascending: true })
+      .then(({ data }) => {
+        if (data) setDbSchools(data)
+      })
+  }, [])
 
   const [formData, setFormData] = useState({
     first_name: lead.first_name || "",
@@ -53,22 +68,27 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     phone: lead.phone || "",
     civil_id: lead.civil_id || "",
     seat_number: lead.seat_number || "",
-    school: lead.school || "",
+    school: lead.school_id || lead.school || "",
     actual_gpa: lead.actual_gpa?.toString() || lead.gpa_grade_11?.toString() || "",
     funding_type: "puc", // Fixed to PUC only
     intended_major: lead.intended_major || "",
   })
 
-  // Filter schools based on search (supports Arabic) and student gender
-  const filteredSchools = SCHOOLS.filter(school => {
-    // Gender filter: male students → boys schools, female students → girls schools
-    if (formData.gender === 'male' && school.gender !== 'boys') return false
-    if (formData.gender === 'female' && school.gender !== 'girls') return false
-    // Search filter
+  // Use database schools if available, fallback to hardcoded SCHOOLS
+  const schoolSource: { id: string; name_en: string; name_ar: string; gender?: string }[] = dbSchools.length > 0
+    ? dbSchools
+    : SCHOOLS.map(s => ({ id: s.value, name_en: s.labelEn, name_ar: s.labelAr || s.label, gender: s.gender }))
+
+  // Filter schools based on search (supports Arabic, English, and abbreviations)
+  const filteredSchools = schoolSource.filter(school => {
+    // Gender filter: male students → boys/male schools, female students → girls/female schools
+    if (formData.gender === 'male' && school.gender && school.gender !== 'boys' && school.gender !== 'male' && school.gender !== 'mixed') return false
+    if (formData.gender === 'female' && school.gender && school.gender !== 'girls' && school.gender !== 'female' && school.gender !== 'mixed') return false
+    if (!schoolSearch) return true
+    const term = schoolSearch.toLowerCase()
     return (
-      school.label.includes(schoolSearch) ||
-      school.labelAr.includes(schoolSearch) ||
-      school.value.toLowerCase().includes(schoolSearch.toLowerCase())
+      school.name_ar.includes(schoolSearch) ||
+      school.name_en.toLowerCase().includes(term)
     )
   })
 
@@ -145,7 +165,8 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       phone: formData.phone.replace(/\D/g, ""),
       civil_id: formData.civil_id.replace(/\D/g, ""),
       seat_number: formData.seat_number.trim(),
-      school: formData.school as School,
+      school: dbSchools.length > 0 ? undefined : (formData.school || undefined) as School | undefined,
+      school_id: dbSchools.length > 0 && formData.school ? formData.school : undefined,
       actual_gpa: parseFloat(formData.actual_gpa),
       gpa_grade_11: parseFloat(formData.actual_gpa),
       funding_type: "puc" as const,
@@ -165,9 +186,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     // If changing gender, clear school if it doesn't match the new gender
     if (field === 'gender') {
       setFormData(prev => {
-        const currentSchool = SCHOOLS.find(s => s.value === prev.school)
-        const genderMismatch = value === 'male' && currentSchool?.gender !== 'boys'
-          || value === 'female' && currentSchool?.gender !== 'girls'
+        const currentSchool = schoolSource.find(s => s.id === prev.school)
+        const gender = currentSchool?.gender
+        const genderMismatch = gender
+          ? (value === 'male' && gender !== 'boys' && gender !== 'male' && gender !== 'mixed')
+            || (value === 'female' && gender !== 'girls' && gender !== 'female' && gender !== 'mixed')
+          : false
         return {
           ...prev,
           gender: value,
@@ -429,12 +453,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               >
                 <Building2 className="w-4 h-4 text-[var(--text-muted)]" />
                 <span className={formData.school ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}>
-                  {formData.school ? SCHOOLS.find(s => s.value === formData.school)?.label : "Select school"}
+                  {formData.school ? (schoolSource.find(s => s.id === formData.school)?.name_ar || formData.school) : "Select school"}
                 </span>
               </div>
 
               {isSchoolDropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
                   <div className="p-2 border-b border-[var(--border)]">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -452,19 +476,20 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     {filteredSchools.length > 0 ? (
                       filteredSchools.map((school) => (
                         <button
-                          key={school.value}
+                          key={school.id}
                           type="button"
                           onClick={() => {
-                            handleChange("school", school.value)
+                            handleChange("school", school.id)
                             setIsSchoolDropdownOpen(false)
                             setSchoolSearch("")
                           }}
                           className={cn(
                             "w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
-                            formData.school === school.value && "bg-[var(--primary-muted)] text-[var(--primary)]"
+                            formData.school === school.id && "bg-[var(--primary-muted)] text-[var(--primary)]"
                           )}
                         >
-                          {school.label}
+                          <span>{school.name_ar}</span>
+                          <span className="block text-xs text-[var(--text-muted)]">{school.name_en}</span>
                         </button>
                       ))
                     ) : (

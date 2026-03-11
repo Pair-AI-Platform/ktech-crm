@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads } from "@/lib/demo-data"
+import { queryKeys } from "./query-keys"
 import type { PipelineStage } from "@/types"
 
 export interface FunnelStage {
@@ -55,53 +56,49 @@ function buildFunnel(leads: { pipeline_stage: string }[]): FunnelStage[] {
   })
 }
 
+const EMPTY_DATA = {
+  all: { stages: [] as FunnelStage[], totalLeads: 0 },
+  puc: { stages: [] as FunnelStage[], totalLeads: 0 },
+  selfFunded: { stages: [] as FunnelStage[], totalLeads: 0 },
+}
+
 export function useConversionFunnel(
   startDate: Date,
   endDate: Date,
   agentId?: string | null
 ) {
-  const [data, setData] = useState<{
-    all: FunnelData
-    puc: FunnelData
-    selfFunded: FunnelData
-  }>({
-    all: { stages: [], totalLeads: 0 },
-    puc: { stages: [], totalLeads: 0 },
-    selfFunded: { stages: [], totalLeads: 0 },
-  })
-  const [loading, setLoading] = useState(true)
+  const { data = EMPTY_DATA, isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.conversionFunnel.detail({
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      agentId: agentId ?? null,
+    }),
+    queryFn: async () => {
+      if (isDemoMode()) {
+        let leads = getDemoLeads()
 
-  const fetch = useCallback(async () => {
-    setLoading(true)
+        // Date filter
+        leads = leads.filter((l) => {
+          const d = new Date(l.created_at)
+          return d >= startDate && d <= endDate
+        })
 
-    if (isDemoMode()) {
-      let leads = getDemoLeads()
+        if (agentId) {
+          leads = leads.filter((l) => l.assigned_to === agentId)
+        }
 
-      // Date filter
-      leads = leads.filter((l) => {
-        const d = new Date(l.created_at)
-        return d >= startDate && d <= endDate
-      })
+        const pucLeads = leads.filter((l) => l.funding_type === "puc")
+        const sfLeads = leads.filter((l) => l.funding_type === "self_funded")
 
-      if (agentId) {
-        leads = leads.filter((l) => l.assigned_to === agentId)
+        return {
+          all: { stages: buildFunnel(leads), totalLeads: leads.length },
+          puc: { stages: buildFunnel(pucLeads), totalLeads: pucLeads.length },
+          selfFunded: { stages: buildFunnel(sfLeads), totalLeads: sfLeads.length },
+        }
       }
 
-      const pucLeads = leads.filter((l) => l.funding_type === "puc")
-      const sfLeads = leads.filter((l) => l.funding_type === "self_funded")
+      const supabase = createClient()
 
-      setData({
-        all: { stages: buildFunnel(leads), totalLeads: leads.length },
-        puc: { stages: buildFunnel(pucLeads), totalLeads: pucLeads.length },
-        selfFunded: { stages: buildFunnel(sfLeads), totalLeads: sfLeads.length },
-      })
-      setLoading(false)
-      return
-    }
-
-    const supabase = createClient()
-
-    try {
       let query = supabase
         .from("leads")
         .select("pipeline_stage, funding_type")
@@ -119,21 +116,14 @@ export function useConversionFunnel(
       const pucLeads = allLeads.filter((l) => l.funding_type === "puc")
       const sfLeads = allLeads.filter((l) => l.funding_type === "self_funded")
 
-      setData({
+      return {
         all: { stages: buildFunnel(allLeads), totalLeads: allLeads.length },
         puc: { stages: buildFunnel(pucLeads), totalLeads: pucLeads.length },
         selfFunded: { stages: buildFunnel(sfLeads), totalLeads: sfLeads.length },
-      })
-    } catch (err) {
-      console.error("Error fetching funnel data:", err)
-    } finally {
-      setLoading(false)
-    }
-  }, [startDate, endDate, agentId])
+      }
+    },
+    staleTime: 60_000,
+  })
 
-  useEffect(() => {
-    fetch()
-  }, [fetch])
-
-  return { data, loading, refetch: fetch }
+  return { data, loading, refetch }
 }

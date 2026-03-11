@@ -13,7 +13,6 @@ import {
   Phone,
   Calendar,
   Edit,
-  MessageSquare,
   FileText,
   User,
   CheckCircle2,
@@ -22,7 +21,6 @@ import {
   Clock,
   Copy,
   Check,
-  MessageCircle,
   ChevronDown,
   Flame,
   Zap,
@@ -47,12 +45,12 @@ import {
   StickyNote,
   Send,
 } from "lucide-react"
-import { PIPELINE_STAGES, SCHOOLS, MINISTRY_BLOCK_REASONS, type PipelineStage } from "@/types"
+import { PIPELINE_STAGES, SCHOOLS, MINISTRY_BLOCK_REASONS, ORIENTATION_STATUSES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, type PipelineStage, type OrientationStatus, type Lead, type LeadStatus } from "@/types"
 import { formatKuwaitPhone, formatDate, cn, getInitials } from "@/lib/utils"
 import { useLead, useLeadMutations } from "@/lib/hooks/use-leads"
 import { useLeadAppointments } from "@/lib/hooks/use-appointments"
 import { useUser } from "@/lib/hooks/use-user"
-import { useStageSettings } from "@/lib/hooks/use-stage-settings"
+
 import { useLeadShortcuts } from "@/lib/hooks/use-lead-shortcuts"
 import { LeadForm } from "@/components/leads/lead-form"
 import { StudentInfoForm } from "@/components/leads/student-info-form"
@@ -60,18 +58,19 @@ import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
 import { SFDownPaymentCard } from "@/components/leads/sf-down-payment-card"
 import { SimpleTooltip } from "@/components/ui/tooltip"
-import { SMSComposer, SMSHistory } from "@/components/sms"
-import { WhatsAppTemplateSelector, WhatsAppHistory } from "@/components/whatsapp"
+import { InlineTagSelect } from "@/components/ui/notion-tag-select"
 import { FollowUpReminders } from "@/components/leads/follow-up-reminders"
+import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
 import { LeadDocuments } from "@/components/leads/lead-documents"
-import { CallHistory } from "@/components/leads/call-history"
+import { SFDocumentManager } from "@/components/leads/sf-document-manager"
+import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
-import { useCallHistory } from "@/lib/hooks/use-calls"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 
 // Simplified stage order for the pipeline
-const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "applicant", "enrolled", "withdraw", "lost"] as const
+const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"] as const
+
 
 // Lead Heat Configuration
 type LeadHeat = "hot" | "warm" | "cold"
@@ -241,8 +240,14 @@ const STAGE_GRADIENT: Record<string, { from: string; to: string; text: string }>
   visit: { from: 'var(--accent, var(--primary))', to: 'var(--accent, var(--primary))', text: 'white' },
   test: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
   application: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
+  applicant: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
   enrolled: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
   lost: { from: 'var(--text-muted)', to: 'var(--text-muted)', text: 'white' },
+  // PUC stages
+  ktech_application: { from: 'var(--primary)', to: 'var(--primary)', text: 'white' },
+  paci_verification: { from: 'var(--primary)', to: 'var(--primary)', text: 'white' },
+  puc_submission: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
+  puc_decision: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
 }
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -251,62 +256,109 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const { profile } = useUser()
   const { lead, loading, error, refetch: refetchLead } = useLead(resolvedParams.id)
   const { appointments } = useLeadAppointments(resolvedParams.id)
-  const { calls } = useCallHistory(resolvedParams.id)
   const { activities } = useLeadActivities(resolvedParams.id)
   const { updateLeadStage, updateLead, loading: mutationLoading } = useLeadMutations()
-  const { activeStages } = useStageSettings()
-
-  // Filter STAGE_ORDER to only include active stages (excluding 'lost' as it's handled separately)
+  // Show all pipeline stages in the stepper (excluding 'lost' and 'withdraw' as they're handled separately)
   const activeStageOrder = useMemo(() => {
-    if (activeStages.length === 0) return STAGE_ORDER.slice(0, -1) // Remove 'lost' from default
-    return STAGE_ORDER.filter(s => s !== 'lost' && activeStages.includes(s as PipelineStage))
-  }, [activeStages])
+    return STAGE_ORDER.filter(s => s !== 'lost' && s !== 'withdraw')
+  }, [])
 
   const [updatingStage, setUpdatingStage] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
-  const [showMessagingMenu, setShowMessagingMenu] = useState(false)
-  const [messagingType, setMessagingType] = useState<'sms' | 'whatsapp' | null>(() => {
-    const msgType = searchParams.get('message')
-    return msgType === 'sms' || msgType === 'whatsapp' ? msgType : null
-  })
+  const [editingOrientationStatus, setEditingOrientationStatus] = useState(false)
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const statusDropdownRef = useRef<HTMLDivElement>(null)
 
   // Get the stage filter from URL params for back navigation
   const stageFromUrl = searchParams.get('stage') as PipelineStage | null
-  const backUrl = stageFromUrl ? `/leads?stage=${stageFromUrl}` : '/leads'
+  const fromPage = searchParams.get('from')
+  const backUrl = fromPage === 'sf_srj' ? '/puc-srj?tab=sf_srj'
+    : fromPage === 'puc' ? '/puc-srj?tab=puc'
+    : fromPage === 'self_fund' ? '/puc-srj?tab=self_fund'
+    : stageFromUrl ? `/leads?stage=${stageFromUrl}` : '/leads'
+  const backLabel = fromPage === 'sf_srj' ? 'Self Funded'
+    : fromPage === 'puc' ? 'PUC'
+    : fromPage === 'self_fund' ? 'Self Fund'
+    : stageFromUrl ? PIPELINE_STAGES.find(s => s.value === stageFromUrl)?.label || 'Leads' : null
   const [newNote, setNewNote] = useState("")
   const [copiedPhone, setCopiedPhone] = useState(false)
   const [showLostDialog, setShowLostDialog] = useState(false)
   const [showReactivateMenu, setShowReactivateMenu] = useState(false)
   const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
-  const [showSFPaymentDialog, setShowSFPaymentDialog] = useState(false)
-  const [sfDialogInitialStep, setSfDialogInitialStep] = useState<"select" | "cash" | "finance">("select")
   const [noteFilter, setNoteFilter] = useState<NoteType>('all')
   const [pinnedNoteIds] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'calls' | 'activity' | 'psp'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
   const [showPSPWizard, setShowPSPWizard] = useState(false)
-  const messagingMenuRef = useRef<HTMLDivElement>(null)
+  const [showRSVPDialog, setShowRSVPDialog] = useState(false)
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
 
   useLeadShortcuts({
     lead,
-    onToggleMessage: () => setShowMessagingMenu(prev => !prev),
     onEdit: () => setShowEditForm(true),
     onFocusNotes: () => notesInputRef.current?.focus(),
   })
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (messagingMenuRef.current && !messagingMenuRef.current.contains(event.target as Node)) {
-        setShowMessagingMenu(false)
-      }
       if (reactivateMenuRef.current && !reactivateMenuRef.current.contains(event.target as Node)) {
         setShowReactivateMenu(false)
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setShowStatusDropdown(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  const handleOrientationStatusChange = async (newStatus: OrientationStatus | '') => {
+    if (!lead) return
+    setEditingOrientationStatus(true)
+    await updateLead(lead.id, { orientation_status: newStatus || undefined } as Partial<typeof lead>)
+    await refetchLead()
+    setEditingOrientationStatus(false)
+  }
+
+  // Stage-to-status mapping
+  const STAGE_STATUSES: Record<PipelineStage, LeadStatus[] | 'none'> = {
+    new: 'none',
+    contacted: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'wrong_number', 'will_see', 'pay_later'],
+    visit: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'pay_later'],
+    test: ['online', 'on_campus'],
+    application: ['no_answer', 'switched_off', 'interested', 'not_interested', 'high_gpa', 'wrong_number', 'will_see', 'pay_later'],
+    lost: ['not_interested', 'wrong_number', 'competitor', 'cant_reach', 'rude'],
+    applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw', 'pay_later'],
+    enrolled: 'none',
+    withdraw: ['might_withdraw', 'not_interested', 'competitor'],
+    puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
+    puc_application_submission: ['applied', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
+  }
+
+  const availableStatuses = useMemo(() => {
+    if (!lead) return []
+    const stageConfig = STAGE_STATUSES[lead.pipeline_stage]
+    if (stageConfig === 'none') return []
+    const isSelfFunded = lead.funding_type === 'self_funded'
+    const statuses = LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
+    return statuses.filter(s => s.value !== 'pay_later' || isSelfFunded)
+  }, [lead?.pipeline_stage, lead?.funding_type])
+
+  // Check if current status belongs to this stage's statuses
+  const isStatusValidForStage = useMemo(() => {
+    if (!lead?.status) return true
+    return availableStatuses.some(s => s.value === lead.status)
+  }, [lead?.status, availableStatuses])
+
+  const handleStatusChange = async (newStatus: LeadStatus | '') => {
+    if (!lead) return
+    setUpdatingStatus(true)
+    await updateLead(lead.id, { status: newStatus || null } as Partial<typeof lead>)
+    await refetchLead()
+    setUpdatingStatus(false)
+    setShowStatusDropdown(false)
+  }
 
   const copyPhone = () => {
     if (lead?.phone) {
@@ -336,11 +388,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       return
     }
 
-    // Intercept SF lead clicking "applicant" from "application" - require down payment
+    // Intercept SF lead clicking "applicant" from "application" - require down payment via inline wizard
     if (stage === 'applicant' && lead.pipeline_stage === 'application' && lead.funding_type === 'self_funded') {
-      console.log('[Stage Click] Intercepting SF applicant click - showing SF payment dialog')
-      setSfDialogInitialStep("select")
-      setShowSFPaymentDialog(true)
+      // The SF Wizard is already visible inline — scroll to it
+      const wizardEl = document.querySelector('[data-sf-wizard]')
+      if (wizardEl) wizardEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
 
@@ -403,6 +455,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       setUpdatingStage(false)
     }
   }
+
 
   const handleMarkLost = () => {
     setShowLostDialog(true)
@@ -516,7 +569,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   const stageInfo = PIPELINE_STAGES.find((s) => s.value === lead.pipeline_stage)
   const schoolInfo = SCHOOLS.find((s) => s.value === lead.school)
-  const currentStageIndex = activeStageOrder.indexOf(lead.pipeline_stage as typeof STAGE_ORDER[number])
+  const currentStageIndex = activeStageOrder.indexOf(lead.pipeline_stage as (typeof activeStageOrder)[number])
 
   const upcomingAppointments = appointments
     .filter(apt => {
@@ -565,7 +618,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         user={profile}
         title=""
         breadcrumbs={[
-          { label: stageFromUrl ? PIPELINE_STAGES.find(s => s.value === stageFromUrl)?.label || 'Leads' : "Leads", href: backUrl },
+          { label: backLabel || "Leads", href: backUrl },
           { label: `${lead.first_name} ${lead.last_name}` },
         ]}
         hideSearch
@@ -584,46 +637,45 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            {stageFromUrl ? `Back to ${PIPELINE_STAGES.find(s => s.value === stageFromUrl)?.label || 'Leads'}` : 'All Leads'}
+            {backLabel ? `Back to ${backLabel}` : 'All Leads'}
           </Link>
         </div>
 
-        {/* Hero Section - Premium Card */}
+        {/* Hero Section - Architectural Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="relative overflow-hidden rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] shadow-md"
+          className="relative overflow-hidden rounded-lg bg-[var(--bg-surface)] border border-[var(--border)]"
+          style={{ boxShadow: 'var(--shadow-card)' }}
         >
-          {/* Subtle noise texture overlay */}
-          <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }} />
+          {/* Left accent bar — stage color */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
+            style={{ background: stageGradient.from }}
+          />
 
-          <div className="relative p-7 sm:p-8">
+          <div className="relative pl-7 pr-6 py-6 sm:pl-8 sm:pr-7 sm:py-7">
             {/* Top Row: Avatar + Info + Actions */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-6">
-              {/* Large Avatar with Refined Ring */}
+              {/* Avatar — compact with heat dot */}
               <motion.div
-                className="relative"
-                whileHover={{ scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="relative shrink-0"
+                whileHover={{ scale: 1.03 }}
+                transition={{ type: "spring", stiffness: 400, damping: 25 }}
               >
-                {/* Outer ring */}
-                <div
-                  className="absolute -inset-1.5 rounded-xl opacity-30"
-                  style={{ background: stageGradient.from }}
-                />
-                <Avatar className="relative w-[88px] h-[88px] sm:w-[100px] sm:h-[100px] ring-[3px] ring-white/80 dark:ring-white/20 shadow-md rounded-xl">
+                <Avatar className="relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg shadow-sm">
                   <AvatarFallback
-                    className="text-[1.75rem] sm:text-[2rem] font-semibold text-white tracking-tight rounded-xl"
+                    className="text-xl sm:text-2xl font-semibold text-white rounded-lg"
                     style={{ background: stageGradient.from }}
                   >
-                    {getInitials(lead.first_name || '', lead.last_name || '')}
+                    {(lead.first_name || '').charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                {/* Heat indicator badge - refined (hide for lost leads) */}
+                {/* Heat indicator — small dot */}
                 {lead.pipeline_stage !== 'lost' && (
                   <SimpleTooltip
-                    content={`${LEAD_HEAT_CONFIG[leadHeat].label} Lead: ${LEAD_HEAT_CONFIG[leadHeat].description}`}
+                    content={`${LEAD_HEAT_CONFIG[leadHeat].label}: ${LEAD_HEAT_CONFIG[leadHeat].description}`}
                     side="right"
                     wrapperClassName="absolute -bottom-1 -right-1"
                   >
@@ -632,13 +684,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.3, type: "spring", stiffness: 400 }}
                       className={cn(
-                        "w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ring-[3px] ring-white dark:ring-[var(--bg-surface)] cursor-help",
+                        "w-5 h-5 rounded-full flex items-center justify-center ring-[2.5px] ring-[var(--bg-surface)] cursor-help",
                         leadHeat === 'hot' && "bg-[var(--error)]",
                         leadHeat === 'warm' && "bg-[var(--warning)]",
                         leadHeat === 'cold' && "bg-[var(--text-muted)]"
                       )}
                     >
-                      <HeatIcon className="w-[18px] h-[18px] text-white drop-shadow-sm" />
+                      <HeatIcon className="w-2.5 h-2.5 text-white" />
                     </motion.div>
                   </SimpleTooltip>
                 )}
@@ -646,233 +698,210 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
               {/* Lead Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <motion.h1
-                      initial={{ opacity: 0, x: -10 }}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    {/* Name + inline stage tag */}
+                    <motion.div
+                      initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.15 }}
-                      className="text-[1.75rem] sm:text-[2rem] font-semibold text-[var(--text-primary)] tracking-[-0.02em] leading-tight"
+                      className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5"
                     >
-                      {lead.first_name} {lead.last_name}
-                    </motion.h1>
+                      <h1 className="text-[1.625rem] sm:text-[1.875rem] font-bold text-[var(--text-primary)] tracking-[-0.025em] leading-none">
+                        {lead.first_name} {lead.last_name}
+                      </h1>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] rounded"
+                          style={{
+                            background: stageGradient.from,
+                            color: stageGradient.text,
+                          }}
+                        >
+                          {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
+                          {stageInfo?.label}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                          <Clock className="w-3 h-3" />
+                          {daysInStage === 0 ? 'Today' : `${daysInStage}d`}
+                        </span>
+                      </div>
+                    </motion.div>
+
+                    {/* Info pills — flat, semantic colors */}
                     <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="flex flex-wrap items-center gap-2.5"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.25 }}
+                      className="flex flex-wrap items-center gap-1.5 mt-3"
                     >
-                      {/* Stage Badge - refined pill */}
-                      <span
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold shadow-md tracking-wide"
-                        style={{
-                          background: `linear-gradient(135deg, ${stageGradient.from}, ${stageGradient.to})`,
-                          color: stageGradient.text,
-                          boxShadow: `0 4px 14px -2px ${stageGradient.from}40`
-                        }}
+                      {lead.funding_type === "puc" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--warning-muted)] text-[var(--warning)] ring-1 ring-[var(--warning)]/10">
+                          <Sparkles className="w-3 h-3" />
+                          PUC
+                        </span>
+                      )}
+                      {lead.is_kuwaiti && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--success-muted)] text-[var(--success)] ring-1 ring-[var(--success)]/10">
+                          <Tag className="w-3 h-3" />
+                          Kuwaiti
+                        </span>
+                      )}
+                      {(schoolInfo?.label || lead.school_name_custom) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--info-muted)] text-[var(--info)] ring-1 ring-[var(--info)]/10">
+                          <Building className="w-3 h-3" />
+                          {schoolInfo?.label || lead.school_name_custom}
+                        </span>
+                      )}
+                      {lead.puc_choice && (
+                        <span className={cn(
+                          "inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium ring-1",
+                          lead.puc_choice === "1"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 ring-emerald-300/30"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 ring-amber-300/30"
+                        )}>
+                          {lead.puc_choice === "1" ? "1st" : lead.puc_choice === "2" ? "2nd" : lead.puc_choice === "3" ? "3rd" : "4th"} Choice
+                          {lead.puc_first_choice_college ? ` — 1st: ${lead.puc_first_choice_college}` : ""}
+                        </span>
+                      )}
+                      {lead.ministry_blocked && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--error-muted)] text-[var(--error)] ring-1 ring-[var(--error)]/10">
+                          <Ban className="w-3 h-3" />
+                          Blocked
+                        </span>
+                      )}
+                    </motion.div>
+
+
+                    {/* Phone — clean monospace */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="flex flex-wrap items-center gap-2.5 mt-4"
+                    >
+                      <button
+                        onClick={copyPhone}
+                        className="group inline-flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--bg-sunken)] hover:bg-[var(--bg-hover)] ring-1 ring-transparent hover:ring-[var(--border)] transition-all duration-200"
                       >
-                        {lead.pipeline_stage === 'lost' && <XCircle className="w-3.5 h-3.5" />}
-                        {stageInfo?.label}
-                      </span>
-                      {/* Days in stage - subtle indicator */}
-                      <span className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] font-medium">
-                        <Clock className="w-3.5 h-3.5 opacity-60" />
-                        {daysInStage === 0 ? 'Today' : `${daysInStage}d in stage`}
-                      </span>
+                        <Phone className="w-4 h-4 text-[var(--text-muted)]" />
+                        <span className="font-mono text-sm font-medium text-[var(--text-primary)] tracking-wide">
+                          {formatKuwaitPhone(lead.phone)}
+                        </span>
+                        {copiedPhone ? (
+                          <motion.span
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="flex items-center gap-1 text-[var(--success)]"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-semibold uppercase tracking-wider">Copied</span>
+                          </motion.span>
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-60 transition-opacity" />
+                        )}
+                      </button>
+
+                      {lead.phone_secondary && (
+                        <a
+                          href={`tel:+965${lead.phone_secondary}`}
+                          className="group inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-sunken)]/60 hover:bg-[var(--bg-hover)] ring-1 ring-transparent hover:ring-[var(--border)] transition-all duration-200"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                          <span className="font-mono text-xs font-medium text-[var(--text-secondary)]">
+                            {formatKuwaitPhone(lead.phone_secondary)}
+                          </span>
+                          <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider font-medium">2nd</span>
+                        </a>
+                      )}
                     </motion.div>
                   </div>
-                  {/* Edit Button - refined */}
+
+                  {/* Edit button */}
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setShowEditForm(true)}
-                      className="w-10 h-10 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] shrink-0 transition-all duration-200"
+                      className="w-9 h-9 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] shrink-0"
                     >
-                      <Edit className="w-[18px] h-[18px]" />
+                      <Edit className="w-4 h-4" />
                     </Button>
                   </motion.div>
-                </div>
-
-                {/* Quick Info Pills - enhanced */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="flex flex-wrap items-center gap-2 mt-4"
-                >
-                  {lead.funding_type === "puc" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 dark:from-amber-950/40 dark:to-orange-950/40 dark:text-amber-400 ring-1 ring-amber-200/60 dark:ring-amber-800/40">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      PUC Scholarship
-                    </span>
-                  )}
-                  {lead.is_kuwaiti && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 dark:from-emerald-950/40 dark:to-teal-950/40 dark:text-emerald-400 ring-1 ring-emerald-200/60 dark:ring-emerald-800/40">
-                      <Tag className="w-3.5 h-3.5" />
-                      Kuwaiti
-                    </span>
-                  )}
-                  {(schoolInfo?.label || lead.school_name_custom) && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 dark:from-blue-950/40 dark:to-indigo-950/40 dark:text-blue-400 ring-1 ring-blue-200/60 dark:ring-blue-800/40">
-                      <Building className="w-3.5 h-3.5" />
-                      {schoolInfo?.label || lead.school_name_custom}
-                    </span>
-                  )}
-                  {lead.ministry_blocked && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 dark:from-orange-950/40 dark:to-amber-950/40 dark:text-orange-400 ring-1 ring-orange-200/60 dark:ring-orange-800/40">
-                      <Ban className="w-3.5 h-3.5" />
-                      Blocked: {lead.ministry_block_reasons?.map(r => MINISTRY_BLOCK_REASONS.find(m => m.value === r)?.label).filter(Boolean).join(', ') || 'Unknown'}
-                    </span>
-                  )}
-                </motion.div>
-
-                {/* Phone Numbers - Premium styling */}
-                <div className="flex flex-wrap items-center gap-3 mt-5">
-                  <motion.button
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    onClick={copyPhone}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    className="group inline-flex items-center gap-3.5 px-5 py-3 rounded-2xl bg-gradient-to-r from-[var(--bg-sunken)] to-[var(--bg-sunken)]/80 hover:from-[var(--bg-hover)] hover:to-[var(--bg-hover)]/80 ring-1 ring-[var(--border)]/50 hover:ring-[var(--border)] transition-all duration-300"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center ring-1 ring-slate-200/60 dark:ring-slate-700/60">
-                      <Phone className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                    </div>
-                    <span className="font-mono text-lg font-semibold text-[var(--text-primary)] tracking-wide">
-                      {formatKuwaitPhone(lead.phone)}
-                    </span>
-                    {copiedPhone ? (
-                      <motion.span
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span className="text-xs font-semibold">Copied!</span>
-                      </motion.span>
-                    ) : (
-                      <Copy className="w-4 h-4 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-all duration-200" />
-                    )}
-                  </motion.button>
-
-                  {lead.phone_secondary && (
-                    <motion.a
-                      href={`tel:+965${lead.phone_secondary}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.35 }}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                      className="group inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[var(--bg-sunken)]/60 hover:bg-[var(--bg-hover)] ring-1 ring-[var(--border)]/40 hover:ring-[var(--border)] transition-all duration-300"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
-                        <Phone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Secondary</span>
-                        <span className="font-mono text-sm font-medium text-[var(--text-primary)]">
-                          {formatKuwaitPhone(lead.phone_secondary)}
-                        </span>
-                      </div>
-                    </motion.a>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Upcoming Appointment Banner - Premium design */}
+            {/* Upcoming Appointment */}
             {upcomingAppointments.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.4 }}
-                className="mt-6"
+                transition={{ delay: 0.35 }}
+                className="mt-5"
               >
                 <Link
                   href={`/calendar?highlight=${upcomingAppointments[0].id}`}
-                  className="group relative flex items-center gap-4 px-5 py-4 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01]"
+                  className="group flex items-center gap-3.5 px-4 py-3 rounded-lg bg-[var(--info-bg)] ring-1 ring-[var(--info)]/15 hover:ring-[var(--info)]/30 transition-all duration-200"
                 >
-                  {/* Gradient background */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/[0.08] via-cyan-500/[0.06] to-teal-500/[0.08] dark:from-blue-500/[0.12] dark:via-cyan-500/[0.10] dark:to-teal-500/[0.12]" />
-                  <div className="absolute inset-0 ring-1 ring-inset ring-blue-500/20 dark:ring-blue-400/20 rounded-2xl" />
-
-                  {/* Calendar icon container */}
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl blur-lg opacity-40" />
-                    <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                      <CalendarDays className="w-7 h-7 text-white" />
-                    </div>
+                  <div className="w-10 h-10 rounded-lg bg-[var(--info)] flex items-center justify-center shadow-sm">
+                    <CalendarDays className="w-5 h-5 text-white" />
                   </div>
-
-                  <div className="relative flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text-primary)] capitalize">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-primary)] capitalize">
                       {upcomingAppointments[0].appointment_type.map(t => t.replace(/_/g, ' ')).join(', ')}
                     </p>
-                    <p className="text-sm text-[var(--text-secondary)] mt-0.5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 opacity-60" />
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3 opacity-50" />
                       {formatDate(upcomingAppointments[0].scheduled_date)} at {upcomingAppointments[0].scheduled_time?.slice(0, 5)}
                     </p>
                   </div>
-
-                  <div className="relative w-10 h-10 rounded-xl bg-white/60 dark:bg-white/10 flex items-center justify-center group-hover:bg-white dark:group-hover:bg-white/20 transition-colors">
-                    <ChevronRight className="w-5 h-5 text-[var(--text-muted)] group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
-                  </div>
+                  <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--info)] group-hover:translate-x-0.5 transition-all" />
                 </Link>
               </motion.div>
             )}
 
-            {/* Action Buttons Row - Premium styling */}
+            {/* Action bar — divider separated */}
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.4 }}
-              className="flex items-center gap-3 mt-6"
-              ref={messagingMenuRef}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="flex items-center gap-2 mt-5 pt-5 border-t border-[var(--border-subtle)]"
             >
               {/* Primary CTA */}
               {lead.pipeline_stage === 'lost' ? (
                 <div className="relative flex-1" ref={reactivateMenuRef}>
                   <motion.button
                     onClick={() => setShowReactivateMenu(!showReactivateMenu)}
-                    whileHover={{ scale: 1.015, y: -1 }}
-                    whileTap={{ scale: 0.985 }}
-                    className="w-full relative flex items-center justify-center gap-3 px-6 py-4 rounded-2xl overflow-hidden font-semibold text-white shadow-xl transition-all duration-300"
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-[var(--text-primary)] text-[var(--text-inverse)] font-medium text-sm shadow-sm hover:opacity-90 transition-all"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                    <RotateCcw className="relative w-5 h-5" />
-                    <span className="relative">Reactivate To</span>
-                    <ChevronDown className={cn(
-                      "relative w-4 h-4 transition-transform",
-                      showReactivateMenu && "rotate-180"
-                    )} />
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Reactivate To</span>
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showReactivateMenu && "rotate-180")} />
                   </motion.button>
 
                   <AnimatePresence>
                     {showReactivateMenu && (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-xl shadow-2xl shadow-black/20 ring-1 ring-[var(--border)] overflow-hidden z-50"
+                        className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-lg shadow-lg ring-1 ring-[var(--border)] overflow-hidden z-50"
                       >
-                        <div className="p-1.5">
+                        <div className="p-1">
                           {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
                             <button
                               key={stage.value}
                               onClick={() => handleReactivateLead(stage.value)}
-                              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
                             >
                               <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                style={{ background: `linear-gradient(135deg, ${STAGE_GRADIENT[stage.value].from}, ${STAGE_GRADIENT[stage.value].to})` }}
-                              >
-                                <CheckCircle2 className="w-4 h-4 text-white" />
-                              </div>
+                                className="w-2 h-2 rounded-full"
+                                style={{ background: STAGE_GRADIENT[stage.value].from }}
+                              />
                               <span className="text-sm font-medium text-[var(--text-primary)]">{stage.label}</span>
                             </button>
                           ))}
@@ -881,239 +910,38 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     )}
                   </AnimatePresence>
                 </div>
-              ) : (
-                <Link
-                  href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name} ${lead.last_name}`)}`}
-                  className="flex-1"
-                >
+              ) : null}
+
+              {/* Calendar button */}
+              <SimpleTooltip content="Book appointment" side="bottom">
+                <Link href={`/calendar?book=${lead.id}`}>
                   <motion.div
-                    whileHover={{ scale: 1.015, y: -1 }}
-                    whileTap={{ scale: 0.985 }}
-                    className="relative flex items-center justify-center gap-3 px-6 py-4 rounded-2xl overflow-hidden font-semibold text-white shadow-xl shadow-emerald-500/25 transition-all duration-300"
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] ring-1 ring-[var(--border-subtle)] hover:ring-[var(--border)] transition-all duration-200"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
-                    <div className="absolute inset-0 opacity-0 hover:opacity-100 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 transition-opacity duration-300" />
-                    <Phone className="relative w-5 h-5" />
-                    <span className="relative tracking-wide">Call Now</span>
+                    <Calendar className="w-[18px] h-[18px]" />
                   </motion.div>
                 </Link>
+              </SimpleTooltip>
+
+              {/* RSVP button - only for applicants */}
+              {lead.pipeline_stage === 'applicant' && (
+                <SimpleTooltip content="Send RSVP link" side="bottom">
+                  <motion.div
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowRSVPDialog(true)}
+                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-emerald-50 hover:text-emerald-600 ring-1 ring-[var(--border-subtle)] hover:ring-emerald-200 transition-all duration-200 cursor-pointer"
+                  >
+                    <Send className="w-[18px] h-[18px]" />
+                  </motion.div>
+                </SimpleTooltip>
               )}
-
-              {/* Message Button - refined */}
-              <div className="relative">
-                <motion.button
-                  onClick={() => setShowMessagingMenu(!showMessagingMenu)}
-                  whileHover={{ scale: 1.05, y: -1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={cn(
-                    "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-300",
-                    messagingType
-                      ? "bg-gradient-to-br from-[var(--text-primary)] to-[var(--text-primary)]/90 text-white shadow-xl shadow-black/20"
-                      : "bg-[var(--bg-surface)] ring-1 ring-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:ring-[var(--border)]/80 shadow-lg shadow-black/5"
-                  )}
-                >
-                  <MessageCircle className="w-5 h-5" />
-                </motion.button>
-
-                <AnimatePresence>
-                  {showMessagingMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                      transition={{ duration: 0.2, type: "spring", stiffness: 400, damping: 25 }}
-                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 bg-[var(--bg-surface)] rounded-2xl shadow-2xl shadow-black/15 ring-1 ring-[var(--border)]/60 overflow-hidden z-50"
-                    >
-                      <div className="p-1.5">
-                        <button
-                          onClick={() => { setMessagingType('sms'); setShowMessagingMenu(false) }}
-                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                          <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
-                            <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <span className="text-sm font-medium text-[var(--text-primary)]">SMS</span>
-                        </button>
-                        <button
-                          onClick={() => { setMessagingType('whatsapp'); setShowMessagingMenu(false) }}
-                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                          <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
-                            <MessageCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                          </div>
-                          <span className="text-sm font-medium text-[var(--text-primary)]">WhatsApp</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Calendar Button - refined */}
-              <Link href={`/calendar?book=${lead.id}`}>
-                <motion.div
-                  whileHover={{ scale: 1.05, y: -1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--bg-surface)] ring-1 ring-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:ring-[var(--border)]/80 transition-all duration-300 shadow-lg shadow-black/5"
-                >
-                  <Calendar className="w-5 h-5" />
-                </motion.div>
-              </Link>
             </motion.div>
           </div>
         </motion.div>
 
-        {/* Messaging Section */}
-        <AnimatePresence>
-          {messagingType === 'sms' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 overflow-hidden"
-            >
-              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-blue-500" />
-                    SMS Templates
-                  </h3>
-                  <button
-                    onClick={() => setMessagingType(null)}
-                    className="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <SMSComposer lead={lead} agent={profile || undefined} onSent={() => {}} />
-                  <SMSHistory leadId={lead.id} />
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {messagingType === 'whatsapp' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 overflow-hidden"
-            >
-              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-emerald-500" />
-                    WhatsApp Templates
-                  </h3>
-                  <button
-                    onClick={() => setMessagingType(null)}
-                    className="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div className="bg-[var(--bg-sunken)] rounded-xl p-4">
-                    <WhatsAppTemplateSelector lead={lead} agent={profile || undefined} onSent={() => {}} />
-                  </div>
-                  <WhatsAppHistory leadId={lead.id} />
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Quick Notes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="mt-6 bg-[var(--bg-surface)] border border-[var(--border)] rounded-3xl overflow-hidden"
-        >
-          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <StickyNote className="w-5 h-5 text-amber-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-[var(--text-primary)]">Notes</h3>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {parsedNotes.length > 0 ? `${parsedNotes.length} note${parsedNotes.length !== 1 ? 's' : ''}` : 'No notes yet'}
-                </p>
-              </div>
-            </div>
-            {parsedNotes.length > 3 && (
-              <button
-                onClick={() => setActiveTab('activity')}
-                className="text-xs text-[var(--primary)] hover:underline font-medium"
-              >
-                View all
-              </button>
-            )}
-          </div>
-          <div className="p-5">
-            {/* Add Note Input */}
-            <div className="flex items-end gap-2 mb-4">
-              <Textarea
-                placeholder="Add a quick note..."
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="flex-1 min-h-[60px] resize-none text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    handleAddNote()
-                  }
-                }}
-              />
-              <Button
-                onClick={handleAddNote}
-                disabled={!newNote.trim() || mutationLoading}
-                size="sm"
-                className="shrink-0 h-10 w-10 p-0"
-              >
-                {mutationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
-            </div>
-
-            {/* Recent Notes */}
-            {parsedNotes.length > 0 ? (
-              <div className="space-y-2">
-                {parsedNotes.slice(0, 3).map((note) => {
-                  const config = NOTE_TYPE_CONFIG[note.type] || NOTE_TYPE_CONFIG.note
-                  const NoteIcon = config.icon
-                  return (
-                    <div
-                      key={note.id}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-[var(--bg-sunken)]"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-hover)] flex items-center justify-center shrink-0">
-                        <NoteIcon className={cn("w-3.5 h-3.5", config.color)} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] text-[var(--text-muted)]">{note.timestamp}</span>
-                          {note.createdByName && (
-                            <>
-                              <span className="text-[10px] text-[var(--text-muted)]">·</span>
-                              <span className="text-[10px] text-[var(--text-primary)] font-medium">{note.createdByName}</span>
-                            </>
-                          )}
-                        </div>
-                        <p className="text-sm text-[var(--text-primary)] line-clamp-2">{note.content}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-xs text-[var(--text-muted)]">Add your first note above</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
 
         {/* Pipeline Progress - Visual Stepper */}
         <motion.div
@@ -1141,7 +969,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <h3 className="font-semibold text-[var(--text-primary)]">{stageInfo?.label}</h3>
                 <p className="text-xs text-[var(--text-muted)]">
                   {lead.pipeline_stage === 'lost' ? 'Lead lost' :
-                   `Stage ${currentStageIndex + 1} of ${STAGE_ORDER.length - 1}`}
+                   `Stage ${currentStageIndex + 1} of ${activeStageOrder.length}`}
                 </p>
               </div>
             </div>
@@ -1158,14 +986,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           {/* Pipeline Steps */}
           <div className="p-5">
             <div className="relative">
-              {/* Progress Line */}
-              <div className="absolute top-5 left-0 right-0 h-1 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
+              {/* Progress Line — spans center-to-center of first and last circles */}
+              <div className="absolute top-5 left-5 right-5 h-1 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: `linear-gradient(90deg, ${stageGradient.from}, ${stageGradient.to})` }}
                   initial={false}
                   animate={{
-                    width: lead.pipeline_stage === 'lost' ? '0%' : `${((currentStageIndex + 1) / activeStageOrder.length) * 100}%`
+                    width: lead.pipeline_stage === 'lost' ? '0%' : `${(currentStageIndex / (activeStageOrder.length - 1)) * 100}%`
                   }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
                 />
@@ -1174,18 +1002,24 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               {/* Stage Nodes */}
               <div className="relative flex justify-between">
                 {activeStageOrder.map((stage, idx) => {
-                  const completedStages = lead.completed_stages || []
-                  const isInCompletedStages = completedStages.includes(stage as PipelineStage)
                   const isCurrentStage = lead.pipeline_stage === stage
                   const isPast = idx < currentStageIndex
-                  // Show as completed if it's before current stage OR explicitly in completed_stages
-                  const isCompleted = isPast || (isInCompletedStages && idx <= currentStageIndex)
+                  const isCompleted = (() => {
+                    const completedStages = lead.completed_stages || []
+                    const isInCompletedStages = completedStages.includes(stage as PipelineStage)
+                    return isPast || (isInCompletedStages && idx <= currentStageIndex)
+                  })()
                   const stageLabel = PIPELINE_STAGES.find(s => s.value === stage)?.label || stage
-                  const colors = STAGE_GRADIENT[stage] || STAGE_GRADIENT.new
+                  const colors = isCurrentStage
+                    ? STAGE_GRADIENT[stage] || STAGE_GRADIENT.new
+                    : isCompleted
+                      ? stageGradient // Completed stages match progress line color
+                      : STAGE_GRADIENT[stage] || STAGE_GRADIENT.new
 
                   const isLostLead = lead.pipeline_stage === 'lost'
                   const nextStage = activeStageOrder[idx + 1]
-                  const isDropOffPoint = isLostLead && isCompleted && nextStage && nextStage !== 'lost' && !completedStages.includes(nextStage as PipelineStage)
+                  const completedStagesArr = lead.completed_stages || []
+                  const isDropOffPoint = isLostLead && isCompleted && nextStage && (nextStage as string) !== 'lost' && !completedStagesArr.includes(nextStage as PipelineStage)
 
                   return (
                     <SimpleTooltip
@@ -1252,6 +1086,67 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
           </div>
+
+          {/* Status selector — linked to stage */}
+          {availableStatuses.length > 0 && (
+            <div className="px-5 py-3 border-t border-[var(--border)]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-[var(--text-muted)] shrink-0">Status</span>
+                <div className="flex flex-wrap items-center gap-1.5" ref={statusDropdownRef}>
+                  {/* Clear / no-status option */}
+                  <button
+                    onClick={() => handleStatusChange('')}
+                    disabled={updatingStatus}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-200",
+                      !lead.status || !isStatusValidForStage
+                        ? "bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-primary)] shadow-sm"
+                        : "border-transparent text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
+                    )}
+                  >
+                    <X className="w-3 h-3" />
+                    None
+                  </button>
+                  {availableStatuses.map((status) => {
+                    const isActive = isStatusValidForStage && lead.status === status.value
+                    const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+                      success: { bg: 'var(--success-muted)', text: 'var(--success)', border: 'var(--success)' },
+                      warning: { bg: 'var(--warning-muted)', text: 'var(--warning)', border: 'var(--warning)' },
+                      destructive: { bg: 'var(--error-muted)', text: 'var(--error)', border: 'var(--error)' },
+                      accent: { bg: 'var(--accent-muted, var(--primary-muted))', text: 'var(--accent, var(--primary))', border: 'var(--accent, var(--primary))' },
+                      secondary: { bg: 'var(--bg-elevated)', text: 'var(--text-secondary)', border: 'var(--border)' },
+                    }
+                    const colors = colorMap[status.color] || colorMap.secondary
+                    return (
+                      <button
+                        key={status.value}
+                        onClick={() => handleStatusChange(isActive ? '' : status.value)}
+                        disabled={updatingStatus}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-200",
+                          isActive
+                            ? "shadow-sm"
+                            : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        )}
+                        style={isActive ? {
+                          background: colors.bg,
+                          color: colors.text,
+                          borderColor: `color-mix(in srgb, ${colors.border} 30%, transparent)`,
+                        } : undefined}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ background: colors.text }}
+                        />
+                        {status.label}
+                      </button>
+                    )
+                  })}
+                  {updatingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--text-muted)] ml-1" />}
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* SF Down Payment Card */}
@@ -1264,28 +1159,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           >
             <SFDownPaymentCard
               lead={lead}
-              onRecordCash={() => {
-                setSfDialogInitialStep("cash")
-                setShowSFPaymentDialog(true)
-              }}
-              onSendLink={() => {
-                setSfDialogInitialStep("finance")
-                setShowSFPaymentDialog(true)
-              }}
+              onSuccess={() => refetchLead()}
             />
           </motion.div>
         )}
-
-        {/* Follow-up Reminders */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-4"
-        >
-          <FollowUpReminders leadId={lead.id} agentId={profile?.id} />
-        </motion.div>
-
 
         {/* Tabbed Content Section */}
         <motion.div
@@ -1299,9 +1176,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             {[
               { id: 'details' as const, label: 'Details', icon: User },
               { id: 'documents' as const, label: 'Documents', icon: FileText },
-              { id: 'calls' as const, label: `Calls (${calls.length})`, icon: Phone },
               { id: 'activity' as const, label: `Activity (${allNotes.length})`, icon: Activity },
-              ...(lead.funding_type === 'puc' ? [{ id: 'psp' as const, label: 'PUC SRJ', icon: ClipboardList }] : []),
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1352,19 +1227,20 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 exit={{ opacity: 0, x: 10 }}
                 className="p-5"
               >
-                <LeadDocuments leadId={lead.id} />
-              </motion.div>
-            )}
-
-            {activeTab === 'calls' && (
-              <motion.div
-                key="calls"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="p-5"
-              >
-                <CallHistory leadId={lead.id} />
+                {lead.funding_type === 'self_funded' ? (
+                  <SFDocumentManager lead={lead} onUpdate={() => refetchLead()} />
+                ) : lead.funding_type === 'puc' ? (
+                  <PUCDocumentUpload leadId={lead.id} />
+                ) : (
+                  <LeadDocuments
+                    leadId={lead.id}
+                    lead={lead}
+                    onDocumentToggle={async (key, value) => {
+                      await updateLead(lead.id, { [key]: value } as Partial<typeof lead>)
+                      await refetchLead()
+                    }}
+                  />
+                )}
               </motion.div>
             )}
 
@@ -1379,7 +1255,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {/* Filter Pills */}
                 <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
                   <Filter className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
-                  {(['all', 'stage_change', 'status_change', 'call', 'meeting', 'follow-up', 'email', 'note'] as NoteType[]).map((type) => (
+                  {(['all', 'stage_change', 'status_change', 'meeting', 'follow-up', 'email', 'note'] as NoteType[]).map((type) => (
                     <button
                       key={type}
                       onClick={() => setNoteFilter(type)}
@@ -1479,18 +1355,108 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </motion.div>
             )}
 
-            {activeTab === 'psp' && lead.funding_type === 'puc' && (
-              <motion.div
-                key="psp"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="p-5"
-              >
-                <PSPTrackingSection lead={lead} onOpenWizard={() => setShowPSPWizard(true)} />
-              </motion.div>
-            )}
+
           </AnimatePresence>
+        </motion.div>
+
+        {/* Follow-up Reminders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="mt-4"
+        >
+          <FollowUpReminders leadId={lead.id} agentId={profile?.id} />
+        </motion.div>
+
+        {/* Quick Notes */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-3xl overflow-hidden"
+        >
+          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <StickyNote className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-[var(--text-primary)]">Notes</h3>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {parsedNotes.length > 0 ? `${parsedNotes.length} note${parsedNotes.length !== 1 ? 's' : ''}` : 'No notes yet'}
+                </p>
+              </div>
+            </div>
+            {parsedNotes.length > 3 && (
+              <button
+                onClick={() => setActiveTab('activity')}
+                className="text-xs text-[var(--primary)] hover:underline font-medium"
+              >
+                View all
+              </button>
+            )}
+          </div>
+          <div className="p-5">
+            {/* Add Note Input */}
+            <div className="flex items-end gap-2 mb-4">
+              <Textarea
+                placeholder="Add a quick note..."
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                className="flex-1 min-h-[60px] resize-none text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    handleAddNote()
+                  }
+                }}
+              />
+              <Button
+                onClick={handleAddNote}
+                disabled={!newNote.trim() || mutationLoading}
+                size="sm"
+                className="shrink-0 h-10 w-10 p-0"
+              >
+                {mutationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+
+            {/* Recent Notes */}
+            {parsedNotes.length > 0 ? (
+              <div className="space-y-2">
+                {parsedNotes.slice(0, 3).map((note) => {
+                  const config = NOTE_TYPE_CONFIG[note.type] || NOTE_TYPE_CONFIG.note
+                  const NoteIcon = config.icon
+                  return (
+                    <div
+                      key={note.id}
+                      className="flex items-start gap-3 p-3 rounded-xl bg-[var(--bg-sunken)]"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-hover)] flex items-center justify-center shrink-0">
+                        <NoteIcon className={cn("w-3.5 h-3.5", config.color)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] text-[var(--text-muted)]">{note.timestamp}</span>
+                          {note.createdByName && (
+                            <>
+                              <span className="text-[10px] text-[var(--text-muted)]">·</span>
+                              <span className="text-[10px] text-[var(--text-primary)] font-medium">{note.createdByName}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-sm text-[var(--text-primary)] line-clamp-2">{note.content}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-xs text-[var(--text-muted)]">Add your first note above</p>
+              </div>
+            )}
+          </div>
         </motion.div>
       </motion.div>
 
@@ -1530,18 +1496,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         }}
       />
 
-      {/* SF Down Payment Dialog */}
-      <EnrollmentPaymentDialog
-        open={showSFPaymentDialog}
-        onOpenChange={setShowSFPaymentDialog}
-        lead={lead}
-        mode="sf_downpayment"
-        initialStep={sfDialogInitialStep}
-        onSuccess={async () => {
-          await refetchLead()
-        }}
-      />
-
       {/* PSP Submission Wizard */}
       <PSPSubmissionWizard
         isOpen={showPSPWizard}
@@ -1552,6 +1506,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           refetchLead()
         }}
       />
+
+      {/* Send RSVP Dialog */}
+      {lead && (
+        <SendRSVPDialog
+          isOpen={showRSVPDialog}
+          onClose={() => setShowRSVPDialog(false)}
+          selectedLeads={[lead]}
+          onSuccess={() => refetchLead()}
+        />
+      )}
 
     </div>
   )

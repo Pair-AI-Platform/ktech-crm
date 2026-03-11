@@ -60,6 +60,10 @@ const badgeVariants = cva(
           "bg-[var(--error-bg)] text-[var(--error)] border border-[rgba(220,38,38,0.15)]",
         lost:
           "bg-[rgba(220,38,38,0.08)] text-[var(--stage-lost)] border border-[rgba(220,38,38,0.15)]",
+        puc_document_submission:
+          "bg-[rgba(6,182,212,0.08)] text-cyan-600 border border-[rgba(6,182,212,0.15)]",
+        puc_application_submission:
+          "bg-[rgba(16,185,129,0.08)] text-emerald-600 border border-[rgba(16,185,129,0.15)]",
       },
       size: {
         xs: "h-5 px-1.5 text-[10px] rounded-md",

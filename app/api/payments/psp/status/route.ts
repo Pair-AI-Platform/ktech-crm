@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       .from("payment_transactions")
       .select("id, status, amount, myfatoorah_invoice_url, completed_at, created_at, cash_invoice_number")
       .eq("lead_id", leadId)
-      .eq("notes", "PSP Fee Payment")
+      .ilike("notes", "PSP Fee Payment%")
       .order("created_at", { ascending: false })
       .limit(1)
       .single()
@@ -43,13 +43,28 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check if there's a payment receipt document
-    const { data: receiptDoc } = await supabase
+    // Check if there's a payment receipt document (puc_receipt or payment_receipt)
+    let receiptDoc = null
+    const { data: pucReceipt } = await supabase
       .from("psp_documents")
       .select("id, public_url, file_name")
       .eq("lead_id", leadId)
       .eq("document_type", "puc_receipt")
+      .limit(1)
       .single()
+
+    if (pucReceipt) {
+      receiptDoc = pucReceipt
+    } else {
+      const { data: paymentReceipt } = await supabase
+        .from("psp_documents")
+        .select("id, public_url, file_name")
+        .eq("lead_id", leadId)
+        .eq("document_type", "payment_receipt")
+        .limit(1)
+        .single()
+      receiptDoc = paymentReceipt
+    }
 
     if (!transaction) {
       return NextResponse.json({

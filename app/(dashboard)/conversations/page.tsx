@@ -368,9 +368,9 @@ export default function ConversationsPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-white">
+    <div className="flex h-[calc(100vh-4rem)] bg-white overflow-hidden">
       {/* Left Panel - Conversation List */}
-      <div className="w-[380px] border-r border-gray-200 flex flex-col">
+      <div className="w-full sm:w-[320px] md:w-[380px] border-r border-gray-200 flex flex-col shrink-0">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">

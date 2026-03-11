@@ -1,10 +1,22 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useCallback, useRef } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { toDateString } from "@/lib/utils"
-import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, saveDemoAppointmentUpdate } from "@/lib/demo-data"
+import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, saveDemoAppointmentUpdate, getDemoLeadById, DEMO_AGENTS } from "@/lib/demo-data"
 import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
+
+// ---------------------------------------------------------------------------
+// Query key factory (local – will defer to query-keys.ts once it exists)
+// ---------------------------------------------------------------------------
+const appointmentKeys = {
+  all: ["appointments"] as const,
+  lists: () => [...appointmentKeys.all, "list"] as const,
+  list: (filters: Record<string, unknown>) => [...appointmentKeys.lists(), filters] as const,
+  stats: () => [...appointmentKeys.all, "stats"] as const,
+  rescheduleHistory: (id: string) => [...appointmentKeys.all, "reschedule-history", id] as const,
+}
 
 interface UseAppointmentsOptions {
   date?: string
@@ -35,58 +47,59 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
   const { date, startDate, endDate, type = "all", status = "all", leadId, studentId, agentId, needsAttention, noUpdated, limit = 100 } = options
   // noUpdated is an alias for needsAttention - both filter past appointments with no status update
   const filterNoUpdated = needsAttention || noUpdated
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const channelIdRef = useRef(`appointments-${++channelCounter}-${Date.now()}`)
+  const queryClient = useQueryClient()
 
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  // Stable filters object for the query key
+  const filters = { date, startDate, endDate, type, status, leadId, studentId, agentId, filterNoUpdated, limit }
 
-    // Check for demo mode
-    if (isDemoMode()) {
-      let demoAppointments = getDemoAppointments()
+  const queryResult = useQuery({
+    queryKey: appointmentKeys.list(filters),
+    queryFn: async (): Promise<Appointment[]> => {
+      // Check for demo mode
+      if (isDemoMode()) {
+        let demoAppointments = getDemoAppointments()
 
-      if (date) {
-        // For demo, return some appointments for any date
-        demoAppointments = demoAppointments.slice(0, 5).map(apt => ({
-          ...apt,
-          scheduled_date: date
-        }))
-      } else if (startDate && endDate) {
-        // Filter by date range
-        demoAppointments = demoAppointments.filter(apt =>
-          apt.scheduled_date >= startDate && apt.scheduled_date <= endDate
-        )
+        if (date) {
+          // For demo, return some appointments for any date
+          demoAppointments = demoAppointments.slice(0, 5).map(apt => ({
+            ...apt,
+            scheduled_date: date
+          }))
+        } else if (startDate && endDate) {
+          // Filter by date range
+          demoAppointments = demoAppointments.filter(apt =>
+            apt.scheduled_date >= startDate && apt.scheduled_date <= endDate
+          )
+        }
+
+        if (type !== "all" && type.length > 0) {
+          demoAppointments = demoAppointments.filter(a =>
+            a.appointment_type.some(t => type.includes(t))
+          )
+        }
+
+        if (status !== "all") {
+          demoAppointments = demoAppointments.filter(a => a.status === status)
+        }
+
+        if (agentId) {
+          demoAppointments = demoAppointments.filter(a => a.assigned_agent === agentId)
+        }
+
+        if (leadId) {
+          demoAppointments = demoAppointments.filter(a => a.lead_id === leadId)
+        }
+
+        if (filterNoUpdated) {
+          demoAppointments = demoAppointments.filter(a => isAppointmentNeedsAttention(a))
+        }
+
+        return demoAppointments
       }
 
-      if (type !== "all" && type.length > 0) {
-        demoAppointments = demoAppointments.filter(a =>
-          a.appointment_type.some(t => type.includes(t))
-        )
-      }
+      const supabase = createClient()
 
-      if (status !== "all") {
-        demoAppointments = demoAppointments.filter(a => a.status === status)
-      }
-
-      if (agentId) {
-        demoAppointments = demoAppointments.filter(a => a.assigned_agent === agentId)
-      }
-
-      if (filterNoUpdated) {
-        demoAppointments = demoAppointments.filter(a => isAppointmentNeedsAttention(a))
-      }
-
-      setAppointments(demoAppointments.slice(0, limit))
-      setLoading(false)
-      return
-    }
-
-    const supabase = createClient()
-
-    try {
       let query = supabase
         .from("appointments")
         .select(`
@@ -161,24 +174,17 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         filteredData = filteredData.filter(apt => isAppointmentNeedsAttention(apt))
       }
 
-      setAppointments(filteredData)
-    } catch (err) {
-      console.error("Error fetching appointments:", err)
-      const message =
-        err instanceof Error ? err.message :
-        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
-        "Failed to fetch appointments"
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
-  }, [date, startDate, endDate, type, status, leadId, studentId, agentId, filterNoUpdated, limit])
-
-  useEffect(() => {
-    fetchAppointments()
-  }, [fetchAppointments])
+      return filteredData
+    },
+    staleTime: 30_000,
+  })
 
   // Subscribe to real-time changes (only in non-demo mode)
+  // Use invalidation instead of direct state updates
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
+  }, [queryClient])
+
   useEffect(() => {
     if (isDemoMode()) return
 
@@ -190,7 +196,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments" },
         () => {
-          fetchAppointments()
+          invalidate()
         }
       )
       .subscribe()
@@ -201,7 +207,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         "postgres_changes",
         { event: "*", schema: "public", table: "appointment_leads" },
         () => {
-          fetchAppointments()
+          invalidate()
         }
       )
       .subscribe()
@@ -210,9 +216,14 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       supabase.removeChannel(channel)
       supabase.removeChannel(junctionChannel)
     }
-  }, [fetchAppointments])
+  }, [invalidate])
 
-  return { appointments, loading, error, refetch: fetchAppointments }
+  return {
+    appointments: queryResult.data ?? [],
+    loading: queryResult.isLoading,
+    error: queryResult.error?.message ?? null,
+    refetch: queryResult.refetch,
+  }
 }
 
 export function useTodayAppointments() {
@@ -241,23 +252,49 @@ export function useNoUpdatedAppointments() {
 
 export function useAppointmentMutations() {
   const supabase = createClient()
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
 
-  const createAppointment = async (appointmentData: Partial<Appointment> & { lead_ids?: string[] }) => {
-    setLoading(true)
-    try {
+  const invalidateAppointments = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
+  }, [queryClient])
+
+  // --- Create Mutation ---
+  const createMutation = useMutation({
+    mutationFn: async (appointmentData: Partial<Appointment> & { lead_ids?: string[] }) => {
       // Handle demo mode
       if (isDemoMode()) {
         const leadIds = appointmentData.lead_ids ||
           (appointmentData.lead_id ? [appointmentData.lead_id] : [])
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { lead_ids: _leadIds, ...insertData } = appointmentData
+
+        // Look up lead data so the calendar can display lead names
+        const primaryLead = leadIds[0] ? getDemoLeadById(leadIds[0]) : null
+        const appointmentLeads = leadIds
+          .map(lid => {
+            const lead = getDemoLeadById(lid)
+            if (!lead) return null
+            return { lead_id: lid, lead }
+          })
+          .filter(Boolean)
+
+        // Look up assigned agent profile
+        const agentId = insertData.assigned_agent || "demo-user"
+        const agentProfile = DEMO_AGENTS.find(a => a.id === agentId)
+
         const demoAppointment: Appointment = {
           id: `demo-apt-${Date.now()}`,
           ...insertData,
           lead_id: leadIds[0] || insertData.lead_id || null,
+          lead: primaryLead || undefined,
+          appointment_leads: appointmentLeads.length > 0 ? appointmentLeads : undefined,
           created_by: "demo-user",
-          assigned_agent: insertData.assigned_agent || "demo-user",
+          assigned_agent: agentId,
+          assigned_agent_profile: agentProfile ? {
+            id: agentProfile.id,
+            full_name: agentProfile.full_name,
+            email: agentProfile.email,
+          } : undefined,
           status: insertData.status || "scheduled",
           scheduled_date: insertData.scheduled_date || toDateString(new Date()),
           scheduled_time: insertData.scheduled_time || "09:00",
@@ -265,8 +302,7 @@ export function useAppointmentMutations() {
           updated_at: new Date().toISOString(),
         } as Appointment
         saveDemoAppointmentUpdate(demoAppointment.id, demoAppointment)
-        setLoading(false)
-        return { data: demoAppointment, error: null }
+        return demoAppointment
       }
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -331,30 +367,22 @@ export function useAppointmentMutations() {
         }
       }
 
-      return { data, error: null }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message :
-        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
-        typeof err === 'string' ? err :
-        "Failed to create appointment"
-      console.error("Error creating appointment:", message, err)
-      return { data: null, error: message }
-    } finally {
-      setLoading(false)
-    }
-  }
+      return data
+    },
+    onSuccess: () => {
+      invalidateAppointments()
+    },
+  })
 
-  const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
-    setLoading(true)
-    try {
+  // --- Update Mutation ---
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Appointment> }) => {
       // Handle demo mode
       if (isDemoMode()) {
         saveDemoAppointmentUpdate(id, updates)
-        // Return mock data for demo mode
         const demoAppointments = getDemoAppointments()
         const updatedApt = demoAppointments.find(a => a.id === id)
-        return { data: updatedApt ? { ...updatedApt, ...updates } : null, error: null }
+        return updatedApt ? { ...updatedApt, ...updates } : null
       }
 
       const { data, error } = await supabase
@@ -365,18 +393,31 @@ export function useAppointmentMutations() {
         .single()
 
       if (error) throw error
-      return { data, error: null }
-    } catch (err) {
-      console.error("Error updating appointment:", err)
-      const message =
-        err instanceof Error ? err.message :
-        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
-        "Failed to update appointment"
-      return { data: null, error: message }
-    } finally {
-      setLoading(false)
-    }
-  }
+      return data
+    },
+    onSuccess: () => {
+      invalidateAppointments()
+    },
+  })
+
+  // --- Delete Mutation ---
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemoMode()) {
+        return
+      }
+
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidateAppointments()
+    },
+  })
 
   // Helper to get user ID (returns demo ID in demo mode)
   const getUserId = async (): Promise<string | undefined> => {
@@ -385,6 +426,51 @@ export function useAppointmentMutations() {
     }
     const { data: { user } } = await supabase.auth.getUser()
     return user?.id
+  }
+
+  // --- Wrapper functions preserving original signatures and return types ---
+
+  const createAppointment = async (appointmentData: Partial<Appointment> & { lead_ids?: string[] }) => {
+    try {
+      const data = await createMutation.mutateAsync(appointmentData)
+      return { data, error: null }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        typeof err === 'string' ? err :
+        "Failed to create appointment"
+      console.error("Error creating appointment:", message, err)
+      return { data: null, error: message }
+    }
+  }
+
+  const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
+    try {
+      const data = await updateMutation.mutateAsync({ id, updates })
+      return { data, error: null }
+    } catch (err) {
+      console.error("Error updating appointment:", err)
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        "Failed to update appointment"
+      return { data: null, error: message }
+    }
+  }
+
+  const deleteAppointment = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id)
+      return { error: null }
+    } catch (err) {
+      console.error("Error deleting appointment:", err)
+      const message =
+        err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
+        "Failed to delete appointment"
+      return { error: message }
+    }
   }
 
   // Confirm appointment (اتصلنا عليه وواكد الموعد)
@@ -480,34 +566,6 @@ export function useAppointmentMutations() {
     })
   }
 
-  // Delete appointment (حذف الموعد)
-  const deleteAppointment = async (id: string) => {
-    setLoading(true)
-    try {
-      if (isDemoMode()) {
-        // In demo mode, just return success
-        return { error: null }
-      }
-
-      const { error } = await supabase
-        .from("appointments")
-        .delete()
-        .eq("id", id)
-
-      if (error) throw error
-      return { error: null }
-    } catch (err) {
-      console.error("Error deleting appointment:", err)
-      const message =
-        err instanceof Error ? err.message :
-        (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message) :
-        "Failed to delete appointment"
-      return { error: message }
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // Legacy methods for backwards compatibility
   const markNoShow = markNA
 
@@ -525,37 +583,21 @@ export function useAppointmentMutations() {
     postponeAppointment,
     // Legacy methods
     markNoShow,
-    loading
+    loading: createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
   }
 }
 
 export function useAppointmentStats() {
-  const [stats, setStats] = useState({
-    today: 0,
-    thisWeek: 0,
-    pending: 0,
-    confirmed: 0,
-    na: 0,
-    cantReach: 0,
-    onTheWay: 0,
-    cancelled: 0,
-    willSee: 0,
-    needsAttention: 0, // Past appointments still in "scheduled" status (legacy name)
-    noUpdated: 0, // غير محدث - Past appointments with no status update (same as needsAttention)
-    // Legacy stats for backwards compatibility
-    noShow: 0,
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchStats() {
+  const queryResult = useQuery({
+    queryKey: appointmentKeys.stats(),
+    queryFn: async () => {
       // Check for demo mode
       if (isDemoMode()) {
         const demoStats = getDemoAppointmentStats()
         // Calculate no updated (needs attention) from demo data
         const demoAppointments = getDemoAppointments()
         const noUpdatedCount = demoAppointments.filter(apt => isAppointmentNeedsAttention(apt)).length
-        setStats({
+        return {
           today: demoStats.today,
           thisWeek: demoStats.total,
           pending: demoStats.pending,
@@ -568,108 +610,117 @@ export function useAppointmentStats() {
           needsAttention: noUpdatedCount, // legacy
           noUpdated: noUpdatedCount, // غير محدث
           noShow: demoStats.noShow,
-        })
-        setLoading(false)
-        return
+        }
       }
 
       const supabase = createClient()
 
-      try {
-        const today = toDateString(new Date())
-        const startOfWeek = new Date()
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-        const endOfWeek = new Date(startOfWeek)
-        endOfWeek.setDate(endOfWeek.getDate() + 6)
+      const today = toDateString(new Date())
+      const startOfWeek = new Date()
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(endOfWeek.getDate() + 6)
 
-        // Fetch this week's appointments
-        const { data: appointments, error } = await supabase
-          .from("appointments")
-          .select("scheduled_date, scheduled_time, status")
-          .gte("scheduled_date", toDateString(startOfWeek))
-          .lte("scheduled_date", toDateString(endOfWeek))
+      // Fetch this week's appointments
+      const { data: appointments, error } = await supabase
+        .from("appointments")
+        .select("scheduled_date, scheduled_time, status")
+        .gte("scheduled_date", toDateString(startOfWeek))
+        .lte("scheduled_date", toDateString(endOfWeek))
 
-        if (error) throw error
+      if (error) throw error
 
-        // Fetch all past appointments that are still "scheduled" (needs attention)
-        const { data: needsAttentionData, error: needsAttentionError } = await supabase
-          .from("appointments")
-          .select("scheduled_date, scheduled_time, status")
-          .eq("status", "scheduled")
-          .lte("scheduled_date", today)
+      // Fetch all past appointments that are still "scheduled" (needs attention)
+      const { data: needsAttentionData, error: needsAttentionError } = await supabase
+        .from("appointments")
+        .select("scheduled_date, scheduled_time, status")
+        .eq("status", "scheduled")
+        .lte("scheduled_date", today)
 
-        if (needsAttentionError) throw needsAttentionError
+      if (needsAttentionError) throw needsAttentionError
 
-        // Filter needs attention by checking if the time has also passed
-        const needsAttentionCount = (needsAttentionData || []).filter(apt => {
-          const now = new Date()
-          const aptDateTime = new Date(`${apt.scheduled_date}T${apt.scheduled_time || "23:59:59"}`)
-          return aptDateTime < now
-        }).length
+      // Filter needs attention by checking if the time has also passed
+      const needsAttentionCount = (needsAttentionData || []).filter(apt => {
+        const now = new Date()
+        const aptDateTime = new Date(`${apt.scheduled_date}T${apt.scheduled_time || "23:59:59"}`)
+        return aptDateTime < now
+      }).length
 
-        let todayCount = 0
-        let pending = 0
-        let confirmed = 0
-        let na = 0
-        let cantReach = 0
-        let onTheWay = 0
-        let cancelled = 0
-        let willSee = 0
+      let todayCount = 0
+      let pending = 0
+      let confirmed = 0
+      let na = 0
+      let cantReach = 0
+      let onTheWay = 0
+      let cancelled = 0
+      let willSee = 0
 
-        appointments?.forEach(apt => {
-          if (apt.scheduled_date === today) todayCount++
+      appointments?.forEach(apt => {
+        if (apt.scheduled_date === today) todayCount++
 
-          switch (apt.status) {
-            case "scheduled":
-              pending++
-              break
-            case "confirmed":
-              confirmed++
-              break
-            case "no_answer":
-              na++
-              break
-            case "cant_reach":
-              cantReach++
-              break
-            case "on_the_way":
-              onTheWay++
-              break
-            case "cancelled":
-              cancelled++
-              break
-            case "will_see":
-              willSee++
-              break
-          }
-        })
+        switch (apt.status) {
+          case "scheduled":
+            pending++
+            break
+          case "confirmed":
+            confirmed++
+            break
+          case "no_answer":
+            na++
+            break
+          case "cant_reach":
+            cantReach++
+            break
+          case "on_the_way":
+            onTheWay++
+            break
+          case "cancelled":
+            cancelled++
+            break
+          case "will_see":
+            willSee++
+            break
+        }
+      })
 
-        setStats({
-          today: todayCount,
-          thisWeek: appointments?.length || 0,
-          pending,
-          confirmed,
-          na,
-          cantReach,
-          onTheWay,
-          cancelled,
-          willSee,
-          needsAttention: needsAttentionCount, // legacy
-          noUpdated: needsAttentionCount, // غير محدث - past appointments with no status update
-          // Legacy mapping
-          noShow: na + cantReach, // NA + Can't Reach = No Show
-        })
-      } catch (err) {
-        console.error("Error fetching appointment stats:", err)
-      } finally {
-        setLoading(false)
+      return {
+        today: todayCount,
+        thisWeek: appointments?.length || 0,
+        pending,
+        confirmed,
+        na,
+        cantReach,
+        onTheWay,
+        cancelled,
+        willSee,
+        needsAttention: needsAttentionCount, // legacy
+        noUpdated: needsAttentionCount, // غير محدث - past appointments with no status update
+        // Legacy mapping
+        noShow: na + cantReach, // NA + Can't Reach = No Show
       }
-    }
+    },
+    staleTime: 30_000,
+  })
 
-    fetchStats()
-  }, [])
+  const defaultStats = {
+    today: 0,
+    thisWeek: 0,
+    pending: 0,
+    confirmed: 0,
+    na: 0,
+    cantReach: 0,
+    onTheWay: 0,
+    cancelled: 0,
+    willSee: 0,
+    needsAttention: 0,
+    noUpdated: 0,
+    noShow: 0,
+  }
 
-  return { stats, loading }
+  return {
+    stats: queryResult.data ?? defaultStats,
+    loading: queryResult.isLoading,
+  }
 }
 
 // Reschedule history entry
@@ -685,77 +736,69 @@ export interface RescheduleEntry {
 
 // Hook to fetch reschedule history from audit_logs
 export function useRescheduleHistory(appointmentId: string) {
-  const [reschedules, setReschedules] = useState<RescheduleEntry[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchRescheduleHistory() {
+  const queryResult = useQuery({
+    queryKey: appointmentKeys.rescheduleHistory(appointmentId),
+    queryFn: async (): Promise<RescheduleEntry[]> => {
       if (!appointmentId) {
-        setLoading(false)
-        return
+        return []
       }
 
       // Demo mode - return empty array
       if (isDemoMode()) {
-        setReschedules([])
-        setLoading(false)
-        return
+        return []
       }
 
       const supabase = createClient()
 
-      try {
-        // Query audit_logs for UPDATE actions on this appointment
-        // where scheduled_date or scheduled_time changed
-        const { data, error } = await supabase
-          .from("audit_logs")
-          .select("*")
-          .eq("table_name", "appointments")
-          .eq("record_id", appointmentId)
-          .eq("action", "UPDATE")
-          .order("created_at", { ascending: true })
+      // Query audit_logs for UPDATE actions on this appointment
+      // where scheduled_date or scheduled_time changed
+      const { data, error } = await supabase
+        .from("audit_logs")
+        .select("*")
+        .eq("table_name", "appointments")
+        .eq("record_id", appointmentId)
+        .eq("action", "UPDATE")
+        .order("created_at", { ascending: true })
 
-        if (error) throw error
+      if (error) throw error
 
-        // Filter for entries where date or time changed
-        const rescheduleEntries: RescheduleEntry[] = []
+      // Filter for entries where date or time changed
+      const rescheduleEntries: RescheduleEntry[] = []
 
-        data?.forEach((log) => {
-          const oldVals = log.old_values as Record<string, unknown> | null
-          const newVals = log.new_values as Record<string, unknown> | null
-          const changedFields = log.changed_fields as string[] | null
+      data?.forEach((log) => {
+        const oldVals = log.old_values as Record<string, unknown> | null
+        const newVals = log.new_values as Record<string, unknown> | null
+        const changedFields = log.changed_fields as string[] | null
 
-          if (!oldVals || !newVals) return
+        if (!oldVals || !newVals) return
 
-          // Check if scheduled_date or scheduled_time changed
-          const dateChanged = changedFields?.includes("scheduled_date") ||
-            (oldVals.scheduled_date !== newVals.scheduled_date)
-          const timeChanged = changedFields?.includes("scheduled_time") ||
-            (oldVals.scheduled_time !== newVals.scheduled_time)
+        // Check if scheduled_date or scheduled_time changed
+        const dateChanged = changedFields?.includes("scheduled_date") ||
+          (oldVals.scheduled_date !== newVals.scheduled_date)
+        const timeChanged = changedFields?.includes("scheduled_time") ||
+          (oldVals.scheduled_time !== newVals.scheduled_time)
 
-          if (dateChanged || timeChanged) {
-            rescheduleEntries.push({
-              id: log.id,
-              oldDate: oldVals.scheduled_date as string || "",
-              oldTime: oldVals.scheduled_time as string || "",
-              newDate: newVals.scheduled_date as string || "",
-              newTime: newVals.scheduled_time as string || "",
-              rescheduledAt: log.created_at,
-              rescheduledBy: log.user_email || undefined,
-            })
-          }
-        })
+        if (dateChanged || timeChanged) {
+          rescheduleEntries.push({
+            id: log.id,
+            oldDate: oldVals.scheduled_date as string || "",
+            oldTime: oldVals.scheduled_time as string || "",
+            newDate: newVals.scheduled_date as string || "",
+            newTime: newVals.scheduled_time as string || "",
+            rescheduledAt: log.created_at,
+            rescheduledBy: log.user_email || undefined,
+          })
+        }
+      })
 
-        setReschedules(rescheduleEntries)
-      } catch (err) {
-        console.error("Error fetching reschedule history:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
+      return rescheduleEntries
+    },
+    enabled: !!appointmentId,
+    staleTime: 30_000,
+  })
 
-    fetchRescheduleHistory()
-  }, [appointmentId])
-
-  return { reschedules, loading }
+  return {
+    reschedules: queryResult.data ?? [],
+    loading: queryResult.isLoading,
+  }
 }

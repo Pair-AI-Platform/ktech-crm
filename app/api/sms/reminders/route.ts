@@ -3,11 +3,34 @@ import { createClient } from '@supabase/supabase-js'
 import { sendSMS, replaceTemplateVariables } from '@/lib/sms/provider'
 import { BUSINESS_CONFIG } from '@/lib/config/constants'
 
-// Use service role for scheduled job (no user context)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialize service role client (no user context - runs as cron job)
+function getServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Supabase service role not configured')
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+}
+
+// Types for Supabase joined appointment query
+interface AppointmentLead {
+  lead_id: string
+  lead: {
+    id: string
+    first_name: string
+    phone: string | null
+    preferred_language?: string
+  } | null
+}
+
+interface AppointmentWithLeads {
+  id: string
+  scheduled_date: string
+  scheduled_time: string
+  status: string
+  reminder_24h_sent: string | null
+  reminder_2h_sent: string | null
+  appointment_leads: AppointmentLead[] | null
+}
 
 // Reminder templates
 const REMINDER_TEMPLATES = {
@@ -37,6 +60,8 @@ export async function POST(request: Request) {
     if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = getServiceClient()
 
     const body = await request.json().catch(() => ({}))
     const reminderType = body.type || '24h' // '24h' or '2h'
@@ -85,11 +110,9 @@ export async function POST(request: Request) {
     }
 
     // Filter appointments by exact time range
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const eligibleAppointments = (appointments || []).filter((apt: Record<string, any>) => {
+    const eligibleAppointments = ((appointments || []) as AppointmentWithLeads[]).filter((apt) => {
       const aptDateTime = new Date(`${apt.scheduled_date}T${apt.scheduled_time}`)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hasLeadWithPhone = apt.appointment_leads?.some((al: Record<string, any>) => al.lead?.phone)
+      const hasLeadWithPhone = apt.appointment_leads?.some((al) => al.lead?.phone)
       return aptDateTime >= startTime && aptDateTime <= endTime && hasLeadWithPhone
     })
 
@@ -117,13 +140,12 @@ export async function POST(request: Request) {
     const smsTasks: SMSTask[] = []
 
     for (const apt of eligibleAppointments) {
-      // Get all leads from junction table
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const leads = (apt as any).appointment_leads
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ?.map((al: any) => al.lead)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((l: any) => l?.phone) || []
+      // Get all leads from junction table (filter guarantees phone is non-null)
+      const leads = (apt.appointment_leads || [])
+        .map((al) => al.lead)
+        .filter((l): l is { id: string; first_name: string; phone: string; preferred_language?: string } =>
+          l !== null && !!l.phone
+        )
 
       if (leads.length === 0) {
         results.skipped++
@@ -172,7 +194,11 @@ export async function POST(request: Request) {
     }
 
     // Send SMS in batches using Promise.allSettled
+    // Mark each appointment as reminded immediately after successful send to prevent re-sends on partial failure
     const BATCH_SIZE = BUSINESS_CONFIG.SMS_BATCH_SIZE
+    const updateField = reminderType === '24h' ? 'reminder_24h_sent' : 'reminder_2h_sent'
+    const remindedAptIds = new Set<string>()
+
     for (let i = 0; i < smsTasks.length; i += BATCH_SIZE) {
       const batch = smsTasks.slice(i, i + BATCH_SIZE)
 
@@ -190,6 +216,16 @@ export async function POST(request: Request) {
             error_message: smsResult.error || null,
             sent_at: smsResult.success ? new Date().toISOString() : null,
           })
+
+          // Mark appointment as reminded immediately after successful SMS send
+          // This prevents re-sends if the job crashes partway through
+          if (smsResult.success && !remindedAptIds.has(task.appointmentId)) {
+            remindedAptIds.add(task.appointmentId)
+            await supabase
+              .from('appointments')
+              .update({ [updateField]: new Date().toISOString() })
+              .eq('id', task.appointmentId)
+          }
 
           return { task, smsResult }
         })
@@ -220,19 +256,6 @@ export async function POST(request: Request) {
           // Promise rejected (network error, etc.)
           results.failed++
         }
-      }
-    }
-
-    // Mark appointments as reminded (once per appointment, not per lead)
-    if (!dryRun) {
-      const remindedAptIds = new Set(smsTasks.map(t => t.appointmentId))
-      const updateField = reminderType === '24h' ? 'reminder_24h_sent' : 'reminder_2h_sent'
-
-      for (const aptId of remindedAptIds) {
-        await supabase
-          .from('appointments')
-          .update({ [updateField]: new Date().toISOString() })
-          .eq('id', aptId)
       }
     }
 

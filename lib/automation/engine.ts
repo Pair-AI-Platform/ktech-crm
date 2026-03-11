@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/client"
 import { createClientLogger } from "@/lib/client-logger"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 const logger = createClientLogger("automation-engine")
 
-export type TriggerType = "stage_change" | "lead_created" | "appointment_scheduled" | "payment_received"
+export type TriggerType = "stage_change" | "lead_created" | "appointment_scheduled" | "payment_received" | "birthday"
 
 export interface AutomationContext {
   trigger: TriggerType
@@ -23,6 +24,33 @@ export interface AutomationRule {
   action_config: Record<string, unknown>
   is_active: boolean
   priority: number
+}
+
+export interface AutomationResult {
+  ruleId: string
+  ruleName: string
+  status: "success" | "failed"
+  result?: Record<string, unknown>
+  error?: string
+}
+
+// --- Infinite loop protection ---
+const executingLeads = new Set<string>()
+const MAX_AUTOMATION_DEPTH = 3
+
+// --- URL helper for server-side fetch ---
+function getApiUrl(path: string): string {
+  if (typeof window !== "undefined") return path
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  return `${baseUrl}${path}`
+}
+
+// --- Runtime config validation ---
+function validateConfig<T extends Record<string, unknown>>(
+  config: Record<string, unknown>,
+  requiredFields: string[]
+): config is T {
+  return requiredFields.every(field => field in config)
 }
 
 function matchesConditions(conditions: Record<string, unknown>, leadData: Record<string, unknown>, metadata?: Record<string, unknown>): boolean {
@@ -48,13 +76,16 @@ function matchesConditions(conditions: Record<string, unknown>, leadData: Record
 async function executeAction(
   rule: AutomationRule,
   ctx: AutomationContext,
-  supabase: ReturnType<typeof createClient>
+  supabase: SupabaseClient
 ): Promise<{ success: boolean; result?: Record<string, unknown>; error?: string }> {
   const { action_type, action_config } = rule
 
   try {
     switch (action_type) {
       case "create_notification": {
+        if (!validateConfig<{ title?: string; body?: string; type?: string }>(action_config, [])) {
+          return { success: false, error: "Invalid config for create_notification" }
+        }
         const { title, body, type = "system_alert" } = action_config as {
           title?: string
           body?: string
@@ -85,6 +116,9 @@ async function executeAction(
       }
 
       case "create_follow_up": {
+        if (!validateConfig<{ days_from_now?: number; title?: string; notes?: string }>(action_config, [])) {
+          return { success: false, error: "Invalid config for create_follow_up" }
+        }
         const { days_from_now = 1, title = "Follow Up", notes = "" } = action_config as {
           days_from_now?: number
           title?: string
@@ -118,42 +152,84 @@ async function executeAction(
       }
 
       case "send_sms": {
+        if (!validateConfig<{ message?: string; template_id?: string }>(action_config, [])) {
+          return { success: false, error: "Invalid config for send_sms: missing message or template_id" }
+        }
         const { template_id, message } = action_config as {
           template_id?: string
           message?: string
         }
-        // Fire-and-forget API call to send SMS
         const phone = ctx.leadData.phone as string
         if (!phone) return { success: false, error: "No phone number on lead" }
 
         const resolvedMessage = (message || "")
           .replace("{lead_name}", `${ctx.leadData.first_name || ""} ${ctx.leadData.last_name || ""}`.trim())
 
-        try {
-          const response = await fetch("/api/sms/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phone,
-              message: resolvedMessage,
-              leadId: ctx.leadId,
-              templateId: template_id,
-            }),
-          })
+        const MAX_RETRIES = 1
+        let lastError = ""
 
-          if (!response.ok) {
-            const data = await response.json()
-            return { success: false, error: data.error || "SMS send failed" }
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const response = await fetch(getApiUrl("/api/sms/send"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone,
+                message: resolvedMessage,
+                leadId: ctx.leadId,
+                templateId: template_id,
+              }),
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              return {
+                success: true,
+                result: {
+                  sms_sent_to: phone,
+                  sms_status: data.status || "sent",
+                  message_sid: data.messageSid,
+                  attempt: attempt + 1,
+                },
+              }
+            }
+
+            const data = await response.json().catch(() => ({}))
+            lastError = data.error || `SMS send failed (HTTP ${response.status})`
+
+            if (attempt < MAX_RETRIES) {
+              logger.warn(`SMS send attempt ${attempt + 1} failed, retrying...`, {
+                phone,
+                error: lastError,
+                ruleId: rule.id,
+              })
+              // Brief delay before retry
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+          } catch (err) {
+            lastError = `SMS request failed: ${err}`
+            if (attempt < MAX_RETRIES) {
+              logger.warn(`SMS request attempt ${attempt + 1} failed, retrying...`, {
+                phone,
+                error: lastError,
+              })
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
           }
-          return { success: true, result: { sms_sent_to: phone } }
-        } catch (err) {
-          return { success: false, error: `SMS request failed: ${err}` }
+        }
+
+        return {
+          success: false,
+          error: lastError,
+          result: { sms_status: "failed", attempts: MAX_RETRIES + 1 },
         }
       }
 
       case "assign_lead": {
-        const { agent_id } = action_config as { agent_id?: string }
-        if (!agent_id) return { success: false, error: "No agent_id in action config" }
+        if (!validateConfig<{ agent_id: string }>(action_config, ["agent_id"])) {
+          return { success: false, error: "No agent_id in action config" }
+        }
+        const { agent_id } = action_config as { agent_id: string }
 
         const { error } = await supabase
           .from("leads")
@@ -165,8 +241,10 @@ async function executeAction(
       }
 
       case "change_stage": {
-        const { target_stage } = action_config as { target_stage?: string }
-        if (!target_stage) return { success: false, error: "No target_stage in action config" }
+        if (!validateConfig<{ target_stage: string }>(action_config, ["target_stage"])) {
+          return { success: false, error: "No target_stage in action config" }
+        }
+        const { target_stage } = action_config as { target_stage: string }
 
         const { error } = await supabase
           .from("leads")
@@ -185,8 +263,22 @@ async function executeAction(
   }
 }
 
-export async function executeAutomations(ctx: AutomationContext): Promise<void> {
-  const supabase = createClient()
+export async function executeAutomations(
+  ctx: AutomationContext,
+  supabaseClient?: SupabaseClient,
+  depth: number = 0
+): Promise<AutomationResult[]> {
+  const results: AutomationResult[] = []
+
+  // Infinite loop / re-entry protection
+  const executionKey = `${ctx.leadId}:${ctx.trigger}`
+  if (depth >= MAX_AUTOMATION_DEPTH || executingLeads.has(executionKey)) {
+    console.warn(`[Automation] Skipping: max depth or re-entry for ${executionKey}`)
+    return results
+  }
+
+  executingLeads.add(executionKey)
+  const supabase = supabaseClient || createClient()
 
   try {
     // Fetch active rules matching this trigger
@@ -199,7 +291,7 @@ export async function executeAutomations(ctx: AutomationContext): Promise<void> 
 
     if (error || !rules || rules.length === 0) {
       if (error) logger.error("Failed to fetch automation rules", { error: error.message })
-      return
+      return results
     }
 
     logger.info(`Found ${rules.length} automation rules for trigger: ${ctx.trigger}`, { leadId: ctx.leadId })
@@ -207,35 +299,42 @@ export async function executeAutomations(ctx: AutomationContext): Promise<void> 
     for (const rule of rules as AutomationRule[]) {
       // Check conditions
       if (!matchesConditions(rule.trigger_conditions, ctx.leadData, ctx.metadata)) {
-        // Log skipped execution
-        await supabase.from("automation_executions").insert({
-          rule_id: rule.id,
-          lead_id: ctx.leadId,
-          status: "skipped",
-          result: { reason: "Conditions not met" },
-        })
         continue
       }
 
       // Execute the action
-      const result = await executeAction(rule, ctx, supabase)
+      const actionResult = await executeAction(rule, ctx, supabase)
 
-      // Log execution
+      // Log execution (only actual executions, not skipped)
       await supabase.from("automation_executions").insert({
         rule_id: rule.id,
         lead_id: ctx.leadId,
-        status: result.success ? "success" : "failed",
-        result: result.result || {},
-        error_message: result.error,
+        status: actionResult.success ? "success" : "failed",
+        result: actionResult.result || {},
+        error_message: actionResult.error,
       })
 
-      if (result.success) {
+      const automationResult: AutomationResult = {
+        ruleId: rule.id,
+        ruleName: rule.name,
+        status: actionResult.success ? "success" : "failed",
+        result: actionResult.result,
+        error: actionResult.error,
+      }
+      results.push(automationResult)
+
+      if (actionResult.success) {
         logger.info(`Automation "${rule.name}" executed successfully`, { ruleId: rule.id, leadId: ctx.leadId })
       } else {
-        logger.error(`Automation "${rule.name}" failed`, { ruleId: rule.id, error: result.error })
+        logger.error(`Automation "${rule.name}" failed`, { ruleId: rule.id, error: actionResult.error })
       }
     }
+
+    return results
   } catch (err) {
     logger.error("Failed to execute automations", { trigger: ctx.trigger, error: String(err) })
+    return results
+  } finally {
+    executingLeads.delete(executionKey)
   }
 }

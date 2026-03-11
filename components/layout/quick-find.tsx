@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, startTransition } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, FileText, Calendar, Users, LayoutDashboard, BarChart3, Phone, Settings, Clock, Star, ArrowRight } from "lucide-react"
+import { Search, FileText, Calendar, Users, LayoutDashboard, BarChart3, Settings, Clock, Star, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
@@ -32,7 +32,6 @@ const defaultPages: QuickFindItem[] = [
   { id: "dashboard", title: "Dashboard", description: "Overview & stats", icon: <LayoutDashboard className="w-4 h-4" />, type: "page", href: "/dashboard" },
   { id: "leads", title: "Leads", description: "Manage prospects", icon: <Users className="w-4 h-4" />, type: "page", href: "/leads" },
   { id: "calendar", title: "Calendar", description: "Schedule & appointments", icon: <Calendar className="w-4 h-4" />, type: "page", href: "/calendar" },
-  { id: "voice", title: "Voice", description: "Kadi AI & calls", icon: <Phone className="w-4 h-4" />, type: "page", href: "/voice" },
   { id: "reports", title: "Reports", description: "Analytics & insights", icon: <BarChart3 className="w-4 h-4" />, type: "page", href: "/reports" },
   { id: "settings", title: "Settings", description: "Preferences", icon: <Settings className="w-4 h-4" />, type: "page", href: "/settings" },
 ]

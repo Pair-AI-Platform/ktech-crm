@@ -18,7 +18,8 @@ RETURNS TABLE (
   pipeline_stage TEXT,
   assigned_to UUID,
   match_type TEXT,
-  created_at TIMESTAMPTZ
+  created_at TIMESTAMPTZ,
+  assigned_agent_name TEXT
 )
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -28,8 +29,10 @@ BEGIN
     SELECT l.id, l.first_name, l.last_name, l.phone, l.civil_id,
            l.pipeline_stage::TEXT, l.assigned_to,
            'phone'::TEXT AS match_type,
-           l.created_at
+           l.created_at,
+           p.full_name::TEXT AS assigned_agent_name
     FROM leads l
+    LEFT JOIN profiles p ON p.id = l.assigned_to
     WHERE l.phone = p_phone
     AND (p_exclude_id IS NULL OR l.id != p_exclude_id);
   END IF;
@@ -40,8 +43,10 @@ BEGIN
     SELECT l.id, l.first_name, l.last_name, l.phone, l.civil_id,
            l.pipeline_stage::TEXT, l.assigned_to,
            'civil_id'::TEXT AS match_type,
-           l.created_at
+           l.created_at,
+           p.full_name::TEXT AS assigned_agent_name
     FROM leads l
+    LEFT JOIN profiles p ON p.id = l.assigned_to
     WHERE l.civil_id = p_civil_id
     AND (p_exclude_id IS NULL OR l.id != p_exclude_id)
     AND (p_phone IS NULL OR p_phone = '' OR l.phone != p_phone);
@@ -54,8 +59,10 @@ BEGIN
     SELECT l.id, l.first_name, l.last_name, l.phone, l.civil_id,
            l.pipeline_stage::TEXT, l.assigned_to,
            'name'::TEXT AS match_type,
-           l.created_at
+           l.created_at,
+           p.full_name::TEXT AS assigned_agent_name
     FROM leads l
+    LEFT JOIN profiles p ON p.id = l.assigned_to
     WHERE lower(l.first_name) = lower(p_first_name)
       AND lower(l.last_name) = lower(p_last_name)
       AND (p_exclude_id IS NULL OR l.id != p_exclude_id)

@@ -1,31 +1,11 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import { withApiHandler } from "@/lib/api-handler"
 
 // POST - Verify or unverify a document (admin only)
-export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClient()
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (profileError || profile?.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only administrators can verify documents" },
-        { status: 403 }
-      )
-    }
-
-    const body = await request.json()
+export const POST = withApiHandler(
+  { context: 'psp-documents-verify', roles: ['admin'] },
+  async ({ req, supabase, user, logger }) => {
+    const body = await req.json()
     const { document_id, is_verified, notes } = body
 
     if (!document_id) {
@@ -63,7 +43,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error verifying document:", error)
+      logger.error("Error verifying document", { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -71,23 +51,20 @@ export async function POST(request: NextRequest) {
       document: data,
       message: is_verified ? "Document verified successfully" : "Verification removed"
     })
-  } catch (err) {
-    console.error("Error verifying document:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+)
 
 // GET - Get verification status for all documents of a lead
-export async function GET(request: NextRequest) {
-  const supabase = await createServerSupabaseClient()
-  const searchParams = request.nextUrl.searchParams
-  const leadId = searchParams.get("lead_id")
+export const GET = withApiHandler(
+  { context: 'psp-documents-verify-status' },
+  async ({ req, supabase, logger }) => {
+    const searchParams = req.nextUrl.searchParams
+    const leadId = searchParams.get("lead_id")
 
-  if (!leadId) {
-    return NextResponse.json({ error: "lead_id is required" }, { status: 400 })
-  }
+    if (!leadId) {
+      return NextResponse.json({ error: "lead_id is required" }, { status: 400 })
+    }
 
-  try {
     const { data, error } = await supabase
       .from("psp_documents")
       .select(`
@@ -103,7 +80,7 @@ export async function GET(request: NextRequest) {
       .eq("lead_id", leadId)
 
     if (error) {
-      console.error("Error fetching verification status:", error)
+      logger.error("Error fetching verification status", { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -118,8 +95,5 @@ export async function GET(request: NextRequest) {
         allVerified: totalCount > 0 && verifiedCount === totalCount
       }
     })
-  } catch (err) {
-    console.error("Error fetching verification status:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+)

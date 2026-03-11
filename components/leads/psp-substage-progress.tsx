@@ -5,7 +5,7 @@ import {
   FileText,
   CheckCircle,
   Send,
-  XCircle,
+  UserCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { SubmissionSubstage } from "@/types"
@@ -18,15 +18,15 @@ interface PSPSubstageProgressProps {
   compact?: boolean
 }
 
-// Main substages in order (excluding lost which is a branch)
-const MAIN_SUBSTAGES: SubmissionSubstage[] = ['documents', 'submissions']
+// Main substages in order
+const MAIN_SUBSTAGES: SubmissionSubstage[] = ['documents', 'submissions', 'applicant']
 
 // Map substages to their icons
 const SUBSTAGE_ICONS: Record<SubmissionSubstage, typeof FileText> = {
   documents: FileText,
   submissions: Send,
   sf_srj: FileText,
-  lost: XCircle,
+  applicant: UserCheck,
 }
 
 // Map substages to colors
@@ -34,7 +34,7 @@ const SUBSTAGE_COLORS: Record<SubmissionSubstage, { from: string; to: string; bg
   documents: { from: '#F59E0B', to: '#D97706', bg: 'bg-amber-100' },
   submissions: { from: '#3B82F6', to: '#2563EB', bg: 'bg-blue-100' },
   sf_srj: { from: '#6366F1', to: '#4F46E5', bg: 'bg-indigo-100' },
-  lost: { from: '#EF4444', to: '#DC2626', bg: 'bg-red-100' },
+  applicant: { from: '#10B981', to: '#059669', bg: 'bg-emerald-100' },
 }
 
 function getSubstageIndex(substage: SubmissionSubstage): number {
@@ -47,7 +47,6 @@ export function PSPSubstageProgress({
   className,
   compact = false,
 }: PSPSubstageProgressProps) {
-  const isLost = currentSubstage === 'lost'
   const currentIndex = getSubstageIndex(currentSubstage)
 
   return (
@@ -63,7 +62,7 @@ export function PSPSubstageProgress({
 
             const isCompleted = currentIndex > idx
             const isCurrent = currentSubstage === substage
-            const isPending = currentIndex < idx && !isLost
+            const isPending = currentIndex < idx
 
             return (
               <div
@@ -83,8 +82,7 @@ export function PSPSubstageProgress({
                     compact ? "w-8 h-8" : "w-10 h-10",
                     isCompleted && "border-transparent",
                     isCurrent && "border-transparent ring-4 ring-offset-2",
-                    isPending && "border-[var(--border)] bg-[var(--bg-surface)]",
-                    isLost && idx >= currentIndex && "border-[var(--border)] bg-[var(--bg-surface)] opacity-50"
+                    isPending && "border-[var(--border)] bg-[var(--bg-surface)]"
                   )}
                   style={{
                     background: isCompleted || isCurrent
@@ -156,9 +154,7 @@ export function PSPSubstageProgress({
             <motion.div
               initial={{ width: 0 }}
               animate={{
-                width: isLost
-                  ? '0%'
-                  : `${(currentIndex / (MAIN_SUBSTAGES.length - 1)) * 100}%`
+                width: `${(currentIndex / (MAIN_SUBSTAGES.length - 1)) * 100}%`
               }}
               transition={{ duration: 0.5, ease: "easeOut" }}
               className="absolute inset-y-0 left-0 bg-gradient-to-r from-[var(--success)] to-[var(--primary)] rounded-full"
@@ -167,23 +163,6 @@ export function PSPSubstageProgress({
         </div>
       </div>
 
-      {/* Lost Branch Indicator */}
-      {isLost && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 p-3 rounded-xl border bg-red-50 border-red-200"
-        >
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-red-500">
-            <XCircle className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1">
-            <p className="font-medium text-sm text-red-800">
-              Submission Lost
-            </p>
-          </div>
-        </motion.div>
-      )}
     </div>
   )
 }

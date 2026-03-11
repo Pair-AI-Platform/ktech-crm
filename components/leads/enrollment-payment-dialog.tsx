@@ -23,7 +23,8 @@ import { Button } from "@/components/ui/button"
 import { Input, Textarea } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { Lead } from "@/types"
-import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
+import { ENROLLMENT_PAYMENT_AMOUNT } from "@/lib/config/constants"
+import { isDemoMode } from "@/lib/demo-data"
 
 type Step = "select" | "finance" | "cash" | "link-sent" | "success" | "error"
 type DialogMode = "enrollment" | "sf_downpayment"
@@ -61,9 +62,12 @@ export function EnrollmentPaymentDialog({
   // Cash state
   const [invoiceNumber, setInvoiceNumber] = useState("")
   const [notes, setNotes] = useState("")
+  const [amount, setAmount] = useState(ENROLLMENT_PAYMENT_AMOUNT.toString())
 
   // Success state
   const [studentId, setStudentId] = useState<string | null>(null)
+
+  const parsedAmount = parseFloat(amount) || 0
 
   const handleClose = () => {
     if (!loading) {
@@ -73,6 +77,7 @@ export function EnrollmentPaymentDialog({
       setCivilId(lead.civil_id || "")
       setInvoiceNumber("")
       setNotes("")
+      setAmount(ENROLLMENT_PAYMENT_AMOUNT.toString())
       setTransactionId(null)
       setInvoiceUrl(null)
       setStudentId(null)
@@ -89,6 +94,15 @@ export function EnrollmentPaymentDialog({
     setLoading(true)
     setError(null)
 
+    // Demo mode: simulate payment link sent
+    if (isDemoMode()) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setInvoiceUrl("https://demo.myfatoorah.com/payment/demo")
+      setStep("link-sent")
+      setLoading(false)
+      return
+    }
+
     try {
       const response = await fetch("/api/payments/myfatoorah/create", {
         method: "POST",
@@ -96,6 +110,7 @@ export function EnrollmentPaymentDialog({
         body: JSON.stringify({
           leadId: lead.id,
           civilId: civilId.trim(),
+          amount: parsedAmount > 0 ? parsedAmount : undefined,
         }),
       })
 
@@ -150,9 +165,21 @@ export function EnrollmentPaymentDialog({
       setError("Invoice number is required")
       return
     }
+    if (parsedAmount <= 0) {
+      setError("Please enter a valid amount")
+      return
+    }
 
     setLoading(true)
     setError(null)
+
+    // Demo mode: simulate success without calling the API
+    if (isDemoMode()) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setLoading(false)
+      setStep("success")
+      return
+    }
 
     try {
       const response = await fetch("/api/payments/cash", {
@@ -162,6 +189,7 @@ export function EnrollmentPaymentDialog({
           leadId: lead.id,
           invoiceNumber: invoiceNumber.trim(),
           notes: notes.trim() || undefined,
+          amount: parsedAmount,
         }),
       })
 
@@ -224,7 +252,7 @@ export function EnrollmentPaymentDialog({
           {step === "select" && (
             <div className="space-y-4">
               <p className="text-sm text-[var(--text-secondary)]">
-                How will the student pay the {ENROLLMENT_PAYMENT_AMOUNT} KWD {isSF ? "down payment" : "enrollment fee"}?
+                Choose a payment method for the {isSF ? "down payment" : "enrollment fee"}.
               </p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -244,9 +272,9 @@ export function EnrollmentPaymentDialog({
                   className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left"
                 >
                   <Banknote className="w-8 h-8 text-emerald-500 mb-2" />
-                  <h3 className="font-medium text-[var(--text-primary)]">Cash Payment</h3>
+                  <h3 className="font-medium text-[var(--text-primary)]">Record Finance</h3>
                   <p className="text-xs text-[var(--text-secondary)] mt-1">
-                    Record cash payment with invoice
+                    Cash or KNET entry
                   </p>
                 </button>
               </div>
@@ -361,6 +389,26 @@ export function EnrollmentPaymentDialog({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                  Amount (KWD) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="150"
+                    min={1}
+                    step={0.5}
+                    className="w-full text-lg font-semibold pl-14"
+                  />
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-[var(--text-muted)]">
+                    KWD
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                   Invoice Number <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -393,7 +441,7 @@ export function EnrollmentPaymentDialog({
 
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <p className="text-sm text-emerald-700">
-                  Recording cash payment of <strong>{ENROLLMENT_PAYMENT_AMOUNT} KWD</strong>.
+                  Recording cash payment of <strong>{parsedAmount} KWD</strong>.
                   {isSF ? " The lead will move to Applicant." : " The student will be enrolled immediately."}
                 </p>
               </div>
@@ -420,7 +468,7 @@ export function EnrollmentPaymentDialog({
 
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <p className="text-sm text-emerald-700">
-                  Payment of {ENROLLMENT_PAYMENT_AMOUNT} KWD recorded.
+                  Payment of {parsedAmount || ENROLLMENT_PAYMENT_AMOUNT} KWD recorded.
                   {isSF ? "" : " A student record has been created."}
                 </p>
               </div>

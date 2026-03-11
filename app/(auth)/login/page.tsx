@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mail, Lock, ArrowRight, Sparkles, Shield, Zap, Users, Play } from "lucide-react"
+import { Mail, Lock, ArrowRight, Sparkles, Shield, Zap, Users, Play, ShieldCheck } from "lucide-react"
 
 const emptySubscribe = () => () => {}
 
@@ -42,11 +42,12 @@ export default function LoginPage() {
   const isDemoAllowed = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true' ||
     process.env.NODE_ENV !== 'production'
 
-  const handleDemoMode = () => {
+  const handleDemoMode = (role: "admin" | "agent") => {
     if (!isDemoAllowed) return
     // Set demo mode cookie (accessible by middleware)
     document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax"
     localStorage.setItem("ktech-demo-mode", "true")
+    localStorage.setItem("ktech-demo-role", role)
     // Use window.location for hard redirect to ensure cookie is sent
     window.location.href = "/dashboard"
   }
@@ -278,18 +279,27 @@ export default function LoginPage() {
               {/* Demo Mode — hidden in production unless NEXT_PUBLIC_ENABLE_DEMO=true */}
               {isDemoAllowed && (
                 <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full h-11 text-sm group"
-                    onClick={handleDemoMode}
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    Enter Demo Mode
-                  </Button>
-                  <p className="text-center text-xs text-[var(--text-muted)] mt-2">
-                    Try the CRM without signing in
-                  </p>
+                  <p className="text-xs text-[var(--text-muted)] mb-3 text-center">Try the CRM without signing in</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 text-sm group"
+                      onClick={() => handleDemoMode("admin")}
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Admin Demo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 text-sm group"
+                      onClick={() => handleDemoMode("agent")}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Agent Demo
+                    </Button>
+                  </div>
                 </div>
               )}
 

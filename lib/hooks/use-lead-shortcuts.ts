@@ -12,7 +12,6 @@ interface Lead {
 
 interface UseLeadShortcutsOptions {
   lead: Lead | null | undefined
-  onToggleMessage?: () => void
   onEdit?: () => void
   onFocusNotes?: () => void
 }
@@ -20,14 +19,12 @@ interface UseLeadShortcutsOptions {
 /**
  * Keyboard shortcuts for the lead detail page
  * - C: Call the lead
- * - M: Toggle message menu
  * - B: Book appointment
  * - E: Edit lead
  * - N: Focus notes input
  */
 export function useLeadShortcuts({
   lead,
-  onToggleMessage,
   onEdit,
   onFocusNotes,
 }: UseLeadShortcutsOptions) {
@@ -65,12 +62,6 @@ export function useLeadShortcuts({
           )
           break
 
-        case "m":
-          // Toggle message menu
-          e.preventDefault()
-          onToggleMessage?.()
-          break
-
         case "b":
           // Book appointment
           e.preventDefault()
@@ -90,7 +81,7 @@ export function useLeadShortcuts({
           break
       }
     },
-    [lead, router, onToggleMessage, onEdit, onFocusNotes]
+    [lead, router, onEdit, onFocusNotes]
   )
 
   useEffect(() => {

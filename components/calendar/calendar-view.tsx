@@ -51,42 +51,48 @@ const TIME_SLOTS = [
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-const APPOINTMENT_COLORS: Record<AppointmentType, { bg: string; border: string; text: string; gradient: string }> = {
+const APPOINTMENT_COLORS: Record<AppointmentType, { bg: string; border: string; text: string; gradient: string; dot: string }> = {
   new_appointment: {
-    bg: "bg-[var(--primary)]/10",
-    border: "border-[var(--primary)]/30",
-    text: "text-[var(--primary)]",
-    gradient: "from-[var(--primary)]/20 to-[var(--primary)]/5"
+    bg: "bg-blue-500/10",
+    border: "border-blue-400/40",
+    text: "text-blue-600 dark:text-blue-400",
+    gradient: "from-blue-500/15 to-blue-500/5",
+    dot: "bg-blue-500",
   },
   puc_documents: {
-    bg: "bg-[var(--accent)]/10",
-    border: "border-[var(--accent)]/30",
-    text: "text-[var(--accent)]",
-    gradient: "from-[var(--accent)]/20 to-[var(--accent)]/5"
+    bg: "bg-violet-500/10",
+    border: "border-violet-400/40",
+    text: "text-violet-600 dark:text-violet-400",
+    gradient: "from-violet-500/15 to-violet-500/5",
+    dot: "bg-violet-500",
   },
   puc_application: {
-    bg: "bg-[var(--warning)]/10",
-    border: "border-[var(--warning)]/30",
-    text: "text-[var(--warning)]",
-    gradient: "from-[var(--warning)]/20 to-[var(--warning)]/5"
+    bg: "bg-amber-500/10",
+    border: "border-amber-400/40",
+    text: "text-amber-600 dark:text-amber-400",
+    gradient: "from-amber-500/15 to-amber-500/5",
+    dot: "bg-amber-500",
   },
   retest: {
-    bg: "bg-[var(--success)]/10",
-    border: "border-[var(--success)]/30",
-    text: "text-[var(--success)]",
-    gradient: "from-[var(--success)]/20 to-[var(--success)]/5"
+    bg: "bg-green-500/10",
+    border: "border-green-400/40",
+    text: "text-green-600 dark:text-green-400",
+    gradient: "from-green-500/15 to-green-500/5",
+    dot: "bg-green-500",
   },
   sf_appointment: {
-    bg: "bg-[var(--info)]/10",
-    border: "border-[var(--info)]/30",
-    text: "text-[var(--info)]",
-    gradient: "from-[var(--info)]/20 to-[var(--info)]/5"
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-400/40",
+    text: "text-cyan-600 dark:text-cyan-400",
+    gradient: "from-cyan-500/15 to-cyan-500/5",
+    dot: "bg-cyan-500",
   },
-  sf_retest: {
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/30",
-    text: "text-emerald-600",
-    gradient: "from-emerald-500/20 to-emerald-500/5"
+  puc_document_submission: {
+    bg: "bg-purple-500/10",
+    border: "border-purple-400/40",
+    text: "text-purple-600 dark:text-purple-400",
+    gradient: "from-purple-500/15 to-purple-500/5",
+    dot: "bg-purple-500",
   },
 }
 
@@ -109,9 +115,9 @@ export function CalendarView({
   // Filter appointments based on calendar mode
   const filteredAppointments = useMemo(() => {
     if (calendarMode === "callbacks") {
-      return appointments.filter(apt => apt.is_callback)
+      return appointments.filter(apt => apt.is_callback === true)
     } else if (calendarMode === "appointments") {
-      return appointments.filter(apt => !apt.is_callback)
+      return appointments.filter(apt => apt.is_callback !== true)
     }
     return appointments
   }, [appointments, calendarMode])
@@ -242,12 +248,25 @@ export function CalendarView({
     }
   }
 
+  // Short type label for appointment cards
+  const getTypeTag = (types: AppointmentType[]): string | null => {
+    if (!types?.length) return null
+    const tags: string[] = []
+    for (const t of types) {
+      if (t === "sf_appointment") tags.push("SF")
+      else if (t === "puc_documents" || t === "puc_application") { if (!tags.includes("PUC")) tags.push("PUC") }
+      else if (t === "retest") tags.push("Retest")
+    }
+    return tags.length > 0 ? tags.join("/") : null
+  }
+
   // Appointment card component
   const AppointmentCard = ({ appointment, compact = false }: { appointment: Appointment; compact?: boolean }) => {
     // Use first type for colors (or default to new_appointment)
     const primaryType = appointment.appointment_type?.[0] || "new_appointment"
     const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
     const agentName = getAgentName(appointment)
+    const typeTag = getTypeTag(appointment.appointment_type as AppointmentType[])
     return (
       <motion.div
         initial={{ opacity: 0, y: 3 }}
@@ -268,7 +287,7 @@ export function CalendarView({
         {/* Left accent bar */}
         <div className={cn(
           "absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-all",
-          colors.text.replace("text-", "bg-"),
+          colors.dot,
           "opacity-70 group-hover:opacity-100"
         )} />
 
@@ -282,6 +301,14 @@ export function CalendarView({
             )}>
               {getAppointmentName(appointment)}
             </span>
+            {typeTag && (
+              <span className={cn(
+                "flex-shrink-0 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wide border ml-auto",
+                colors.border, colors.text, "opacity-80"
+              )}>
+                {typeTag}
+              </span>
+            )}
           </div>
           {agentName && (
             <div className="flex items-center gap-1 mt-0.5 min-w-0">
@@ -450,7 +477,6 @@ export function CalendarView({
                     <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Type</th>
                     <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
                     <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Assigned To</th>
-                    <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Duration</th>
                     <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Phone</th>
                   </tr>
                 </thead>
@@ -542,12 +568,6 @@ export function CalendarView({
                               ) : (
                                 <span className="text-sm text-[var(--text-muted)]">-</span>
                               )}
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                                <span className="text-sm text-[var(--text-secondary)]">{apt.duration_minutes}min</span>
-                              </div>
                             </td>
                             <td className="p-3">
                               {(() => {
@@ -683,17 +703,9 @@ export function CalendarView({
                           )}
 
                           <div className="flex flex-col gap-1">
-                            {slotAppointments.slice(0, 2).map((apt) => (
+                            {slotAppointments.map((apt) => (
                               <AppointmentCard key={apt.id} appointment={apt} compact />
                             ))}
-                            {slotAppointments.length > 2 && (
-                              <div className="text-center py-0.5">
-                                <span className="text-[9px] font-semibold text-[var(--text-muted)] bg-[var(--bg-sunken)] px-2 py-0.5 rounded-full border border-[var(--border)]/50 inline-flex items-center gap-0.5">
-                                  <CalendarIcon className="w-2.5 h-2.5" />
-                                  +{slotAppointments.length - 2} more
-                                </span>
-                              </div>
-                            )}
                           </div>
 
                           {/* Add button — always visible on hover */}
@@ -848,7 +860,7 @@ export function CalendarView({
                                 {/* Left accent */}
                                 <div className={cn(
                                   "absolute left-0 top-3 bottom-3 w-1 rounded-full transition-all",
-                                  colors.text.replace("text-", "bg-"),
+                                  colors.dot,
                                   "opacity-70 group-hover/card:opacity-100"
                                 )} />
 
@@ -870,10 +882,6 @@ export function CalendarView({
                                   </p>
 
                                   <div className="flex items-center flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
-                                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-surface)]/80">
-                                      <Clock className="w-3 h-3" />
-                                      {apt.duration_minutes}min
-                                    </span>
                                     {(apt.appointment_leads?.[0]?.lead?.phone || apt.lead?.phone) && (
                                       <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-surface)]/80">
                                         <Phone className="w-3 h-3" />
@@ -987,7 +995,7 @@ export function CalendarView({
 
                         {/* Appointments */}
                         <div className="space-y-1">
-                          {dayAppointments.slice(0, 2).map((apt) => {
+                          {dayAppointments.map((apt) => {
                             const primaryType = apt.appointment_type?.[0] || "new_appointment"
                             const colors = APPOINTMENT_COLORS[primaryType as AppointmentType] || APPOINTMENT_COLORS.new_appointment
                             const employeeName = getAgentName(apt)
@@ -1005,7 +1013,7 @@ export function CalendarView({
                                 <div className="flex items-center gap-1 truncate">
                                   <div className={cn(
                                     "w-1 h-1 rounded-full flex-shrink-0",
-                                    colors.text.replace("text-", "bg-")
+                                    colors.dot
                                   )} />
                                   <span className="truncate">
                                     {apt.scheduled_time?.slice(0, 5)} {getAppointmentName(apt)}
@@ -1020,11 +1028,6 @@ export function CalendarView({
                               </div>
                             )
                           })}
-                          {dayAppointments.length > 2 && (
-                            <p className="text-[10px] text-[var(--text-muted)] pl-2 font-medium">
-                              +{dayAppointments.length - 2} more
-                            </p>
-                          )}
                         </div>
 
                         {/* Hover overlay */}

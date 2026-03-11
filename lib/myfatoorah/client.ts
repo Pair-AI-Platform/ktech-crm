@@ -99,6 +99,7 @@ export async function createPaymentLink(
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(30_000),
       body: JSON.stringify({
         NotificationOption: 'LNK', // Return link only, don't send SMS/email
         CustomerName: params.customerName,
@@ -165,6 +166,7 @@ export async function getPaymentStatus(
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(30_000),
       body: JSON.stringify({
         Key: invoiceId,
         KeyType: 'InvoiceId',

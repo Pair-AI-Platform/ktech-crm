@@ -103,7 +103,7 @@ export function MarkLostDialog({
             <div className="space-y-4">
               {/* Reason Selection */}
               <div className="space-y-3">
-                {Object.entries(groupedReasons).map(([category, categoryReasons]) => (
+                {(Object.entries(groupedReasons) as [LostReasonCategory, typeof reasons][]).map(([category, categoryReasons]) => (
                   <div key={category}>
                     <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">
                       {CATEGORY_LABELS[category as LostReasonCategory] || category}

@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Bell, CheckCheck, CreditCard, UserPlus, Calendar, AlertCircle, ArrowRight } from "lucide-react"
+import { Bell, CheckCheck, CreditCard, UserPlus, Calendar, AlertCircle, ArrowRight, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CounterBadge } from "@/components/ui/badge"
 import { useNotifications, type Notification } from "@/lib/hooks/use-notifications"
+import { useNoUpdatedAppointments } from "@/lib/hooks/use-appointments"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -23,6 +24,9 @@ const typeConfig: Record<string, { icon: typeof Bell; color: string }> = {
 
 export function NotificationDropdown({ userId }: NotificationDropdownProps) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId)
+  const { appointments: noUpdatedAppointments, loading: noUpdatedLoading } = useNoUpdatedAppointments()
+  const noUpdatedCount = noUpdatedAppointments.length
+  const totalUnread = unreadCount + (noUpdatedCount > 0 ? 1 : 0)
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -55,9 +59,9 @@ export function NotificationDropdown({ userId }: NotificationDropdownProps) {
         onClick={() => setOpen(!open)}
       >
         <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
+        {totalUnread > 0 && (
           <div className="absolute -top-0.5 -right-0.5">
-            <CounterBadge count={unreadCount} />
+            <CounterBadge count={totalUnread} />
           </div>
         )}
       </Button>
@@ -80,7 +84,29 @@ export function NotificationDropdown({ userId }: NotificationDropdownProps) {
 
           {/* Notification List */}
           <div className="max-h-[380px] overflow-y-auto">
-            {notifications.length === 0 ? (
+            {/* No Updated Appointments Alert */}
+            {!noUpdatedLoading && noUpdatedCount > 0 && (
+              <Link href="/" onClick={() => setOpen(false)}>
+                <div className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-[var(--bg-hover)] bg-[var(--warning)]/5 border-b border-[var(--border)]">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-[var(--warning)]/10">
+                    <AlertTriangle className="w-4 h-4 text-[var(--warning)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm leading-snug text-[var(--text-primary)] font-medium">
+                        {noUpdatedCount} Appointments Not Updated
+                      </p>
+                      <span className="w-2 h-2 rounded-full bg-[var(--warning)] shrink-0 mt-1.5" />
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                      Past appointments still have no status update
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            )}
+
+            {notifications.length === 0 && noUpdatedCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-[var(--text-muted)]">
                 <Bell className="w-8 h-8 mb-2 opacity-40" />
                 <p className="text-sm">No notifications yet</p>

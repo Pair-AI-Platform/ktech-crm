@@ -7,6 +7,12 @@ export function isDemoMode(): boolean {
   return localStorage.getItem("ktech-demo-mode") === "true"
 }
 
+// Get the demo role (admin or agent)
+export function getDemoRole(): "admin" | "agent" {
+  if (typeof window === "undefined") return "admin"
+  return (localStorage.getItem("ktech-demo-role") as "admin" | "agent") || "admin"
+}
+
 // Demo data persistence - store updates in localStorage
 const DEMO_LEADS_STORAGE_KEY = "ktech-demo-leads-updates"
 const DEMO_APPOINTMENTS_STORAGE_KEY = "ktech-demo-appointments-updates"
@@ -69,12 +75,12 @@ export function clearDemoDataUpdates(): void {
   localStorage.removeItem(DEMO_LEADS_STORAGE_KEY)
 }
 
-// Demo agents - Real ktech team members
+// Demo agents - fictional data for demo mode
 export const DEMO_AGENTS: Profile[] = [
   // Admins
   {
     id: "admin-1",
-    email: "a.ghazal@ktech.edu.kw",
+    email: "demo.admin1@example.com",
     full_name: "Adel Ghazal",
     role: "admin",
     avatar_url: undefined,
@@ -85,7 +91,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "admin-2",
-    email: "a.ali@ktech.edu.kw",
+    email: "demo.admin2@example.com",
     full_name: "Aldana Ali",
     role: "admin",
     avatar_url: undefined,
@@ -96,7 +102,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "admin-3",
-    email: "a.boodai@ktech.edu.kw",
+    email: "demo.admin3@example.com",
     full_name: "Abdulwahab Boodai",
     role: "admin",
     avatar_url: undefined,
@@ -108,7 +114,7 @@ export const DEMO_AGENTS: Profile[] = [
   // Agents
   {
     id: "agent-1",
-    email: "sarah.jones@ktech.edu.kw",
+    email: "demo.agent1@example.com",
     full_name: "Sarah Jones",
     role: "agent",
     avatar_url: undefined,
@@ -119,7 +125,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-2",
-    email: "ahmed.hassan@ktech.edu.kw",
+    email: "demo.agent2@example.com",
     full_name: "Ahmed Hassan",
     role: "agent",
     avatar_url: undefined,
@@ -130,7 +136,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-3",
-    email: "nora.khalid@ktech.edu.kw",
+    email: "demo.agent3@example.com",
     full_name: "Nora Khalid",
     role: "agent",
     avatar_url: undefined,
@@ -141,7 +147,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-4",
-    email: "omar.farid@ktech.edu.kw",
+    email: "demo.agent4@example.com",
     full_name: "Omar Farid",
     role: "agent",
     avatar_url: undefined,
@@ -152,7 +158,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-5",
-    email: "lina.mahmoud@ktech.edu.kw",
+    email: "demo.agent5@example.com",
     full_name: "Lina Mahmoud",
     role: "agent",
     avatar_url: undefined,
@@ -163,7 +169,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-6",
-    email: "khalid.nasser@ktech.edu.kw",
+    email: "demo.agent6@example.com",
     full_name: "Khalid Nasser",
     role: "agent",
     avatar_url: undefined,
@@ -174,7 +180,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-7",
-    email: "dana.ali@ktech.edu.kw",
+    email: "demo.agent7@example.com",
     full_name: "Dana Ali",
     role: "agent",
     avatar_url: undefined,
@@ -185,7 +191,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-8",
-    email: "faisal.khaled@ktech.edu.kw",
+    email: "demo.agent8@example.com",
     full_name: "Faisal Khaled",
     role: "agent",
     avatar_url: undefined,
@@ -196,7 +202,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-9",
-    email: "reem.salem@ktech.edu.kw",
+    email: "demo.agent9@example.com",
     full_name: "Reem Salem",
     role: "agent",
     avatar_url: undefined,
@@ -207,7 +213,7 @@ export const DEMO_AGENTS: Profile[] = [
   },
   {
     id: "agent-10",
-    email: "yousef.ward@ktech.edu.kw",
+    email: "demo.agent10@example.com",
     full_name: "Yousef Ward",
     role: "agent",
     avatar_url: undefined,
@@ -242,7 +248,7 @@ const majors = ["cyber_security", "cis", "marketing", "accounting", "mis", "netw
 const fundingTypes = ["self_funded", "puc"]
 const contactStatuses = ["uncontacted", "interested", "not_interested", "no_answer", "callback", "will_see"]
 const gradeLevels = ["10th", "11th", "12th"]
-const stages: PipelineStage[] = ["new", "contacted", "visit", "test", "application", "applicant", "enrolled", "withdraw", "lost"]
+const stages: PipelineStage[] = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"]
 
 function randomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -292,10 +298,12 @@ function generateActivityNotes(stage: PipelineStage, firstName: string): string 
     visit: 3,
     test: 5,
     application: 6,
-    applicant: 7,
-    enrolled: 8,
+    applicant: 9,
+    enrolled: 10,
     withdraw: 3,
     lost: 3,
+    puc_document_submission: 7,
+    puc_application_submission: 8,
   }
 
   const numNotes = Math.min(stageProgress[stage], Math.floor(Math.random() * 4) + stageProgress[stage])
@@ -344,7 +352,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
 
     // Ministry block reasons for submission stage leads
     // Submission substages for even distribution of colors
-    const submissionSubstages: Lead["submission_substage"][] = ['documents', 'submissions', 'lost']
+    const submissionSubstages: Lead["submission_substage"][] = ['documents', 'submissions', 'applicant']
 
     // For submission stage leads, assign substage in round-robin for even distribution
     let submissionSubstage: Lead["submission_substage"] | undefined = undefined
@@ -383,8 +391,13 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       gpa_grade_10: randomGPA(),
       gpa_grade_11: randomGPA(),
       gpa_grade_12_expected: stage !== "new" ? randomGPA() : undefined,
+      expected_gpa: Math.round((60 + Math.random() * 35) * 10) / 10,
+      actual_gpa: Math.round((55 + Math.random() * 35) * 10) / 10,
       intended_major: randomItem(majors) as Lead["intended_major"],
-      funding_type: randomItem(fundingTypes) as Lead["funding_type"],
+      funding_type: (stage === "puc_document_submission" || stage === "puc_application_submission") ? "puc" : randomItem(fundingTypes) as Lead["funding_type"],
+      puc_stage: (stage === "puc_document_submission" || stage === "puc_application_submission")
+        ? randomItem(["ktech_application", "paci_verification", "puc_submission", "puc_decision", "enrolled"]) as Lead["puc_stage"]
+        : undefined,
       has_bank_account: Math.random() > 0.3,
       has_weyay_account: Math.random() > 0.5,
       assigned_to: agent.id,
@@ -396,7 +409,14 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       created_at: randomDate(60),
       updated_at: randomDate(5),
       submission_substage: submissionSubstage,
+      puc_choice: stage === "applicant" ? (randomItem(["1", "1", "2", "3", "4"]) as Lead["puc_choice"]) : undefined,
+      puc_first_choice_college: undefined,
     })
+
+    // Set first choice college for non-1st choice applicants
+    if (stage === "applicant" && leads[leads.length - 1].puc_choice && leads[leads.length - 1].puc_choice !== "1") {
+      leads[leads.length - 1].puc_first_choice_college = randomItem(["PAAET", "KU", "AUM", "GUST", "AUK", "ACM"])
+    }
   }
 
   return leads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -474,7 +494,7 @@ export function generateDemoStudents(count: number = 20): Student[] {
 // Generate demo appointments - large realistic dataset
 export function generateDemoAppointments(count: number = 200): Appointment[] {
   const appointments: Appointment[] = []
-  const types: AppointmentType[] = ["new_appointment", "puc_documents", "puc_application", "retest", "sf_appointment", "sf_retest"]
+  const types: AppointmentType[] = ["new_appointment", "puc_documents", "puc_application", "retest", "sf_appointment"]
   // Time slots for realistic scheduling (8:00 AM to 4:00 PM, 30-min increments)
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
@@ -621,8 +641,7 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
     if (r < 0.50) return "puc_documents"
     if (r < 0.65) return "puc_application"
     if (r < 0.78) return "retest"
-    if (r < 0.90) return "sf_appointment"
-    return "sf_retest"
+    return "sf_appointment"
   }
 
   // Sometimes appointments have multiple types
@@ -644,7 +663,6 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
       case "puc_application": return "application"
       case "retest": return "test"
       case "sf_appointment": return "contacted"
-      case "sf_retest": return "test"
       default: return "contacted"
     }
   }
@@ -652,7 +670,7 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
   // Funding type matched to appointment type
   function fundingForType(type: AppointmentType): Lead["funding_type"] {
     if (type === "puc_documents" || type === "puc_application") return "puc"
-    if (type === "sf_appointment" || type === "sf_retest") return "self_funded"
+    if (type === "sf_appointment") return "self_funded"
     return Math.random() > 0.5 ? "puc" : "self_funded"
   }
 
@@ -682,7 +700,8 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
     const isCallback = Math.random() > 0.85
     const stage = stageForType(primaryType)
     const funding = fundingForType(primaryType)
-    const leadId = `lead-${(i % 360) + 1}`
+    // Map appointments to ~120 unique leads so some leads get 2-3 appointments (realistic rebookings)
+    const leadId = `lead-${(i % 120) + 1}`
 
     // Build tracking fields based on status
     const confirmedAt = (status === "confirmed" || status === "completed" || status === "on_the_way" || status === "will_see")
@@ -728,7 +747,7 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
       modality: modality,
       scheduled_date: dateInfo.date,
       scheduled_time: timeSlot,
-      duration_minutes: (primaryType === "retest" || primaryType === "sf_retest") ? 60 : 30,
+      duration_minutes: primaryType === "retest" ? 60 : 30,
       status: status,
       is_callback: isCallback,
       callback_reason: isCallback ? randomItem(["Student requested callback", "Parent asked to reschedule", "Agent follow-up needed", "No answer - retry"]) : undefined,
@@ -771,7 +790,7 @@ let cachedAppointments: Appointment[] | null = null
 
 export function getDemoLeads(): Lead[] {
   if (!cachedLeads) {
-    cachedLeads = generateDemoLeads(360) // 40 leads per stage (9 stages)
+    cachedLeads = generateDemoLeads(440) // 40 leads per stage (11 stages)
   }
 
   // Apply any stored updates from localStorage
@@ -826,7 +845,13 @@ export function getDemoAppointments(): Appointment[] {
     }
   }
 
-  return result
+  // Sort by date descending (matching Supabase query order) so new appointments
+  // are positioned correctly and not cut off by limit/slice
+  return result.sort((a, b) => {
+    const dateCompare = b.scheduled_date.localeCompare(a.scheduled_date)
+    if (dateCompare !== 0) return dateCompare
+    return (b.scheduled_time || "").localeCompare(a.scheduled_time || "")
+  })
 }
 
 // Stats helpers
@@ -834,7 +859,8 @@ export function getDemoLeadStats() {
   const leads = getDemoLeads()
   const byStage: Record<PipelineStage, number> = {
     new: 0, contacted: 0, visit: 0,
-    test: 0, application: 0, applicant: 0, enrolled: 0, withdraw: 0, lost: 0
+    test: 0, application: 0, applicant: 0, enrolled: 0, withdraw: 0, lost: 0,
+    puc_document_submission: 0, puc_application_submission: 0
   }
 
   const now = new Date()

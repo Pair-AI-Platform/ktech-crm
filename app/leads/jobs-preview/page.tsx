@@ -231,13 +231,6 @@ export default function LeadDetailJobs() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-8 py-4 bg-white text-black rounded-full text-sm font-medium hover:bg-neutral-100 transition-colors"
-              >
-                Call Now
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 className="px-8 py-4 bg-transparent text-white border border-neutral-700 rounded-full text-sm font-medium hover:border-neutral-500 transition-colors"
               >
                 Send WhatsApp

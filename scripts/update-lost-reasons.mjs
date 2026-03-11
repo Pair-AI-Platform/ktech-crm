@@ -29,6 +29,7 @@ async function updateLostReasons() {
     { category: 'competitors', reason_en: 'MOHE', reason_ar: 'MOHE' },
     { category: 'competitors', reason_en: 'Other', reason_ar: 'أخرى' },
     { category: 'personal', reason_en: 'Changed mind', reason_ar: 'غير رأيه' },
+    { category: 'academic', reason_en: 'Academic Reason', reason_ar: 'سبب أكاديمي' },
   ]
 
   // Filter out reasons that already exist

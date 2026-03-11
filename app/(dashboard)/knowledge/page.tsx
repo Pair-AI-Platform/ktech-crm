@@ -101,7 +101,7 @@ export default function KnowledgePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-sunken)] p-8">
+    <div className="min-h-screen bg-[var(--bg-sunken)] px-3 py-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">

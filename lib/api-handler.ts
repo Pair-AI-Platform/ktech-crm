@@ -3,19 +3,36 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createLogger, errorResponse, type Logger } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
+import type { UserRole } from '@/types'
 
-export interface ApiHandlerContext {
+/** Context for authenticated routes (requireAuth: true, the default) */
+export interface AuthenticatedContext {
   req: NextRequest
   supabase: SupabaseClient
   user: User
+  profile: { role: UserRole }
   logger: Logger
 }
 
-interface HandlerOptions {
-  /** Logging context name (e.g., 'sms-send', 'cash-payment') */
+/** Context for unauthenticated routes (requireAuth: false) */
+export interface UnauthenticatedContext {
+  req: NextRequest
+  logger: Logger
+}
+
+/** @deprecated Use AuthenticatedContext instead */
+export type ApiHandlerContext = AuthenticatedContext
+
+interface AuthenticatedOptions {
   context: string
-  /** Set to false for unauthenticated routes like webhooks. Defaults to true. */
-  requireAuth?: boolean
+  requireAuth?: true
+  /** When specified, only users with one of these roles may access the route */
+  roles?: UserRole[]
+}
+
+interface UnauthenticatedOptions {
+  context: string
+  requireAuth: false
 }
 
 /**
@@ -37,8 +54,18 @@ interface HandlerOptions {
  *   )
  */
 export function withApiHandler(
-  options: HandlerOptions,
-  handler: (ctx: ApiHandlerContext) => Promise<Response | NextResponse>
+  options: AuthenticatedOptions,
+  handler: (ctx: AuthenticatedContext) => Promise<Response | NextResponse>
+): (req: NextRequest) => Promise<Response | NextResponse>
+
+export function withApiHandler(
+  options: UnauthenticatedOptions,
+  handler: (ctx: UnauthenticatedContext) => Promise<Response | NextResponse>
+): (req: NextRequest) => Promise<Response | NextResponse>
+
+export function withApiHandler(
+  options: AuthenticatedOptions | UnauthenticatedOptions,
+  handler: ((ctx: any) => Promise<Response | NextResponse>)
 ): (req: NextRequest) => Promise<Response | NextResponse> {
   return async (req: NextRequest) => {
     const logger = createLogger(options.context)
@@ -48,13 +75,7 @@ export function withApiHandler(
 
     try {
       if (options.requireAuth === false) {
-        // For unauthenticated routes, pass null placeholders
-        const response = await handler({
-          req,
-          logger,
-          supabase: null as unknown as SupabaseClient,
-          user: null as unknown as User,
-        })
+        const response = await handler({ req, logger })
         logger.info('Request completed', { status: response.status, durationMs: Date.now() - startTime })
         return response
       }
@@ -67,7 +88,24 @@ export function withApiHandler(
         return errorResponse('Unauthorized', 401, logger)
       }
 
-      const response = await handler({ req, supabase, user, logger })
+      // Fetch user profile for role information
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      const userProfile: { role: UserRole } = { role: profile?.role ?? 'user' }
+
+      // Role-based authorization check
+      if ('roles' in options && options.roles && options.roles.length > 0) {
+        if (!options.roles.includes(userProfile.role)) {
+          logger.warn('Forbidden: insufficient role', { userId: user.id, role: userProfile.role, requiredRoles: options.roles })
+          return errorResponse('Forbidden', 403, logger)
+        }
+      }
+
+      const response = await handler({ req, supabase, user, profile: userProfile, logger })
       logger.info('Request completed', { status: response.status, durationMs: Date.now() - startTime })
       return response
     } catch (error) {

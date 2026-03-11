@@ -87,6 +87,7 @@ async function moodleApiCall<T>(
     headers: {
       'Accept': 'application/json',
     },
+    signal: AbortSignal.timeout(30_000),
   })
 
   if (!response.ok) {

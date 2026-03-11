@@ -8,6 +8,8 @@ export const BUSINESS_CONFIG = {
   // -- Payments --
   /** Enrollment fee amount in KWD */
   ENROLLMENT_PAYMENT_AMOUNT: 150,
+  /** Full tuition amount in KWD */
+  FULL_TUITION_AMOUNT: 550,
   /** PUC (Pre-University Course) fee amount in KWD */
   PUC_FEE_AMOUNT: 10,
   /** Default currency */
@@ -55,6 +57,7 @@ export const PUC_SRJ_AUTO_ROUTE = {
 // Re-export individual values for convenience
 export const {
   ENROLLMENT_PAYMENT_AMOUNT,
+  FULL_TUITION_AMOUNT,
   PUC_FEE_AMOUNT,
   GPA_SELF_FUNDED_THRESHOLD,
   PLACEMENT_TEST_PASSING_THRESHOLD,

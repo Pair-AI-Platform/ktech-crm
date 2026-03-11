@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useCallback } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+import { queryKeys } from "./query-keys"
 import type { Profile, PipelineStage, ContactStatus, LeadSource, LeadSourceCategory, FundingType } from "@/types"
 
 export interface DeletedLead {
@@ -73,24 +75,20 @@ interface UseDeletedLeadsOptions {
 
 export function useDeletedLeads(options: UseDeletedLeadsOptions = {}) {
   const { searchQuery = "", limit = 50, showRestored = false } = options
-  const [deletedLeads, setDeletedLeads] = useState<DeletedLead[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetchDeletedLeads = useCallback(async (abortSignal?: AbortSignal) => {
-    setLoading(true)
-    setError(null)
+  const listQueryKey = queryKeys.deletedLeads.list({ searchQuery, limit, showRestored })
 
-    // Demo mode - return empty for now
-    if (isDemoMode()) {
-      setDeletedLeads([])
-      setLoading(false)
-      return
-    }
+  const { data: deletedLeads = [], isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: listQueryKey,
+    queryFn: async () => {
+      // Demo mode - return empty for now
+      if (isDemoMode()) {
+        return [] as DeletedLead[]
+      }
 
-    const supabase = createClient()
+      const supabase = createClient()
 
-    try {
       let query = supabase
         .from("deleted_leads")
         .select(`
@@ -113,30 +111,13 @@ export function useDeletedLeads(options: UseDeletedLeadsOptions = {}) {
 
       const { data, error } = await query
 
-      // Check if request was aborted
-      if (abortSignal?.aborted) return
-
       if (error) throw error
-      setDeletedLeads(data || [])
-    } catch (err) {
-      if (abortSignal?.aborted) return
-      console.error("Error fetching deleted leads:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch deleted leads")
-    } finally {
-      if (!abortSignal?.aborted) {
-        setLoading(false)
-      }
-    }
-  }, [searchQuery, limit, showRestored])
+      return (data || []) as DeletedLead[]
+    },
+    staleTime: 30_000,
+  })
 
-  useEffect(() => {
-    const abortController = new AbortController()
-    fetchDeletedLeads(abortController.signal)
-
-    return () => {
-      abortController.abort()
-    }
-  }, [fetchDeletedLeads])
+  const error = queryError?.message ?? null
 
   // Subscribe to real-time changes
   useEffect(() => {
@@ -149,7 +130,7 @@ export function useDeletedLeads(options: UseDeletedLeadsOptions = {}) {
         "postgres_changes",
         { event: "*", schema: "public", table: "deleted_leads" },
         () => {
-          fetchDeletedLeads()
+          queryClient.invalidateQueries({ queryKey: queryKeys.deletedLeads.all })
         }
       )
       .subscribe()
@@ -157,26 +138,23 @@ export function useDeletedLeads(options: UseDeletedLeadsOptions = {}) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchDeletedLeads])
+  }, [queryClient])
 
-  return { deletedLeads, loading, error, refetch: fetchDeletedLeads }
+  return { deletedLeads, loading, error, refetch }
 }
 
 export function useDeletedLeadMutations() {
-  const supabase = createClient()
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
 
-  const restoreLead = async (deletedLeadId: string) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { data: null, error: null }
-    }
+  const restoreLeadMutation = useMutation({
+    mutationFn: async (deletedLeadId: string) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { data: null, error: null }
+      }
 
-    setLoading(true)
-    try {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("User not authenticated")
 
@@ -200,25 +178,22 @@ export function useDeletedLeadMutations() {
 
       if (error) throw error
       return { data, error: null }
-    } catch (err) {
-      console.error("Error restoring lead:", err)
-      return { data: null, error: err instanceof Error ? err.message : "Failed to restore lead" }
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.deletedLeads.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
 
-  const bulkRestoreLeads = async (deletedLeadIds: string[]) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { error: null, count: deletedLeadIds.length }
-    }
+  const bulkRestoreLeadsMutation = useMutation({
+    mutationFn: async (deletedLeadIds: string[]) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { error: null, count: deletedLeadIds.length }
+      }
 
-    setLoading(true)
-    try {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("User not authenticated")
 
@@ -255,25 +230,22 @@ export function useDeletedLeadMutations() {
       }
 
       return { error: errors.length > 0 ? errors.join("; ") : null, count: successCount }
-    } catch (err) {
-      console.error("Error bulk restoring leads:", err)
-      return { error: err instanceof Error ? err.message : "Failed to restore leads", count: 0 }
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.deletedLeads.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
 
-  const permanentlyDeleteLead = async (deletedLeadId: string) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { error: null }
-    }
+  const permanentlyDeleteLeadMutation = useMutation({
+    mutationFn: async (deletedLeadId: string) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { error: null }
+      }
 
-    setLoading(true)
-    try {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("User not authenticated")
 
@@ -296,13 +268,52 @@ export function useDeletedLeadMutations() {
 
       if (error) throw error
       return { error: null }
-    } catch (err) {
-      console.error("Error permanently deleting lead:", err)
-      return { error: err instanceof Error ? err.message : "Failed to permanently delete lead" }
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.deletedLeads.all })
+    },
+  })
+
+  const restoreLead = useCallback(
+    async (deletedLeadId: string) => {
+      try {
+        const result = await restoreLeadMutation.mutateAsync(deletedLeadId)
+        return result
+      } catch (err) {
+        console.error("Error restoring lead:", err)
+        return { data: null, error: err instanceof Error ? err.message : "Failed to restore lead" }
+      }
+    },
+    [restoreLeadMutation]
+  )
+
+  const bulkRestoreLeads = useCallback(
+    async (deletedLeadIds: string[]) => {
+      try {
+        const result = await bulkRestoreLeadsMutation.mutateAsync(deletedLeadIds)
+        return result
+      } catch (err) {
+        console.error("Error bulk restoring leads:", err)
+        return { error: err instanceof Error ? err.message : "Failed to restore leads", count: 0 }
+      }
+    },
+    [bulkRestoreLeadsMutation]
+  )
+
+  const permanentlyDeleteLead = useCallback(
+    async (deletedLeadId: string) => {
+      try {
+        const result = await permanentlyDeleteLeadMutation.mutateAsync(deletedLeadId)
+        return result
+      } catch (err) {
+        console.error("Error permanently deleting lead:", err)
+        return { error: err instanceof Error ? err.message : "Failed to permanently delete lead" }
+      }
+    },
+    [permanentlyDeleteLeadMutation]
+  )
+
+  const loading = restoreLeadMutation.isPending || bulkRestoreLeadsMutation.isPending || permanentlyDeleteLeadMutation.isPending
 
   return {
     restoreLead,
@@ -313,61 +324,41 @@ export function useDeletedLeadMutations() {
 }
 
 export function useDeletedLeadsStats() {
-  const [stats, setStats] = useState({
-    total: 0,
-    restoredCount: 0,
-    thisMonth: 0,
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchStats() {
+  const { data: stats = { total: 0, restoredCount: 0, thisMonth: 0 }, isLoading: loading } = useQuery({
+    queryKey: queryKeys.deletedLeads.stats(),
+    queryFn: async () => {
       if (isDemoMode()) {
-        setStats({ total: 0, restoredCount: 0, thisMonth: 0 })
-        setLoading(false)
-        return
+        return { total: 0, restoredCount: 0, thisMonth: 0 }
       }
 
       const supabase = createClient()
 
-      try {
-        // Get all deleted leads
-        const { data: deletedLeads, error } = await supabase
-          .from("deleted_leads")
-          .select("deleted_at, is_restored")
+      const { data: deletedLeads, error } = await supabase
+        .from("deleted_leads")
+        .select("deleted_at, is_restored")
 
-        if (error) throw error
+      if (error) throw error
 
-        const now = new Date()
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        let thisMonth = 0
-        let restoredCount = 0
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      let thisMonth = 0
+      let restoredCount = 0
 
-        deletedLeads?.forEach(lead => {
-          if (lead.is_restored) {
-            restoredCount++
-          }
-          if (new Date(lead.deleted_at) >= startOfMonth) {
-            thisMonth++
-          }
-        })
+      deletedLeads?.forEach(lead => {
+        if (lead.is_restored) {
+          restoredCount++
+        }
+        if (new Date(lead.deleted_at) >= startOfMonth) {
+          thisMonth++
+        }
+      })
 
-        const total = deletedLeads?.filter(l => !l.is_restored).length || 0
+      const total = deletedLeads?.filter(l => !l.is_restored).length || 0
 
-        setStats({
-          total,
-          restoredCount,
-          thisMonth,
-        })
-      } catch (err) {
-        console.error("Error fetching deleted leads stats:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-  }, [])
+      return { total, restoredCount, thisMonth }
+    },
+    staleTime: 60_000,
+  })
 
   return { stats, loading }
 }

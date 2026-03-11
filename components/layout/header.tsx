@@ -10,6 +10,7 @@ interface HeaderProps {
   user: Profile | null
   title?: string
   subtitle?: string
+  subtitleExtra?: React.ReactNode
   action?: {
     label: string
     onClick?: () => void
@@ -20,14 +21,14 @@ interface HeaderProps {
   hideSearch?: boolean
 }
 
-export function Header({ user, title, subtitle, action, breadcrumbs }: HeaderProps) {
+export function Header({ user, title, subtitle, subtitleExtra, action, breadcrumbs }: HeaderProps) {
   return (
     <header className="sticky top-0 z-20 bg-[var(--bg-surface)] border-b border-[var(--border)]">
       <div className="flex items-center justify-between min-h-[4.5rem] md:min-h-[4rem] py-3 md:py-2 px-4 md:px-6">
         {/* Left Section - Title & Breadcrumbs */}
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
           <div className="lg:hidden w-10 shrink-0" /> {/* Spacer for mobile menu button */}
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 && (
               <nav className={`flex items-center gap-1.5 text-sm ${title ? 'mb-1' : ''}`}>
                 {breadcrumbs.map((crumb, index) => (
@@ -53,7 +54,10 @@ export function Header({ user, title, subtitle, action, breadcrumbs }: HeaderPro
               </h1>
             )}
             {subtitle && (
-              <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-snug">{subtitle}</p>
+              <div className="flex items-center gap-0">
+                <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-snug truncate max-w-[60vw] md:max-w-none">{subtitle}</p>
+                {subtitleExtra}
+              </div>
             )}
           </div>
         </div>

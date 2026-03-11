@@ -1078,7 +1078,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       [showArabic ? 'messageContentAr' : 'messageContent']: e.target.value
                     }))}
                     placeholder={showArabic
-                      ? "مرحبا {{first_name}}! حبيت أتواصل معاك..."
+                      ? "Type your Arabic message here..."
                       : "Hello {{first_name}}! I wanted to reach out..."}
                     rows={formData.type === 'email' ? 8 : 4}
                     className={cn(
@@ -1240,8 +1240,8 @@ export default function CampaignsPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
       {/* Header */}
-      <header className="px-6 lg:px-8 py-6 border-b border-[var(--border)] bg-[var(--bg-surface)]">
-        <div className="flex items-center justify-between mb-6 pl-10 lg:pl-0">
+      <header className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-[var(--border)] bg-[var(--bg-surface)]">
+        <div className="flex items-center justify-between mb-4 sm:mb-6 pl-10 lg:pl-0 gap-2 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Campaigns</h1>
             <p className="text-sm text-[var(--text-muted)]">Outreach automation</p>
@@ -1301,7 +1301,7 @@ export default function CampaignsPage() {
       </header>
 
       {/* Content */}
-      <main className="px-6 lg:px-8 py-8">
+      <main className="px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <AnimatePresence mode="wait">
           {activeView === "templates" ? (
             <motion.div

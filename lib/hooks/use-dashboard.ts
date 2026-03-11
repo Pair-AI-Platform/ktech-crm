@@ -4,7 +4,6 @@ import { useMemo } from "react"
 import { useLeads } from "./use-leads"
 import { useTodayAppointments, useAppointmentStats } from "./use-appointments"
 import { useAgentTargetProgress } from "./use-reports"
-import { useMissedCalls } from "./use-calls"
 import { useConversionFunnel } from "./use-conversion-funnel"
 import { useActivityFeed } from "./use-activity-feed"
 import { useInsights } from "./use-insights"
@@ -24,7 +23,6 @@ export function useDashboard({ dateRange, isAdmin, profileId }: UseDashboardOpti
   const { stats: appointmentStats, loading: statsLoading } = useAppointmentStats()
   const { progress: myTargetProgress, allAgentsProgress, loading: targetLoading, targetMode } =
     useAgentTargetProgress(profileId ?? undefined)
-  const { calls: missedCalls, loading: missedCallsLoading } = useMissedCalls()
 
   // Conversion funnel
   const { data: funnelData, loading: funnelLoading } = useConversionFunnel(
@@ -118,7 +116,7 @@ export function useDashboard({ dateRange, isAdmin, profileId }: UseDashboardOpti
     allAgentsProgress,
     conversionDelta,
     overdueAppointments: appointmentStats.noUpdated || 0,
-    missedCallsCount: missedCalls.length,
+    missedCallsCount: 0,
     funnelDropOff: funnelData.all.stages,
   })
 
@@ -133,7 +131,6 @@ export function useDashboard({ dateRange, isAdmin, profileId }: UseDashboardOpti
     myTargetProgress,
     allAgentsProgress,
     targetMode,
-    missedCalls,
     funnelData,
     activities,
     insights,
@@ -144,7 +141,6 @@ export function useDashboard({ dateRange, isAdmin, profileId }: UseDashboardOpti
     leadsLoading,
     appointmentsLoading,
     targetLoading,
-    missedCallsLoading,
     funnelLoading,
     activitiesLoading,
   }

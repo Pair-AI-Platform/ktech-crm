@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import {
   User,
   GraduationCap,
@@ -24,8 +25,10 @@ import {
   RefreshCw,
   MessageSquare,
   Phone,
+  Upload,
 } from "lucide-react"
-import type { Lead, FundingType, IntendedMajor, SubmissionSubstage } from "@/types"
+import { SCHOOLS } from "@/types"
+import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationType } from "@/types"
 import { cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { PSPDocumentManager } from "./psp-document-manager"
@@ -124,15 +127,15 @@ export function PSPWizardContent({
   // Form state - Academic Info
   const [schoolId, setSchoolId] = useState("")
   const [graduationYear, setGraduationYear] = useState("")
-  const [expectedGpa, setExpectedGpa] = useState("")
   const [actualGpa, setActualGpa] = useState("")
   const [intendedMajor, setIntendedMajor] = useState("")
-  const fundingType: FundingType = "puc"
+  const fundingType: FundingType = lead?.funding_type || "puc"
   const [seatNumber, setSeatNumber] = useState("")
 
   // Form state - Documents
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [graduateType, setGraduateType] = useState<GraduateType | null>(null)
+  const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
 
   // Form state - Payment
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "knet" | "online_link" | null>(null)
@@ -170,6 +173,11 @@ export function PSPWizardContent({
   const [receiptSent, setReceiptSent] = useState(false)
   const [processingCashPayment, setProcessingCashPayment] = useState(false)
 
+  // Already paid PUC fee state
+  const [pucFeeAlreadyPaid, setPucFeeAlreadyPaid] = useState(false)
+  const [pucFeeReceiptFile, setPucFeeReceiptFile] = useState<File | null>(null)
+  const [uploadingPucReceipt, setUploadingPucReceipt] = useState(false)
+
   // Fee amounts
   const FEES = {
     puc: { label: "PUC Fees", amount: 10 },
@@ -203,13 +211,32 @@ export function PSPWizardContent({
 
       setSchoolId(lead.school_id || "")
       setGraduationYear((lead as unknown as Record<string, unknown>).graduation_year?.toString() || "")
-      setExpectedGpa(lead.gpa_grade_12_expected?.toString() || "")
       setActualGpa(lead.gpa_grade_11?.toString() || "")
       setIntendedMajor((lead as unknown as Record<string, unknown>).intended_major as string || "")
       setSeatNumber((lead as unknown as Record<string, unknown>).seat_number as string || "")
 
-      setGraduateType(null)
-      setDocuments([])
+      // Initialize graduate type from lead's education_type if available
+      const existingType = lead.education_type?.toUpperCase() as GraduateType | undefined
+      if (existingType && GRADUATE_TYPE_OPTIONS.some(opt => opt.value === existingType)) {
+        setGraduateType(existingType)
+      } else if (lead.pipeline_stage === "puc_document_submission") {
+        // For leads in doc_submission without education_type, try to infer from existing PSP documents
+        fetch(`/api/psp/documents?lead_id=${lead.id}`)
+          .then(res => res.json())
+          .then(data => {
+            const docs = data.documents || data
+            if (Array.isArray(docs) && docs.length > 0 && docs[0].graduate_type) {
+              const docType = docs[0].graduate_type.toUpperCase() as GraduateType
+              if (GRADUATE_TYPE_OPTIONS.some(opt => opt.value === docType)) {
+                setGraduateType(docType)
+              }
+            }
+          })
+          .catch(() => { /* ignore - user can still select manually */ })
+      } else {
+        setGraduateType(null)
+        setDocuments([])
+      }
 
       setCurrentStep("info")
       setError(null)
@@ -217,6 +244,8 @@ export function PSPWizardContent({
       setPaymentMethod(null)
       setReceiptNumber("")
       setSelectedFees({ puc: true, application: true, test: true })
+      setPucFeeAlreadyPaid(false)
+      setPucFeeReceiptFile(null)
 
       setPaymentStatus(null)
       setPaymentLinkSent(false)
@@ -251,6 +280,19 @@ export function PSPWizardContent({
     }
   }, [isActive])
 
+  // Auto-match school from lead's text-based school field when school_id is not set
+  useEffect(() => {
+    if (schools.length > 0 && !schoolId && lead?.school) {
+      const schoolEntry = SCHOOLS.find(s => s.value === lead.school)
+      if (schoolEntry) {
+        const matched = schools.find(s => s.name_ar === schoolEntry.labelAr)
+        if (matched) {
+          setSchoolId(matched.id)
+        }
+      }
+    }
+  }, [schools, schoolId, lead?.school])
+
   // Filter schools based on search (supports Arabic)
   const filteredSchools = schools.filter(school =>
     school.name_ar.includes(schoolSearch) ||
@@ -262,12 +304,20 @@ export function PSPWizardContent({
   useEffect(() => {
     if (graduateType) {
       setDocuments(getDocumentsForType(graduateType, { isSpecialNeeds, isDiplomatic }))
+      setCheckedDocs({})
 
-      if (lead?.id && !lead.submission_substage) {
-        updateLead(lead.id, { submission_substage: "documents" })
+      // Save education_type to the lead so the badge can show correct counts
+      if (lead?.id) {
+        const educationType = (graduateType === 'OTHER' ? 'other' : graduateType) as EducationType
+        const updates: Partial<Lead> = { education_type: educationType }
+        if (!lead.submission_substage) {
+          updates.submission_substage = "documents"
+        }
+        updateLead(lead.id, updates)
       }
     } else {
       setDocuments([])
+      setCheckedDocs({})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graduateType, isSpecialNeeds, isDiplomatic, lead?.id, lead?.submission_substage])
@@ -589,9 +639,12 @@ Kuwait Technical College`
   }
 
   const validatePayments = (): boolean => {
-    // Allow proceeding without payment - payment can be completed later
-    setValidationErrors({})
-    return true
+    const errors: Record<string, string> = {}
+    if (pucFeeAlreadyPaid && !pucFeeReceiptFile) {
+      errors.pucReceipt = "Please upload the PUC fee payment receipt"
+    }
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const canProceed = (): boolean => {
@@ -599,7 +652,7 @@ Kuwait Technical College`
       case "info":
         return !!firstName && !!lastName && !!civilId && !!phone
       case "payments":
-        return true
+        return !pucFeeAlreadyPaid || !!pucFeeReceiptFile
       case "submission":
         return true
       default:
@@ -607,7 +660,7 @@ Kuwait Technical College`
     }
   }
 
-  const goNext = () => {
+  const goNext = async () => {
     let isValid = true
     switch (currentStep) {
       case "info":
@@ -616,6 +669,45 @@ Kuwait Technical College`
         break
       case "payments":
         isValid = validatePayments()
+        // Upload PUC fee receipt if "already paid" is toggled
+        if (isValid && pucFeeAlreadyPaid && pucFeeReceiptFile && lead?.id) {
+          setUploadingPucReceipt(true)
+          try {
+            const supabase = (await import("@/lib/supabase/client")).createClient()
+            const timestamp = Date.now()
+            const safeName = pucFeeReceiptFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+            const storagePath = `leads/${lead.id}/psp/puc_fee_receipt/${timestamp}-${safeName}`
+            const { error: uploadError } = await supabase.storage
+              .from("documents")
+              .upload(storagePath, pucFeeReceiptFile, { cacheControl: "3600", upsert: false })
+            if (uploadError && !uploadError.message.includes("Bucket not found")) {
+              throw uploadError
+            }
+            // Save as a psp_document record of type puc_receipt
+            const gradType = graduateType || "GOV"
+            const { data: urlData } = supabase.storage.from("documents").getPublicUrl(storagePath)
+            await fetch("/api/psp/documents", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                lead_id: lead.id,
+                document_type: "puc_receipt",
+                graduate_type: gradType,
+                file_name: pucFeeReceiptFile.name,
+                file_type: pucFeeReceiptFile.type,
+                file_size: pucFeeReceiptFile.size,
+                storage_path: storagePath,
+                public_url: urlData?.publicUrl,
+              }),
+            })
+          } catch (err) {
+            console.error("Failed to upload PUC fee receipt:", err)
+            setError("Failed to upload receipt. Please try again.")
+            isValid = false
+          } finally {
+            setUploadingPucReceipt(false)
+          }
+        }
         break
     }
 
@@ -659,10 +751,10 @@ Kuwait Technical College`
         is_special_needs: isSpecialNeeds,
         school_id: schoolId || undefined,
         graduation_year: graduationYear ? parseInt(graduationYear) : undefined,
-        gpa_grade_12_expected: expectedGpa ? parseFloat(expectedGpa) : undefined,
         gpa_grade_11: actualGpa ? parseFloat(actualGpa) : undefined,
         intended_major: (intendedMajor as IntendedMajor) || undefined,
         funding_type: fundingType,
+        education_type: graduateType ? (graduateType === 'OTHER' ? 'other' : graduateType) as EducationType : undefined,
         seat_number: seatNumber || undefined,
         pipeline_stage: newPipelineStage,
         submission_substage: newSubstage,
@@ -714,7 +806,7 @@ Kuwait Technical College`
               <ClipboardCheck className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="text-lg font-semibold">PSP Submission Wizard</span>
+              <span className="text-lg font-semibold">PUC Submission</span>
               <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                 {lead ? `${lead.first_name} ${lead.last_name}` : "Submit lead to PSP"}
               </p>
@@ -900,12 +992,12 @@ Kuwait Technical College`
                         "text-sm flex-1 text-right",
                         schoolId ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
                       )} dir="rtl">
-                        {schoolId ? schools.find(s => s.id === schoolId)?.name_ar : "اختر المدرسة..."}
+                        {schoolId ? schools.find(s => s.id === schoolId)?.name_ar : "Select school..."}
                       </span>
                     </div>
 
                     {isSchoolDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
                         <div className="p-2 border-b border-[var(--border)]">
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -913,7 +1005,7 @@ Kuwait Technical College`
                               type="text"
                               value={schoolSearch}
                               onChange={(e) => setSchoolSearch(e.target.value)}
-                              placeholder="ابحث عن المدرسة..."
+                              placeholder="Search schools..."
                               className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] text-right"
                               dir="rtl"
                               autoFocus
@@ -923,7 +1015,7 @@ Kuwait Technical College`
                         <div className="max-h-48 overflow-y-auto">
                           {loadingSchools ? (
                             <div className="p-4 text-center text-sm text-[var(--text-muted)]">
-                              جاري التحميل...
+                              Loading...
                             </div>
                           ) : filteredSchools.length > 0 ? (
                             filteredSchools.map((school) => (
@@ -946,7 +1038,7 @@ Kuwait Technical College`
                             ))
                           ) : (
                             <div className="px-3 py-4 text-sm text-center text-[var(--text-muted)]">
-                              لا توجد مدارس
+                              No schools found
                             </div>
                           )}
                         </div>
@@ -965,35 +1057,19 @@ Kuwait Technical College`
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                    Expected GPA
-                  </label>
-                  <Input
-                    type="number"
-                    value={expectedGpa}
-                    onChange={(e) => setExpectedGpa(e.target.value)}
-                    placeholder="0-100"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                    Actual GPA
-                  </label>
-                  <Input
-                    type="number"
-                    value={actualGpa}
-                    onChange={(e) => setActualGpa(e.target.value)}
-                    placeholder="0-100"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                  Actual GPA
+                </label>
+                <Input
+                  type="number"
+                  value={actualGpa}
+                  onChange={(e) => setActualGpa(e.target.value)}
+                  placeholder="0-100"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                />
               </div>
 
               {/* Documents Section */}
@@ -1062,26 +1138,96 @@ Kuwait Technical College`
                   </div>
                 )}
 
-                {/* Document Manager with File Upload */}
+                {/* Document Manager - Upload for PUC, Checkboxes for Self-Funded */}
                 {lead && graduateType && (
                   <div className="mt-4">
-                    <PSPDocumentManager
-                      leadId={lead.id}
-                      documents={documents.map(d => ({
-                        id: d.id,
-                        name: d.name,
-                        required: d.required,
-                        file: d.file,
-                      }))}
-                      onDocumentsChange={(updatedDocs) => {
-                        setDocuments(updatedDocs.map(d => ({
-                          ...d,
-                          uploaded: !!d.file,
-                        })))
-                      }}
-                      graduateType={graduateType}
-                      conditionalFlags={{ isSpecialNeeds, isDiplomatic }}
-                    />
+                    {fundingType === "self_funded" ? (
+                      <div className="space-y-3">
+                        <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-[var(--text-primary)]">
+                              Documents Checked
+                            </span>
+                            <span className="text-sm text-[var(--primary)] font-semibold">
+                              {documents.filter(d => checkedDocs[d.id]).length} / {documents.filter(d => d.required).length} required
+                            </span>
+                          </div>
+                          <div className="w-full bg-[var(--border)] rounded-full h-2">
+                            <div
+                              className={cn(
+                                "h-2 rounded-full transition-all duration-300",
+                                documents.filter(d => d.required).length > 0 &&
+                                documents.filter(d => checkedDocs[d.id]).length >= documents.filter(d => d.required).length
+                                  ? "bg-[var(--success)]"
+                                  : "bg-[var(--primary)]"
+                              )}
+                              style={{
+                                width: `${documents.filter(d => d.required).length > 0
+                                  ? Math.min(100, Math.round((documents.filter(d => checkedDocs[d.id]).length / documents.filter(d => d.required).length) * 100))
+                                  : 0}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          {documents.map((doc) => (
+                            <label
+                              key={doc.id}
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer select-none transition-all",
+                                checkedDocs[doc.id]
+                                  ? "border-[var(--success)] bg-[var(--success)]/5"
+                                  : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
+                              )}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!checkedDocs[doc.id]}
+                                onChange={(e) => {
+                                  setCheckedDocs(prev => ({
+                                    ...prev,
+                                    [doc.id]: e.target.checked,
+                                  }))
+                                }}
+                                className="w-4 h-4 rounded border-[var(--border)] text-[var(--success)] focus:ring-[var(--success)]/20"
+                              />
+                              <span className={cn(
+                                "text-sm font-medium flex-1",
+                                checkedDocs[doc.id] ? "text-[var(--success)]" : "text-[var(--text-primary)]"
+                              )}>
+                                {doc.name}
+                              </span>
+                              {doc.required && !checkedDocs[doc.id] && (
+                                <Badge variant="destructive" size="sm">
+                                  Required
+                                </Badge>
+                              )}
+                              {checkedDocs[doc.id] && (
+                                <Check className="w-4 h-4 text-[var(--success)]" />
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <PSPDocumentManager
+                        leadId={lead.id}
+                        documents={documents.map(d => ({
+                          id: d.id,
+                          name: d.name,
+                          required: d.required,
+                          file: d.file,
+                        }))}
+                        onDocumentsChange={(updatedDocs) => {
+                          setDocuments(updatedDocs.map(d => ({
+                            ...d,
+                            uploaded: !!d.file,
+                          })))
+                        }}
+                        graduateType={graduateType}
+                        conditionalFlags={{ isSpecialNeeds, isDiplomatic }}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -1209,40 +1355,115 @@ Kuwait Technical College`
                     Fee Breakdown
                   </h4>
                   {Object.entries(FEES).map(([key, fee]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setSelectedFees(prev => ({ ...prev, [key]: !prev[key] }))}
-                      className={cn(
-                        "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
-                        selectedFees[key]
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                          : "border-[var(--border)] bg-[var(--bg-surface)]"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-5 h-5 rounded flex items-center justify-center border-2 transition-all",
-                          selectedFees[key]
-                            ? "border-[var(--primary)] bg-[var(--primary)]"
-                            : "border-[var(--border)]"
-                        )}>
-                          {selectedFees[key] && <Check className="w-3 h-3 text-white" />}
+                    <div key={key} className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (key === 'puc' && pucFeeAlreadyPaid) return
+                          setSelectedFees(prev => ({ ...prev, [key]: !prev[key] }))
+                        }}
+                        className={cn(
+                          "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
+                          pucFeeAlreadyPaid && key === 'puc'
+                            ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20"
+                            : selectedFees[key]
+                              ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                              : "border-[var(--border)] bg-[var(--bg-surface)]"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center border-2 transition-all",
+                            pucFeeAlreadyPaid && key === 'puc'
+                              ? "border-emerald-500 bg-emerald-500"
+                              : selectedFees[key]
+                                ? "border-[var(--primary)] bg-[var(--primary)]"
+                                : "border-[var(--border)]"
+                          )}>
+                            {(selectedFees[key] || (pucFeeAlreadyPaid && key === 'puc')) && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-sm font-medium",
+                              selectedFees[key] || (pucFeeAlreadyPaid && key === 'puc') ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                            )}>
+                              {fee.label}
+                            </span>
+                            {pucFeeAlreadyPaid && key === 'puc' && (
+                              <Badge variant="success" size="xs">Already Paid</Badge>
+                            )}
+                          </div>
                         </div>
                         <span className={cn(
-                          "text-sm font-medium",
-                          selectedFees[key] ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                          "text-sm font-semibold",
+                          pucFeeAlreadyPaid && key === 'puc'
+                            ? "text-emerald-600 line-through"
+                            : selectedFees[key] ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
                         )}>
-                          {fee.label}
+                          {fee.amount} KD
                         </span>
-                      </div>
-                      <span className={cn(
-                        "text-sm font-semibold",
-                        selectedFees[key] ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
-                      )}>
-                        {fee.amount} KD
-                      </span>
-                    </button>
+                      </button>
+
+                      {/* Already Paid toggle for PUC Fees (10 KD) */}
+                      {key === 'puc' && (
+                        <div className="ml-8 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[var(--text-muted)]">Already paid externally</span>
+                            <Switch
+                              checked={pucFeeAlreadyPaid}
+                              onCheckedChange={(checked) => {
+                                setPucFeeAlreadyPaid(checked)
+                                if (checked) {
+                                  setSelectedFees(prev => ({ ...prev, puc: false }))
+                                }
+                                if (!checked) {
+                                  setPucFeeReceiptFile(null)
+                                }
+                              }}
+                            />
+                          </div>
+                          {pucFeeAlreadyPaid && (
+                            <div className="p-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg space-y-2">
+                              <p className="text-xs text-[var(--text-muted)]">
+                                Upload the PUC fee payment receipt <span className="text-red-500">*</span>
+                              </p>
+                              <label className={cn(
+                                "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
+                                pucFeeReceiptFile
+                                  ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20"
+                                  : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                              )}>
+                                {pucFeeReceiptFile ? (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span className="text-xs font-medium text-emerald-700 truncate max-w-[200px]">
+                                      {pucFeeReceiptFile.name}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-4 h-4 text-[var(--text-muted)]" />
+                                    <span className="text-xs text-[var(--text-muted)]">Choose receipt file</span>
+                                  </>
+                                )}
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) setPucFeeReceiptFile(file)
+                                  }}
+                                />
+                              </label>
+                              {!pucFeeReceiptFile && (
+                                <p className="text-[10px] text-red-500">Receipt is required when marking as already paid</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ))}
 
                   {/* Total */}
@@ -1512,12 +1733,6 @@ Kuwait Technical College`
                     <div>
                       <span className="text-[var(--text-muted)]">Funding:</span>
                       <Badge variant="info" size="sm" className="ml-2">PUC</Badge>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-muted)]">Expected GPA:</span>
-                      <span className="ml-2 text-[var(--text-primary)] font-medium">
-                        {expectedGpa || "N/A"}
-                      </span>
                     </div>
                     <div>
                       <span className="text-[var(--text-muted)]">Actual GPA:</span>

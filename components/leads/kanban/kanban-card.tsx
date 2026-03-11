@@ -35,6 +35,8 @@ const stageColors: Record<PipelineStage, string> = {
   enrolled: "bg-green-500",
   lost: "bg-red-500",
   withdraw: "bg-gray-500",
+  puc_document_submission: "bg-cyan-500",
+  puc_application_submission: "bg-emerald-500",
 }
 
 // Status badge variants

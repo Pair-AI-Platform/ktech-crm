@@ -30,6 +30,7 @@ import type { Appointment, PipelineStage, LeadStatus } from "@/types"
 import { APPOINTMENT_TYPES, PIPELINE_STAGES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES } from "@/types"
 import { stageColors } from "@/lib/utils"
 import { useAppointmentMutations, useRescheduleHistory } from "@/lib/hooks/use-appointments"
+import { useAgents } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 
@@ -103,7 +104,9 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const [leadStatusLoading, setLeadStatusLoading] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesValue, setNotesValue] = useState("")
+  const [savedNotes, setSavedNotes] = useState("")
   const [notesSaving, setNotesSaving] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const {
     markNA,
@@ -119,6 +122,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
 
   // Fetch reschedule history - use empty string if no appointment to satisfy hook rules
   const { reschedules } = useRescheduleHistory(appointment?.id || "")
+  const { agents } = useAgents()
+  const agentMap = new Map(agents.map(a => [a.id, a.full_name]))
 
   // Reset local state when appointment changes
   useEffect(() => {
@@ -128,6 +133,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
       setLocalLeadStatusOverride(null)
       setEditingNotes(false)
       setNotesValue(appointment?.notes || "")
+      setSavedNotes(appointment?.notes || "")
     })
   }, [appointment?.id, appointment?.notes])
 
@@ -157,8 +163,13 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
 
   const handleAction = async (action: () => Promise<unknown>) => {
     setIsLoading(true)
-    await action()
+    setActionError(null)
+    const result = await action() as { data?: unknown; error?: string | null } | undefined
     setIsLoading(false)
+    if (result?.error) {
+      setActionError(typeof result.error === 'string' ? result.error : 'Failed to update appointment')
+      return
+    }
     onUpdate?.()
     onClose()
   }
@@ -171,10 +182,22 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
 
   const handleSaveNotes = async () => {
     setNotesSaving(true)
-    await updateAppointment(appointment.id, { notes: notesValue.trim() || null } as Partial<Appointment>)
-    setNotesSaving(false)
-    setEditingNotes(false)
-    onUpdate?.()
+    try {
+      const result = await updateAppointment(appointment.id, { notes: notesValue.trim() || null } as Partial<Appointment>)
+      if (result?.error) {
+        setActionError(typeof result.error === 'string' ? result.error : 'Failed to save notes')
+        return
+      }
+      const trimmed = notesValue.trim()
+      setNotesValue(trimmed)
+      setSavedNotes(trimmed)
+      setEditingNotes(false)
+      onUpdate?.()
+    } catch {
+      setActionError('Failed to save notes')
+    } finally {
+      setNotesSaving(false)
+    }
   }
 
   // Mark all leads as Canceled with notes + cancel the appointment
@@ -234,10 +257,6 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         .update(updates)
         .eq("id", lid)
     }
-    // Auto-confirm the appointment if not already confirmed
-    if (appointment.status !== "confirmed") {
-      await confirmAppointment(appointment.id)
-    }
     setStageLoading(false)
     onUpdate?.()
   }
@@ -263,13 +282,24 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
     enrolled: 'none',
     withdraw: 'all',
+    puc_document_submission: 'none',
+    puc_application_submission: 'none',
   }
   const stageConfig = currentStageForStatus ? STAGE_STATUSES[currentStageForStatus as PipelineStage] : 'all'
-  const availableLeadStatuses = stageConfig === 'none'
-    ? []
-    : stageConfig === 'all'
-    ? LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
-    : LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
+  const currentLeadStatusValue = appointmentLeads[0]?.status as LeadStatus | undefined
+  const availableLeadStatuses = (() => {
+    let statuses = stageConfig === 'none'
+      ? []
+      : stageConfig === 'all'
+      ? LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+      : LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
+    // Always include the lead's current status so it shows as pre-selected
+    if (currentLeadStatusValue && !statuses.some(s => s.value === currentLeadStatusValue)) {
+      const currentStatusDef = LEAD_STATUSES.find(s => s.value === currentLeadStatusValue)
+      if (currentStatusDef) statuses = [currentStatusDef, ...statuses]
+    }
+    return statuses
+  })()
 
   // Change lead status for all leads
   const handleChangeLeadStatus = async (status: LeadStatus) => {
@@ -492,7 +522,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                 Lead Stage {appointmentLeads.length > 1 ? `(${appointmentLeads.length} leads)` : ''}
               </p>
               <div className="flex flex-wrap gap-2">
-                {PIPELINE_STAGES.map((stage) => {
+                {PIPELINE_STAGES.filter((stage) => stage.value !== 'lost').map((stage) => {
                   const currentStage = localStageOverride || appointmentLeads[0]?.pipeline_stage
                   const isActive = currentStage === stage.value
                   const colors = stageColors[stage.value] || 'bg-gray-100 text-gray-700 border-gray-200'
@@ -534,7 +564,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               ) : (
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => { setEditingNotes(false); setNotesValue(appointment.notes || "") }}
+                    onClick={() => { setEditingNotes(false); setNotesValue(savedNotes) }}
                     className="text-[var(--text-muted)] hover:text-[var(--error)] transition-colors text-xs"
                   >
                     Cancel
@@ -564,7 +594,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                   }
                   if (e.key === "Escape") {
                     setEditingNotes(false)
-                    setNotesValue(appointment.notes || "")
+                    setNotesValue(savedNotes)
                   }
                 }}
               />
@@ -572,14 +602,32 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               <p
                 className={cn(
                   "text-sm leading-relaxed cursor-pointer rounded-lg p-1 -m-1 hover:bg-[var(--bg-primary)]/50 transition-colors",
-                  appointment.notes ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]/50 italic"
+                  notesValue ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]/50 italic"
                 )}
-                onClick={() => { setNotesValue(appointment.notes || ""); setEditingNotes(true) }}
+                onClick={() => setEditingNotes(true)}
               >
-                {appointment.notes || "Click to add notes..."}
+                {notesValue || "Click to add notes..."}
               </p>
             )}
           </div>
+
+          {/* Error Banner */}
+          {actionError && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="p-3 rounded-xl border border-red-500/30 bg-red-500/5 flex items-center gap-2"
+            >
+              <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-500 flex-1">{actionError}</p>
+              <button
+                onClick={() => setActionError(null)}
+                className="text-xs text-red-400 hover:text-red-500 underline"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          )}
 
           {/* Cancel Form */}
           {showCancelForm && (
@@ -710,88 +758,123 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               {/* Timeline line */}
               <div className="absolute left-1 top-2 bottom-2 w-px bg-gradient-to-b from-[var(--border)] via-[var(--border)] to-transparent" />
 
-              <div className="flex items-center gap-3 text-sm relative">
-                <div className="w-2.5 h-2.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--text-muted)] z-10" />
-                <span className="text-[var(--text-muted)] font-medium">Created</span>
-                <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                  {new Date(appointment.created_at).toLocaleString()}
-                </span>
-              </div>
+              {(() => {
+                // Collect all timeline events with timestamps and sort chronologically
+                const events: { key: string; timestamp: Date; label: string; dotClass: string; agentName?: string; extra?: React.ReactNode }[] = [
+                  {
+                    key: "created",
+                    timestamp: new Date(appointment.created_at),
+                    label: "Created",
+                    dotClass: "bg-[var(--bg-surface)] border-2 border-[var(--text-muted)]",
+                    agentName: appointment.created_by_profile?.full_name || (appointment.created_by ? agentMap.get(appointment.created_by) : undefined) || appointment.assigned_agent_profile?.full_name,
+                  },
+                ]
 
-              {appointment.confirmed_at && (
-                <div className="flex items-center gap-3 text-sm relative">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--primary)] z-10" />
-                  <span className="text-[var(--text-muted)] font-medium">Confirmed</span>
-                  <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                    {new Date(appointment.confirmed_at).toLocaleString()}
-                  </span>
-                </div>
-              )}
+                if (appointment.confirmed_at) {
+                  events.push({
+                    key: "confirmed",
+                    timestamp: new Date(appointment.confirmed_at),
+                    label: "Confirmed",
+                    dotClass: "bg-[var(--bg-surface)] border-2 border-[var(--primary)]",
+                    agentName: appointment.confirmed_by ? agentMap.get(appointment.confirmed_by) : undefined,
+                  })
+                }
 
-              {appointment.na_marked_at && (
-                <div className="flex items-center gap-3 text-sm relative">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--warning)] z-10" />
-                  <span className="text-[var(--text-muted)] font-medium">NA (No Answer)</span>
-                  <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                    {new Date(appointment.na_marked_at).toLocaleString()}
-                  </span>
-                </div>
-              )}
+                if (appointment.na_marked_at) {
+                  events.push({
+                    key: "na",
+                    timestamp: new Date(appointment.na_marked_at),
+                    label: "NA (No Answer)",
+                    dotClass: "bg-[var(--warning)]",
+                    agentName: appointment.na_marked_by ? agentMap.get(appointment.na_marked_by) : undefined,
+                  })
+                }
 
-              {appointment.cant_reach_at && (
-                <div className="flex items-center gap-3 text-sm relative">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--error)] z-10" />
-                  <span className="text-[var(--text-muted)] font-medium">Can&apos;t Reach</span>
-                  <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                    {new Date(appointment.cant_reach_at).toLocaleString()}
-                  </span>
-                </div>
-              )}
+                if (appointment.cant_reach_at) {
+                  events.push({
+                    key: "cant_reach",
+                    timestamp: new Date(appointment.cant_reach_at),
+                    label: "Can't Reach",
+                    dotClass: "bg-[var(--error)]",
+                    agentName: appointment.cant_reach_by ? agentMap.get(appointment.cant_reach_by) : undefined,
+                  })
+                }
 
-              {appointment.on_the_way_at && (
-                <div className="flex items-center gap-3 text-sm relative">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--info)] z-10" />
-                  <span className="text-[var(--text-muted)] font-medium">On The Way</span>
-                  <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                    {new Date(appointment.on_the_way_at).toLocaleString()}
-                  </span>
-                </div>
-              )}
+                if (appointment.on_the_way_at) {
+                  events.push({
+                    key: "on_the_way",
+                    timestamp: new Date(appointment.on_the_way_at),
+                    label: "On The Way",
+                    dotClass: "bg-[var(--info)]",
+                    agentName: appointment.on_the_way_marked_by ? agentMap.get(appointment.on_the_way_marked_by) : undefined,
+                  })
+                }
 
-              {/* All Reschedules */}
-              {reschedules.map((reschedule, index) => (
-                <div key={reschedule.id} className="flex flex-col gap-1 text-sm relative">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[var(--primary)] z-10" />
-                    <span className="text-[var(--text-muted)] font-medium">
-                      Rescheduled #{index + 1}
-                    </span>
-                    <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                      {new Date(reschedule.rescheduledAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="ml-5 pl-3 text-xs text-[var(--text-secondary)]">
-                    <span className="line-through opacity-60">
-                      {new Date(reschedule.oldDate).toLocaleDateString()} {reschedule.oldTime?.slice(0, 5)}
-                    </span>
-                    <span className="mx-2">→</span>
-                    <span className="text-[var(--primary)] font-medium">
-                      {new Date(reschedule.newDate).toLocaleDateString()} {reschedule.newTime?.slice(0, 5)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                reschedules.forEach((reschedule, index) => {
+                  events.push({
+                    key: `reschedule-${reschedule.id}`,
+                    timestamp: new Date(reschedule.rescheduledAt),
+                    label: `Rescheduled #${index + 1}`,
+                    dotClass: "bg-[var(--primary)]",
+                    extra: (
+                      <div className="ml-5 pl-3 text-xs text-[var(--text-secondary)]">
+                        <span className="line-through opacity-60">
+                          {new Date(reschedule.oldDate).toLocaleDateString()} {reschedule.oldTime?.slice(0, 5)}
+                        </span>
+                        <span className="mx-2">→</span>
+                        <span className="text-[var(--primary)] font-medium">
+                          {new Date(reschedule.newDate).toLocaleDateString()} {reschedule.newTime?.slice(0, 5)}
+                        </span>
+                      </div>
+                    ),
+                  })
+                })
 
-              {/* Current postponed status (if no reschedule history but status is postponed) */}
-              {appointment.status === "postponed" && reschedules.length === 0 && (
-                <div className="flex items-center gap-3 text-sm relative">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--primary)] z-10" />
-                  <span className="text-[var(--text-muted)] font-medium">Postponed</span>
-                  <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
-                    {new Date(appointment.updated_at).toLocaleString()}
-                  </span>
-                </div>
-              )}
+                if (appointment.status === "postponed" && reschedules.length === 0) {
+                  events.push({
+                    key: "postponed",
+                    timestamp: new Date(appointment.updated_at),
+                    label: "Postponed",
+                    dotClass: "bg-[var(--primary)]",
+                  })
+                }
+
+                // Sort by timestamp ascending (oldest first)
+                events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+
+                return events.map((event) =>
+                  event.extra ? (
+                    <div key={event.key} className="flex flex-col gap-1 text-sm relative">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2.5 h-2.5 rounded-full ${event.dotClass} z-10`} />
+                        <span className="text-[var(--text-muted)] font-medium">{event.label}</span>
+                        {event.agentName && (
+                          <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-sunken)] px-1.5 py-0.5 rounded-full">
+                            {event.agentName}
+                          </span>
+                        )}
+                        <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
+                          {event.timestamp.toLocaleString()}
+                        </span>
+                      </div>
+                      {event.extra}
+                    </div>
+                  ) : (
+                    <div key={event.key} className="flex items-center gap-3 text-sm relative">
+                      <div className={`w-2.5 h-2.5 rounded-full ${event.dotClass} z-10`} />
+                      <span className="text-[var(--text-muted)] font-medium">{event.label}</span>
+                      {event.agentName && (
+                        <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-sunken)] px-1.5 py-0.5 rounded-full">
+                          {event.agentName}
+                        </span>
+                      )}
+                      <span className="text-xs text-[var(--text-secondary)] ml-auto font-mono">
+                        {event.timestamp.toLocaleString()}
+                      </span>
+                    </div>
+                  )
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -799,6 +882,11 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         {/* Footer Actions - Status Action Buttons */}
         {isActionable && !showPostponedForm && !showCancelForm && !showDeleteConfirm && (
           <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
+            {/* Reminder */}
+            <p className="text-[11px] font-semibold text-[var(--warning)] mb-2.5 flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
+              Please select an appointment status before closing
+            </p>
             {/* Status Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
               {appointment.status !== "confirmed" && (

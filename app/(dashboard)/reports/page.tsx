@@ -61,6 +61,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
+import { RoleGuard } from "@/components/auth/role-guard"
 import {
   MAJORS,
 } from "@/types"
@@ -169,21 +170,31 @@ const FUNDING_TYPES = [
 // MAIN COMPONENT
 // =============================================
 export default function ReportsPage() {
-  const { profile } = useUser()
+  const { profile, isAdmin } = useUser()
   const { agents } = useAgents()
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+
+  // Agents can only see their own reports
+  const isAgent = profile?.role === "agent"
 
   // Tab state
   const [activeTab, setActiveTab] = useState<string>('overview')
 
-  // Filter states
-  const [filters, setFilters] = useState<ReportFilters>(defaultFilters)
+  // Filter states - agents are locked to their own ID
+  const [filters, setFilters] = useState<ReportFilters>(() => {
+    if (isAgent && profile?.id) {
+      return { ...defaultFilters, agentId: profile.id }
+    }
+    return defaultFilters
+  })
   const [datePreset, setDatePreset] = useState<string>('month')
   const [dateFrom, setDateFrom] = useState<string>("")
   const [dateTo, setDateTo] = useState<string>("")
   const [sourceCategory, setSourceCategory] = useState<string>("all")
   const [fundingType, setFundingType] = useState<string>("all")
-  const [selectedAgent, setSelectedAgent] = useState<string>("all")
+  const [selectedAgent, setSelectedAgent] = useState<string>(() =>
+    isAgent && profile?.id ? profile.id : "all"
+  )
   const [gender, setGender] = useState<string>("all")
   const [paymentStatus, setPaymentStatus] = useState<string>("all")
   const [major, setMajor] = useState<string>("all")
@@ -194,6 +205,14 @@ export default function ReportsPage() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { data, loading, error, refetch } = useReports(filters)
+
+  // Lock agent filter when profile loads
+  useEffect(() => {
+    if (isAgent && profile?.id && filters.agentId !== profile.id) {
+      setSelectedAgent(profile.id)
+      setFilters(prev => ({ ...prev, agentId: profile.id }))
+    }
+  }, [isAgent, profile?.id])
 
   // Calculate summary metrics
   const summaryMetrics = useMemo(() => {
@@ -225,7 +244,7 @@ export default function ReportsPage() {
       },
       semesterId: null,
       fundingType: fundingType === 'all' ? 'all' : fundingType as ReportFilters['fundingType'],
-      agentId: selectedAgent === 'all' ? null : selectedAgent,
+      agentId: isAgent && profile?.id ? profile.id : (selectedAgent === 'all' ? null : selectedAgent),
       school: 'all',
       gender: gender === 'all' ? 'all' : gender as ReportFilters['gender'],
       source: 'all',
@@ -233,7 +252,7 @@ export default function ReportsPage() {
     }
     setFilters(newFilters)
     setLastUpdated(new Date())
-  }, [datePreset, dateFrom, dateTo, sourceCategory, fundingType, selectedAgent, gender])
+  }, [datePreset, dateFrom, dateTo, sourceCategory, fundingType, selectedAgent, gender, isAgent, profile?.id])
 
   // Handle date preset change
   const handleDatePresetChange = (preset: string) => {
@@ -260,11 +279,14 @@ export default function ReportsPage() {
     setDateTo("")
     setSourceCategory("all")
     setFundingType("all")
-    setSelectedAgent("all")
+    setSelectedAgent(isAgent && profile?.id ? profile.id : "all")
     setGender("all")
     setPaymentStatus("all")
     setMajor("all")
-    setFilters(defaultFilters)
+    const clearedFilters = isAgent && profile?.id
+      ? { ...defaultFilters, agentId: profile.id }
+      : defaultFilters
+    setFilters(clearedFilters)
     setLastUpdated(new Date())
   }
 
@@ -346,6 +368,7 @@ export default function ReportsPage() {
   }
 
   return (
+    <RoleGuard allowedRoles={['admin', 'agent']}>
     <div className={cn(
       "min-h-screen bg-[var(--bg-base)] transition-all",
       isFullscreen && "fixed inset-0 z-50 overflow-auto"
@@ -647,7 +670,8 @@ export default function ReportsPage() {
                       </Select>
                     </div>
 
-                    {/* Agent */}
+                    {/* Agent - hidden for agents (locked to own data) */}
+                    {isAdmin && (
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
                         Agent
@@ -666,6 +690,7 @@ export default function ReportsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
 
                     {/* Gender */}
                     <div className="space-y-2">
@@ -899,6 +924,7 @@ export default function ReportsPage() {
 
       </div>
     </div>
+    </RoleGuard>
   )
 }
 

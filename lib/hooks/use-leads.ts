@@ -1,123 +1,154 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useCallback } from "react"
+import { useQuery, useMutation, useQueryClient, useIsMutating } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads, getDemoLeadStats, saveDemoLeadUpdate, getDemoLeadById } from "@/lib/demo-data"
 import type { Lead, PipelineStage, FundingType, LeadStatus } from "@/types"
-import { PIPELINE_STAGES, LEAD_STATUSES } from "@/types"
+import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
 import { GPA_SELF_FUNDED_THRESHOLD, PUC_SRJ_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
+import { queryKeys } from "./query-keys"
 
 interface UseLeadsOptions {
   stage?: PipelineStage | "all"
   fundingType?: FundingType | "all"
   searchQuery?: string
   limit?: number
+  page?: number
+  pageSize?: number
 }
 
 export function useLeads(options: UseLeadsOptions = {}) {
-  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50 } = options
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25 } = options
+  const usePagination = page !== undefined
+  const queryClient = useQueryClient()
 
-  const fetchLeads = useCallback(async (abortSignal?: AbortSignal) => {
-    setLoading(true)
-    setError(null)
+  const filters = { stage, fundingType, searchQuery, limit, page, pageSize }
 
-    // Check for demo mode
-    if (isDemoMode()) {
-      let demoLeads = getDemoLeads()
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKeys.leads.list(filters),
+    queryFn: async () => {
+      // Check for demo mode
+      if (isDemoMode()) {
+        let demoLeads = getDemoLeads()
 
-      if (stage !== "all") {
-        demoLeads = demoLeads.filter(l => l.pipeline_stage === stage)
+        if (stage !== "all") {
+          demoLeads = demoLeads.filter(l => l.pipeline_stage === stage)
+        }
+
+        if (fundingType !== "all") {
+          demoLeads = demoLeads.filter(l => l.funding_type === fundingType)
+        }
+
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase()
+          demoLeads = demoLeads.filter(l =>
+            l.first_name.toLowerCase().includes(query) ||
+            l.last_name.toLowerCase().includes(query) ||
+            l.phone?.includes(query) ||
+            l.civil_id?.includes(query)
+          )
+        }
+
+        const totalCount = demoLeads.length
+        if (usePagination) {
+          const start = (page! - 1) * pageSize
+          return { leads: demoLeads.slice(start, start + pageSize), totalCount }
+        } else {
+          return { leads: demoLeads.slice(0, limit), totalCount }
+        }
       }
 
-      if (fundingType !== "all") {
-        demoLeads = demoLeads.filter(l => l.funding_type === fundingType)
+      const supabase = createClient()
+
+      // Build count query in parallel with data query for pagination
+      const buildQuery = (forCount: boolean) => {
+        let q = supabase
+          .from("leads")
+          .select(
+            forCount
+              ? "*"
+              : `
+                *,
+                school:schools(id, name_en, name_ar),
+                assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
+                appointments(id, appointment_type, status, scheduled_date),
+                lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category)
+              `,
+            forCount ? { count: "exact", head: true } : undefined
+          )
+
+        if (!forCount) {
+          q = q
+            .order("position_in_stage", { ascending: true })
+            .order("created_at", { ascending: false })
+        }
+
+        if (stage !== "all") {
+          q = q.eq("pipeline_stage", stage)
+        }
+
+        if (fundingType !== "all") {
+          q = q.eq("funding_type", fundingType)
+        }
+
+        if (searchQuery) {
+          q = q.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,civil_id.ilike.%${searchQuery}%`)
+        }
+
+        return q
       }
 
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        demoLeads = demoLeads.filter(l =>
-          l.first_name.toLowerCase().includes(query) ||
-          l.last_name.toLowerCase().includes(query) ||
-          l.phone?.includes(query) ||
-          l.civil_id?.includes(query)
-        )
+      if (usePagination) {
+        const offset = (page! - 1) * pageSize
+        const [dataResult, countResult] = await Promise.all([
+          buildQuery(false).range(offset, offset + pageSize - 1),
+          buildQuery(true),
+        ])
+
+        if (dataResult.error) throw dataResult.error
+
+        return {
+          leads: (dataResult.data as unknown as Lead[] | null) || [],
+          totalCount: countResult.count ?? 0,
+        }
+      } else {
+        const dataResult = await buildQuery(false).limit(limit)
+
+        if (dataResult.error) throw dataResult.error
+
+        return {
+          leads: (dataResult.data as unknown as Lead[] | null) || [],
+          totalCount: dataResult.data?.length || 0,
+        }
       }
-
-      setLeads(demoLeads.slice(0, limit))
-      setLoading(false)
-      return
-    }
-
-    const supabase = createClient()
-
-    try {
-      let query = supabase
-        .from("leads")
-        .select(`
-          *,
-          school:schools(id, name_en, name_ar),
-          assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
-          appointments(id, appointment_type, status, scheduled_date)
-        `)
-        .order("position_in_stage", { ascending: true })
-        .order("created_at", { ascending: false })
-        .limit(limit)
-
-      if (stage !== "all") {
-        query = query.eq("pipeline_stage", stage)
-      }
-
-      if (fundingType !== "all") {
-        query = query.eq("funding_type", fundingType)
-      }
-
-      if (searchQuery) {
-        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,civil_id.ilike.%${searchQuery}%`)
-      }
-
-      const { data, error } = await query
-
-      // Check if request was aborted
-      if (abortSignal?.aborted) return
-
-      if (error) throw error
-      setLeads(data || [])
-    } catch (err) {
-      if (abortSignal?.aborted) return
-      console.error("Error fetching leads:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch leads")
-    } finally {
-      if (!abortSignal?.aborted) {
-        setLoading(false)
-      }
-    }
-  }, [stage, fundingType, searchQuery, limit])
-
-  useEffect(() => {
-    const abortController = new AbortController()
-    fetchLeads(abortController.signal)
-
-    return () => {
-      abortController.abort()
-    }
-  }, [fetchLeads])
+    },
+    staleTime: 30_000,
+  })
 
   // Subscribe to real-time changes (only in non-demo mode)
+  // On realtime event, invalidate the React Query cache instead of fetching directly
   useEffect(() => {
     if (isDemoMode()) return
 
     const supabase = createClient()
+
+    // Build a filter for the subscription to only react to relevant changes
+    const filter = stage !== "all" ? `pipeline_stage=eq.${stage}` : undefined
+
     const channel = supabase
-      .channel("leads-changes")
+      .channel(`leads-changes-${stage}-${fundingType}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "leads" },
+        {
+          event: "*",
+          schema: "public",
+          table: "leads",
+          ...(filter ? { filter } : {}),
+        },
         () => {
-          fetchLeads()
+          queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
         }
       )
       .subscribe()
@@ -125,67 +156,72 @@ export function useLeads(options: UseLeadsOptions = {}) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchLeads])
+  }, [queryClient, stage, fundingType])
 
-  return { leads, loading, error, refetch: fetchLeads }
+  const leads = data?.leads ?? []
+  const totalCount = data?.totalCount ?? 0
+  const totalPages = usePagination ? Math.ceil(totalCount / pageSize) : 1
+
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.leads.list(filters) })
+  }, [queryClient, filters])
+
+  return {
+    leads,
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : "Failed to fetch leads") : null,
+    totalCount,
+    totalPages,
+    refetch,
+  }
 }
 
 export function useLead(id: string) {
-  const [lead, setLead] = useState<Lead | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetchLead = useCallback(async () => {
-    if (!id) {
-      setLoading(false)
-      return
-    }
+  const { data: lead = null, isLoading, error } = useQuery({
+    queryKey: queryKeys.leads.detail(id),
+    queryFn: async () => {
+      if (!id) return null
 
-    setLoading(true)
-    setError(null)
-
-    // Check for demo mode
-    if (isDemoMode()) {
-      const demoLeads = getDemoLeads()
-      const demoLead = demoLeads.find(l => l.id === id)
-      if (demoLead) {
-        setLead(demoLead)
-      } else {
-        setError("Lead not found")
+      // Check for demo mode
+      if (isDemoMode()) {
+        const demoLeads = getDemoLeads()
+        const demoLead = demoLeads.find(l => l.id === id)
+        if (demoLead) return demoLead
+        throw new Error("Lead not found")
       }
-      setLoading(false)
-      return
-    }
 
-    const supabase = createClient()
+      const supabase = createClient()
 
-    try {
       const { data, error } = await supabase
         .from("leads")
         .select(`
           *,
           school:schools(id, name_en, name_ar),
           assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
-          lost_reason:lost_reasons(id, reason_en, reason_ar, category)
+          lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category)
         `)
         .eq("id", id)
         .single()
 
       if (error) throw error
-      setLead(data)
-    } catch (err) {
-      console.error("Error fetching lead:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch lead")
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
+      return data as Lead
+    },
+    enabled: !!id,
+    staleTime: 30_000,
+  })
 
-  useEffect(() => {
-    fetchLead()
-  }, [fetchLead])
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.leads.detail(id) })
+  }, [queryClient, id])
 
-  return { lead, loading, error, refetch: fetchLead }
+  return {
+    lead,
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : "Failed to fetch lead") : null,
+    refetch,
+  }
 }
 
 // Helper function to check if lead should be automatically set to self-funded based on GPA
@@ -240,7 +276,9 @@ function shouldAutoRouteToPucSrj(leadData: Partial<Lead>): boolean {
 
 export function useLeadMutations() {
   const supabase = createClient()
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
+  const mutatingCount = useIsMutating({ mutationKey: ['lead-mutation'] })
+  const loading = mutatingCount > 0
 
   const getNextPosition = async (stage: PipelineStage): Promise<number> => {
     const { data } = await supabase
@@ -253,17 +291,15 @@ export function useLeadMutations() {
     return (data?.position_in_stage ?? 0) + 1
   }
 
-  const createLead = async (leadData: Partial<Lead>) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { data: { ...leadData, id: `lead-${Date.now()}` } as Lead, error: null }
-    }
+  const createLeadMutation = useMutation({
+    mutationKey: ['lead-mutation'],
+    mutationFn: async (leadData: Partial<Lead>) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { data: { ...leadData, id: `lead-${Date.now()}` } as Lead, error: null }
+      }
 
-    setLoading(true)
-    try {
       const { data: { user } } = await supabase.auth.getUser()
 
       // Auto-set funding_type to self_funded if any GPA is below 70
@@ -321,35 +357,30 @@ export function useLeadMutations() {
       }
 
       return { data, error: null }
-    } catch (err) {
-      console.error("Error creating lead:", err)
-      return { data: null, error: err instanceof Error ? err.message : "Failed to create lead" }
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
 
-  const updateLead = async (id: string, updates: Partial<Lead>) => {
-    // Demo mode - save to localStorage and simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
+  const updateLeadMutation = useMutation({
+    mutationKey: ['lead-mutation'],
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Lead> }) => {
+      // Demo mode - save to localStorage and simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        saveDemoLeadUpdate(id, updates)
+        const updatedLead = getDemoLeadById(id)
+        return { data: updatedLead || { id, ...updates } as Lead, error: null }
+      }
 
-      saveDemoLeadUpdate(id, updates)
-      const updatedLead = getDemoLeadById(id)
-      setLoading(false)
-      return { data: updatedLead || { id, ...updates } as Lead, error: null }
-    }
-
-    setLoading(true)
-    try {
       // Get current user for audit trail
       const { data: { user } } = await supabase.auth.getUser()
 
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count")
+        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override")
         .eq("id", id)
         .single()
 
@@ -395,13 +426,6 @@ export function useLeadMutations() {
       // Assign next position when moving to a different stage
       if (updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage) {
         updates.position_in_stage = await getNextPosition(updates.pipeline_stage)
-      }
-
-      // Increment contact_count on stage change, status change, or any activity
-      const isStageChange = updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage
-      const isStatusChange = oldLead && updates.status !== undefined && updates.status !== oldLead.status
-      if (oldLead && (isStageChange || isStatusChange)) {
-        updates.contact_count = ((oldLead as unknown as Record<string, number>).contact_count || 0) + 1
       }
 
       const { data, error } = await supabase
@@ -499,7 +523,7 @@ export function useLeadMutations() {
 
       // Log activity for automatic funding type change due to low GPA
       if (wasAutoSF && oldLead) {
-        const lowGpaValues = []
+        const lowGpaValues: string[] = []
         if (mergedGpaData.gpa_grade_10 !== undefined && mergedGpaData.gpa_grade_10 !== null && mergedGpaData.gpa_grade_10 < GPA_SELF_FUNDED_THRESHOLD) {
           lowGpaValues.push(`Grade 10: ${mergedGpaData.gpa_grade_10}`)
         }
@@ -527,6 +551,31 @@ export function useLeadMutations() {
         })
       }
 
+      // Log activity for document status override change
+      if (updates.puc_document_status_override !== undefined && oldLead) {
+        const oldStatus = (oldLead as Record<string, unknown>).puc_document_status_override as string | null
+        const newStatus = updates.puc_document_status_override as string | null
+        if (oldStatus !== newStatus) {
+          const oldLabel = oldStatus ? (PUC_DOCUMENT_STATUSES.find(s => s.value === oldStatus)?.label || oldStatus) : 'None'
+          const newLabel = newStatus ? (PUC_DOCUMENT_STATUSES.find(s => s.value === newStatus)?.label || newStatus) : 'None'
+          const isSystemChange = !user
+          await supabase.from('activities').insert({
+            lead_id: id,
+            activity_type: 'doc_status_change',
+            title: isSystemChange ? 'Doc Status Updated (System)' : 'Doc Status Override',
+            description: `${oldLead.first_name} ${oldLead.last_name}: ${oldLabel} → ${newLabel}`,
+            metadata: {
+              old_status: oldStatus,
+              new_status: newStatus,
+              old_label: oldLabel,
+              new_label: newLabel,
+              changed_by: isSystemChange ? 'system' : 'agent',
+            },
+            created_by: user?.id,
+          })
+        }
+      }
+
       // Log activity for auto PUC SRJ routing
       if (wasAutoRoutedToPuc && oldLead) {
         await supabase.from('activities').insert({
@@ -547,11 +596,177 @@ export function useLeadMutations() {
       }
 
       return { data, error: null }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
+
+  const deleteLeadMutation = useMutation({
+    mutationKey: ['lead-mutation'],
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { error: null }
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("User not authenticated")
+
+      // Use the soft_delete_lead function to move the lead to deleted_leads table
+      const { data, error } = await supabase
+        .rpc("soft_delete_lead", {
+          lead_id: id,
+          deleting_user_id: user.id,
+          reason: reason || null
+        })
+
+      if (error) throw error
+      return { error: null, deletedRecordId: data }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
+
+  const bulkAssignMutation = useMutation({
+    mutationKey: ['lead-mutation'],
+    mutationFn: async ({ leadIds, agentId }: { leadIds: string[]; agentId: string }) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { error: null, count: leadIds.length }
+      }
+
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+      const { error } = await supabase
+        .from("leads")
+        .update({
+          assigned_to: agentId,
+          assigned_at: new Date().toISOString(),
+        })
+        .in("id", leadIds)
+
+      if (error) throw error
+
+      // Notify the assigned agent
+      supabase.from('notifications').insert({
+        user_id: agentId,
+        type: 'new_assignment',
+        title: `${leadIds.length} lead${leadIds.length > 1 ? 's' : ''} assigned to you`,
+        body: `You have been assigned ${leadIds.length} new lead${leadIds.length > 1 ? 's' : ''}`,
+        action_url: '/leads',
+        created_by: currentUser?.id,
+      }).then(() => {}) // fire-and-forget
+
+      return { error: null, count: leadIds.length }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
+
+  const bulkDeleteMutation = useMutation({
+    mutationKey: ['lead-mutation'],
+    mutationFn: async ({ leadIds, reason }: { leadIds: string[]; reason?: string }) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { error: null, count: leadIds.length }
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("User not authenticated")
+
+      // Soft delete each lead using the soft_delete_lead function
+      let successCount = 0
+      const errors: string[] = []
+
+      for (const leadId of leadIds) {
+        const { error } = await supabase
+          .rpc("soft_delete_lead", {
+            lead_id: leadId,
+            deleting_user_id: user.id,
+            reason: reason || null
+          })
+
+        if (error) {
+          errors.push(`Failed to delete lead ${leadId}: ${error.message}`)
+        } else {
+          successCount++
+        }
+      }
+
+      if (errors.length > 0 && successCount === 0) {
+        throw new Error(errors.join("; "))
+      }
+
+      return { error: errors.length > 0 ? errors.join("; ") : null, count: successCount }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
+
+  const bulkUpdateStageMutation = useMutation({
+    mutationKey: ['lead-mutation'],
+    mutationFn: async ({ leadIds, stage }: { leadIds: string[]; stage: PipelineStage }) => {
+      // Demo mode - simulate success
+      if (isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { error: null, count: leadIds.length }
+      }
+
+      // Get current max position in target stage
+      let nextPos = await getNextPosition(stage)
+
+      // Update each lead individually with sequential positions
+      const errors: string[] = []
+      for (const id of leadIds) {
+        const { error } = await supabase
+          .from("leads")
+          .update({
+            pipeline_stage: stage,
+            position_in_stage: nextPos,
+            last_contacted_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+
+        if (error) {
+          errors.push(error.message)
+        } else {
+          nextPos++
+        }
+      }
+
+      if (errors.length > 0) throw new Error(errors.join("; "))
+      return { error: null, count: leadIds.length }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+    },
+  })
+
+  // Wrap mutations to preserve the same return type interface
+  const createLead = async (leadData: Partial<Lead>) => {
+    try {
+      const result = await createLeadMutation.mutateAsync(leadData)
+      return result
+    } catch (err) {
+      console.error("Error creating lead:", err)
+      return { data: null, error: err instanceof Error ? err.message : "Failed to create lead" }
+    }
+  }
+
+  const updateLead = async (id: string, updates: Partial<Lead>) => {
+    try {
+      const result = await updateLeadMutation.mutateAsync({ id, updates })
+      return result
     } catch (err) {
       console.error("Error updating lead:", err)
       return { data: null, error: err instanceof Error ? err.message : "Failed to update lead" }
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -615,177 +830,48 @@ export function useLeadMutations() {
   }
 
   const deleteLead = async (id: string, reason?: string) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { error: null }
-    }
-
-    setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("User not authenticated")
-
-      // Use the soft_delete_lead function to move the lead to deleted_leads table
-      const { data, error } = await supabase
-        .rpc("soft_delete_lead", {
-          lead_id: id,
-          deleting_user_id: user.id,
-          reason: reason || null
-        })
-
-      if (error) throw error
-      return { error: null, deletedRecordId: data }
+      const result = await deleteLeadMutation.mutateAsync({ id, reason })
+      return result
     } catch (err) {
       console.error("Error deleting lead:", err)
       return { error: err instanceof Error ? err.message : "Failed to delete lead" }
-    } finally {
-      setLoading(false)
     }
   }
 
   const bulkAssignLeads = async (leadIds: string[], agentId: string) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { error: null, count: leadIds.length }
-    }
-
-    setLoading(true)
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-
-      const { error } = await supabase
-        .from("leads")
-        .update({
-          assigned_to: agentId,
-          assigned_at: new Date().toISOString(),
-        })
-        .in("id", leadIds)
-
-      if (error) throw error
-
-      // Notify the assigned agent
-      supabase.from('notifications').insert({
-        user_id: agentId,
-        type: 'new_assignment',
-        title: `${leadIds.length} lead${leadIds.length > 1 ? 's' : ''} assigned to you`,
-        body: `You have been assigned ${leadIds.length} new lead${leadIds.length > 1 ? 's' : ''}`,
-        action_url: '/leads',
-        created_by: currentUser?.id,
-      }).then(() => {}) // fire-and-forget
-
-      return { error: null, count: leadIds.length }
+      const result = await bulkAssignMutation.mutateAsync({ leadIds, agentId })
+      return result
     } catch (err) {
       console.error("Error bulk assigning leads:", err)
       return { error: err instanceof Error ? err.message : "Failed to assign leads", count: 0 }
-    } finally {
-      setLoading(false)
     }
   }
 
   const bulkDeleteLeads = async (leadIds: string[], reason?: string) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { error: null, count: leadIds.length }
-    }
-
-    setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("User not authenticated")
-
-      // Soft delete each lead using the soft_delete_lead function
-      let successCount = 0
-      const errors: string[] = []
-
-      for (const leadId of leadIds) {
-        const { error } = await supabase
-          .rpc("soft_delete_lead", {
-            lead_id: leadId,
-            deleting_user_id: user.id,
-            reason: reason || null
-          })
-
-        if (error) {
-          errors.push(`Failed to delete lead ${leadId}: ${error.message}`)
-        } else {
-          successCount++
-        }
-      }
-
-      if (errors.length > 0 && successCount === 0) {
-        throw new Error(errors.join("; "))
-      }
-
-      return { error: errors.length > 0 ? errors.join("; ") : null, count: successCount }
+      const result = await bulkDeleteMutation.mutateAsync({ leadIds, reason })
+      return result
     } catch (err) {
       console.error("Error bulk deleting leads:", err)
       return { error: err instanceof Error ? err.message : "Failed to delete leads", count: 0 }
-    } finally {
-      setLoading(false)
     }
   }
 
   const bulkUpdateStage = async (leadIds: string[], stage: PipelineStage) => {
-    // Demo mode - simulate success
-    if (isDemoMode()) {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setLoading(false)
-      return { error: null, count: leadIds.length }
-    }
-
-    setLoading(true)
     try {
-      // Get current max position in target stage
-      let nextPos = await getNextPosition(stage)
-
-      // Fetch current contact_count for all leads
-      const { data: currentLeads } = await supabase
-        .from("leads")
-        .select("id, contact_count")
-        .in("id", leadIds)
-
-      const countMap = new Map(currentLeads?.map(l => [l.id, (l as unknown as Record<string, number>).contact_count || 0]) || [])
-
-      // Update each lead individually with sequential positions and incremented contact_count
-      const errors: string[] = []
-      for (const id of leadIds) {
-        const { error } = await supabase
-          .from("leads")
-          .update({
-            pipeline_stage: stage,
-            position_in_stage: nextPos,
-            last_contacted_at: new Date().toISOString(),
-            contact_count: (countMap.get(id) || 0) + 1
-          })
-          .eq("id", id)
-
-        if (error) {
-          errors.push(error.message)
-        } else {
-          nextPos++
-        }
-      }
-
-      if (errors.length > 0) throw new Error(errors.join("; "))
-      return { error: null, count: leadIds.length }
+      const result = await bulkUpdateStageMutation.mutateAsync({ leadIds, stage })
+      return result
     } catch (err) {
       console.error("Error bulk updating stage:", err)
       return { error: err instanceof Error ? err.message : "Failed to update leads", count: 0 }
-    } finally {
-      setLoading(false)
     }
   }
 
+  // TODO: This uses read-then-write which has a race condition under concurrent calls.
+  // Ideally, replace with a Supabase RPC like: supabase.rpc('increment_contact_count', { lead_id: leadId })
+  // For now, the read-then-write approach is acceptable for typical usage patterns.
   const incrementContactCount = async (leadId: string) => {
     try {
       const { data: lead } = await supabase
@@ -796,8 +882,14 @@ export function useLeadMutations() {
 
       await supabase
         .from("leads")
-        .update({ contact_count: ((lead as unknown as Record<string, number>)?.contact_count || 0) + 1 })
+        .update({
+          contact_count: ((lead as unknown as Record<string, number>)?.contact_count || 0) + 1,
+          last_contacted_at: new Date().toISOString(),
+        })
         .eq("id", leadId)
+
+      // Invalidate to reflect updated contact count
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })
     } catch (err) {
       console.error("Error incrementing contact count:", err)
     }
@@ -817,98 +909,81 @@ export function useLeadMutations() {
 }
 
 export function useLeadStats() {
-  const [stats, setStats] = useState({
-    total: 0,
-    byStage: {} as Record<PipelineStage, number>,
-    thisMonth: 0,
-    conversionRate: 0,
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchStats() {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: queryKeys.leads.stats(),
+    queryFn: async () => {
       // Check for demo mode
       if (isDemoMode()) {
-        const demoStats = getDemoLeadStats()
-        setStats(demoStats)
-        setLoading(false)
-        return
+        return getDemoLeadStats()
       }
 
       const supabase = createClient()
 
-      try {
-        // Get all leads for stage counts
-        const { data: leads, error } = await supabase
-          .from("leads")
-          .select("pipeline_stage, created_at")
+      // Get all leads for stage counts
+      const { data: leads, error } = await supabase
+        .from("leads")
+        .select("pipeline_stage, created_at")
 
-        if (error) throw error
+      if (error) throw error
 
-        const byStage: Record<string, number> = {}
-        // Initialize all pipeline stages to 0
-        const stages: PipelineStage[] = [
-          "new", "contacted", "visit", "test", "application", "applicant", "enrolled", "lost"
-        ]
+      const byStage: Record<string, number> = {}
+      // Initialize all pipeline stages to 0
+      const stages: PipelineStage[] = [
+        "new", "contacted", "visit", "test", "application", "applicant", "enrolled", "lost"
+      ]
 
-        stages.forEach(stage => {
-          byStage[stage] = 0
-        })
+      stages.forEach(stage => {
+        byStage[stage] = 0
+      })
 
-        const now = new Date()
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        let thisMonth = 0
-        let enrolled = 0
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      let thisMonth = 0
+      let enrolled = 0
 
-        leads?.forEach(lead => {
-          if (lead.pipeline_stage) {
-            byStage[lead.pipeline_stage] = (byStage[lead.pipeline_stage] || 0) + 1
-          }
-          if (new Date(lead.created_at) >= startOfMonth) {
-            thisMonth++
-          }
-          if (lead.pipeline_stage === "enrolled") {
-            enrolled++
-          }
-        })
+      leads?.forEach(lead => {
+        if (lead.pipeline_stage) {
+          byStage[lead.pipeline_stage] = (byStage[lead.pipeline_stage] || 0) + 1
+        }
+        if (new Date(lead.created_at) >= startOfMonth) {
+          thisMonth++
+        }
+        if (lead.pipeline_stage === "enrolled") {
+          enrolled++
+        }
+      })
 
-        const total = leads?.length || 0
-        const conversionRate = total > 0 ? Math.round((enrolled / total) * 100) : 0
+      const total = leads?.length || 0
+      const conversionRate = total > 0 ? Math.round((enrolled / total) * 100) : 0
 
-        setStats({
-          total,
-          byStage: byStage as Record<PipelineStage, number>,
-          thisMonth,
-          conversionRate,
-        })
-      } catch (err) {
-        console.error("Error fetching lead stats:", err)
-      } finally {
-        setLoading(false)
+      return {
+        total,
+        byStage: byStage as Record<PipelineStage, number>,
+        thisMonth,
+        conversionRate,
       }
-    }
+    },
+    staleTime: 30_000,
+  })
 
-    fetchStats()
-  }, [])
-
-  return { stats, loading }
+  return {
+    stats: stats ?? {
+      total: 0,
+      byStage: {} as Record<PipelineStage, number>,
+      thisMonth: 0,
+      conversionRate: 0,
+    },
+    loading: isLoading,
+  }
 }
 
 export function useLostReasons() {
-  const [reasons, setReasons] = useState<{
-    id: string
-    category: string
-    reason_en: string
-    reason_ar: string
-    is_active: boolean
-  }[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchReasons() {
+  const { data: reasons = [], isLoading } = useQuery({
+    queryKey: queryKeys.leads.lostReasons(),
+    queryFn: async () => {
       if (isDemoMode()) {
         // Demo data - all lost reasons matching database
-        setReasons([
+        return [
           // Competitors
           { id: '1', category: 'competitors', reason_en: 'ACM', reason_ar: 'ACM', is_active: true },
           { id: '2', category: 'competitors', reason_en: 'AUM', reason_ar: 'AUM', is_active: true },
@@ -944,31 +1019,24 @@ export function useLostReasons() {
           { id: '27', category: 'personal', reason_en: 'Medical Travel Abroad', reason_ar: 'مسافر علاج بالخارج', is_active: true },
           { id: '28', category: 'personal', reason_en: 'Fear of Payment Loss', reason_ar: 'متخوف من الدفع', is_active: true },
           { id: '29', category: 'personal', reason_en: 'No Interest in College', reason_ar: 'لا يرغب بالكلية', is_active: true },
-        ])
-        setLoading(false)
-        return
+          // Academic (additional)
+          { id: '30', category: 'academic', reason_en: 'Repeat School Year', reason_ar: 'إعادة سنة دراسية', is_active: true },
+        ]
       }
 
       const supabase = createClient()
 
-      try {
-        const { data, error } = await supabase
-          .from('lost_reasons')
-          .select('*')
-          .eq('is_active', true)
-          .order('category')
+      const { data, error } = await supabase
+        .from('lost_reasons')
+        .select('*')
+        .eq('is_active', true)
+        .order('category')
 
-        if (error) throw error
-        setReasons(data || [])
-      } catch (err) {
-        console.error('Error fetching lost reasons:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+      if (error) throw error
+      return data || []
+    },
+    staleTime: 5 * 60_000, // Lost reasons rarely change, cache for 5 minutes
+  })
 
-    fetchReasons()
-  }, [])
-
-  return { reasons, loading }
+  return { reasons, loading: isLoading }
 }

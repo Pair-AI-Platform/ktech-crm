@@ -153,10 +153,10 @@ export default function IssuesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-sunken)] p-6">
+    <div className="min-h-screen bg-[var(--bg-sunken)] px-3 py-4 sm:p-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Issues</h1>
+      <div className="mb-4 sm:mb-6 flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)]">Issues</h1>
         <div className="flex gap-3">
           <button className="flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] shadow-sm hover:bg-[var(--bg-hover)] border border-[var(--border)]">
             <Flag className="h-4 w-4" />

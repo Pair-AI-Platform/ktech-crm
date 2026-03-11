@@ -71,6 +71,12 @@ export function DuplicateWarningDialog({
                           {config.label}
                         </Badge>
                       </div>
+                      {dup.assigned_agent_name && (
+                        <div className="flex items-center gap-1 mt-0.5 text-xs font-medium text-[var(--text-secondary)]">
+                          <User className="w-3 h-3" />
+                          Assigned to: {dup.assigned_agent_name}
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-[var(--text-muted)]">
                         {dup.phone && <span>{dup.phone}</span>}
                         {dup.civil_id && <span>ID: {dup.civil_id}</span>}

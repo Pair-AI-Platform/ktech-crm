@@ -96,11 +96,11 @@ export function EnrollmentStatusBadge({
   const docProgress = getDocumentProgress()
 
   const colorMap = {
-    success: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    warning: "bg-amber-100 text-amber-700 border-amber-200",
-    info: "bg-blue-100 text-blue-700 border-blue-200",
-    destructive: "bg-red-100 text-red-700 border-red-200",
-    secondary: "bg-gray-100 text-gray-700 border-gray-200",
+    success: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20",
+    warning: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20",
+    info: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20",
+    destructive: "bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/20",
+    secondary: "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)]",
   }
 
   const iconMap = {
@@ -123,8 +123,8 @@ export function EnrollmentStatusBadge({
         className={cn(
           "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium",
           isSF
-            ? "bg-blue-50 text-blue-700 border-blue-200"
-            : "bg-purple-50 text-purple-700 border-purple-200",
+            ? "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
+            : "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20",
           size === "sm" && "text-[10px] px-1.5 py-0"
         )}
       >
@@ -154,8 +154,8 @@ export function EnrollmentStatusBadge({
           className={cn(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium",
             docProgress.percentage === 100
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : "bg-gray-50 text-gray-700 border-gray-200",
+              ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20"
+              : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)]",
             size === "sm" && "text-[10px] px-1.5 py-0"
           )}
         >

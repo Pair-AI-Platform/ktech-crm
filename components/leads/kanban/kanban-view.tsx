@@ -33,7 +33,7 @@ interface KanbanViewProps {
   className?: string
 }
 
-// Default visible stages (excluding lost and withdraw for cleaner board)
+// Default visible stages (excluding lost for cleaner board)
 const defaultVisibleStages: PipelineStage[] = [
   "new",
   "contacted",
@@ -42,6 +42,7 @@ const defaultVisibleStages: PipelineStage[] = [
   "application",
   "applicant",
   "enrolled",
+  "withdraw",
 ]
 
 export function KanbanView({

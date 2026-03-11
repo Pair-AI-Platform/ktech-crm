@@ -1,0 +1,400 @@
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import {
+  FileText,
+  Upload,
+  Trash2,
+  Download,
+  Eye,
+  Check,
+  Image,
+  File,
+  Loader2,
+  X,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+import { PDFViewer } from "@/components/ui/pdf-viewer"
+
+// The 5 PUC document types that appear on the lead profile
+const PUC_PROFILE_DOCUMENTS = [
+  { id: "civil_id", name: "Civil ID", nameAr: "البطاقة المدنية" },
+  { id: "parent_civil_id", name: "Parent Civil ID", nameAr: "البطاقة المدنية للوالد" },
+  { id: "passport", name: "Passport", nameAr: "جواز السفر" },
+  { id: "extra_document_1", name: "Extra Document 1", nameAr: "مستند إضافي 1" },
+  { id: "extra_document_2", name: "Extra Document 2", nameAr: "مستند إضافي 2" },
+] as const
+
+interface StoredDocument {
+  id: string
+  document_type: string
+  file_name: string
+  file_type: string | null
+  file_size: number | null
+  storage_path: string
+  public_url: string | null
+  uploaded_at: string
+}
+
+interface PUCDocumentUploadProps {
+  leadId: string
+  className?: string
+}
+
+const FILE_ICONS: Record<string, typeof FileText> = {
+  "application/pdf": FileText,
+  "image/jpeg": Image,
+  "image/png": Image,
+  "image/gif": Image,
+  "image/webp": Image,
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getFileIcon(type: string) {
+  return FILE_ICONS[type] || File
+}
+
+export function PUCDocumentUpload({ leadId, className }: PUCDocumentUploadProps) {
+  const [documents, setDocuments] = useState<Record<string, StoredDocument | null>>({})
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  // Load existing documents from the psp_documents table
+  useEffect(() => {
+    loadDocuments()
+  }, [leadId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadDocuments = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/psp/documents?lead_id=${leadId}`)
+      if (!response.ok) throw new Error("Failed to load documents")
+      const data = await response.json()
+      const docs: Record<string, StoredDocument | null> = {}
+      for (const docType of PUC_PROFILE_DOCUMENTS) {
+        const found = (data.documents || []).find(
+          (d: StoredDocument) => d.document_type === docType.id
+        )
+        docs[docType.id] = found || null
+      }
+      setDocuments(docs)
+    } catch (err) {
+      console.error("Failed to load PUC documents:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpload = async (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const file = files[0]
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File is too large. Maximum size is 10MB.")
+      return
+    }
+
+    setUploading(docId)
+    const supabase = createClient()
+
+    try {
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      // Use a generic graduate_type folder since we don't know it yet at profile level
+      const storagePath = `leads/${leadId}/psp/profile/${docId}/${timestamp}-${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, { cacheControl: "3600", upsert: false })
+
+      if (uploadError) {
+        if (uploadError.message.includes("Bucket not found")) {
+          alert("Document storage is not configured. Please contact support.")
+          return
+        }
+        throw uploadError
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("documents")
+        .getPublicUrl(storagePath)
+
+      // Save to psp_documents table using the same API the wizard uses
+      // Use "_profile" as graduate_type so the wizard can pick these up as fallbacks
+      const response = await fetch("/api/psp/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          document_type: docId,
+          graduate_type: "_profile",
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          storage_path: storagePath,
+          public_url: urlData?.publicUrl,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to save document record")
+
+      const { document: savedDoc } = await response.json()
+      setDocuments((prev) => ({
+        ...prev,
+        [docId]: savedDoc,
+      }))
+    } catch (err) {
+      console.error("Upload failed:", err)
+      alert("Failed to upload file. Please try again.")
+    } finally {
+      setUploading(null)
+      if (fileInputRefs.current[docId]) {
+        fileInputRefs.current[docId]!.value = ""
+      }
+    }
+  }
+
+  const handleDelete = async (docId: string) => {
+    const doc = documents[docId]
+    if (!doc) return
+
+    if (!confirm(`Delete "${doc.file_name}"?`)) return
+
+    try {
+      const response = await fetch(`/api/psp/documents?id=${doc.id}`, {
+        method: "DELETE",
+      })
+      if (!response.ok) throw new Error("Failed to delete document")
+
+      setDocuments((prev) => ({ ...prev, [docId]: null }))
+    } catch (err) {
+      console.error("Delete failed:", err)
+      alert("Failed to delete document. Please try again.")
+    }
+  }
+
+  const handlePreview = (doc: StoredDocument) => {
+    if (!doc.public_url) return
+    if (doc.file_type === "application/pdf") {
+      setPdfPreview({ url: doc.public_url, name: doc.file_name })
+    } else if (doc.file_type?.startsWith("image/")) {
+      setPreviewUrl(doc.public_url)
+    }
+  }
+
+  const handleDownload = (doc: StoredDocument) => {
+    if (!doc.public_url) return
+    const link = document.createElement("a")
+    link.href = doc.public_url
+    link.download = doc.file_name
+    link.target = "_blank"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const uploadedCount = PUC_PROFILE_DOCUMENTS.filter((d) => documents[d.id]).length
+
+  if (loading) {
+    return (
+      <div className={cn("flex items-center justify-center py-12", className)}>
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      {/* Progress */}
+      <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-[var(--text-primary)]">
+            Documents Uploaded
+          </span>
+          <span className="text-sm text-[var(--primary)] font-semibold">
+            {uploadedCount} / {PUC_PROFILE_DOCUMENTS.length}
+          </span>
+        </div>
+        <div className="w-full bg-[var(--border)] rounded-full h-2">
+          <div
+            className={cn(
+              "h-2 rounded-full transition-all duration-300",
+              uploadedCount === PUC_PROFILE_DOCUMENTS.length
+                ? "bg-[var(--success)]"
+                : "bg-[var(--primary)]"
+            )}
+            style={{
+              width: `${Math.round((uploadedCount / PUC_PROFILE_DOCUMENTS.length) * 100)}%`,
+            }}
+          />
+        </div>
+        {uploadedCount === PUC_PROFILE_DOCUMENTS.length && (
+          <p className="text-xs text-[var(--success)] mt-2 flex items-center gap-1">
+            <Check className="w-3 h-3" />
+            All documents uploaded
+          </p>
+        )}
+      </div>
+
+      {/* Document List */}
+      <div className="space-y-2">
+        {PUC_PROFILE_DOCUMENTS.map((docType) => {
+          const doc = documents[docType.id]
+          const hasFile = !!doc
+          const isUploading = uploading === docType.id
+          const FileIcon = doc?.file_type ? getFileIcon(doc.file_type) : FileText
+
+          return (
+            <div
+              key={docType.id}
+              className={cn(
+                "rounded-xl border transition-all overflow-hidden",
+                hasFile
+                  ? "border-[var(--primary)]/50 bg-[var(--primary)]/5"
+                  : "border-[var(--border)] bg-[var(--bg-surface)]"
+              )}
+            >
+              <div className="flex items-center gap-3 p-3">
+                {/* Icon */}
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                    hasFile ? "bg-[var(--primary)]" : "bg-[var(--bg-sunken)]"
+                  )}
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  ) : hasFile ? (
+                    <Check className="w-5 h-5 text-white" />
+                  ) : (
+                    <FileText className="w-5 h-5 text-[var(--text-muted)]" />
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                    {docType.name}
+                  </p>
+                  {hasFile ? (
+                    <p className="text-xs text-[var(--text-muted)] truncate">
+                      {doc.file_name} {doc.file_size ? `• ${formatFileSize(doc.file_size)}` : ""}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Click upload to add this document
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1">
+                  {hasFile ? (
+                    <>
+                      {doc.public_url &&
+                        (doc.file_type?.startsWith("image/") ||
+                          doc.file_type === "application/pdf") && (
+                          <button
+                            onClick={() => handlePreview(doc)}
+                            className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                            title="Preview"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                      <button
+                        onClick={() => handleDownload(doc)}
+                        className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                        title="Download"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(docType.id)}
+                        className="p-2 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        ref={(el) => {
+                          fileInputRefs.current[docType.id] = el
+                        }}
+                        type="file"
+                        onChange={(e) => handleUpload(docType.id, e)}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRefs.current[docType.id]?.click()}
+                        disabled={isUploading}
+                        className="gap-1.5"
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        Upload
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Image Preview Modal */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-[rgba(31,29,26,0.85)] flex items-center justify-center p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewUrl(null)}
+              className="absolute -top-4 -right-4 p-2 bg-[var(--bg-surface)] rounded-full shadow-lg hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewUrl}
+              alt="Preview"
+              className="max-w-full max-h-[85vh] rounded-lg shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PDFViewer
+          url={pdfPreview.url}
+          fileName={pdfPreview.name}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
+    </div>
+  )
+}

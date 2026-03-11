@@ -12,6 +12,7 @@ export interface DuplicateMatch {
   civil_id?: string
   pipeline_stage: string
   assigned_to?: string
+  assigned_agent_name?: string
   match_type: "phone" | "civil_id" | "name"
   created_at: string
 }

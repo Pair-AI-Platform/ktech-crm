@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT } from './config/constants'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -40,42 +41,12 @@ export function toDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-// Date utilities
-export function formatDate(date: Date | string, locale: 'en' | 'ar' = 'en'): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString(locale === 'ar' ? 'ar-KW' : 'en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
+// Date utilities - canonical versions in lib/date-utils.ts
+export { formatDate, formatDateTime, formatRelativeTime } from './date-utils'
 
-export function formatTime(date: Date | string, locale: 'en' | 'ar' = 'en'): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleTimeString(locale === 'ar' ? 'ar-KW' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-export function formatDateTime(date: Date | string, locale: 'en' | 'ar' = 'en'): string {
-  return `${formatDate(date, locale)} ${formatTime(date, locale)}`
-}
-
-export function getRelativeTime(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return formatDate(d)
-}
+// Alias for backward compatibility
+import { formatRelativeTime as _formatRelativeTime } from './date-utils'
+export const getRelativeTime = _formatRelativeTime
 
 // Currency formatting
 export function formatCurrency(amount: number, currency: string = 'KWD'): string {
@@ -89,8 +60,8 @@ export function formatCurrency(amount: number, currency: string = 'KWD'): string
 
 // Payment status calculation
 export function getPaymentStatus(amountPaid: number): 'pending' | 'seat_reserved' | 'full_tuition' {
-  if (amountPaid < 150) return 'pending'
-  if (amountPaid < 550) return 'seat_reserved'
+  if (amountPaid < ENROLLMENT_PAYMENT_AMOUNT) return 'pending'
+  if (amountPaid < FULL_TUITION_AMOUNT) return 'seat_reserved'
   return 'full_tuition'
 }
 
@@ -111,12 +82,13 @@ export const stageColors: Record<string, string> = {
   visit: 'bg-teal-100 text-teal-700 border-teal-200',
   test: 'bg-lime-100 text-lime-700 border-lime-200',
   application: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  documents: 'bg-amber-100 text-amber-700 border-amber-200',
+  submissions: 'bg-blue-100 text-blue-700 border-blue-200',
   applicant: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   payment: 'bg-orange-100 text-orange-700 border-orange-200',
   enrolled: 'bg-green-100 text-green-700 border-green-200',
   lost: 'bg-gray-100 text-gray-700 border-gray-200'
 }
-
 // Get the meaningful first letter of an Arabic or Latin name part
 // Skips the Arabic definite article "ال" to get the actual initial
 function getNameInitial(name: string): string {
@@ -163,8 +135,16 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 
 // Generate random ID
 export function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36)
+  return crypto.randomUUID()
 }
 
-// Alias for getRelativeTime
-export const formatRelativeTime = getRelativeTime
+// HTML escaping to prevent XSS in server-rendered HTML templates
+export function escapeHtml(str: string | null | undefined): string {
+  if (!str) return ''
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}

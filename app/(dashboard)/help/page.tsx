@@ -184,7 +184,7 @@ export default function HelpPage() {
         subtitle="Find answers and learn how to use ktech CRM"
       />
 
-      <div className="p-6 space-y-8 page-enter">
+      <div className="px-3 py-4 sm:p-6 space-y-6 sm:space-y-8 page-enter">
         {/* Hero Search */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

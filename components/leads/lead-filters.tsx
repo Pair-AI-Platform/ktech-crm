@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input, SearchInput } from "@/components/ui/input"
@@ -21,10 +21,12 @@ import {
   SlidersHorizontal,
   GraduationCap,
   Ban,
+  ShieldAlert,
   MessageSquareText,
-  CreditCard
+  CreditCard,
+  BookOpen
 } from "lucide-react"
-import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus } from "@/types"
+import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack } from "@/types"
 import { cn } from "@/lib/utils"
 
 export interface LeadFilters {
@@ -46,8 +48,13 @@ export interface LeadFilters {
   gpaMax: number | null
   isKuwaiti: boolean | null
   ministryBlocked: "all" | "blocked" | "not_blocked"
+  blockReasons: SubmissionBlockedReason[]
   hasNotes: "all" | "with_notes" | "without_notes"
   paymentStatus: "all" | "pending" | "seat_reserved" | "full_tuition"
+  paymentAmountMin: number
+  paymentAmountMax: number
+  academicTrack: "all" | AcademicTrack
+  lostReasonIds: string[]
 }
 
 interface LeadFiltersProps {
@@ -76,8 +83,13 @@ const defaultFilters: LeadFilters = {
   gpaMax: null,
   isKuwaiti: null,
   ministryBlocked: "all",
+  blockReasons: [],
   hasNotes: "all",
   paymentStatus: "all",
+  paymentAmountMin: 0,
+  paymentAmountMax: 5000,
+  academicTrack: "all",
+  lostReasonIds: [],
 }
 
 // Stages that leads can be lost at (excludes 'lost' and 'enrolled')
@@ -94,6 +106,8 @@ const STAGE_ALLOWED_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none
   applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
   enrolled: 'none',
   withdraw: 'all',
+  puc_document_submission: 'none',
+  puc_application_submission: 'none',
 }
 
 function getStatusesForStages(stages: PipelineStage[]) {
@@ -245,7 +259,9 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     (localFilters.dateRange !== "all" ? 1 : 0) +
     (localFilters.assignedTo ? 1 : 0) +
     (localFilters.hasNotes !== "all" ? 1 : 0) +
-    (localFilters.paymentStatus !== "all" ? 1 : 0)
+    (localFilters.paymentStatus !== "all" ? 1 : 0) +
+    (localFilters.paymentAmountMin > 0 || localFilters.paymentAmountMax < 5000 ? 1 : 0) +
+    (localFilters.academicTrack !== "all" ? 1 : 0)
 
   return (
     <AnimatePresence>
@@ -553,6 +569,36 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
+              {/* Academic Track (Type) */}
+              <FilterSection
+                title="Type"
+                icon={<BookOpen className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("academicTrack")}
+                onToggle={() => toggleSection("academicTrack")}
+                count={localFilters.academicTrack !== "all" ? 1 : 0}
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "science", label: "Science" },
+                    { value: "arts", label: "Arts" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setLocalFilters(prev => ({ ...prev, academicTrack: option.value as LeadFilters["academicTrack"] }))}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-sm text-center transition-all",
+                        localFilters.academicTrack === option.value
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+
               {/* Funding Type */}
               <FilterSection
                 title="Funding Type"
@@ -589,36 +635,18 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 icon={<CreditCard className="w-4 h-4" />}
                 isExpanded={expandedSections.includes("paymentStatus")}
                 onToggle={() => toggleSection("paymentStatus")}
-                count={localFilters.paymentStatus !== "all" ? 1 : 0}
+                count={localFilters.paymentAmountMin > 0 || localFilters.paymentAmountMax < 5000 ? 1 : 0}
               >
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: "all", label: "All" },
-                    { value: "pending", label: "No Payment" },
-                    { value: "seat_reserved", label: "Seat Reserved" },
-                    { value: "full_tuition", label: "Full Tuition" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setLocalFilters(prev => ({ ...prev, paymentStatus: option.value as LeadFilters["paymentStatus"] }))}
-                      className={cn(
-                        "p-2.5 rounded-lg border text-sm text-center transition-all",
-                        localFilters.paymentStatus === option.value
-                          ? option.value === "pending"
-                            ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                            : option.value === "full_tuition"
-                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-[var(--text-muted)] mt-2">
-                  Pending: &lt;150 KD · Seat Reserved: 150–549 KD · Full Tuition: 550+ KD. Only applies to self-funded leads.
-                </p>
+                <PaymentRangeSlider
+                  min={localFilters.paymentAmountMin}
+                  max={localFilters.paymentAmountMax}
+                  onChange={(min, max) => setLocalFilters(prev => ({
+                    ...prev,
+                    paymentAmountMin: min,
+                    paymentAmountMax: max,
+                    paymentStatus: min === 0 && max === 5000 ? "all" : "all",
+                  }))}
+                />
               </FilterSection>
 
               {/* Ministry Blocked Filter */}
@@ -650,6 +678,48 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                       {option.label}
                     </button>
                   ))}
+                </div>
+              </FilterSection>
+
+              {/* Block Reason Filter */}
+              <FilterSection
+                title="Block Reason"
+                icon={<ShieldAlert className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("blockReasons")}
+                onToggle={() => toggleSection("blockReasons")}
+                count={localFilters.blockReasons.length}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {SUBMISSION_BLOCKED_REASONS.map((reason) => {
+                    const isSelected = localFilters.blockReasons.includes(reason.value)
+                    return (
+                      <button
+                        key={reason.value}
+                        onClick={() => setLocalFilters(prev => ({
+                          ...prev,
+                          blockReasons: isSelected
+                            ? prev.blockReasons.filter(r => r !== reason.value)
+                            : [...prev.blockReasons, reason.value]
+                        }))}
+                        className={cn(
+                          "flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-all",
+                          isSelected
+                            ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                          isSelected
+                            ? "bg-orange-500 border-orange-500"
+                            : "border-[var(--border)]"
+                        )}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        {reason.label}
+                      </button>
+                    )
+                  })}
                 </div>
               </FilterSection>
 
@@ -685,7 +755,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
 
               {/* GPA Filter */}
               <FilterSection
-                title="GPA Range"
+                title="GPA Percentage"
                 icon={<GraduationCap className="w-4 h-4" />}
                 isExpanded={expandedSections.includes("gpa")}
                 onToggle={() => toggleSection("gpa")}
@@ -694,13 +764,13 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Min GPA</Label>
+                      <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Min %</Label>
                       <Input
                         type="number"
-                        step="0.01"
+                        step="0.1"
                         min="0"
-                        max="4"
-                        placeholder="0.00"
+                        max="100"
+                        placeholder="0"
                         value={localFilters.gpaMin ?? ""}
                         onChange={(e) => setLocalFilters(prev => ({
                           ...prev,
@@ -710,13 +780,13 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Max GPA</Label>
+                      <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Max %</Label>
                       <Input
                         type="number"
-                        step="0.01"
+                        step="0.1"
                         min="0"
-                        max="4"
-                        placeholder="4.00"
+                        max="100"
+                        placeholder="100"
                         value={localFilters.gpaMax ?? ""}
                         onChange={(e) => setLocalFilters(prev => ({
                           ...prev,
@@ -727,7 +797,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                     </div>
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
-                    Filters by highest available GPA (Grade 12, 11, or 10)
+                    Filters by highest available GPA percentage (Grade 12, 11, or 10)
                   </p>
                 </div>
               </FilterSection>
@@ -773,7 +843,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 count={localFilters.stages.length}
               >
                 <div className="grid grid-cols-2 gap-2">
-                  {PIPELINE_STAGES.map((stage) => (
+                  {PIPELINE_STAGES.filter(s => s.value !== 'lost').map((stage) => (
                     <button
                       key={stage.value}
                       onClick={() => toggleStage(stage.value)}
@@ -825,6 +895,217 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
         </>
       )}
     </AnimatePresence>
+  )
+}
+
+// Dual-handle range slider for payment amount filtering
+function PaymentRangeSlider({
+  min,
+  max,
+  onChange,
+}: {
+  min: number
+  max: number
+  onChange: (min: number, max: number) => void
+}) {
+  const SLIDER_MIN = 0
+  const SLIDER_MAX = 5000
+  const STEP = 10
+
+  // Guard against NaN/undefined values from persisted state
+  const safeMin = typeof min === "number" && !isNaN(min) ? min : 0
+  const safeMax = typeof max === "number" && !isNaN(max) ? max : 5000
+
+  const getPercent = (value: number) =>
+    ((value - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100
+
+  const minPercent = getPercent(safeMin)
+  const maxPercent = getPercent(safeMax)
+
+  const [minInput, setMinInput] = React.useState(String(safeMin))
+  const [maxInput, setMaxInput] = React.useState(String(safeMax))
+
+  // Sync inputs when external value changes (e.g. zone button click)
+  React.useEffect(() => { setMinInput(String(safeMin)) }, [safeMin])
+  React.useEffect(() => { setMaxInput(String(safeMax)) }, [safeMax])
+
+  const commitMin = () => {
+    const parsed = parseInt(minInput, 10)
+    const clamped = isNaN(parsed) ? safeMin : Math.min(Math.max(parsed, SLIDER_MIN), safeMax - STEP)
+    setMinInput(String(clamped))
+    onChange(clamped, safeMax)
+  }
+
+  const commitMax = () => {
+    const parsed = parseInt(maxInput, 10)
+    const clamped = isNaN(parsed) ? safeMax : Math.max(Math.min(parsed, SLIDER_MAX), safeMin + STEP)
+    setMaxInput(String(clamped))
+    onChange(safeMin, clamped)
+  }
+
+  const hasSeatReserved = safeMin < 550 && safeMax >= 150
+  const hasFullTuition = safeMax >= 550
+
+  const zones = [
+    {
+      key: "seat_reserved",
+      label: "Seat Reserved",
+      flex: "flex-[400]",
+      range: [150, 549] as [number, number],
+      active: hasSeatReserved,
+      activeClass: "bg-blue-500/15 border-blue-500/40 text-blue-600 dark:text-blue-400",
+      hoverClass: "hover:border-blue-400/40 hover:text-blue-500",
+      trackClass: "bg-blue-400/25",
+      left: "15%",
+      width: "40%",
+    },
+    {
+      key: "full_tuition",
+      label: "Full Tuition",
+      flex: "flex-[450]",
+      range: [550, 5000] as [number, number],
+      active: hasFullTuition,
+      activeClass: "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
+      hoverClass: "hover:border-emerald-400/40 hover:text-emerald-500",
+      trackClass: "bg-emerald-400/25",
+      left: "55%",
+      width: "45%",
+    },
+  ]
+
+  return (
+    <div className="space-y-3 pt-1">
+      {/* Amount display — editable */}
+      <div className="flex items-stretch gap-2">
+        <label className="flex-1 bg-[var(--bg-sunken)] rounded-lg px-3 py-2 text-center border border-[var(--border)] focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)]/30 transition-all cursor-text">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] block">From</span>
+          <div className="flex items-baseline justify-center gap-1 mt-0.5">
+            <input
+              type="number"
+              min={SLIDER_MIN}
+              max={SLIDER_MAX}
+              value={minInput}
+              onChange={(e) => setMinInput(e.target.value)}
+              onBlur={commitMin}
+              onKeyDown={(e) => e.key === "Enter" && commitMin()}
+              className="w-14 bg-transparent text-sm font-bold text-[var(--text-primary)] tabular-nums text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span className="text-xs text-[var(--text-muted)]">KD</span>
+          </div>
+        </label>
+        <div className="flex items-center text-[var(--text-muted)] text-xs">→</div>
+        <label className="flex-1 bg-[var(--bg-sunken)] rounded-lg px-3 py-2 text-center border border-[var(--border)] focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)]/30 transition-all cursor-text">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] block">To</span>
+          <div className="flex items-baseline justify-center gap-1 mt-0.5">
+            <input
+              type="number"
+              min={SLIDER_MIN}
+              max={SLIDER_MAX}
+              value={maxInput}
+              onChange={(e) => setMaxInput(e.target.value)}
+              onBlur={commitMax}
+              onKeyDown={(e) => e.key === "Enter" && commitMax()}
+              className="w-14 bg-transparent text-sm font-bold text-[var(--text-primary)] tabular-nums text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span className="text-xs text-[var(--text-muted)]">KD</span>
+          </div>
+        </label>
+      </div>
+
+      {/* Slider track */}
+      <div className="relative h-10 flex items-center">
+        {/* Zone-tinted background segments */}
+        {zones.map((zone) => (
+          <div
+            key={zone.key}
+            className={cn("absolute h-2", zone.trackClass)}
+            style={{ left: zone.left, width: zone.width }}
+          />
+        ))}
+        {/* Plain track behind zones */}
+        <div className="absolute w-full h-2 rounded-full border border-[var(--border)] bg-transparent" />
+
+        {/* Active range fill */}
+        <div
+          className="absolute h-2 rounded-full bg-[var(--primary)]/70"
+          style={{
+            left: `${minPercent}%`,
+            width: `${maxPercent - minPercent}%`,
+          }}
+        />
+
+        {/* Threshold markers */}
+        {[150, 550].map((threshold) => (
+          <div
+            key={threshold}
+            className="absolute w-0.5 h-4 bg-[var(--text-muted)]/30 rounded-full"
+            style={{ left: `${getPercent(threshold)}%`, top: "50%", transform: "translate(-50%, -50%)" }}
+          />
+        ))}
+
+        {/* Min handle */}
+        <input
+          type="range"
+          min={SLIDER_MIN}
+          max={SLIDER_MAX}
+          step={STEP}
+          value={safeMin}
+          onChange={(e) => {
+            const val = Math.min(Number(e.target.value), safeMax - STEP)
+            onChange(val, safeMax)
+          }}
+          className="absolute w-full pointer-events-none appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:active:cursor-grabbing [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[var(--primary)] [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-grab"
+          style={{ zIndex: safeMin > SLIDER_MAX - 100 ? 5 : 3 }}
+        />
+
+        {/* Max handle */}
+        <input
+          type="range"
+          min={SLIDER_MIN}
+          max={SLIDER_MAX}
+          step={STEP}
+          value={safeMax}
+          onChange={(e) => {
+            const val = Math.max(Number(e.target.value), safeMin + STEP)
+            onChange(safeMin, val)
+          }}
+          className="absolute w-full pointer-events-none appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:active:cursor-grabbing [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[var(--primary)] [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-grab"
+          style={{ zIndex: 4 }}
+        />
+      </div>
+
+      {/* Threshold labels */}
+      <div className="relative h-4 text-[10px] text-[var(--text-muted)]">
+        <span className="absolute left-0">0</span>
+        <span className="absolute" style={{ left: `${getPercent(150)}%`, transform: "translateX(-50%)" }}>150</span>
+        <span className="absolute" style={{ left: `${getPercent(550)}%`, transform: "translateX(-50%)" }}>550</span>
+        <span className="absolute right-0">5000</span>
+      </div>
+
+      {/* Quick-select zone buttons */}
+      <div className="flex gap-1.5">
+        {zones.map((zone) => (
+          <button
+            key={zone.key}
+            type="button"
+            onClick={() => onChange(zone.range[0], zone.range[1])}
+            className={cn(
+              zone.flex,
+              "rounded-lg px-2 py-1.5 text-center border text-[10px] font-medium transition-all",
+              zone.active
+                ? zone.activeClass
+                : cn("bg-[var(--bg-sunken)] border-[var(--border)] text-[var(--text-muted)]", zone.hoverClass)
+            )}
+          >
+            {zone.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs text-[var(--text-muted)]">
+        Drag handles or click a zone to filter by payment range. Applies to self-funded leads only.
+      </p>
+    </div>
   )
 }
 
@@ -887,6 +1168,11 @@ interface QuickFiltersProps {
   onOpenAdvanced: () => void
   stats: Record<PipelineStage, number>
   total: number
+  lostAtMode?: boolean
+  hideStages?: boolean
+  lostReasonFilter?: string[]
+  onLostReasonFilterChange?: (ids: string[]) => void
+  lostReasons?: { id: string; category: string; reason_en: string }[]
 }
 
 export function QuickFilters({
@@ -897,7 +1183,29 @@ export function QuickFilters({
   onOpenAdvanced,
   stats,
   total,
+  lostAtMode,
+  hideStages,
+  lostReasonFilter,
+  onLostReasonFilterChange,
+  lostReasons,
 }: QuickFiltersProps) {
+  const stagePillsRef = useRef<HTMLDivElement>(null)
+
+  // In lost-at mode, show stages where leads can be lost (exclude lost/withdraw)
+  const stagesToShow = lostAtMode
+    ? PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value !== 'withdraw')
+    : PIPELINE_STAGES.filter(s => s.value !== 'lost')
+
+  // Scroll active stage pill into view
+  useEffect(() => {
+    const container = stagePillsRef.current
+    if (!container) return
+    const activeBtn = container.querySelector('[data-active="true"]') as HTMLElement
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }
+  }, [activeStage])
+
   return (
     <div className="space-y-4">
       {/* Search and Advanced Filter */}
@@ -918,19 +1226,21 @@ export function QuickFilters({
       </div>
 
       {/* Stage Pills */}
-      <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+      {!hideStages && (
+      <div ref={stagePillsRef} className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
         <Button
           variant={activeStage === "all" ? "default" : "ghost"}
           size="sm"
           onClick={() => onStageChange("all")}
           className="shrink-0"
+          data-active={activeStage === "all"}
         >
-          All Stages
+          {lostAtMode ? "All" : "All Stages"}
           <Badge variant="secondary" size="sm" className="ml-2">
-            {total - (stats.lost || 0) - (stats.withdraw || 0)}
+            {lostAtMode ? total : total - (stats.lost || 0)}
           </Badge>
         </Button>
-        {PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value !== 'withdraw').map((stage) => {
+        {stagesToShow.map((stage) => {
           const count = stats[stage.value] || 0
           return (
             <Button
@@ -939,6 +1249,7 @@ export function QuickFilters({
               size="sm"
               onClick={() => onStageChange(stage.value)}
               className="shrink-0"
+              data-active={activeStage === stage.value}
             >
               {stage.label}
               {count > 0 && (
@@ -950,6 +1261,42 @@ export function QuickFilters({
           )
         })}
       </div>
+      )}
+
+      {/* Lost Reason Filter Pills */}
+      {lostAtMode && lostReasons && lostReasons.length > 0 && onLostReasonFilterChange && (
+        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar items-center">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] shrink-0">Reason:</span>
+          <Button
+            variant={!lostReasonFilter || lostReasonFilter.length === 0 ? "default" : "ghost"}
+            size="sm"
+            onClick={() => onLostReasonFilterChange([])}
+            className="shrink-0 h-7 text-xs"
+          >
+            All
+          </Button>
+          {lostReasons.map((reason) => {
+            const isActive = lostReasonFilter?.includes(reason.id)
+            return (
+              <Button
+                key={reason.id}
+                variant={isActive ? "default" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  if (isActive) {
+                    onLostReasonFilterChange(lostReasonFilter!.filter(id => id !== reason.id))
+                  } else {
+                    onLostReasonFilterChange([...(lostReasonFilter || []), reason.id])
+                  }
+                }}
+                className="shrink-0 h-7 text-xs"
+              >
+                {reason.reason_en}
+              </Button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

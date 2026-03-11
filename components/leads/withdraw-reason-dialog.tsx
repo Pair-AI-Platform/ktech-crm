@@ -18,9 +18,39 @@ import { cn } from "@/lib/utils"
 const WITHDRAWAL_REASONS = [
   { id: "payment_issue", label: "Payment Issue", labelAr: "مشكلة في الدفع" },
   { id: "far_away", label: "Far Away", labelAr: "بعيد" },
-  { id: "police_military_fire", label: "Police, Military, Fire Force", labelAr: "شرطة، عسكري، إطفاء" },
-  { id: "paaet_ku_other", label: "PAAET, KU, Another Institute", labelAr: "التطبيقي، جامعة الكويت، معهد آخر" },
   { id: "language_issues", label: "Language Issues", labelAr: "مشاكل لغوية" },
+  { id: "academic_reason", label: "Academic Reason", labelAr: "سبب أكاديمي" },
+  { id: "accepted_second_choice", label: "Accepted Second Choice", labelAr: "قُبل في الخيار الثاني" },
+  { id: "personal_reasons", label: "Personal Reasons", labelAr: "أسباب شخصية" },
+  { id: "medical_travel_abroad", label: "Medical Travel Abroad", labelAr: "سفر علاجي للخارج" },
+  { id: "traveling", label: "Traveling", labelAr: "مسافر" },
+  { id: "studying_abroad", label: "Studying Abroad", labelAr: "الدراسة في الخارج" },
+] as const
+
+const COMPETITOR_OPTIONS = [
+  { id: "competitor_acm", label: "ACM" },
+  { id: "competitor_aum", label: "AUM" },
+  { id: "competitor_auk", label: "AUK" },
+  { id: "competitor_gust", label: "GUST" },
+  { id: "competitor_paaet", label: "PAAET" },
+  { id: "competitor_ku", label: "KU" },
+  { id: "competitor_kilaw", label: "KILAW" },
+  { id: "competitor_iuk", label: "IUK" },
+  { id: "competitor_cat", label: "CAT" },
+  { id: "competitor_kcst", label: "KCST" },
+  { id: "competitor_cck", label: "CCK" },
+  { id: "competitor_aou", label: "AOU" },
+  { id: "competitor_aiu", label: "AIU" },
+  { id: "competitor_au", label: "AU" },
+  { id: "competitor_boxhill", label: "BOXHILL" },
+] as const
+
+const MILITARY_SECURITY_OPTIONS = [
+  { id: "military", label: "Military" },
+  { id: "police", label: "Police" },
+  { id: "fire_force", label: "Fire Force" },
+  { id: "army", label: "Army" },
+  { id: "national_guard", label: "National Guard" },
 ] as const
 
 interface WithdrawReasonDialogProps {
@@ -80,7 +110,7 @@ export function WithdrawReasonDialog({
 
         <DialogBody>
           <div className="space-y-4">
-            {/* Reason Selection */}
+            {/* General Reasons */}
             <div>
               <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
                 Select Reason
@@ -99,6 +129,54 @@ export function WithdrawReasonDialog({
                   >
                     {selectedReason === reason.id && <Check className="w-3.5 h-3.5" />}
                     {reason.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Competitors */}
+            <div>
+              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                Competitors
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {COMPETITOR_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setSelectedReason(option.id)}
+                    className={cn(
+                      "px-3 py-1.5 text-sm rounded-lg border transition-all inline-flex items-center gap-1.5",
+                      selectedReason === option.id
+                        ? "bg-amber-500 border-amber-500 text-white"
+                        : "bg-[var(--bg-sunken)] border-[var(--border)] text-[var(--text-primary)] hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    )}
+                  >
+                    {selectedReason === option.id && <Check className="w-3.5 h-3.5" />}
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Military / Security */}
+            <div>
+              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                Military / Security
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {MILITARY_SECURITY_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setSelectedReason(option.id)}
+                    className={cn(
+                      "px-3 py-1.5 text-sm rounded-lg border transition-all inline-flex items-center gap-1.5",
+                      selectedReason === option.id
+                        ? "bg-amber-500 border-amber-500 text-white"
+                        : "bg-[var(--bg-sunken)] border-[var(--border)] text-[var(--text-primary)] hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    )}
+                  >
+                    {selectedReason === option.id && <Check className="w-3.5 h-3.5" />}
+                    {option.label}
                   </button>
                 ))}
               </div>

@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback, startTransition } from "react"
+import { useEffect, useCallback } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+import { queryKeys } from "./query-keys"
 import type { NotificationType } from "@/lib/notifications/create"
 
 export interface Notification {
@@ -55,39 +57,30 @@ const DEMO_NOTIFICATIONS: Notification[] = [
 ]
 
 export function useNotifications(userId?: string | null) {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  const fetchNotifications = useCallback(async () => {
-    if (isDemoMode() || !userId) {
-      startTransition(() => {
-        setNotifications(DEMO_NOTIFICATIONS)
-        setUnreadCount(DEMO_NOTIFICATIONS.filter((n) => !n.is_read).length)
-        setLoading(false)
-      })
-      return
-    }
+  const { data: notifications = [], isLoading: loading, refetch } = useQuery({
+    queryKey: [...queryKeys.notifications.all, userId],
+    queryFn: async () => {
+      if (isDemoMode() || !userId) {
+        return DEMO_NOTIFICATIONS
+      }
 
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(50)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50)
 
-    if (!error && data) {
-      setNotifications(data as Notification[])
-      setUnreadCount(data.filter((n: { is_read: boolean }) => !n.is_read).length)
-    }
-    setLoading(false)
-  }, [userId])
+      if (error) throw error
+      return (data as Notification[]) ?? []
+    },
+    staleTime: 30_000,
+  })
 
-  // Initial fetch
-  useEffect(() => {
-    startTransition(() => { fetchNotifications() })
-  }, [fetchNotifications])
+  const unreadCount = notifications.filter((n) => !n.is_read).length
 
   // Real-time subscription for new notifications
   useEffect(() => {
@@ -105,7 +98,7 @@ export function useNotifications(userId?: string | null) {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          fetchNotifications()
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
         }
       )
       .subscribe()
@@ -113,54 +106,90 @@ export function useNotifications(userId?: string | null) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchNotifications, userId])
+  }, [userId, queryClient])
 
-  const markAsRead = useCallback(
-    async (notificationId: string) => {
-      if (isDemoMode()) {
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
-          )
-        )
-        setUnreadCount((prev) => Math.max(0, prev - 1))
-        return
-      }
+  const markAsReadMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      if (isDemoMode()) return
 
       const supabase = createClient()
-      await supabase
+      const { error } = await supabase
         .from("notifications")
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq("id", notificationId)
 
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
-        )
-      )
-      setUnreadCount((prev) => Math.max(0, prev - 1))
+      if (error) throw error
     },
-    []
+    onMutate: async (notificationId: string) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all })
+
+      const previousNotifications = queryClient.getQueryData<Notification[]>([...queryKeys.notifications.all, userId])
+
+      queryClient.setQueryData<Notification[]>(
+        [...queryKeys.notifications.all, userId],
+        (old) =>
+          old?.map((n) =>
+            n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+          ) ?? []
+      )
+
+      return { previousNotifications }
+    },
+    onError: (_err, _notificationId, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData([...queryKeys.notifications.all, userId], context.previousNotifications)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
+    },
+  })
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: async () => {
+      if (isDemoMode() || !userId) return
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .eq("is_read", false)
+
+      if (error) throw error
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all })
+
+      const previousNotifications = queryClient.getQueryData<Notification[]>([...queryKeys.notifications.all, userId])
+
+      queryClient.setQueryData<Notification[]>(
+        [...queryKeys.notifications.all, userId],
+        (old) => old?.map((n) => ({ ...n, is_read: true })) ?? []
+      )
+
+      return { previousNotifications }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData([...queryKeys.notifications.all, userId], context.previousNotifications)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
+    },
+  })
+
+  const markAsRead = useCallback(
+    async (notificationId: string) => {
+      markAsReadMutation.mutate(notificationId)
+    },
+    [markAsReadMutation]
   )
 
   const markAllAsRead = useCallback(async () => {
-    if (isDemoMode()) {
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-      setUnreadCount(0)
-      return
-    }
-
-    if (!userId) return
-    const supabase = createClient()
-    await supabase
-      .from("notifications")
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq("user_id", userId)
-      .eq("is_read", false)
-
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-    setUnreadCount(0)
-  }, [userId])
+    markAllAsReadMutation.mutate()
+  }, [markAllAsReadMutation])
 
   return {
     notifications,
@@ -168,6 +197,6 @@ export function useNotifications(userId?: string | null) {
     loading,
     markAsRead,
     markAllAsRead,
-    refetch: fetchNotifications,
+    refetch,
   }
 }

@@ -6,7 +6,7 @@ import { cn, toDateString } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -30,11 +30,13 @@ import {
   AlertCircle,
   UserCircle,
   Video,
-  XCircle
+  XCircle,
+  UserPlus,
+  Plus
 } from "lucide-react"
 import type { AppointmentType, AppointmentModality, Lead } from "@/types"
 import { APPOINTMENT_TYPES, APPOINTMENT_MODALITIES } from "@/types"
-import { useLeads } from "@/lib/hooks/use-leads"
+import { useLeads, useLeadMutations } from "@/lib/hooks/use-leads"
 import { useAppointmentMutations } from "@/lib/hooks/use-appointments"
 import { useAgents, useUser } from "@/lib/hooks/use-user"
 
@@ -107,9 +109,15 @@ export function AppointmentBooking({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedAgent, setSelectedAgent] = useState<string>("")
+  const [showQuickCreate, setShowQuickCreate] = useState(false)
+  const [quickFirstName, setQuickFirstName] = useState("")
+  const [quickLastName, setQuickLastName] = useState("")
+  const [quickPhone, setQuickPhone] = useState("")
+  const [quickCreateLoading, setQuickCreateLoading] = useState(false)
 
   const { leads, loading: leadsLoading } = useLeads({ searchQuery, limit: 20 })
   const { createAppointment } = useAppointmentMutations()
+  const { createLead } = useLeadMutations()
   const { agents } = useAgents()
   const { profile } = useUser()
 
@@ -126,6 +134,10 @@ export function AppointmentBooking({
       setSearchQuery("")
       setError(null)
       setSelectedAgent("")
+      setShowQuickCreate(false)
+      setQuickFirstName("")
+      setQuickLastName("")
+      setQuickPhone("")
     }
   }, [isOpen, preselectedDate, preselectedTime, skipToDateTime, preselectedType, singleFormMode, preselectedLead, callbackMode])
 
@@ -174,15 +186,51 @@ export function AppointmentBooking({
   // Helper: first selected lead (for backward compat and display)
   const selectedLead = selectedLeads[0] || null
 
-  // Filter appointment types based on selected leads' stages
-  // puc_documents is only available for leads in the "application" stage
-  // new_appointment is NOT available for leads in the "application" stage
-  const availableAppointmentTypes = APPOINTMENT_TYPES.filter(type => {
-    if (type.value === 'puc_documents') {
-      return selectedLeads.some(l => l.pipeline_stage === 'application')
+  const handleQuickCreateLead = async () => {
+    if (!quickFirstName.trim() || !quickLastName.trim() || !quickPhone.trim()) return
+    setQuickCreateLoading(true)
+    try {
+      const { data, error: createError } = await createLead({
+        first_name: quickFirstName.trim(),
+        last_name: quickLastName.trim(),
+        phone: quickPhone.trim().replace(/\D/g, ""),
+        pipeline_stage: "new",
+        nationality: "Kuwaiti",
+        is_kuwaiti: true,
+        is_transfer_student: false,
+        is_special_needs: false,
+        is_diplomatic: false,
+        is_athlete: false,
+        is_married: false,
+        is_employee: false,
+      })
+      if (createError || !data) {
+        setError(typeof createError === "string" ? createError : "Failed to create lead")
+        return
+      }
+      setSelectedLeads(prev => [...prev, data as Lead])
+      setShowQuickCreate(false)
+      setQuickFirstName("")
+      setQuickLastName("")
+      setQuickPhone("")
+      setSearchQuery("")
+    } catch {
+      setError("Failed to create lead")
+    } finally {
+      setQuickCreateLoading(false)
     }
-    if (type.value === 'new_appointment') {
-      return !selectedLeads.some(l => l.pipeline_stage === 'application')
+  }
+
+  // Filter appointment types based on selected leads' funding type and stages
+  const isSelfFunded = selectedLeads.length > 0 && selectedLeads.every(l => l.funding_type === 'self_funded')
+  const availableAppointmentTypes = APPOINTMENT_TYPES.filter(type => {
+    // Self-funded leads only get: new_appointment, retest, sf_appointment
+    if (isSelfFunded) {
+      return ['new_appointment', 'retest', 'sf_appointment'].includes(type.value)
+    }
+    // PUC leads: sf_appointment is not relevant
+    if (type.value === 'sf_appointment') {
+      return false
     }
     return true
   })
@@ -236,13 +284,14 @@ export function AppointmentBooking({
         modality: selectedModality,
         lead_ids: selectedLeads.map(l => l.id),
         lead_id: selectedLeads[0]?.id,
-        scheduled_date: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
+        scheduled_date: toDateString(selectedDate),
         scheduled_time: selectedTime,
         duration_minutes: maxDuration,
         status: "scheduled",
         notes,
         assigned_agent: selectedAgent || undefined,
-        ...(callbackMode && { is_callback: true, callback_reason: "Callback scheduled" }),
+        is_callback: callbackMode ? true : false,
+        ...(callbackMode && { callback_reason: "Callback scheduled" }),
       })
 
       if (error) {
@@ -397,38 +446,102 @@ export function AppointmentBooking({
                                 <div className="absolute inset-0 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
                               </div>
                             </div>
-                          ) : leads.length === 0 ? (
-                            <div className="text-center py-4 text-sm text-[var(--text-muted)]">
-                              No leads found
-                            </div>
                           ) : (
-                            leads.filter(l => !selectedLeads.some(sl => sl.id === l.id)).map((lead) => (
+                            <>
+                              {leads.length === 0 ? (
+                                <div className="text-center py-3 text-sm text-[var(--text-muted)]">
+                                  No leads found
+                                </div>
+                              ) : (
+                                leads.filter(l => !selectedLeads.some(sl => sl.id === l.id)).map((lead) => (
+                                  <button
+                                    key={lead.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedLeads(prev => [...prev, lead])
+                                      setSearchQuery("")
+                                    }}
+                                    className="w-full p-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-3"
+                                  >
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-semibold text-[var(--primary)]">
+                                        {lead.first_name[0]}{lead.last_name[0]}
+                                      </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm text-[var(--text-primary)] truncate">
+                                        {lead.first_name} {lead.last_name}
+                                      </p>
+                                      <p className="text-xs text-[var(--text-muted)]">{lead.phone}</p>
+                                    </div>
+                                    <Badge variant="outline" size="xs" shape="pill">
+                                      {lead.pipeline_stage?.replace(/_/g, " ")}
+                                    </Badge>
+                                  </button>
+                                ))
+                              )}
+                              {/* Create new lead option */}
                               <button
-                                key={lead.id}
                                 type="button"
-                                onClick={() => {
-                                  setSelectedLeads(prev => [...prev, lead])
-                                  setSearchQuery("")
-                                }}
-                                className="w-full p-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-3"
+                                onClick={() => setShowQuickCreate(true)}
+                                className="w-full p-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-3 text-[var(--primary)]"
                               >
-                                <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
-                                  <span className="text-xs font-semibold text-[var(--primary)]">
-                                    {lead.first_name[0]}{lead.last_name[0]}
-                                  </span>
+                                <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                                  <UserPlus className="w-4 h-4" />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm text-[var(--text-primary)] truncate">
-                                    {lead.first_name} {lead.last_name}
-                                  </p>
-                                  <p className="text-xs text-[var(--text-muted)]">{lead.phone}</p>
-                                </div>
-                                <Badge variant="outline" size="xs" shape="pill">
-                                  {lead.pipeline_stage?.replace(/_/g, " ")}
-                                </Badge>
+                                <p className="font-medium text-sm">Create new lead</p>
                               </button>
-                            ))
+                            </>
                           )}
+                        </div>
+                      )}
+
+                      {/* Quick Create Lead Form */}
+                      {showQuickCreate && (
+                        <div className="rounded-lg border border-[var(--primary)]/30 bg-[var(--primary-muted)]/30 p-3 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Quick Create Lead</p>
+                            <button type="button" onClick={() => setShowQuickCreate(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              placeholder="First name *"
+                              value={quickFirstName}
+                              onChange={(e) => setQuickFirstName(e.target.value)}
+                              className="h-9 text-sm"
+                            />
+                            <Input
+                              placeholder="Last name *"
+                              value={quickLastName}
+                              onChange={(e) => setQuickLastName(e.target.value)}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                          <Input
+                            placeholder="Phone number *"
+                            value={quickPhone}
+                            onChange={(e) => setQuickPhone(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleQuickCreateLead}
+                            disabled={!quickFirstName.trim() || !quickLastName.trim() || !quickPhone.trim() || quickCreateLoading}
+                            className="w-full h-9"
+                          >
+                            {quickCreateLoading ? (
+                              <div className="relative w-4 h-4 mr-2">
+                                <div className="absolute inset-0 rounded-full border-2 border-white/20" />
+                                <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                              </div>
+                            ) : (
+                              <Plus className="w-4 h-4 mr-2" />
+                            )}
+                            {quickCreateLoading ? "Creating..." : "Create & Select"}
+                          </Button>
                         </div>
                       )}
                     </>
@@ -444,7 +557,11 @@ export function AppointmentBooking({
                     <Input
                       type="date"
                       value={selectedDate ? toDateString(selectedDate) : ""}
-                      onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                      onChange={(e) => {
+                        if (!e.target.value) { setSelectedDate(null); return }
+                        const [y, m, d] = e.target.value.split('-').map(Number)
+                        setSelectedDate(new Date(y, m - 1, d))
+                      }}
                       min={toDateString(new Date())}
                       className="h-10 rounded-lg"
                     />
@@ -932,74 +1049,161 @@ export function AppointmentBooking({
                       </div>
                       <p className="text-sm text-[var(--text-muted)]">Loading leads...</p>
                     </div>
-                  ) : leads.length === 0 ? (
-                    <div className="text-center py-12">
+                  ) : leads.length === 0 && !showQuickCreate ? (
+                    <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-xl bg-[var(--bg-sunken)] flex items-center justify-center mx-auto mb-3">
                         <User className="w-5 h-5 text-[var(--text-muted)]" />
                       </div>
-                      <p className="text-sm text-[var(--text-muted)]">No leads found</p>
+                      <p className="text-sm text-[var(--text-muted)] mb-3">No leads found</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowQuickCreate(true)}
+                        className="gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Create new lead
+                      </Button>
                     </div>
                   ) : (
-                    leads.map((lead, idx) => {
-                      const isSelected = selectedLeads.some(l => l.id === lead.id)
-                      return (
-                        <motion.button
-                          key={lead.id}
-                          onClick={() => {
-                            setSelectedLeads(prev =>
+                    <>
+                      {leads.map((lead, idx) => {
+                        const isSelected = selectedLeads.some(l => l.id === lead.id)
+                        return (
+                          <motion.button
+                            key={lead.id}
+                            onClick={() => {
+                              setSelectedLeads(prev =>
+                                isSelected
+                                  ? prev.filter(l => l.id !== lead.id)
+                                  : [...prev, lead]
+                              )
+                            }}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.03 }}
+                            whileHover={{ scale: 1.01, x: 2 }}
+                            className={cn(
+                              "w-full p-3.5 rounded-xl border-2 text-left transition-all duration-200 relative",
                               isSelected
-                                ? prev.filter(l => l.id !== lead.id)
-                                : [...prev, lead]
-                            )
-                          }}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.03 }}
-                          whileHover={{ scale: 1.01, x: 2 }}
-                          className={cn(
-                            "w-full p-3.5 rounded-xl border-2 text-left transition-all duration-200 relative",
-                            isSelected
-                              ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-md shadow-[var(--primary)]/10"
-                              : "border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--bg-hover)]"
-                          )}
-                        >
-                          {isSelected && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--primary)] rounded-r-full" />
-                          )}
-                          <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-semibold text-[var(--primary)]">
-                                {lead.first_name[0]}{lead.last_name[0]}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-[var(--text-primary)] truncate">
-                                {lead.first_name} {lead.last_name}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] px-2 py-0.5 rounded-md bg-[var(--bg-sunken)]">
-                                  <Phone className="w-3 h-3" />
-                                  {lead.phone}
+                                ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-md shadow-[var(--primary)]/10"
+                                : "border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--bg-hover)]"
+                            )}
+                          >
+                            {isSelected && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--primary)] rounded-r-full" />
+                            )}
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-semibold text-[var(--primary)]">
+                                  {lead.first_name[0]}{lead.last_name[0]}
                                 </span>
-                                <Badge variant="outline" size="xs" shape="pill">
-                                  {lead.pipeline_stage?.replace(/_/g, " ")}
-                                </Badge>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-[var(--text-primary)] truncate">
+                                  {lead.first_name} {lead.last_name}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] px-2 py-0.5 rounded-md bg-[var(--bg-sunken)]">
+                                    <Phone className="w-3 h-3" />
+                                    {lead.phone}
+                                  </span>
+                                  <Badge variant="outline" size="xs" shape="pill">
+                                    {lead.pipeline_stage?.replace(/_/g, " ")}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className={cn(
+                                "w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0",
+                                isSelected
+                                  ? "border-[var(--primary)] bg-[var(--primary)]"
+                                  : "border-[var(--border)]"
+                              )}>
+                                {isSelected && (
+                                  <Check className="w-3.5 h-3.5 text-white" />
+                                )}
                               </div>
                             </div>
-                            <div className={cn(
-                              "w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0",
-                              isSelected
-                                ? "border-[var(--primary)] bg-[var(--primary)]"
-                                : "border-[var(--border)]"
-                            )}>
-                              {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-white" />
-                              )}
-                            </div>
+                          </motion.button>
+                        )
+                      })}
+                      {/* Create new lead button */}
+                      {!showQuickCreate && (
+                        <motion.button
+                          type="button"
+                          onClick={() => setShowQuickCreate(true)}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: leads.length * 0.03 }}
+                          className="w-full p-3.5 rounded-xl border-2 border-dashed border-[var(--primary)]/30 text-left hover:border-[var(--primary)]/60 hover:bg-[var(--primary-muted)]/30 transition-all duration-200 flex items-center gap-3"
+                        >
+                          <div className="w-11 h-11 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                            <UserPlus className="w-5 h-5 text-[var(--primary)]" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-[var(--primary)]">Create new lead</p>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5">Add a lead that doesn&apos;t exist yet</p>
                           </div>
                         </motion.button>
-                      )
-                    })
+                      )}
+                    </>
+                  )}
+
+                  {/* Quick Create Lead Form - Multi-step mode */}
+                  {showQuickCreate && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border-2 border-[var(--primary)]/30 bg-[var(--primary-muted)]/20 p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <UserPlus className="w-4 h-4 text-[var(--primary)]" />
+                          <p className="text-sm font-semibold text-[var(--primary)]">Quick Create Lead</p>
+                        </div>
+                        <button type="button" onClick={() => setShowQuickCreate(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="First name *"
+                          value={quickFirstName}
+                          onChange={(e) => setQuickFirstName(e.target.value)}
+                          className="h-10 rounded-lg"
+                        />
+                        <Input
+                          placeholder="Last name *"
+                          value={quickLastName}
+                          onChange={(e) => setQuickLastName(e.target.value)}
+                          className="h-10 rounded-lg"
+                        />
+                      </div>
+                      <Input
+                        placeholder="Phone number *"
+                        value={quickPhone}
+                        onChange={(e) => setQuickPhone(e.target.value)}
+                        className="h-10 rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleQuickCreateLead}
+                        disabled={!quickFirstName.trim() || !quickLastName.trim() || !quickPhone.trim() || quickCreateLoading}
+                        className="w-full h-10 rounded-lg gap-2"
+                      >
+                        {quickCreateLoading ? (
+                          <div className="relative w-4 h-4">
+                            <div className="absolute inset-0 rounded-full border-2 border-white/20" />
+                            <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          </div>
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
+                        {quickCreateLoading ? "Creating..." : "Create & Select"}
+                      </Button>
+                    </motion.div>
                   )}
                 </div>
               </motion.div>
@@ -1030,7 +1234,11 @@ export function AppointmentBooking({
                   <Input
                     type="date"
                     value={selectedDate ? toDateString(selectedDate) : ""}
-                    onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                    onChange={(e) => {
+                      if (!e.target.value) { setSelectedDate(null); return }
+                      const [y, m, d] = e.target.value.split('-').map(Number)
+                      setSelectedDate(new Date(y, m - 1, d))
+                    }}
                     min={toDateString(new Date())}
                     className="h-11 rounded-xl"
                   />

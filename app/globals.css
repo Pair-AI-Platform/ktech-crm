@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /* ============================================
-   ktech CRM - Harvey AI Design System
-   Warm-Neutral, Enterprise Professional
-   Clarity-First, Intentionally Restrained
+   KTECH CRM Design System
+   Navy & Blue, Enterprise Professional
+   Clarity-First, Brand-Aligned
    ============================================ */
 
 /* Typography - Geist: Ultra-clean sans-serif by Vercel */
@@ -56,58 +56,75 @@
   font-display: swap;
 }
 
-/* IBM Plex Sans Arabic - RTL support */
+/* Almarai - Arabic font (auto-applied via unicode-range) */
 @font-face {
-  font-family: 'IBM Plex Sans Arabic';
-  src: url('https://fonts.gstatic.com/s/ibmplexsansarabic/v12/Qw3CZRtWPQCuHme67tEYUIx3Kh0PHR9N6Ys43PWrfyNx.woff2') format('woff2');
-  font-weight: 400 500 600;
+  font-family: 'Almarai';
+  src: url('https://fonts.gstatic.com/s/almarai/v12/tssoApxBaigK_hnnS_anhnicoq72sXg.woff2') format('woff2');
+  font-weight: 400;
   font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+10E60-10E7F;
+}
+
+@font-face {
+  font-family: 'Almarai';
+  src: url('https://fonts.gstatic.com/s/almarai/v12/tssoApxBaigK_hnnQ_Gnhnicoq72sXg.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+10E60-10E7F;
+}
+
+@font-face {
+  font-family: 'Almarai';
+  src: url('https://fonts.gstatic.com/s/almarai/v12/tssoApxBaigK_hnnc_Cnhnicoq72sXg.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+10E60-10E7F;
 }
 
 /* ============================================
-   Light Theme - Harvey Warm-Neutral Palette
+   Light Theme - KTECH Cool-Blue Palette
    ============================================ */
 :root {
-  /* Backgrounds - Warm off-whites */
-  --bg-base: #FAF9F7;
+  /* Backgrounds - Cool off-whites */
+  --bg-base: #F8FAFC;
   --bg-surface: #FFFFFF;
   --bg-elevated: #FFFFFF;
-  --bg-sunken: #F5F4F1;
-  --bg-hover: #F0EFEC;
-  --bg-active: #E8E7E4;
-  --bg-canvas: #FAF9F7;
+  --bg-sunken: #F1F5F9;
+  --bg-hover: #E2E8F0;
+  --bg-active: #CBD5E1;
+  --bg-canvas: #F8FAFC;
 
-  /* Primary - Harvey Ink */
-  --primary: #1F1D1A;
-  --primary-hover: #2C2A27;
-  --primary-muted: rgba(31, 29, 26, 0.08);
-  --primary-subtle: rgba(31, 29, 26, 0.04);
-  --primary-foreground: #FAF9F7;
-  --primary-gradient: linear-gradient(135deg, #1F1D1A 0%, #3A3835 100%);
+  /* Primary - KTECH Navy */
+  --primary: #2d3a6d;
+  --primary-hover: #3a4a80;
+  --primary-muted: rgba(45, 58, 109, 0.08);
+  --primary-subtle: rgba(45, 58, 109, 0.04);
+  --primary-foreground: #FFFFFF;
+  --primary-gradient: linear-gradient(135deg, #2d3a6d 0%, #3a4a80 100%);
 
-  /* Accent - Harvey Jade */
-  --accent: #0D9488;
-  --accent-hover: #0F766E;
-  --accent-muted: rgba(13, 148, 136, 0.08);
+  /* Accent - KTECH Light Blue */
+  --accent: #5b73a8;
+  --accent-hover: #4a5f96;
+  --accent-muted: rgba(91, 115, 168, 0.08);
   --accent-foreground: #FFFFFF;
 
-  /* Secondary - Warm stone */
-  --secondary: #57534E;
-  --secondary-hover: #44403C;
-  --secondary-muted: rgba(87, 83, 78, 0.08);
+  /* Secondary - Cool slate */
+  --secondary: #64748B;
+  --secondary-hover: #475569;
+  --secondary-muted: rgba(100, 116, 139, 0.08);
 
-  /* Text - Warm ink scale */
-  --text-primary: #1F1D1A;
-  --text-secondary: #57534E;
-  --text-tertiary: #78716C;
-  --text-muted: #A8A29E;
-  --text-disabled: #D6D3CD;
-  --text-inverse: #FAF9F7;
+  /* Text - Cool ink scale */
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-tertiary: #64748B;
+  --text-muted: #94A3B8;
+  --text-disabled: #CBD5E1;
+  --text-inverse: #F8FAFC;
 
-  /* Borders - Warm */
-  --border: #E7E5E0;
-  --border-subtle: #F0EFEC;
-  --border-emphasis: #D6D3CD;
+  /* Borders - Cool */
+  --border: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  --border-emphasis: #CBD5E1;
   --border-focus: var(--primary);
 
   /* Semantic - Refined warm tones */
@@ -126,15 +143,15 @@
   --error-bg: rgba(220, 38, 38, 0.04);
   --error-foreground: #FFFFFF;
 
-  --info: #0D9488;
-  --info-muted: rgba(13, 148, 136, 0.08);
-  --info-bg: rgba(13, 148, 136, 0.04);
+  --info: #5b73a8;
+  --info-muted: rgba(91, 115, 168, 0.08);
+  --info-bg: rgba(91, 115, 168, 0.04);
 
-  /* Pipeline Stages - Harvey amber/olive/jade-inspired muted tones */
-  --stage-new: #57534E;
-  --stage-contacted: #78716C;
-  --stage-appointed: #0D9488;
-  --stage-visited: #0F766E;
+  /* Pipeline Stages - KTECH blue-inspired tones */
+  --stage-new: #64748B;
+  --stage-contacted: #8b9dc3;
+  --stage-appointed: #5b73a8;
+  --stage-visited: #4a5f96;
   --stage-applied: #65A30D;
   --stage-tested: #D97706;
   --stage-application: #B45309;
@@ -142,18 +159,18 @@
   --stage-enrolled: #15803D;
   --stage-lost: #DC2626;
 
-  /* Shadows - Warm black (31, 29, 26) */
-  --shadow-xs: 0 1px 2px rgba(31, 29, 26, 0.03);
-  --shadow-sm: 0 1px 3px rgba(31, 29, 26, 0.04), 0 1px 2px rgba(31, 29, 26, 0.02);
-  --shadow-md: 0 4px 6px -1px rgba(31, 29, 26, 0.06), 0 2px 4px -2px rgba(31, 29, 26, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(31, 29, 26, 0.08), 0 4px 6px -4px rgba(31, 29, 26, 0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(31, 29, 26, 0.10), 0 8px 10px -6px rgba(31, 29, 26, 0.06);
-  --shadow-2xl: 0 25px 50px -12px rgba(31, 29, 26, 0.18);
-  --shadow-inner: inset 0 2px 4px rgba(31, 29, 26, 0.03);
+  /* Shadows - Navy-tinted (45, 58, 109) */
+  --shadow-xs: 0 1px 2px rgba(45, 58, 109, 0.04);
+  --shadow-sm: 0 1px 3px rgba(45, 58, 109, 0.05), 0 1px 2px rgba(45, 58, 109, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(45, 58, 109, 0.07), 0 2px 4px -2px rgba(45, 58, 109, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(45, 58, 109, 0.09), 0 4px 6px -4px rgba(45, 58, 109, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(45, 58, 109, 0.12), 0 8px 10px -6px rgba(45, 58, 109, 0.06);
+  --shadow-2xl: 0 25px 50px -12px rgba(45, 58, 109, 0.20);
+  --shadow-inner: inset 0 2px 4px rgba(45, 58, 109, 0.03);
   --shadow-focus: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--primary-muted);
-  --shadow-glow: 0 0 24px rgba(31, 29, 26, 0.06);
-  --shadow-card: 0 1px 2px rgba(31, 29, 26, 0.04);
-  --shadow-card-hover: 0 4px 12px rgba(31, 29, 26, 0.08);
+  --shadow-glow: 0 0 24px rgba(45, 58, 109, 0.08);
+  --shadow-card: 0 1px 2px rgba(45, 58, 109, 0.05);
+  --shadow-card-hover: 0 4px 12px rgba(45, 58, 109, 0.10);
 
   /* Layout */
   --sidebar-width: 240px;
@@ -206,50 +223,50 @@ html.light, .light {
 }
 
 /* ============================================
-   Dark Theme - Harvey Ink Mode
-   Warm charcoal, never cold blue-black
+   Dark Theme - KTECH Navy Mode
+   Deep navy, brand-aligned dark
    ============================================ */
 html.dark, .dark {
-  /* Backgrounds - Warm charcoal */
-  --bg-base: #1F1D1A;
-  --bg-surface: #292724;
-  --bg-elevated: #33312E;
-  --bg-sunken: #17150F;
-  --bg-hover: #3A3835;
-  --bg-active: #44423F;
-  --bg-canvas: #17150F;
+  /* Backgrounds - Cool charcoal with navy undertone */
+  --bg-base: #1a1d2e;
+  --bg-surface: #242840;
+  --bg-elevated: #2e3350;
+  --bg-sunken: #131526;
+  --bg-hover: #353a58;
+  --bg-active: #3f4568;
+  --bg-canvas: #131526;
 
-  /* Primary - Harvey Ivory */
-  --primary: #FAF9F7;
-  --primary-hover: #E7E5E0;
-  --primary-muted: rgba(250, 249, 247, 0.10);
-  --primary-subtle: rgba(250, 249, 247, 0.05);
-  --primary-foreground: #1F1D1A;
-  --primary-gradient: linear-gradient(135deg, #FAF9F7 0%, #E7E5E0 100%);
+  /* Primary - Light for dark mode */
+  --primary: #F8FAFC;
+  --primary-hover: #E2E8F0;
+  --primary-muted: rgba(248, 250, 252, 0.10);
+  --primary-subtle: rgba(248, 250, 252, 0.05);
+  --primary-foreground: #1a1d2e;
+  --primary-gradient: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%);
 
-  /* Accent */
-  --accent: #2DD4BF;
-  --accent-hover: #5EEAD4;
-  --accent-muted: rgba(45, 212, 191, 0.12);
+  /* Accent - KTECH Light Blue */
+  --accent: #8b9dc3;
+  --accent-hover: #a3b3d4;
+  --accent-muted: rgba(139, 157, 195, 0.12);
   --accent-foreground: #1F1D1A;
 
   /* Secondary */
-  --secondary: #A8A29E;
-  --secondary-hover: #D6D3CD;
-  --secondary-muted: rgba(168, 162, 158, 0.12);
+  --secondary: #94A3B8;
+  --secondary-hover: #CBD5E1;
+  --secondary-muted: rgba(148, 163, 184, 0.12);
 
-  /* Text - High contrast ivory */
-  --text-primary: #FAF9F7;
-  --text-secondary: #A8A29E;
-  --text-tertiary: #78716C;
-  --text-muted: #57534E;
-  --text-disabled: #3A3835;
-  --text-inverse: #1F1D1A;
+  /* Text - High contrast cool */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-tertiary: #64748B;
+  --text-muted: #475569;
+  --text-disabled: #334155;
+  --text-inverse: #1a1d2e;
 
-  /* Borders - Warm */
-  --border: #3A3835;
-  --border-subtle: #33312E;
-  --border-emphasis: #57534E;
+  /* Borders - Cool */
+  --border: #334155;
+  --border-subtle: #2e3350;
+  --border-emphasis: #475569;
   --border-focus: var(--primary);
 
   /* Semantic - Warm dark variants */
@@ -268,15 +285,15 @@ html.dark, .dark {
   --error-bg: rgba(248, 113, 113, 0.08);
   --error-foreground: #1F1D1A;
 
-  --info: #2DD4BF;
-  --info-muted: rgba(45, 212, 191, 0.12);
-  --info-bg: rgba(45, 212, 191, 0.08);
+  --info: #8b9dc3;
+  --info-muted: rgba(139, 157, 195, 0.12);
+  --info-bg: rgba(139, 157, 195, 0.08);
 
-  /* Pipeline Stages - Luminous warm */
-  --stage-new: #A8A29E;
-  --stage-contacted: #D6D3CD;
-  --stage-appointed: #2DD4BF;
-  --stage-visited: #5EEAD4;
+  /* Pipeline Stages - KTECH blue tones */
+  --stage-new: #94A3B8;
+  --stage-contacted: #a3b3d4;
+  --stage-appointed: #8b9dc3;
+  --stage-visited: #a3b3d4;
   --stage-applied: #A3E635;
   --stage-tested: #FCD34D;
   --stage-application: #FBBF24;
@@ -293,7 +310,7 @@ html.dark, .dark {
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.15);
   --shadow-focus: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--primary-muted);
-  --shadow-glow: 0 0 32px rgba(250, 249, 247, 0.06);
+  --shadow-glow: 0 0 32px rgba(139, 157, 195, 0.08);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
 
@@ -301,7 +318,7 @@ html.dark, .dark {
 
 /* RTL */
 [dir="rtl"] {
-  font-family: 'IBM Plex Sans Arabic', 'Geist', system-ui, sans-serif;
+  font-family: 'Almarai', 'Geist', system-ui, sans-serif;
 }
 
 /* Tailwind Theme */
@@ -339,7 +356,7 @@ html.dark {
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Geist', system-ui, -apple-system, sans-serif;
+  font-family: 'Almarai', 'Geist', system-ui, -apple-system, sans-serif;
   font-weight: 400;
   font-size: 14px;
   line-height: 1.55;

@@ -1,0 +1,530 @@
+"use client"
+
+import { useState, useEffect, useCallback, useRef } from "react"
+import { CheckSquare, Square, Paperclip, GraduationCap, Check, Send, Upload, FileText, Loader2, X, Download } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { type Lead, type EducationType } from "@/types"
+import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { GRADUATE_TYPE_CONFIGS, getDocumentsForGraduateType, type GraduateType, type ConditionalDocumentFlags } from "@/lib/psp/document-rules"
+import { createClient } from "@/lib/supabase/client"
+
+const GRADUATE_TYPE_OPTIONS: { value: GraduateType; label: string; description: string }[] = [
+  { value: "GOV", label: "GOV", description: "Kuwait Government School" },
+  { value: "US", label: "US", description: "American Curriculum" },
+  { value: "UK", label: "UK", description: "British Curriculum" },
+  { value: "KSA", label: "KSA", description: "Saudi Arabian Curriculum" },
+  { value: "OTHER", label: "Others", description: "Other Curriculum" },
+]
+
+// Map EducationType to GraduateType
+function educationToGraduateType(educationType?: EducationType): GraduateType | null {
+  if (!educationType) return null
+  if (educationType === 'other') return 'OTHER'
+  return educationType as GraduateType
+}
+
+interface UploadedDocFile {
+  name: string
+  size: number
+  type: string
+  url: string
+  storage_path: string
+  uploaded_at: string
+}
+
+interface SFDocumentManagerProps {
+  lead: Lead
+  onUpdate?: () => void
+  className?: string
+}
+
+export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManagerProps) {
+  const [selectedType, setSelectedType] = useState<GraduateType | null>(
+    educationToGraduateType(lead.education_type)
+  )
+  const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedDocFile>>({})
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
+  const [sentToRegistration, setSentToRegistration] = useState(false)
+  const [isTransfer, setIsTransfer] = useState(false)
+  const [isSpecialNeeds, setIsSpecialNeeds] = useState(false)
+  const { updateLead } = useLeadMutations()
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  // Load sent-to-registration flag from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(`sf-sent-to-registration-${lead.id}`)
+    if (stored === 'true') {
+      setSentToRegistration(true)
+    }
+    // Load conditional flags
+    const storedFlags = localStorage.getItem(`sf-flags-${lead.id}`)
+    if (storedFlags) {
+      try {
+        const flags = JSON.parse(storedFlags)
+        setIsTransfer(!!flags.isTransfer)
+        setIsSpecialNeeds(!!flags.isSpecialNeeds)
+      } catch { /* ignore */ }
+    }
+  }, [lead.id])
+
+  const handleSendToRegistration = () => {
+    localStorage.setItem(`sf-sent-to-registration-${lead.id}`, 'true')
+    setSentToRegistration(true)
+    // Dispatch storage event so lead-table can pick it up in real time
+    window.dispatchEvent(new Event('storage'))
+  }
+
+  const handleUndoRegistration = () => {
+    localStorage.removeItem(`sf-sent-to-registration-${lead.id}`)
+    setSentToRegistration(false)
+    window.dispatchEvent(new Event('storage'))
+  }
+
+  // Load checked docs and uploaded files from localStorage
+  useEffect(() => {
+    if (!selectedType) return
+    const stored = localStorage.getItem(`sf-docs-${lead.id}-${selectedType}`)
+    if (stored) {
+      try {
+        setCheckedDocs(JSON.parse(stored))
+      } catch {
+        setCheckedDocs({})
+      }
+    } else {
+      setCheckedDocs({})
+    }
+
+    const storedFiles = localStorage.getItem(`sf-files-${lead.id}-${selectedType}`)
+    if (storedFiles) {
+      try {
+        setUploadedFiles(JSON.parse(storedFiles))
+      } catch {
+        setUploadedFiles({})
+      }
+    } else {
+      setUploadedFiles({})
+    }
+  }, [lead.id, selectedType])
+
+  // Save checked docs to localStorage
+  const saveCheckedDocs = useCallback((docs: Record<string, boolean>) => {
+    if (!selectedType) return
+    localStorage.setItem(`sf-docs-${lead.id}-${selectedType}`, JSON.stringify(docs))
+    setCheckedDocs(docs)
+  }, [lead.id, selectedType])
+
+  // Save uploaded files to localStorage
+  const saveUploadedFiles = useCallback((files: Record<string, UploadedDocFile>) => {
+    if (!selectedType) return
+    localStorage.setItem(`sf-files-${lead.id}-${selectedType}`, JSON.stringify(files))
+    setUploadedFiles(files)
+  }, [lead.id, selectedType])
+
+  // Toggle conditional flags
+  const handleToggleTransfer = () => {
+    const newVal = !isTransfer
+    setIsTransfer(newVal)
+    const flags = { isTransfer: newVal, isSpecialNeeds }
+    localStorage.setItem(`sf-flags-${lead.id}`, JSON.stringify(flags))
+  }
+
+  const handleToggleSpecialNeeds = () => {
+    const newVal = !isSpecialNeeds
+    setIsSpecialNeeds(newVal)
+    const flags = { isTransfer, isSpecialNeeds: newVal }
+    localStorage.setItem(`sf-flags-${lead.id}`, JSON.stringify(flags))
+  }
+
+  // Get documents for selected type (with conditional flags)
+  const conditionalFlags: ConditionalDocumentFlags = { isTransfer, isSpecialNeeds }
+  const typeConfig = selectedType
+    ? GRADUATE_TYPE_CONFIGS.find(c => c.type === selectedType)
+    : null
+  const typeDocs = selectedType
+    ? getDocumentsForGraduateType(selectedType, conditionalFlags).filter(
+        doc => doc.id !== 'nationality' || lead.is_kuwaiti
+      )
+    : []
+
+  const requiredDocs = typeDocs.filter(d => d.required)
+  const typeCheckedCount = typeDocs.filter(d => checkedDocs[d.id]).length
+
+  const handleTypeSelect = async (type: GraduateType) => {
+    setSelectedType(type)
+    // Also persist the education_type on the lead
+    const educationType: EducationType = type === 'OTHER' ? 'other' : type as EducationType
+    if (lead.education_type !== educationType) {
+      await updateLead(lead.id, { education_type: educationType } as Partial<Lead>)
+      onUpdate?.()
+    }
+  }
+
+  const handleDocToggle = (docId: string) => {
+    const updated = { ...checkedDocs, [docId]: !checkedDocs[docId] }
+    saveCheckedDocs(updated)
+  }
+
+  const handleFileUpload = async (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const file = files[0]
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File is too large. Maximum size is 10MB.")
+      return
+    }
+
+    setUploadingDoc(docId)
+    const supabase = createClient()
+
+    try {
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      const storagePath = `leads/${lead.id}/sf-docs/${selectedType}/${docId}/${timestamp}-${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        })
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError)
+        if (uploadError.message.includes("Bucket not found")) {
+          alert("Document storage is not configured. Please contact support.")
+          return
+        }
+        throw uploadError
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("documents")
+        .getPublicUrl(storagePath)
+
+      const uploadedFile: UploadedDocFile = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: urlData?.publicUrl || "",
+        storage_path: storagePath,
+        uploaded_at: new Date().toISOString(),
+      }
+
+      const updated = { ...uploadedFiles, [docId]: uploadedFile }
+      saveUploadedFiles(updated)
+    } catch (err) {
+      console.error("Upload failed:", err)
+      alert("Failed to upload file. Please try again.")
+    } finally {
+      setUploadingDoc(null)
+      if (fileInputRefs.current[docId]) {
+        fileInputRefs.current[docId]!.value = ""
+      }
+    }
+  }
+
+  const handleRemoveFile = async (docId: string) => {
+    const file = uploadedFiles[docId]
+    if (!file) return
+
+    const supabase = createClient()
+    try {
+      await supabase.storage.from("documents").remove([file.storage_path])
+    } catch (err) {
+      console.error("Delete from storage failed:", err)
+    }
+
+    const updated = { ...uploadedFiles }
+    delete updated[docId]
+    saveUploadedFiles(updated)
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="text-[var(--text-muted)]">
+            <Paperclip className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-[var(--text-primary)]">Documents</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Check off received documents
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Graduate Type Selector */}
+      <div>
+        <p className="text-xs font-medium text-[var(--text-muted)] mb-2 uppercase tracking-wide">Graduate Type</p>
+        <div className="grid grid-cols-5 gap-2">
+          {GRADUATE_TYPE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleTypeSelect(option.value)}
+              className={cn(
+                "p-3 rounded-xl border text-center transition-all",
+                selectedType === option.value
+                  ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                  : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
+              )}
+            >
+              <span className={cn(
+                "text-sm font-bold",
+                selectedType === option.value ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
+              )}>
+                {option.label}
+              </span>
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">
+                {option.description}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Conditional Flags */}
+      {selectedType && (
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={handleToggleTransfer}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm",
+              isTransfer
+                ? "border-blue-400 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400"
+                : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-blue-300"
+            )}
+          >
+            {isTransfer ? (
+              <CheckSquare className="w-4 h-4 text-blue-600" />
+            ) : (
+              <Square className="w-4 h-4 text-[var(--text-muted)]" />
+            )}
+            Transfer
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleSpecialNeeds}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm",
+              isSpecialNeeds
+                ? "border-purple-400 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400"
+                : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-purple-300"
+            )}
+          >
+            {isSpecialNeeds ? (
+              <CheckSquare className="w-4 h-4 text-purple-600" />
+            ) : (
+              <Square className="w-4 h-4 text-[var(--text-muted)]" />
+            )}
+            Special Needs
+          </button>
+        </div>
+      )}
+
+      {/* Type-specific Documents */}
+      {selectedType && typeDocs.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
+              {typeConfig?.label} Documents
+            </p>
+            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-full">
+              {typeCheckedCount}/{requiredDocs.length}
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="w-full bg-[var(--border)] rounded-full h-1.5 mb-3">
+            <div
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                typeCheckedCount >= requiredDocs.length ? "bg-emerald-500" : "bg-[var(--primary)]"
+              )}
+              style={{ width: `${requiredDocs.length > 0 ? Math.min(100, Math.round((typeCheckedCount / requiredDocs.length) * 100)) : 0}%` }}
+            />
+          </div>
+          <div className="space-y-1">
+            {typeDocs.map((doc) => {
+              const isChecked = !!checkedDocs[doc.id]
+              const uploadedFile = uploadedFiles[doc.id]
+              const isUploading = uploadingDoc === doc.id
+              return (
+                <div key={doc.id} className="space-y-0">
+                  <div
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                      isChecked
+                        ? "bg-emerald-50 dark:bg-emerald-950/20"
+                        : "bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)]",
+                      uploadedFile && "rounded-b-none"
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => handleDocToggle(doc.id)}
+                      className="shrink-0"
+                    >
+                      {isChecked ? (
+                        <CheckSquare className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-[var(--text-muted)]" />
+                      )}
+                    </button>
+
+                    {/* Document Info */}
+                    <button
+                      type="button"
+                      onClick={() => handleDocToggle(doc.id)}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <p className={cn(
+                        "text-sm font-medium",
+                        isChecked ? "text-emerald-700 dark:text-emerald-400" : "text-[var(--text-primary)]"
+                      )}>
+                        {doc.name}
+                      </p>
+                      {doc.description && (
+                        <p className="text-xs text-[var(--text-muted)]">{doc.description}</p>
+                      )}
+                    </button>
+
+                    {/* Upload Button */}
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      <input
+                        ref={(el) => { fileInputRefs.current[doc.id] = el }}
+                        type="file"
+                        onChange={(e) => handleFileUpload(doc.id, e)}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
+                      />
+                      {!uploadedFile && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            fileInputRefs.current[doc.id]?.click()
+                          }}
+                          disabled={isUploading}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                            "bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-secondary)]",
+                            "hover:border-[var(--primary)]/50 hover:text-[var(--primary)]",
+                            isUploading && "opacity-50 cursor-not-allowed"
+                          )}
+                          title="Upload file (optional)"
+                        >
+                          {isUploading ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="w-3.5 h-3.5" />
+                          )}
+                          Upload
+                        </button>
+                      )}
+
+                      {/* Optional label */}
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        Optional
+                      </span>
+                    </div>
+
+                    {isChecked && !uploadedFile && (
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    )}
+                  </div>
+
+                  {/* Uploaded file indicator */}
+                  {uploadedFile && (
+                    <div className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-b-xl border-t",
+                      isChecked
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/20"
+                        : "bg-[var(--bg-sunken)]/50 border-[var(--border)]"
+                    )}>
+                      <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span className="text-xs text-[var(--text-secondary)] truncate flex-1">
+                        {uploadedFile.name}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)] shrink-0">
+                        {formatFileSize(uploadedFile.size)}
+                      </span>
+                      <a
+                        href={uploadedFile.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 rounded hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+                        title="Download"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(doc.id)}
+                        className="p-1 rounded hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors shrink-0"
+                        title="Remove file"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Prompt to select type if none selected */}
+      {!selectedType && (
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <GraduationCap className="w-10 h-10 text-[var(--text-muted)] mb-2 opacity-40" />
+          <p className="text-sm text-[var(--text-muted)]">
+            Select a graduate type to view required documents
+          </p>
+        </div>
+      )}
+
+      {/* Send to Registration Button */}
+      <div className="pt-4 border-t border-[var(--border)]">
+        {sentToRegistration ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
+              <Check className="w-5 h-5" />
+              <span className="text-sm font-semibold">Sent to Registration</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleUndoRegistration}
+              className="w-full text-xs text-[var(--text-muted)] hover:text-red-500 transition-colors py-1"
+            >
+              Undo
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSendToRegistration}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors"
+          >
+            <Send className="w-4 h-4" />
+            Send to Registration
+          </button>
+        )}
+      </div>
+
+    </div>
+  )
+}

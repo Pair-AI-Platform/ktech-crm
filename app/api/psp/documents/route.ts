@@ -1,5 +1,5 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import { withApiHandler } from "@/lib/api-handler"
 
 export interface PSPDocument {
   id: string
@@ -23,75 +23,79 @@ export interface PSPDocument {
 }
 
 // GET - Fetch documents for a lead
-export async function GET(request: NextRequest) {
-  const supabase = await createServerSupabaseClient()
-  const searchParams = request.nextUrl.searchParams
-  const leadId = searchParams.get("lead_id")
-  const graduateType = searchParams.get("graduate_type")
+export const GET = withApiHandler(
+  { context: 'psp-documents-list' },
+  async ({ req, supabase, user, profile, logger }) => {
+    const searchParams = req.nextUrl.searchParams
+    const leadId = searchParams.get("lead_id")
+    const graduateType = searchParams.get("graduate_type")
 
-  if (!leadId) {
-    return NextResponse.json({ error: "lead_id is required" }, { status: 400 })
-  }
-
-  try {
-    let query = supabase
-      .from("psp_documents")
-      .select(`
-        *,
-        verified_by_profile:profiles!verified_by(id, full_name, email),
-        uploaded_by_profile:profiles!uploaded_by(id, full_name, email)
-      `)
-      .eq("lead_id", leadId)
-      .order("uploaded_at", { ascending: false })
-
-    if (graduateType) {
-      query = query.eq("graduate_type", graduateType)
+    if (!leadId) {
+      return NextResponse.json({ error: "lead_id is required" }, { status: 400 })
     }
 
-    const { data, error } = await query
+    // Verify user owns the lead or is admin (IDOR check)
+    if (profile.role !== 'admin') {
+      const { data: lead } = await supabase.from('leads').select('assigned_to').eq('id', leadId).single()
+      if (!lead || lead.assigned_to !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
 
-    if (error) {
-      // If the join fails, try a simpler query without profile joins
-      console.warn("PSP documents query with joins failed, trying without joins:", error.message)
-      let fallbackQuery = supabase
+    try {
+      let query = supabase
         .from("psp_documents")
-        .select("*")
+        .select(`
+          *,
+          verified_by_profile:profiles!verified_by(id, full_name, email),
+          uploaded_by_profile:profiles!uploaded_by(id, full_name, email)
+        `)
         .eq("lead_id", leadId)
         .order("uploaded_at", { ascending: false })
 
       if (graduateType) {
-        fallbackQuery = fallbackQuery.eq("graduate_type", graduateType)
+        query = query.eq("graduate_type", graduateType)
       }
 
-      const { data: fallbackData, error: fallbackError } = await fallbackQuery
+      const { data, error } = await query
 
-      if (fallbackError) {
-        // Table likely doesn't exist yet - return empty array
-        console.warn("PSP documents table not available:", fallbackError.message)
-        return NextResponse.json({ documents: [] })
+      if (error) {
+        // If the join fails, try a simpler query without profile joins
+        logger.warn("PSP documents query with joins failed, trying without joins", { error: error.message })
+        let fallbackQuery = supabase
+          .from("psp_documents")
+          .select("*")
+          .eq("lead_id", leadId)
+          .order("uploaded_at", { ascending: false })
+
+        if (graduateType) {
+          fallbackQuery = fallbackQuery.eq("graduate_type", graduateType)
+        }
+
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery
+
+        if (fallbackError) {
+          // Table likely doesn't exist yet - return empty array
+          logger.warn("PSP documents table not available", { error: fallbackError.message })
+          return NextResponse.json({ documents: [] })
+        }
+
+        return NextResponse.json({ documents: fallbackData || [] })
       }
 
-      return NextResponse.json({ documents: fallbackData || [] })
+      return NextResponse.json({ documents: data || [] })
+    } catch (err) {
+      logger.error("Error fetching PSP documents", { error: err instanceof Error ? err.message : String(err) })
+      return NextResponse.json({ documents: [] })
     }
-
-    return NextResponse.json({ documents: data || [] })
-  } catch (err) {
-    console.error("Error fetching PSP documents:", err)
-    return NextResponse.json({ documents: [] })
   }
-}
+)
 
 // POST - Create/update a document record
-export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClient()
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const body = await request.json()
+export const POST = withApiHandler(
+  { context: 'psp-documents-create' },
+  async ({ req, supabase, user, logger }) => {
+    const body = await req.json()
     const {
       lead_id,
       document_type,
@@ -142,28 +146,19 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error creating PSP document:", error)
+      logger.error("Error creating PSP document", { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ document: data })
-  } catch (err) {
-    console.error("Error creating PSP document:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+)
 
 // DELETE - Remove a document
-export async function DELETE(request: NextRequest) {
-  const supabase = await createServerSupabaseClient()
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
+export const DELETE = withApiHandler(
+  { context: 'psp-documents-delete' },
+  async ({ req, supabase, logger }) => {
+    const { searchParams } = new URL(req.url)
     const documentId = searchParams.get("id")
 
     if (!documentId) {
@@ -178,7 +173,7 @@ export async function DELETE(request: NextRequest) {
       .single()
 
     if (fetchError) {
-      console.error("Error fetching document:", fetchError)
+      logger.error("Document not found for deletion", { documentId, error: fetchError.message })
       return NextResponse.json({ error: "Document not found" }, { status: 404 })
     }
 
@@ -189,7 +184,7 @@ export async function DELETE(request: NextRequest) {
         .remove([doc.storage_path])
 
       if (storageError) {
-        console.error("Error deleting from storage:", storageError)
+        logger.warn("Error deleting from storage, continuing with DB deletion", { error: storageError.message })
         // Continue with database deletion even if storage fails
       }
     }
@@ -201,28 +196,19 @@ export async function DELETE(request: NextRequest) {
       .eq("id", documentId)
 
     if (deleteError) {
-      console.error("Error deleting document:", deleteError)
+      logger.error("Error deleting document from DB", { error: deleteError.message })
       return NextResponse.json({ error: deleteError.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error("Error deleting PSP document:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+)
 
 // PATCH - Update document (expiration date, etc.)
-export async function PATCH(request: NextRequest) {
-  const supabase = await createServerSupabaseClient()
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const body = await request.json()
+export const PATCH = withApiHandler(
+  { context: 'psp-documents-update' },
+  async ({ req, supabase, logger }) => {
+    const body = await req.json()
     const { id, expiration_date } = body
 
     if (!id) {
@@ -251,13 +237,10 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error updating document:", error)
+      logger.error("Error updating document", { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ document: data })
-  } catch (err) {
-    console.error("Error updating PSP document:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+)

@@ -107,9 +107,9 @@ export default function WorkspacesPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="px-3 py-4 sm:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6 sm:mb-8 gap-3 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold text-[var(--text-primary)]">Workspaces</h1>
           <p className="text-[var(--text-secondary)] mt-1">

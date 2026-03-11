@@ -14,7 +14,6 @@ const WEBHOOK_ROUTES = [
   '/api/payments/psp/webhook',
   '/api/payments/puc-fee/webhook',
   '/api/sms/webhook',
-  '/api/voice/avaya/webhook',
 ]
 
 // CRON / service endpoints that use their own auth (Bearer token)

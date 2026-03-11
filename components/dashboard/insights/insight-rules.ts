@@ -126,23 +126,7 @@ export const INSIGHT_RULES: RuleDefinition[] = [
     },
   },
 
-  // 7. Missed calls spike >5 (both)
-  {
-    id: "missed-calls-spike",
-    label: "Missed Calls Spike",
-    audience: "both",
-    evaluate: ({ missedCallsCount }) => {
-      if (missedCallsCount <= 5) return null
-      return {
-        id: "missed-calls-spike",
-        severity: "warning",
-        title: `${missedCallsCount} missed calls today`,
-        description: "Higher than usual missed call volume. Consider returning these calls promptly.",
-      }
-    },
-  },
-
-  // 8. Unassigned new leads (admin)
+  // 7. Unassigned new leads (admin)
   {
     id: "unassigned-leads",
     label: "Unassigned Leads",

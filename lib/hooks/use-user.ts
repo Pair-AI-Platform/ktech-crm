@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { isDemoMode, DEMO_AGENTS } from "@/lib/demo-data"
+import { isDemoMode, getDemoRole, DEMO_AGENTS } from "@/lib/demo-data"
 import type { User } from "@supabase/supabase-js"
 
 export interface Profile {
@@ -19,14 +19,25 @@ export interface Profile {
   updated_at: string
 }
 
-// Demo user profile
-const DEMO_PROFILE: Profile = {
-  id: "demo-user-id",
-  email: "demo@ktech.edu.kw",
-  full_name: "Demo Admin",
+// Demo user profiles
+const DEMO_ADMIN_PROFILE: Profile = {
+  id: "demo-admin-id",
+  email: "adel@ktech.edu.kw",
+  full_name: "Adel",
   role: "admin",
   is_active: true,
   monthly_target: 50,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
+const DEMO_AGENT_PROFILE: Profile = {
+  id: "demo-agent-id",
+  email: "sarah@ktech.edu.kw",
+  full_name: "Sarah Jones",
+  role: "agent",
+  is_active: true,
+  monthly_target: 40,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
@@ -40,7 +51,8 @@ export function useUser() {
     async function getUser() {
       // Check for demo mode
       if (isDemoMode()) {
-        setProfile(DEMO_PROFILE)
+        const demoRole = getDemoRole()
+        setProfile(demoRole === "agent" ? DEMO_AGENT_PROFILE : DEMO_ADMIN_PROFILE)
         setLoading(false)
         return
       }
@@ -96,6 +108,7 @@ export function useUser() {
     // Clear demo mode
     if (isDemoMode()) {
       localStorage.removeItem("ktech-demo-mode")
+      localStorage.removeItem("ktech-demo-role")
       document.cookie = "ktech-demo-mode=; path=/; max-age=0"
       window.location.href = "/login"
       return
@@ -106,7 +119,14 @@ export function useUser() {
     window.location.href = "/login"
   }
 
-  return { user, profile, loading, signOut, isAdmin: profile?.role === "admin" }
+  return {
+    user,
+    profile,
+    loading,
+    signOut,
+    isAdmin: profile?.role === "admin",
+    isAgent: profile?.role === "agent",
+  }
 }
 
 // Hook to get all team members/agents

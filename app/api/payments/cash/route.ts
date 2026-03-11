@@ -5,7 +5,7 @@ import { ENROLLMENT_PAYMENT_AMOUNT } from '@/types'
 
 export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, supabase, user, logger }) => {
   const body = await req.json()
-  const { leadId, invoiceNumber, notes } = body
+  const { leadId, invoiceNumber, notes, amount: customAmount } = body
 
   if (!leadId) {
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
@@ -22,13 +22,18 @@ export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, su
     return NextResponse.json({ error: reason }, { status: 400 })
   }
 
+  // Determine payment amount (custom or default)
+  const paymentAmount = typeof customAmount === 'number' && customAmount > 0
+    ? customAmount
+    : ENROLLMENT_PAYMENT_AMOUNT
+
   // Create payment transaction record
-  logger.info('Creating cash payment transaction', { leadId, invoiceNumber })
+  logger.info('Creating cash payment transaction', { leadId, invoiceNumber, amount: paymentAmount })
   const { data: transaction, error: txError } = await supabase
     .from('payment_transactions')
     .insert({
       lead_id: leadId,
-      amount: ENROLLMENT_PAYMENT_AMOUNT,
+      amount: paymentAmount,
       currency: 'KWD',
       payment_method: 'cash',
       status: 'completed',
@@ -63,7 +68,7 @@ export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, su
     const sfResult = await promoteSFLeadToApplicant(supabase, {
       leadId,
       transactionId: transaction.id,
-      amountPaid: ENROLLMENT_PAYMENT_AMOUNT,
+      amountPaid: paymentAmount,
       userId: user.id,
     })
 
@@ -89,7 +94,7 @@ export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, su
   const result = await convertLeadToStudent(supabase, {
     leadId,
     transactionId: transaction.id,
-    amountPaid: ENROLLMENT_PAYMENT_AMOUNT,
+    amountPaid: paymentAmount,
     userId: user.id,
   })
 
@@ -109,11 +114,11 @@ export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, su
     student_id: result.student?.id,
     activity_type: 'payment_received',
     title: 'Cash Payment Received',
-    description: `Cash payment of ${ENROLLMENT_PAYMENT_AMOUNT} KWD received. Invoice: ${invoiceNumber}`,
+    description: `Cash payment of ${paymentAmount} KWD received. Invoice: ${invoiceNumber}`,
     metadata: {
       transaction_id: transaction.id,
       payment_method: 'cash',
-      amount: ENROLLMENT_PAYMENT_AMOUNT,
+      amount: paymentAmount,
       invoice_number: invoiceNumber,
     },
     created_by: user.id,

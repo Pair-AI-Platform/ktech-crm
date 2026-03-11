@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { withApiHandler } from "@/lib/api-handler"
 
 // Check if the payment_transactions migration has been applied
-export async function GET() {
-  try {
-    const supabase = await createServerSupabaseClient()
-
+export const GET = withApiHandler(
+  { context: 'check-migration', roles: ['admin'] },
+  async ({ supabase, logger }) => {
     // Try to query the payment_transactions table
     const { error } = await supabase
       .from("payment_transactions")
@@ -14,6 +13,7 @@ export async function GET() {
 
     if (error) {
       // Table doesn't exist
+      logger.warn("Migration not applied", { error: error.message })
       return NextResponse.json({
         migrationApplied: false,
         error: error.message,
@@ -26,10 +26,5 @@ export async function GET() {
       migrationApplied: true,
       message: "payment_transactions table exists",
     })
-  } catch (error) {
-    return NextResponse.json({
-      migrationApplied: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    })
   }
-}
+)

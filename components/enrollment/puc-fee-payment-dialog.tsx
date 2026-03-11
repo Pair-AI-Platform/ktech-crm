@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { Student } from "@/types"
-import { PUC_FEE_AMOUNT } from "@/types"
+import { PUC_FEE_AMOUNT } from "@/lib/config/constants"
 
 type Step = "select" | "whatsapp" | "cash" | "link-sent" | "success"
 
@@ -211,9 +211,9 @@ export function PUCFeePaymentDialog({
                   className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-amber-300 hover:bg-amber-50 transition-all text-left"
                 >
                   <Banknote className="w-8 h-8 text-amber-500 mb-2" />
-                  <h3 className="font-medium text-[var(--text-primary)]">Cash Payment</h3>
+                  <h3 className="font-medium text-[var(--text-primary)]">Record Finance</h3>
                   <p className="text-xs text-[var(--text-secondary)] mt-1">
-                    Record cash payment with receipt
+                    Cash or KNET entry
                   </p>
                 </button>
               </div>

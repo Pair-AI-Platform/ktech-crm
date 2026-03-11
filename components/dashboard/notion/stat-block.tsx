@@ -155,8 +155,9 @@ export function StatGrid({ stats, columns = 2, loading = false }: StatGridProps)
         <div
           key={stat.id}
           className={cn(
-            "p-4 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border-subtle)]",
+            "p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border-subtle)]",
             "hover:bg-[var(--bg-hover)] hover:border-[var(--border-default)] transition-all",
+            "flex items-center min-h-[4.5rem]",
             stat.onClick && "cursor-pointer"
           )}
           onClick={stat.onClick}

@@ -153,7 +153,9 @@ export interface PaymentStatusData {
 export async function preloadPaymentStatus(leadId: string): Promise<PaymentStatusData> {
   return fetchOnce(`payment-${leadId}`, async () => {
     const response = await fetch(`/api/payments/psp/status?leadId=${leadId}`)
-    if (!response.ok) throw new Error("Failed to preload payment status")
+    if (!response.ok) {
+      return { hasPaid: false, hasTransaction: false } as PaymentStatusData
+    }
     return (await response.json()) as PaymentStatusData
   })
 }
@@ -164,10 +166,10 @@ export function getCachedPaymentStatus(leadId: string): PaymentStatusData | null
 
 // --- Preload everything for a lead ---
 
-const GRADUATE_TYPES = ["gov", "us", "uk", "ksa"]
+const GRADUATE_TYPES = ["gov", "us", "uk", "ksa", "_profile"]
 
 export function preloadAllForLead(leadId: string) {
-  // Preload documents for all graduate types in parallel
+  // Preload documents for all graduate types (including profile-uploaded) in parallel
   for (const gt of GRADUATE_TYPES) {
     preloadDocuments(leadId, gt).catch(() => {
       // Silently ignore preload failures

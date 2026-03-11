@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
+import { withApiHandler } from "@/lib/api-handler"
 
 // Twilio Content API for WhatsApp Templates
 const TWILIO_CONTENT_API = "https://content.twilio.com/v1/Content"
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const body = await request.json()
+export const POST = withApiHandler(
+  { context: 'whatsapp-templates-create' },
+  async ({ req, supabase, logger }) => {
+    const body = await req.json()
 
     const { name, category, language, body: templateBody } = body
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     if (!accountSid || !authToken) {
       // If Twilio credentials not configured, save locally for now
-      console.log("[WhatsApp Templates] Twilio credentials not configured, saving template locally")
+      logger.info("Twilio credentials not configured, saving template locally")
 
       const { data: template, error: insertError } = await supabase
         .from("whatsapp_templates")
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (insertError) {
-        console.error("[WhatsApp Templates] Insert error:", insertError)
+        logger.error("Failed to save WhatsApp template", { error: insertError.message })
         return NextResponse.json(
           { error: "Failed to save template" },
           { status: 500 }
@@ -94,13 +94,14 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
       },
+      signal: AbortSignal.timeout(30_000),
       body: JSON.stringify(contentPayload),
     })
 
     const twilioData = await response.json()
 
     if (!response.ok) {
-      console.error("[WhatsApp Templates] Twilio error:", twilioData)
+      logger.error("Twilio Content API error", { status: response.status, error: twilioData.message })
       return NextResponse.json(
         { error: twilioData.message || "Failed to create template" },
         { status: response.status }
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error("[WhatsApp Templates] DB insert error:", insertError)
+      logger.error("Failed to save WhatsApp template to DB after Twilio creation", { error: insertError.message })
       // Template was created in Twilio, just log the error
     }
 
@@ -134,29 +135,19 @@ export async function POST(request: NextRequest) {
       template,
       message: "Template submitted for approval. Usually approved within 24-48 hours.",
     })
-  } catch (error: unknown) {
-    console.error("[WhatsApp Templates] Error:", error)
-
-    const errorMessage = error instanceof Error ? error.message : "Failed to create template"
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
   }
-}
+)
 
-export async function GET() {
-  try {
-    const supabase = await createServerSupabaseClient()
-
+export const GET = withApiHandler(
+  { context: 'whatsapp-templates-list' },
+  async ({ supabase, logger }) => {
     const { data: templates, error } = await supabase
       .from("whatsapp_templates")
       .select("*")
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("[WhatsApp Templates] Fetch error:", error)
+      logger.error("Failed to fetch WhatsApp templates", { error: error.message })
       return NextResponse.json(
         { error: "Failed to fetch templates" },
         { status: 500 }
@@ -167,14 +158,5 @@ export async function GET() {
       success: true,
       templates,
     })
-  } catch (error: unknown) {
-    console.error("[WhatsApp Templates] Error:", error)
-
-    const errorMessage = error instanceof Error ? error.message : "Failed to fetch templates"
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
   }
-}
+)

@@ -24,7 +24,8 @@ import {
   Edit,
   UserPlus,
   Target,
-  Check
+  Check,
+  User
 } from "lucide-react"
 import type { Profile } from "@/types"
 import { createClient } from "@/lib/supabase/client"

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { escapeHtml } from "@/lib/utils"
 import { PUC_FEE_AMOUNT } from "@/types"
 
 export async function GET(
@@ -74,7 +75,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PUC Fee Receipt - ${student.first_name} ${student.last_name}</title>
+  <title>PUC Fee Receipt - ${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</title>
   <style>
     * {
       margin: 0;
@@ -261,11 +262,11 @@ export async function GET(
       <div class="receipt-info">
         <div>
           <label>Receipt No.</label>
-          <span>${receiptNumber}</span>
+          <span>${escapeHtml(receiptNumber)}</span>
         </div>
         <div>
           <label>Date</label>
-          <span>${paymentDate}</span>
+          <span>${escapeHtml(paymentDate)}</span>
         </div>
         <div>
           <label>Payment Method</label>
@@ -277,19 +278,19 @@ export async function GET(
         <h3>Student Information</h3>
         <div class="detail-row">
           <label>Name</label>
-          <span>${student.first_name} ${student.last_name}</span>
+          <span>${escapeHtml(student.first_name)} ${escapeHtml(student.last_name)}</span>
         </div>
         <div class="detail-row">
           <label>Civil ID</label>
-          <span>${student.civil_id || 'N/A'}</span>
+          <span>${escapeHtml(student.civil_id || 'N/A')}</span>
         </div>
         <div class="detail-row">
           <label>Phone</label>
-          <span>${student.phone || 'N/A'}</span>
+          <span>${escapeHtml(student.phone || 'N/A')}</span>
         </div>
         <div class="detail-row">
           <label>Email</label>
-          <span>${student.email || 'N/A'}</span>
+          <span>${escapeHtml(student.email || 'N/A')}</span>
         </div>
       </div>
 

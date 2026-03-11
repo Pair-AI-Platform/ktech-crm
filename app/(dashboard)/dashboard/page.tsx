@@ -1,14 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
-  Phone,
-  PhoneMissed,
   Calendar,
   Users,
   Target,
-  TrendingUp,
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
@@ -16,6 +13,17 @@ import {
   CalendarPlus,
   BarChart3,
   Layers,
+  History,
+  GraduationCap,
+  UserX,
+  CalendarCheck,
+  ClipboardList,
+  Clock,
+  XCircle,
+  Cake,
+  Gift,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -24,13 +32,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/layout/header"
 import { APPOINTMENT_TYPES, PIPELINE_STAGES } from "@/types"
-import { useLeads } from "@/lib/hooks/use-leads"
+import { useDashboardStats } from "@/lib/hooks/use-dashboard-stats"
+import type { DashboardLead } from "@/lib/hooks/use-dashboard-stats"
 import { useUser } from "@/lib/hooks/use-user"
-import { useTodayAppointments, useAppointmentStats } from "@/lib/hooks/use-appointments"
-import { useAgentTargetProgress } from "@/lib/hooks/use-reports"
-import { useMissedCalls } from "@/lib/hooks/use-calls"
-import type { Lead } from "@/types"
+import { useTodayAppointments, useAppointmentStats, useNoUpdatedAppointments } from "@/lib/hooks/use-appointments"
+import { useAgentTargetProgress, useAgentTargetHistory } from "@/lib/hooks/use-reports"
+import { useAgentHistory } from "@/lib/hooks/use-agent-history"
+import type { Appointment } from "@/types"
 import { cn } from "@/lib/utils"
+
+import { AnimatePresence } from "framer-motion"
+import { AppointmentDetail } from "@/components/calendar/appointment-detail"
+import { NoUpdatedAppointments } from "@/components/calendar/no-updated-appointments"
 
 // Import Notion-style components
 import {
@@ -39,33 +52,36 @@ import {
   ListBlock,
   PipelineBlock,
   QuickActionsBlock,
-  PipelineVertical,
 } from "@/components/dashboard/notion"
 
 export default function DashboardPage() {
   const router = useRouter()
   const { profile, isAdmin } = useUser()
-  const { leads: allLeads, loading: leadsLoading } = useLeads({ limit: 200 })
+  const {
+    myLeads,
+    sfLeads: mySfLeads,
+    pucLeads: myPucLeads,
+    attentionPool,
+    loading: leadsLoading,
+  } = useDashboardStats()
+  const sfLoading = leadsLoading
+  const pucLoading = leadsLoading
   const { appointments: todayAppointments, loading: appointmentsLoading } = useTodayAppointments()
   const { stats: appointmentStats, loading: statsLoading } = useAppointmentStats()
   const { progress: myTargetProgress, allAgentsProgress } = useAgentTargetProgress(profile?.id)
-  const { calls: missedCalls, loading: missedCallsLoading } = useMissedCalls()
-
-  // Filter leads assigned to current agent
-  const myLeads = useMemo(() => {
-    if (!profile?.id) return allLeads
-    return allLeads.filter(lead => lead.assigned_to === profile.id)
-  }, [allLeads, profile])
+  const { history: targetHistory, loading: targetHistoryLoading } = useAgentTargetHistory(profile?.id)
+  const { history: agentHistory, loading: historyLoading } = useAgentHistory(profile?.id)
+  const { appointments: noUpdatedAppointments, loading: noUpdatedLoading, refetch: refetchNoUpdated } = useNoUpdatedAppointments()
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [showNoUpdatedModal, setShowNoUpdatedModal] = useState(false)
+  const [expandedHistoryMonths, setExpandedHistoryMonths] = useState<Record<string, boolean>>({})
 
   // Get priority leads that need attention
-  // Admins see all leads; agents see only their own
-  const attentionPool = isAdmin ? allLeads : myLeads
-
   const priorityLeads = useMemo(() => {
     if (!attentionPool.length) return []
 
     const now = new Date()
-    const priorities: { lead: Lead; reason: string; urgency: "high" | "medium" | "low" }[] = []
+    const priorities: { lead: DashboardLead; reason: string; urgency: "high" | "medium" | "low" }[] = []
 
     attentionPool.forEach(lead => {
       if (lead.pipeline_stage === 'lost' || lead.pipeline_stage === 'enrolled' || lead.pipeline_stage === 'withdraw') return
@@ -83,6 +99,17 @@ export default function DashboardPage() {
           lead,
           reason: daysSinceCreated === 0 ? 'New today' : `Waiting ${daysSinceCreated}d`,
           urgency: daysSinceCreated > 2 ? 'high' : daysSinceCreated > 0 ? 'medium' : 'low',
+        })
+        return
+      }
+
+      // Contacted leads with interested/will_see status — need follow-up
+      if (lead.pipeline_stage === 'contacted' && (lead.status === 'interested' || lead.status === 'will_see')) {
+        const statusLabel = lead.status === 'interested' ? 'Interested' : 'Will See'
+        priorities.push({
+          lead,
+          reason: statusLabel,
+          urgency: daysSinceContact >= 3 ? 'high' : 'medium',
         })
         return
       }
@@ -146,21 +173,25 @@ export default function DashboardPage() {
       return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear()
     }).length
 
-    return { newLeads, activeLeads, appointedLeads, applicationThisMonth }
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const callbackLeads = myLeads.filter(l => l.status === 'callback' && l.callback_date === todayStr).length
+
+    return { newLeads, activeLeads, appointedLeads, applicationThisMonth, callbackLeads }
   }, [myLeads])
 
-  // Pipeline progress data
-  const pipelineProgress = useMemo(() => {
+  // SF Pipeline progress data
+  const sfPipelineProgress = useMemo(() => {
     const stages = [
-      { key: 'new', label: 'New', color: 'var(--info)' },
-      { key: 'contacted', label: 'Contacted', color: 'var(--primary)' },
-      { key: 'test', label: 'Test', color: 'var(--warning)' },
-      { key: 'application', label: 'Applied', color: '#F97316' },
-      { key: 'applicant', label: 'Applicant', color: '#14B8A6' },
-      { key: 'enrolled', label: 'Enrolled', color: 'var(--success)' },
+      { key: 'new', label: 'New', color: '#3B82F6' },
+      { key: 'contacted', label: 'Contacted', color: '#6366F1' },
+      { key: 'test', label: 'Test', color: '#F59E0B' },
+      { key: 'application', label: 'File', color: '#EF4444' },
+      { key: 'applicant', label: 'Applicant', color: '#06B6D4' },
+      { key: 'enrolled', label: 'Enrolled', color: '#22C55E' },
     ]
 
-    const activeLeads = myLeads.filter(l => l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
+    const activeLeads = mySfLeads.filter(l => l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
     const total = activeLeads.length
 
     const stageData = stages.map(s => ({
@@ -172,11 +203,141 @@ export default function DashboardPage() {
     const conversionRate = total > 0 ? Math.round((enrolled / total) * 100) : 0
 
     return { stages: stageData, total, conversionRate }
-  }, [myLeads])
+  }, [mySfLeads])
+
+  // PUC Pipeline progress data
+  const pucPipelineProgress = useMemo(() => {
+    const stages = [
+      { key: 'new', label: 'New', color: '#3B82F6' },
+      { key: 'contacted', label: 'Contacted', color: '#6366F1' },
+      { key: 'visit', label: 'Visit', color: '#8B5CF6' },
+      { key: 'test', label: 'Test', color: '#F59E0B' },
+      { key: 'application', label: 'File', color: '#EF4444' },
+      { key: 'puc_document_submission', label: 'Doc Submission', color: '#EC4899' },
+      { key: 'puc_application_submission', label: 'App Submission', color: '#06B6D4' },
+      { key: 'applicant', label: 'Applicant', color: '#14B8A6' },
+      { key: 'enrolled', label: 'Enrolled', color: '#22C55E' },
+    ]
+
+    const activeLeads = myPucLeads.filter(l => l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
+    const total = activeLeads.length
+
+    const stageData = stages.map(s => ({
+      ...s,
+      count: activeLeads.filter(l => l.pipeline_stage === s.key).length,
+    }))
+
+    const enrolled = stageData.find(s => s.key === 'enrolled')?.count || 0
+    const conversionRate = total > 0 ? Math.round((enrolled / total) * 100) : 0
+
+    return { stages: stageData, total, conversionRate }
+  }, [myPucLeads])
 
   const firstName = profile?.full_name?.split(' ')[0] || ''
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+  // Message styles — Gen Z motivational, always about the agent
+  const messageStyles: Record<string, { label: string; icon: string; messages: string[] }> = {
+    funny: {
+      label: 'ضحك 😂',
+      icon: '😂',
+      messages: [
+        "😂 قهوة وحدة بس وتصير سوبرمان، اشربها يلا",
+        "😅 فراشك حاول يخطفك الصبح بس انت أقوى منه، بطل",
+        "🤭 المنبه يكرهك بس انت تحبه.. لا مو صج",
+        "☕ لو التفكير الزايد رياضة جان عندك عضلات",
+        "😂 انت مو شخص صباحي بس شخص فوزي وهذا اللي يهم",
+        "🧠 مخك فاتح ٤٧ تاب والمهم فيهم بعده يحمّل",
+        "😄 كن الريد بول اللي تتمناه الصبح",
+        "🎬 انت البطل واليوم حلقتك الأسطورية",
+        "🤭 في أحد يأمن فيك.. أنا. يلا قوم",
+        "💪 قمت من النوم؟ هذا إنجاز، الباقي بونص",
+        "📱 موهبتك دقت عليك وقالت طنش السوشل ميديا وكون عظيم",
+        "😎 مستوى الثقة: قوقل يحتاجك مو انت تحتاجه",
+        "😤 عدّيت يوم الأحد، تقدر تعدي أي شي",
+        "🧬 مختلف عن الكل، يشتغل على الفوضى، وبالأخير يفوز",
+        "🦸 مو كل الأبطال يلبسون كاب، بعضهم بس يوصلون بوقتهم",
+        "✨ طموحك عالي بس المنبه يقولك رد نام",
+        "🚀 احلم كبير، نام بعدين، اغزو العالم الحين",
+        "😂 انت الدليل إن الأشياء الحلوة تيي مع القهوة",
+        "🐔 اللي يقوم بدري الدجاجة مو انت، بس انت أحسن",
+        "🫠 لو الحظ شخص جان انت صاحبه المقرب",
+      ],
+    },
+    hype: {
+      label: 'تحفيز 🔥',
+      icon: '🔥',
+      messages: [
+        "🔥 اليوم يومك، ملكه",
+        "💪 كل خطوة تقربك للقمة، لا توقف",
+        "🚀 لما تركز ما أحد يقدر يوقفك",
+        "🏆 الأبطال ما ياخذون إجازة، يلا نبدأ",
+        "⭐ إمكانياتك ما لها حدود، وريهم",
+        "📞 الثقة تليق عليك، كمل فيها",
+        "💯 انت أحسن من أمس وبكرة بتكون أحسن",
+        "👑 مكانك في القمة ينتظرك، روح خذه",
+        "🔥 أهداف كبيرة تبي طاقة كبيرة، وعندك الاثنين",
+        "💪 رجعتك دايم أقوى من سقطتك",
+        "🎯 ركز على الهدف ولا تلتفت",
+        "✨ كل يوم فرصة جديدة تثبت نفسك",
+      ],
+    },
+    chill: {
+      label: 'ريلاكس 😮‍💨',
+      icon: '😮‍💨',
+      messages: [
+        "😮‍💨 يوم صعب؟ شي واحد حلو يغير كل شي",
+        "☕ خذ نفس، اشرب قهوة، وارجع أقوى",
+        "🐢 التقدم البطيء بعده تقدم، انت تمام",
+        "🌤️ مو كل يوم لازم يكون أسطوري، بس كل يوم يسوى",
+        "💆 حتى بأسوأ يوم، انت بعدك بالسالفة",
+        "🧊 ابدأ بشي صغير، فوز واحد بس، وابني عليه",
+        "🎧 سرعتك انت، سباقك انت، بس لا توقف",
+        "🌊 ارتاح لو تبي، بس لا تستسلم",
+        "✨ عادي يكون يومك مو أحسن شي، بكرة صفحة جديدة",
+        "💫 عدّيت ١٠٠٪ من أيامك الصعبة، واليوم مو مختلف",
+      ],
+    },
+    genz: {
+      label: 'Gen Z 💅',
+      icon: '💅',
+      messages: [
+        "💅 You're about to eat today, no crumbs left",
+        "✨ Main character energy: activated",
+        "🏆 The vibe says number one and I'm here clapping",
+        "💯 Understood the assignment, bestie",
+        "👑 Woke up and chose greatness, as per usual",
+        "🔥 Vibes are immaculate, work is bussin",
+        "🧬 You're built different and everyone sees it",
+        "😤 Don't tell me you're about to crush every goal today",
+        "🧠 Living rent-free in the competition's head",
+        "🍽️ Ate and left no crumbs, as always",
+        "💪 Lowkey obsessed with your grind",
+        "🚀 This is your sign to go full send",
+        "💅 The way you show up every day? Iconic",
+        "👑 You're that person and you know it",
+        "✨ Zero chill on mediocrity, slay energy maxed out",
+      ],
+    },
+  }
+
+  const [messageStyle, setMessageStyle] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('dashboard-message-style') || 'funny'
+    }
+    return 'funny'
+  })
+  const [showStylePicker, setShowStylePicker] = useState(false)
+  const currentMessages = messageStyles[messageStyle]?.messages || messageStyles.funny.messages
+
+  const [sayingIndex, setSayingIndex] = useState(0)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSayingIndex(prev => (prev + 1) % currentMessages.length)
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [currentMessages.length])
 
   const isLoading = leadsLoading || appointmentsLoading || statsLoading
 
@@ -234,56 +395,102 @@ export default function DashboardPage() {
         subtitle: stageInfo?.label || item.lead.pipeline_stage,
         metadata: item.reason,
         badge: <span className={cn("w-2 h-2 rounded-full", urgencyColors[item.urgency])} />,
-        icon: (
-          <Avatar className="w-9 h-9">
-            <AvatarFallback className="text-xs font-medium bg-[var(--warning)]/10 text-[var(--warning)]">
-              {item.lead.first_name?.[0]}{item.lead.last_name?.[0]}
-            </AvatarFallback>
-          </Avatar>
-        ),
         onClick: () => router.push(`/leads/${item.lead.id}`),
-        actions: [
-          {
-            label: "Call",
-            icon: <Phone className="w-4 h-4" />,
-            onClick: () => window.location.href = `tel:${item.lead.phone}`,
-          },
-        ],
       }
     })
   }, [priorityLeads, router])
 
-  // Transform missed calls for ListBlock
-  const missedCallItems = useMemo(() => {
-    return missedCalls.slice(0, 5).map((call) => {
-      const now = new Date()
-      const callTime = new Date(call.created_at)
-      const diffMs = now.getTime() - callTime.getTime()
-      const diffMins = Math.floor(diffMs / (1000 * 60))
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-      const timeAgo = diffMins < 60 ? `${diffMins}m ago` : `${diffHours}h ago`
-      const isAvaya = call.source === "avaya" || call.avaya_call_id
+  // Compute leads with upcoming birthdays (today + next 2 days)
+  const birthdayLeads = useMemo(() => {
+    const today = new Date()
+    const todayMonth = today.getMonth()
+    const todayDate = today.getDate()
 
-      return {
-        id: call.id,
-        title: call.from_number,
-        subtitle: isAvaya ? "Avaya PBX" : "Twilio",
-        metadata: timeAgo,
-        icon: (
-          <div className="w-9 h-9 rounded-full bg-[var(--error)]/10 flex items-center justify-center">
-            <PhoneMissed className="w-4 h-4 text-[var(--error)]" />
-          </div>
-        ),
-        actions: [
-          {
-            label: "Call back",
-            icon: <Phone className="w-4 h-4" />,
-            onClick: () => window.location.href = `tel:${call.from_number}`,
-          },
-        ],
+    const results: { lead: DashboardLead; daysUntil: number; isToday: boolean }[] = []
+
+    attentionPool.forEach(lead => {
+      if (!lead.date_of_birth) return
+      if (lead.pipeline_stage === 'lost' || lead.pipeline_stage === 'withdraw') return
+
+      const dob = new Date(lead.date_of_birth)
+      const dobMonth = dob.getMonth()
+      const dobDate = dob.getDate()
+
+      // Calculate days until birthday this year
+      const thisYearBirthday = new Date(today.getFullYear(), dobMonth, dobDate)
+      let diff = Math.floor((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+      // If birthday already passed this year, check next year
+      if (diff < 0) {
+        const nextYearBirthday = new Date(today.getFullYear() + 1, dobMonth, dobDate)
+        diff = Math.floor((nextYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      }
+
+      if (diff <= 2) {
+        results.push({
+          lead,
+          daysUntil: diff,
+          isToday: diff === 0,
+        })
       }
     })
-  }, [missedCalls])
+
+    return results.sort((a, b) => a.daysUntil - b.daysUntil)
+  }, [attentionPool])
+
+  // Transform birthday leads for ListBlock
+  const birthdayItems = useMemo(() => {
+    return birthdayLeads.map((item) => {
+      const age = (() => {
+        const dob = new Date(item.lead.date_of_birth!)
+        const today = new Date()
+        let a = today.getFullYear() - dob.getFullYear()
+        const m = today.getMonth() - dob.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) a--
+        return a + (item.isToday ? 1 : 1) // next age on birthday
+      })()
+
+      return {
+        id: item.lead.id,
+        title: `${item.lead.first_name} ${item.lead.last_name}`,
+        subtitle: item.isToday
+          ? `Turns ${age} today!`
+          : `Turns ${age} in ${item.daysUntil} day${item.daysUntil > 1 ? 's' : ''}`,
+        metadata: item.lead.phone || '',
+        badge: item.isToday ? (
+          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-[#E879F9]/10 text-[#C026D3]">
+            Today
+          </span>
+        ) : (
+          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--info)]/10 text-[var(--info)]">
+            {item.daysUntil}d
+          </span>
+        ),
+        onClick: () => router.push(`/leads/${item.lead.id}`),
+      }
+    })
+  }, [birthdayLeads, router])
+
+  const getAppointmentColor = (type: string) => {
+    switch (type) {
+      case "new_appointment": return "bg-[var(--primary)]"
+      case "puc_documents": return "bg-[var(--accent)]"
+      case "puc_application": return "bg-[var(--warning)]"
+      case "retest": return "bg-[var(--success)]"
+      case "sf_appointment": return "bg-[var(--info)]"
+      default: return "bg-[var(--primary)]"
+    }
+  }
+
+  const getAppointmentName = (apt: Appointment) => {
+    const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
+    if (leads.length > 0) {
+      if (leads.length === 1) return `${leads[0]!.first_name} ${leads[0]!.last_name}`
+      return `${leads[0]!.first_name} ${leads[0]!.last_name} +${leads.length - 1}`
+    }
+    if (apt.lead) return `${apt.lead.first_name} ${apt.lead.last_name}`
+    return "Unknown"
+  }
 
   // Quick action items
   const quickActions = [
@@ -324,79 +531,210 @@ export default function DashboardPage() {
       onClick: () => router.push("/calendar"),
     },
     {
-      id: "needs-attention",
-      value: leadsLoading ? "..." : priorityLeads.length,
-      label: "Need Attention",
-      icon: <AlertTriangle className="w-5 h-5 text-[var(--warning)]" />,
+      id: "callbacks",
+      value: leadsLoading ? "..." : stats.callbackLeads,
+      label: "Today's Callbacks",
+      icon: <Clock className="w-5 h-5 text-[var(--warning)]" />,
       iconBg: "bg-[var(--warning)]/10",
-      onClick: () => router.push("/leads"),
-    },
-    {
-      id: "active-leads",
-      value: leadsLoading ? "..." : stats.activeLeads,
-      label: "Active Leads",
-      icon: <Users className="w-5 h-5 text-[var(--info)]" />,
-      iconBg: "bg-[var(--info)]/10",
-      onClick: () => router.push("/leads"),
-    },
-    {
-      id: "applications",
-      value: leadsLoading ? "..." : stats.applicationThisMonth,
-      label: "Applications (Month)",
-      icon: <CheckCircle2 className="w-5 h-5 text-[var(--success)]" />,
-      iconBg: "bg-[var(--success)]/10",
-      onClick: () => router.push("/leads?stage=application"),
+      onClick: () => router.push("/leads?status=callback"),
     },
   ]
 
-  // Mini pipeline for sidebar
-  const miniPipelineStages = [
-    { key: 'new', label: 'New', color: 'var(--info)', count: myLeads.filter(l => l.pipeline_stage === 'new').length },
-    { key: 'test', label: 'Test', color: 'var(--warning)', count: myLeads.filter(l => l.pipeline_stage === 'test').length },
-    { key: 'application', label: 'Application', color: 'var(--success)', count: myLeads.filter(l => l.pipeline_stage === 'application').length },
-  ]
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
       <Header
         user={profile}
         title={`${greeting}${firstName ? `, ${firstName}` : ''}`}
-        subtitle="Here's what needs your attention today"
+        subtitle={currentMessages[sayingIndex]}
+        subtitleExtra={
+          <div className="relative inline-block">
+            <button
+              onClick={() => setShowStylePicker(!showStylePicker)}
+              className="ml-2 text-xs px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              {messageStyles[messageStyle]?.icon || '😂'}
+            </button>
+            {showStylePicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowStylePicker(false)} />
+                <div className="absolute top-full mt-1 left-0 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                  {Object.entries(messageStyles).map(([key, style]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setMessageStyle(key)
+                        setSayingIndex(0)
+                        setShowStylePicker(false)
+                        localStorage.setItem('dashboard-message-style', key)
+                      }}
+                      className={`w-full text-right px-3 py-2 text-xs hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2 ${messageStyle === key ? 'text-[var(--primary)] font-medium bg-[var(--primary)]/5' : 'text-[var(--text-secondary)]'}`}
+                    >
+                      <span>{style.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        }
       />
 
-      <div className="p-6 space-y-6 page-enter">
+      <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
         {/* Quick Stats Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <StatGrid stats={statItems} columns={4} loading={isLoading} />
+          <StatGrid stats={statItems} columns={2} loading={isLoading} />
         </motion.div>
 
-        {/* Application Pipeline Progress */}
+        {/* No Updated Appointments — Primary Featured Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+        >
+          <div className="rounded-2xl border-2 border-[var(--warning)]/40 bg-[var(--warning)]/5 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--warning)]/20 bg-[var(--warning)]/10">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-[var(--warning)]" />
+                <h2 className="text-base font-semibold text-[var(--text-primary)]">No Calendar Update</h2>
+                {!noUpdatedLoading && (
+                  <span className="px-2.5 py-0.5 text-sm font-bold rounded-full bg-[var(--warning)] text-white">
+                    {noUpdatedAppointments.length}
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                className="bg-[var(--warning)] hover:bg-[var(--warning)]/90 text-white"
+                onClick={() => setShowNoUpdatedModal(true)}
+                disabled={noUpdatedLoading}
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                View All & Update ({noUpdatedLoading ? "..." : noUpdatedAppointments.length})
+              </Button>
+            </div>
+
+            {/* Body */}
+            {noUpdatedLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--warning)]" />
+              </div>
+            ) : noUpdatedAppointments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-[var(--text-muted)]">
+                <CheckCircle2 className="w-8 h-8 text-[var(--success)]" />
+                <p className="text-sm">All caught up! No appointments need updating.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                <AnimatePresence>
+                  {noUpdatedAppointments.slice(0, 9).map((apt, index) => {
+                    const employeeName = apt.assigned_agent_profile?.full_name
+                    return (
+                      <motion.div
+                        key={apt.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        onClick={() => setSelectedAppointment(apt)}
+                        className="p-3 rounded-xl border border-[var(--warning)]/30 bg-[var(--bg-card)] hover:border-[var(--warning)] hover:shadow-sm transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full flex-shrink-0",
+                              getAppointmentColor(apt.appointment_type?.[0] || "new_appointment")
+                            )} />
+                            <span className="font-medium text-sm text-[var(--text-primary)] group-hover:text-[var(--warning)] transition-colors truncate">
+                              {getAppointmentName(apt)}
+                            </span>
+                          </div>
+                          <AlertTriangle className="w-3.5 h-3.5 text-[var(--warning)] flex-shrink-0 ml-2" />
+                        </div>
+                        <p className="text-xs text-[var(--text-muted)] mt-1 ml-4 truncate">
+                          {(apt.appointment_type || []).map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 ml-4 text-xs text-[var(--text-muted)]">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {apt.scheduled_date}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {apt.scheduled_time?.slice(0, 5)}
+                          </span>
+                        </div>
+                        {employeeName && (
+                          <div className="flex items-center gap-1 mt-1 ml-4 text-xs text-[var(--text-muted)]">
+                            <Users className="w-3 h-3" />
+                            {employeeName}
+                          </div>
+                        )}
+                      </motion.div>
+                    )
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* SF Pipeline Progress */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
           <StaticBlock
-            title="Application Pipeline"
+            title="SF Pipeline"
             icon={<Layers className="w-4 h-4 text-[var(--accent)]" />}
             headerActions={
-              <Link href="/leads">
+              <Link href="/leads?fundingType=self_funded">
                 <Button variant="ghost" size="sm" className="text-[var(--text-muted)]">
-                  View Leads
+                  View SF
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
             }
           >
             <PipelineBlock
-              stages={pipelineProgress.stages}
-              total={pipelineProgress.total}
-              conversionRate={pipelineProgress.conversionRate}
-              loading={leadsLoading}
-              onStageClick={(stage) => router.push(`/leads?stage=${stage}`)}
+              stages={sfPipelineProgress.stages}
+              total={sfPipelineProgress.total}
+              conversionRate={sfPipelineProgress.conversionRate}
+              loading={sfLoading}
+              onStageClick={(stage) => router.push(`/leads?fundingType=self_funded&stage=${stage}`)}
+            />
+          </StaticBlock>
+        </motion.div>
+
+        {/* PUC Pipeline Progress */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <StaticBlock
+            title="PUC Pipeline"
+            icon={<GraduationCap className="w-4 h-4 text-[var(--accent)]" />}
+            headerActions={
+              <Link href="/puc-srj?tab=puc">
+                <Button variant="ghost" size="sm" className="text-[var(--text-muted)]">
+                  View PUC
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            }
+          >
+            <PipelineBlock
+              stages={pucPipelineProgress.stages}
+              total={pucPipelineProgress.total}
+              conversionRate={pucPipelineProgress.conversionRate}
+              loading={pucLoading}
+              onStageClick={(stage) => router.push(`/puc-srj?tab=puc&stage=${stage}`)}
             />
           </StaticBlock>
         </motion.div>
@@ -488,6 +826,66 @@ export default function DashboardPage() {
                       ? `${myTargetProgress.remaining} more applications to reach target`
                       : "Target reached! Great job!"}
                   </p>
+
+                  {/* Weekly Sub-Targets */}
+                  {myTargetProgress.weeklyTargets && myTargetProgress.weeklyTargets.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                      <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        Weekly Breakdown
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {myTargetProgress.weeklyTargets.map((week) => (
+                          <div
+                            key={week.weekNumber}
+                            className={cn(
+                              "p-2.5 rounded-lg border",
+                              week.isCurrent
+                                ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                                : "border-[var(--border)] bg-[var(--bg-sunken)]"
+                            )}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={cn(
+                                "text-xs font-medium",
+                                week.isCurrent ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                              )}>
+                                {week.weekLabel.split(' (')[0]}
+                                {week.isCurrent && (
+                                  <span className="ml-1 inline-block px-1.5 py-0 text-[10px] rounded bg-[var(--primary)] text-white">Now</span>
+                                )}
+                              </span>
+                              <span className={cn(
+                                "text-xs font-bold",
+                                week.progress >= 100
+                                  ? "text-[var(--success)]"
+                                  : week.isCurrent
+                                    ? "text-[var(--primary)]"
+                                    : "text-[var(--text-muted)]"
+                              )}>
+                                {week.applications}/{week.target}
+                              </span>
+                            </div>
+                            <div className="relative h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(100, week.progress)}%` }}
+                                transition={{ duration: 0.6, ease: "easeOut" }}
+                                className={cn(
+                                  "absolute inset-y-0 left-0 rounded-full",
+                                  week.progress >= 100
+                                    ? "bg-[var(--success)]"
+                                    : week.isCurrent
+                                      ? "bg-[var(--primary)]"
+                                      : "bg-[var(--text-muted)]/40"
+                                )}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </StaticBlock>
               </motion.div>
             )}
@@ -596,20 +994,253 @@ export default function DashboardPage() {
                 </StaticBlock>
               </motion.div>
             )}
-          </div>
 
-          {/* Right Column - Quick Actions, Leads, Calls, Pipeline */}
-          <div className="space-y-6">
-            {/* Quick Actions */}
+            {/* Target History */}
+            {myTargetProgress && myTargetProgress.target > 0 && targetHistory.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <StaticBlock
+                  title="Target History"
+                  icon={<History className="w-4 h-4 text-[var(--accent)]" />}
+                >
+                  <div className="space-y-2">
+                    {targetHistory.map((month) => {
+                      const isExpanded = expandedHistoryMonths[month.month]
+                      return (
+                        <div
+                          key={month.month}
+                          className="rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)] overflow-hidden"
+                        >
+                          <button
+                            onClick={() => setExpandedHistoryMonths(prev => ({
+                              ...prev,
+                              [month.month]: !prev[month.month]
+                            }))}
+                            className="w-full p-3 flex items-center justify-between hover:bg-[var(--bg-elevated)]/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                                month.progress >= 100
+                                  ? "bg-[var(--success)]/10 text-[var(--success)]"
+                                  : month.progress >= 70
+                                    ? "bg-[var(--primary)]/10 text-[var(--primary)]"
+                                    : month.progress >= 40
+                                      ? "bg-[var(--warning)]/10 text-[var(--warning)]"
+                                      : "bg-[var(--error)]/10 text-[var(--error)]"
+                              )}>
+                                {month.progress}%
+                              </div>
+                              <div className="text-left">
+                                <p className="text-sm font-medium text-[var(--text-primary)]">{month.monthLabel}</p>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  {month.applications} / {month.target} applications
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 relative h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "absolute inset-y-0 left-0 rounded-full",
+                                    month.progress >= 100
+                                      ? "bg-[var(--success)]"
+                                      : month.progress >= 70
+                                        ? "bg-[var(--primary)]"
+                                        : month.progress >= 40
+                                          ? "bg-[var(--warning)]"
+                                          : "bg-[var(--error)]"
+                                  )}
+                                  style={{ width: `${Math.min(100, month.progress)}%` }}
+                                />
+                              </div>
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                              )}
+                            </div>
+                          </button>
+                          {isExpanded && month.weeklyTargets.length > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="px-3 pb-3 grid grid-cols-2 gap-2"
+                            >
+                              {month.weeklyTargets.map((week) => (
+                                <div
+                                  key={week.weekNumber}
+                                  className="p-2 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)]"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-[var(--text-muted)]">
+                                      {week.weekLabel.split(' (')[0]}
+                                    </span>
+                                    <span className={cn(
+                                      "text-xs font-bold",
+                                      week.progress >= 100 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"
+                                    )}>
+                                      {week.applications}/{week.target}
+                                    </span>
+                                  </div>
+                                  <div className="relative h-1 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+                                    <div
+                                      className={cn(
+                                        "absolute inset-y-0 left-0 rounded-full",
+                                        week.progress >= 100
+                                          ? "bg-[var(--success)]"
+                                          : "bg-[var(--text-muted)]/40"
+                                      )}
+                                      style={{ width: `${Math.min(100, week.progress)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </StaticBlock>
+              </motion.div>
+            )}
+
+            {/* Agent History at KTECH */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
+              transition={{ delay: 0.3 }}
             >
-              <StaticBlock title="Quick Actions" collapsible={false}>
-                <QuickActionsBlock actions={quickActions} columns={2} size="md" />
+              <StaticBlock
+                title="My History at KTECH"
+                icon={<History className="w-4 h-4 text-[var(--accent)]" />}
+              >
+                {historyLoading ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="animate-pulse p-3 rounded-xl bg-[var(--bg-sunken)]">
+                        <div className="h-8 bg-[var(--bg-elevated)] rounded w-12 mb-2" />
+                        <div className="h-3 bg-[var(--bg-elevated)] rounded w-20" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Member since */}
+                    {agentHistory.memberSince && (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Member since {new Date(agentHistory.memberSince).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </p>
+                    )}
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[
+                        {
+                          value: agentHistory.totalLeads,
+                          label: "Total Leads",
+                          icon: <Users className="w-4 h-4 text-[var(--primary)]" />,
+                          bg: "bg-[var(--primary)]/10",
+                        },
+                        {
+                          value: agentHistory.totalContacted,
+                          label: "Total Contacted",
+                          icon: <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />,
+                          bg: "bg-[var(--accent)]/10",
+                        },
+                        {
+                          value: agentHistory.enrolled,
+                          label: "Enrolled",
+                          icon: <GraduationCap className="w-4 h-4 text-[var(--success)]" />,
+                          bg: "bg-[var(--success)]/10",
+                        },
+                        {
+                          value: agentHistory.applicants,
+                          label: "Applicants",
+                          icon: <ClipboardList className="w-4 h-4 text-[var(--info)]" />,
+                          bg: "bg-[var(--info)]/10",
+                        },
+                        {
+                          value: agentHistory.totalAppointments,
+                          label: "Total Appts",
+                          icon: <Calendar className="w-4 h-4 text-[var(--warning)]" />,
+                          bg: "bg-[var(--warning)]/10",
+                        },
+                        {
+                          value: agentHistory.completedAppointments,
+                          label: "Completed Appts",
+                          icon: <CalendarCheck className="w-4 h-4 text-[var(--success)]" />,
+                          bg: "bg-[var(--success)]/10",
+                        },
+                      ].map((stat) => (
+                        <div
+                          key={stat.label}
+                          className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border-subtle)]"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", stat.bg)}>
+                              {stat.icon}
+                            </div>
+                          </div>
+                          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">
+                            {stat.value}
+                          </p>
+                          <p className="text-xs text-[var(--text-muted)]">{stat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Conversion Rate */}
+                    {agentHistory.totalLeads > 0 && (
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border-subtle)]">
+                        <div>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Lifetime Conversion</p>
+                          <p className="text-xs text-[var(--text-muted)]">Enrolled / Total Leads</p>
+                        </div>
+                        <div className={cn(
+                          "text-xl font-bold",
+                          Math.round((agentHistory.enrolled / agentHistory.totalLeads) * 100) >= 20
+                            ? "text-[var(--success)]"
+                            : Math.round((agentHistory.enrolled / agentHistory.totalLeads) * 100) >= 10
+                              ? "text-[var(--warning)]"
+                              : "text-[var(--text-secondary)]"
+                        )}>
+                          {Math.round((agentHistory.enrolled / agentHistory.totalLeads) * 100)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </StaticBlock>
             </motion.div>
+          </div>
+
+          {/* Right Column - Leads, Calls, Pipeline */}
+          <div className="space-y-6">
+            {/* Upcoming Birthdays */}
+            {birthdayLeads.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 }}
+              >
+                <StaticBlock
+                  title={`Birthdays${birthdayLeads.some(b => b.isToday) ? ' - Today!' : ''}`}
+                  icon={<Cake className="w-4 h-4 text-[#C026D3]" />}
+                >
+                  <ListBlock
+                    items={birthdayItems}
+                    loading={leadsLoading}
+                    emptyMessage="No upcoming birthdays"
+                    emptyIcon={<Cake className="w-8 h-8 text-[var(--text-muted)]" />}
+                  />
+                </StaticBlock>
+              </motion.div>
+            )}
 
             {/* Leads Needing Attention */}
             <motion.div
@@ -638,53 +1269,28 @@ export default function DashboardPage() {
               </StaticBlock>
             </motion.div>
 
-            {/* Missed Calls */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-            >
-              <StaticBlock
-                title="Missed Calls"
-                icon={<PhoneMissed className="w-4 h-4 text-[var(--error)]" />}
-                headerActions={
-                  missedCalls.length > 0 && (
-                    <Badge variant="destructive" size="sm">
-                      {missedCalls.length}
-                    </Badge>
-                  )
-                }
-              >
-                <ListBlock
-                  items={missedCallItems}
-                  loading={missedCallsLoading}
-                  emptyMessage="No missed calls"
-                  emptyIcon={<CheckCircle2 className="w-8 h-8 text-[var(--success)]" />}
-                />
-              </StaticBlock>
-            </motion.div>
-
-            {/* My Pipeline Summary */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <StaticBlock
-                title="My Pipeline"
-                icon={<TrendingUp className="w-4 h-4 text-[var(--info)]" />}
-              >
-                <PipelineVertical
-                  stages={miniPipelineStages}
-                  total={myLeads.filter(l => l.pipeline_stage !== 'lost').length}
-                  loading={leadsLoading}
-                  onStageClick={(stage) => router.push(`/leads?stage=${stage}`)}
-                />
-              </StaticBlock>
-            </motion.div>
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <AppointmentDetail
+        appointment={selectedAppointment}
+        isOpen={!!selectedAppointment}
+        onClose={() => setSelectedAppointment(null)}
+        onUpdate={() => refetchNoUpdated()}
+      />
+
+      <NoUpdatedAppointments
+        appointments={noUpdatedAppointments}
+        isOpen={showNoUpdatedModal}
+        onClose={() => setShowNoUpdatedModal(false)}
+        onUpdate={() => refetchNoUpdated()}
+        onAppointmentClick={(apt) => {
+          setShowNoUpdatedModal(false)
+          setSelectedAppointment(apt)
+        }}
+      />
     </div>
   )
 }

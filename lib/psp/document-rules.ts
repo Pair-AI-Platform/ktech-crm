@@ -13,14 +13,18 @@ export type DocumentTypeId =
   | 'nationality'
   | 'puc_receipt'
   | 'acceptance_letter'
+  | 'declaration'
+  | 'payment_receipt'
   | 'transcript_moh'
   | 'sequence'
   | 'gcse'
   | 'shahada'
   | 'qiyas'
   | 'equivalency'
+  | 'transfer_certificate'
   | 'special_needs_certificate'
   | 'ministry_foreign_affairs'
+  | 'course_description'
   | 'extra_document_1'
   | 'extra_document_2'
 
@@ -127,6 +131,39 @@ const ACCEPTANCE_LETTER: DocumentRule = {
   description: 'Ktech acceptance letter'
 }
 
+const DECLARATION: DocumentRule = {
+  id: 'declaration',
+  name: 'Declaration',
+  nameAr: 'إقرار',
+  required: false,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Signed declaration form'
+}
+
+const PAYMENT_RECEIPT: DocumentRule = {
+  id: 'payment_receipt',
+  name: 'Payment Receipt',
+  nameAr: 'إيصال الدفع',
+  required: true,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Payment receipt'
+}
+
+const TRANSFER_CERTIFICATE: DocumentRule = {
+  id: 'transfer_certificate',
+  name: 'Official Transcript',
+  nameAr: 'كشف الدرجات الرسمي',
+  required: true,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Official academic transcript from previous institution'
+}
+
 const SPECIAL_NEEDS_CERTIFICATE: DocumentRule = {
   id: 'special_needs_certificate',
   name: 'Special Needs Certificate',
@@ -147,6 +184,17 @@ const MINISTRY_FOREIGN_AFFAIRS: DocumentRule = {
   maxSizeMB: 10,
   hasExpiration: false,
   description: 'Ministry of Foreign Affairs document for diplomatic students'
+}
+
+const COURSE_DESCRIPTION: DocumentRule = {
+  id: 'course_description',
+  name: 'Course Description',
+  nameAr: 'وصف المقررات',
+  required: true,
+  acceptedFileTypes: DOCUMENT_FILE_TYPES,
+  maxSizeMB: 10,
+  hasExpiration: false,
+  description: 'Course description from previous institution for credit transfer evaluation'
 }
 
 const EXTRA_DOCUMENT_1: DocumentRule = {
@@ -183,8 +231,8 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
       PARENT_CIVIL_ID,
       HS_CERTIFICATE,
       NATIONALITY,
-      PUC_RECEIPT,
-      ACCEPTANCE_LETTER
+      ACCEPTANCE_LETTER,
+      PAYMENT_RECEIPT,
     ]
   },
   {
@@ -193,17 +241,18 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
     labelAr: 'خريج منهج أمريكي',
     documents: [
       CIVIL_ID,
+      PARENT_CIVIL_ID,
       PASSPORT,
       NATIONALITY,
       {
         id: 'transcript_moh',
-        name: 'HS Transcript (MOH Equivalency)',
-        nameAr: 'كشف الدرجات مع معادلة وزارة التربية',
+        name: 'Original HS Transcript',
+        nameAr: 'كشف الدرجات الأصلي للثانوية',
         required: true,
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'High school transcript with Ministry of Education equivalency'
+        description: 'Official high school transcript from grade 9-12'
       },
       {
         id: 'sequence',
@@ -223,10 +272,10 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'Ministry of Education equivalency certificate'
+        description: 'Private education sector equivalency certificate'
       },
-      PUC_RECEIPT,
-      ACCEPTANCE_LETTER
+      ACCEPTANCE_LETTER,
+      PAYMENT_RECEIPT,
     ]
   },
   {
@@ -235,6 +284,7 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
     labelAr: 'خريج منهج بريطاني',
     documents: [
       CIVIL_ID,
+      PARENT_CIVIL_ID,
       {
         id: 'gcse',
         name: 'GCSE/IGCSE Certificates',
@@ -253,12 +303,12 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'Ministry of Education equivalency certificate'
+        description: 'Private education sector equivalency certificate'
       },
       PASSPORT,
       NATIONALITY,
-      PUC_RECEIPT,
-      ACCEPTANCE_LETTER
+      ACCEPTANCE_LETTER,
+      PAYMENT_RECEIPT,
     ]
   },
   {
@@ -267,20 +317,21 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
     labelAr: 'خريج منهج سعودي',
     documents: [
       CIVIL_ID,
+      PARENT_CIVIL_ID,
       {
         id: 'shahada',
-        name: 'Shahada (Certificate)',
+        name: 'Original HS Certificate',
         nameAr: 'الشهادة',
         required: true,
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'Saudi high school certificate (Shahada)'
+        description: 'Official high school certificate (Shahada)'
       },
       {
         id: 'qiyas',
-        name: 'Qiyas (Equivalency)',
-        nameAr: 'قياس (المعادلة)',
+        name: 'Qiyas',
+        nameAr: 'قياس',
         required: true,
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
@@ -289,8 +340,8 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
       },
       PASSPORT,
       NATIONALITY,
-      PUC_RECEIPT,
-      ACCEPTANCE_LETTER
+      ACCEPTANCE_LETTER,
+      PAYMENT_RECEIPT,
     ]
   },
   {
@@ -299,6 +350,7 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
     labelAr: 'خريج منهج آخر',
     documents: [
       CIVIL_ID,
+      PARENT_CIVIL_ID,
       HS_CERTIFICATE,
       {
         id: 'equivalency',
@@ -308,12 +360,12 @@ export const GRADUATE_TYPE_CONFIGS: GraduateTypeConfig[] = [
         acceptedFileTypes: DOCUMENT_FILE_TYPES,
         maxSizeMB: 10,
         hasExpiration: false,
-        description: 'Ministry of Education equivalency certificate'
+        description: 'Private education sector equivalency certificate'
       },
       PASSPORT,
       NATIONALITY,
-      PUC_RECEIPT,
-      ACCEPTANCE_LETTER
+      ACCEPTANCE_LETTER,
+      PAYMENT_RECEIPT,
     ]
   }
 ]
@@ -397,6 +449,7 @@ export function checkDocumentExpiration(expirationDate: Date, warningDays: numbe
 
 // Conditional document flags
 export interface ConditionalDocumentFlags {
+  isTransfer?: boolean
   isSpecialNeeds?: boolean
   isDiplomatic?: boolean
 }
@@ -413,12 +466,19 @@ export function getDocumentsForGraduateType(
 
   const docs = [...config.documents]
 
+  if (flags?.isTransfer) {
+    docs.push(TRANSFER_CERTIFICATE)
+    docs.push(COURSE_DESCRIPTION)
+  }
   if (flags?.isSpecialNeeds) {
     docs.push(SPECIAL_NEEDS_CERTIFICATE)
   }
   if (flags?.isDiplomatic) {
     docs.push(MINISTRY_FOREIGN_AFFAIRS)
   }
+
+  // Declaration is optional – always at the end
+  docs.push(DECLARATION)
 
   // Always include optional extra document slots
   docs.push(EXTRA_DOCUMENT_1)
@@ -447,15 +507,17 @@ export function getDocumentCompletionStatus(
   percentage: number
   isComplete: boolean
 } {
-  const requiredDocs = getDocumentsForGraduateType(graduateType, flags).filter(doc => doc.required)
+  const allDocs = getDocumentsForGraduateType(graduateType, flags)
+  const requiredDocs = allDocs.filter(doc => doc.required)
+  const uploadedAll = allDocs.filter(doc => uploadedDocumentIds.includes(doc.id))
   const uploadedRequired = requiredDocs.filter(doc => uploadedDocumentIds.includes(doc.id))
 
   return {
     total: requiredDocs.length,
-    uploaded: uploadedRequired.length,
+    uploaded: uploadedAll.length,
     missing: requiredDocs.length - uploadedRequired.length,
     percentage: requiredDocs.length > 0
-      ? Math.round((uploadedRequired.length / requiredDocs.length) * 100)
+      ? Math.min(100, Math.round((uploadedAll.length / requiredDocs.length) * 100))
       : 0,
     isComplete: uploadedRequired.length === requiredDocs.length
   }

@@ -16,6 +16,7 @@ import { StageSettings } from "@/components/settings/stage-settings"
 import { TargetSettings } from "@/components/settings/target-settings"
 import { SchoolManagement } from "@/components/settings/school-management"
 import { AutomationRulesManager } from "@/components/settings/automation-rules-manager"
+import { DocumentConfigManagement } from "@/components/settings/document-config-management"
 import {
   Select,
   SelectContent,
@@ -48,15 +49,17 @@ import {
   ExternalLink,
   GitBranch,
   Target,
-  School
+  School,
+  FileText
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
+import { usePreferences } from "@/lib/hooks/use-preferences"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets" | "schools" | "automations"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets" | "schools" | "documents" | "automations"
 
-const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean }[] = [
+const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -64,6 +67,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "pipeline", label: "Pipeline", icon: GitBranch, adminOnly: true },
   { id: "targets", label: "Targets", icon: Target, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
+  { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
   { id: "sms", label: "SMS", icon: MessageSquare, adminOnly: true },
   { id: "automations", label: "Automations", icon: Zap, adminOnly: true },
   { id: "team", label: "Team", icon: Users, adminOnly: true },
@@ -71,6 +75,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
 
 export default function SettingsPage() {
   const { profile, isAdmin } = useUser()
+  const { preferences, loading: prefsLoading, updatePreferences, saving: prefsSaving } = usePreferences()
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -79,11 +84,7 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState("")
   const [phone, setPhone] = useState("")
 
-  // Notification state
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [appointmentReminders, setAppointmentReminders] = useState(true)
-  const [leadAssignments, setLeadAssignments] = useState(true)
-  const [weeklyReport, setWeeklyReport] = useState(false)
+  // Notification state (synced from backend preferences)
   const [notificationsSaved, setNotificationsSaved] = useState(false)
 
   // Appearance state
@@ -99,32 +100,19 @@ export default function SettingsPage() {
     }
   }, [])
 
-  // Load notification settings from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("ktech-notification-settings")
-    if (stored) {
-      try {
-        const settings = JSON.parse(stored)
-        setEmailNotifications(settings.emailNotifications ?? true)
-        setAppointmentReminders(settings.appointmentReminders ?? true)
-        setLeadAssignments(settings.leadAssignments ?? true)
-        setWeeklyReport(settings.weeklyReport ?? false)
-      } catch (e) {
-        console.error("Failed to parse notification settings:", e)
-      }
+  const handleSaveNotifications = async () => {
+    try {
+      await updatePreferences({
+        email_notifications: preferences.email_notifications,
+        appointment_reminders: preferences.appointment_reminders,
+        lead_updates: preferences.lead_updates,
+        system_alerts: preferences.system_alerts,
+      })
+      setNotificationsSaved(true)
+      setTimeout(() => setNotificationsSaved(false), 2000)
+    } catch (e) {
+      console.error("Failed to save notification preferences:", e)
     }
-  }, [])
-
-  const handleSaveNotifications = () => {
-    const settings = {
-      emailNotifications,
-      appointmentReminders,
-      leadAssignments,
-      weeklyReport,
-    }
-    localStorage.setItem("ktech-notification-settings", JSON.stringify(settings))
-    setNotificationsSaved(true)
-    setTimeout(() => setNotificationsSaved(false), 2000)
   }
 
   const setTheme = (newTheme: "light" | "dark" | "system") => {
@@ -178,7 +166,12 @@ export default function SettingsPage() {
     }
   }
 
-  const visibleTabs = TABS.filter(tab => !tab.adminOnly || isAdmin)
+  const userRole = profile?.role || "agent"
+  const visibleTabs = TABS.filter(tab => {
+    if (tab.adminOnly && !isAdmin) return false
+    if (tab.roles && !tab.roles.includes(userRole)) return false
+    return true
+  })
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
@@ -188,7 +181,7 @@ export default function SettingsPage() {
         subtitle="Manage your account and preferences"
       />
 
-      <div className="p-6 page-enter">
+      <div className="px-3 py-4 sm:p-6 page-enter">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar Navigation */}
@@ -199,7 +192,7 @@ export default function SettingsPage() {
             >
               <Card className="sticky top-6">
                 <CardContent className="p-2">
-                  <nav className="space-y-1">
+                  <nav className="space-y-1" role="tablist">
                     {visibleTabs.map((tab) => {
                       const Icon = tab.icon
                       const isActive = activeTab === tab.id
@@ -208,6 +201,9 @@ export default function SettingsPage() {
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id)}
                           whileHover={{ x: 4 }}
+                          role="tab"
+                          aria-selected={activeTab === tab.id}
+                          aria-controls={`panel-${tab.id}`}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all",
                             isActive
@@ -233,6 +229,8 @@ export default function SettingsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="lg:col-span-3"
+              role="tabpanel"
+              id={`panel-${activeTab}`}
             >
               <AnimatePresence mode="wait">
                 {/* Profile Tab */}
@@ -257,7 +255,7 @@ export default function SettingsPage() {
                           <div className="relative group">
                             <Avatar className="w-24 h-24">
                               <AvatarImage src={profile?.avatar_url} />
-                              <AvatarFallback className="text-3xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] text-white">
+                              <AvatarFallback className="text-3xl bg-[#2D347D] text-white">
                                 {profile?.full_name
                                   ?.split(" ")
                                   .map((n) => n[0])
@@ -380,36 +378,44 @@ export default function SettingsPage() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        <div className="space-y-4">
-                          <NotificationToggle
-                            title="Email Notifications"
-                            description="Receive email updates for new leads and activities"
-                            checked={emailNotifications}
-                            onCheckedChange={setEmailNotifications}
-                          />
-                          <NotificationToggle
-                            title="Appointment Reminders"
-                            description="Get reminded 1 hour before appointments"
-                            checked={appointmentReminders}
-                            onCheckedChange={setAppointmentReminders}
-                          />
-                          <NotificationToggle
-                            title="Lead Assignments"
-                            description="Notify when leads are assigned to you"
-                            checked={leadAssignments}
-                            onCheckedChange={setLeadAssignments}
-                          />
-                          <NotificationToggle
-                            title="Weekly Performance Report"
-                            description="Receive a weekly summary of your performance"
-                            checked={weeklyReport}
-                            onCheckedChange={setWeeklyReport}
-                          />
-                        </div>
+                        {prefsLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--primary)]" />
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <NotificationToggle
+                              title="Email Notifications"
+                              description="Receive email updates for new leads and activities"
+                              checked={preferences.email_notifications}
+                              onCheckedChange={(val) => updatePreferences({ email_notifications: val })}
+                            />
+                            <NotificationToggle
+                              title="Appointment Reminders"
+                              description="Get reminded 1 hour before appointments"
+                              checked={preferences.appointment_reminders}
+                              onCheckedChange={(val) => updatePreferences({ appointment_reminders: val })}
+                            />
+                            <NotificationToggle
+                              title="Lead Updates"
+                              description="Notify when leads are assigned or updated"
+                              checked={preferences.lead_updates}
+                              onCheckedChange={(val) => updatePreferences({ lead_updates: val })}
+                            />
+                            <NotificationToggle
+                              title="System Alerts"
+                              description="Important system notifications and alerts"
+                              checked={preferences.system_alerts}
+                              onCheckedChange={(val) => updatePreferences({ system_alerts: val })}
+                            />
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-3 pt-4 border-t border-[var(--border)]">
-                          <Button onClick={handleSaveNotifications}>
-                            {notificationsSaved ? (
+                          <Button onClick={handleSaveNotifications} disabled={prefsSaving}>
+                            {prefsSaving ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                            ) : notificationsSaved ? (
                               <Check className="w-4 h-4 mr-2" />
                             ) : null}
                             {notificationsSaved ? "Saved!" : "Save Preferences"}
@@ -488,7 +494,7 @@ export default function SettingsPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="en">English</SelectItem>
-                                <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                                <SelectItem value="ar">Arabic</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -765,6 +771,19 @@ export default function SettingsPage() {
                     className="space-y-6"
                   >
                     <SchoolManagement />
+                  </motion.div>
+                )}
+
+                {/* Documents Tab */}
+                {activeTab === "documents" && isAdmin && (
+                  <motion.div
+                    key="documents"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <DocumentConfigManagement />
                   </motion.div>
                 )}
 

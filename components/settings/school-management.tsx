@@ -26,8 +26,11 @@ import {
   Loader2,
   Building2,
   AlertCircle,
+  Phone,
+  User,
+  Pencil,
 } from "lucide-react"
-import { GOVERNORATES, SCHOOL_GENDERS, type SchoolEntity, type Governorate, type SchoolGender } from "@/types"
+import { GOVERNORATES, SCHOOL_GENDERS, SCHOOL_TYPES, type SchoolEntity, type Governorate, type SchoolGender, type SchoolType } from "@/types"
 import { createClient } from "@/lib/supabase/client"
 
 export function SchoolManagement() {
@@ -36,10 +39,13 @@ export function SchoolManagement() {
   const [searchQuery, setSearchQuery] = useState("")
   const [governorateFilter, setGovernorateFilter] = useState<string>("all")
   const [genderFilter, setGenderFilter] = useState<string>("all")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [editingSchool, setEditingSchool] = useState<SchoolEntity | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   // New school form
   const [newSchool, setNewSchool] = useState({
@@ -47,6 +53,22 @@ export function SchoolManagement() {
     name_ar: "",
     governorate: "" as Governorate | "",
     gender: "" as SchoolGender | "",
+    school_type: "" as SchoolType | "",
+    location: "",
+    principal_name: "",
+    phone_number: "",
+  })
+
+  // Edit school form
+  const [editForm, setEditForm] = useState({
+    name_en: "",
+    name_ar: "",
+    governorate: "" as Governorate | "",
+    gender: "" as SchoolGender | "",
+    school_type: "" as SchoolType | "",
+    location: "",
+    principal_name: "",
+    phone_number: "",
   })
 
   const supabase = createClient()
@@ -98,6 +120,18 @@ export function SchoolManagement() {
       if (newSchool.gender) {
         insertData.gender = newSchool.gender
       }
+      if (newSchool.school_type) {
+        insertData.school_type = newSchool.school_type
+      }
+      if (newSchool.location.trim()) {
+        insertData.location = newSchool.location.trim()
+      }
+      if (newSchool.principal_name.trim()) {
+        insertData.principal_name = newSchool.principal_name.trim()
+      }
+      if (newSchool.phone_number.trim()) {
+        insertData.phone_number = newSchool.phone_number.trim()
+      }
 
       const { data, error: insertError } = await supabase
         .from("schools")
@@ -114,7 +148,7 @@ export function SchoolManagement() {
         setSchools(prev => [...prev, data].sort((a, b) => a.name_ar.localeCompare(b.name_ar)))
       }
 
-      setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "" })
+      setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "", school_type: "", location: "", principal_name: "", phone_number: "" })
       setShowAddModal(false)
       setSuccessMessage("School added successfully")
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -136,6 +170,78 @@ export function SchoolManagement() {
     }
   }
 
+  const openEditModal = (school: SchoolEntity) => {
+    setEditingSchool(school)
+    setEditForm({
+      name_en: school.name_en || "",
+      name_ar: school.name_ar || "",
+      governorate: (school.governorate || "") as Governorate | "",
+      gender: (school.gender || "") as SchoolGender | "",
+      school_type: (school.school_type || "") as SchoolType | "",
+      location: school.location || "",
+      principal_name: school.principal_name || "",
+      phone_number: school.phone_number || "",
+    })
+    setError("")
+    setShowEditModal(true)
+  }
+
+  const handleEditSchool = async () => {
+    if (!editingSchool) return
+
+    if (!editForm.name_ar.trim()) {
+      setError("School name (Arabic) is required")
+      return
+    }
+
+    if (!editForm.gender) {
+      setError("Gender is required")
+      return
+    }
+
+    setSaving(true)
+    setError("")
+
+    try {
+      const updateData: Record<string, string | null> = {
+        name_en: editForm.name_en.trim() || editForm.name_ar.trim(),
+        name_ar: editForm.name_ar.trim(),
+        governorate: editForm.governorate || null,
+        gender: editForm.gender || null,
+        school_type: editForm.school_type || null,
+        location: editForm.location.trim() || null,
+        principal_name: editForm.principal_name.trim() || null,
+        phone_number: editForm.phone_number.trim() || null,
+      }
+
+      const { data, error: updateError } = await supabase
+        .from("schools")
+        .update(updateData)
+        .eq("id", editingSchool.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        setError(updateError.message)
+        return
+      }
+
+      if (data) {
+        setSchools(prev =>
+          prev.map(s => s.id === editingSchool.id ? data : s)
+            .sort((a, b) => a.name_ar.localeCompare(b.name_ar))
+        )
+      }
+
+      setShowEditModal(false)
+      setEditingSchool(null)
+      setSuccessMessage("School updated successfully")
+      setTimeout(() => setSuccessMessage(""), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const filteredSchools = schools.filter(s => {
     const matchesSearch =
       s.name_ar.includes(searchQuery) ||
@@ -144,7 +250,9 @@ export function SchoolManagement() {
       governorateFilter === "all" || s.governorate === governorateFilter
     const matchesGender =
       genderFilter === "all" || s.gender === genderFilter
-    return matchesSearch && matchesGovernorate && matchesGender
+    const matchesType =
+      typeFilter === "all" || s.school_type === typeFilter
+    return matchesSearch && matchesGovernorate && matchesGender && matchesType
   })
 
   const activeCount = schools.filter(s => s.is_active).length
@@ -185,11 +293,11 @@ export function SchoolManagement() {
             </div>
             <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-blue-200 dark:border-blue-800/50 text-center">
               <p className="text-2xl font-bold text-blue-600">{maleCount}</p>
-              <p className="text-xs text-[var(--text-muted)]">Male (بنين)</p>
+              <p className="text-xs text-[var(--text-muted)]">Male</p>
             </div>
             <div className="p-3 rounded-xl bg-[var(--bg-sunken)] border border-pink-200 dark:border-pink-800/50 text-center">
               <p className="text-2xl font-bold text-pink-600">{femaleCount}</p>
-              <p className="text-xs text-[var(--text-muted)]">Female (بنات)</p>
+              <p className="text-xs text-[var(--text-muted)]">Female</p>
             </div>
           </div>
 
@@ -232,6 +340,19 @@ export function SchoolManagement() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {SCHOOL_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label} ({t.labelAr})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={governorateFilter} onValueChange={setGovernorateFilter}>
               <SelectTrigger className="w-48">
                 <MapPin className="w-4 h-4 mr-2 text-[var(--text-muted)]" />
@@ -257,7 +378,7 @@ export function SchoolManagement() {
             <div className="text-center py-12">
               <Building2 className="w-10 h-10 mx-auto mb-3 text-[var(--text-muted)] opacity-50" />
               <p className="text-sm text-[var(--text-muted)]">
-                {searchQuery || governorateFilter !== "all" || genderFilter !== "all"
+                {searchQuery || governorateFilter !== "all" || genderFilter !== "all" || typeFilter !== "all"
                   ? "No schools match your search"
                   : "No schools added yet"}
               </p>
@@ -310,18 +431,78 @@ export function SchoolManagement() {
                             {SCHOOL_GENDERS.find(g => g.value === school.gender)?.labelAr || school.gender}
                           </Badge>
                         )}
+                        {school.school_type && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 shrink-0 font-semibold",
+                              school.school_type === 'gov'
+                                ? "border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                                : school.school_type === 'us'
+                                ? "border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30"
+                                : school.school_type === 'uk'
+                                ? "border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30"
+                                : school.school_type === 'ksa'
+                                ? "border-teal-300 dark:border-teal-700 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30"
+                                : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/30"
+                            )}
+                          >
+                            {SCHOOL_TYPES.find(t => t.value === school.school_type)?.label || school.school_type}
+                          </Badge>
+                        )}
                         {school.governorate && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
                             {GOVERNORATES.find(g => g.value === school.governorate)?.labelAr || school.governorate}
                           </Badge>
                         )}
                       </div>
+                      {(school.location || school.principal_name || school.phone_number) && (
+                        <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--text-muted)]">
+                          {school.location && (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(school.location)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 hover:text-[var(--text-primary)] transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MapPin className="w-3 h-3" />
+                              {school.location}
+                            </a>
+                          )}
+                          {school.principal_name && (
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {school.principal_name}
+                            </span>
+                          )}
+                          {school.phone_number && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              <span dir="ltr">{school.phone_number}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <Switch
-                    checked={school.is_active}
-                    onCheckedChange={() => handleToggleActive(school)}
-                  />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-[var(--text-muted)] hover:text-[var(--primary)]"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditModal(school)
+                      }}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Switch
+                      checked={school.is_active}
+                      onCheckedChange={() => handleToggleActive(school)}
+                    />
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -357,7 +538,7 @@ export function SchoolManagement() {
             </DialogHeader>
           </div>
 
-          <DialogBody className="px-7 py-5 space-y-5 max-h-none overflow-visible">
+          <DialogBody className="px-7 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
             {/* Error display */}
             <AnimatePresence>
               {error && (
@@ -392,7 +573,7 @@ export function SchoolManagement() {
                   setNewSchool(prev => ({ ...prev, name_ar: e.target.value }))
                   setError("")
                 }}
-                placeholder="ثانوية ..."
+                placeholder="School name in Arabic..."
                 dir="rtl"
                 variant="filled"
                 className="h-12 text-base font-medium"
@@ -467,6 +648,79 @@ export function SchoolManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* School Type Field */}
+            <div className="space-y-2.5">
+              <Label className="text-[var(--text-primary)]">School Type</Label>
+              <Select
+                value={newSchool.school_type || "none"}
+                onValueChange={(value) => setNewSchool(prev => ({ ...prev, school_type: value === "none" ? "" : value as SchoolType }))}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No type</SelectItem>
+                  {SCHOOL_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label} - {t.labelAr}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Location Field */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="location" className="text-[var(--text-primary)]">
+                  Location
+                </Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="location"
+                value={newSchool.location}
+                onChange={(e) => setNewSchool(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="e.g. Block 3, Salmiya"
+                variant="filled"
+              />
+            </div>
+
+            {/* Principal/Manager Field */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="principal_name" className="text-[var(--text-primary)]">
+                  Principal / Manager
+                </Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="principal_name"
+                value={newSchool.principal_name}
+                onChange={(e) => setNewSchool(prev => ({ ...prev, principal_name: e.target.value }))}
+                placeholder="e.g. Ahmad Al-Sabah"
+                variant="filled"
+              />
+            </div>
+
+            {/* Phone Number Field */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="phone_number" className="text-[var(--text-primary)]">
+                  Phone Number
+                </Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="phone_number"
+                value={newSchool.phone_number}
+                onChange={(e) => setNewSchool(prev => ({ ...prev, phone_number: e.target.value }))}
+                placeholder="e.g. +965 2222 3333"
+                dir="ltr"
+                variant="filled"
+              />
+            </div>
           </DialogBody>
 
           <DialogFooter className="px-7 py-5 bg-[var(--bg-sunken)]/50">
@@ -474,7 +728,7 @@ export function SchoolManagement() {
               variant="ghost"
               onClick={() => {
                 setShowAddModal(false)
-                setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "" })
+                setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "", school_type: "", location: "", principal_name: "", phone_number: "" })
                 setError("")
               }}
             >
@@ -492,6 +746,234 @@ export function SchoolManagement() {
                 <Check className="w-4 h-4" />
               )}
               {saving ? "Adding..." : "Add School"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit School Modal */}
+      <Dialog open={showEditModal} onOpenChange={(open) => {
+        setShowEditModal(open)
+        if (!open) {
+          setEditingSchool(null)
+          setError("")
+        }
+      }}>
+        <DialogContent className="max-w-[480px] p-0 overflow-hidden">
+          <div className="relative">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--accent)] via-[var(--primary)] to-[var(--accent)]" />
+            <DialogHeader className="pt-8 pb-5 px-7 border-b-0">
+              <DialogTitle className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--primary)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
+                    <Pencil className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">Edit School</h2>
+                  <p className="text-sm text-[var(--text-muted)] font-normal mt-0.5">Update school information</p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+
+          <DialogBody className="px-7 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--error-bg)] border border-[var(--error)]/20 text-sm">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--error)]/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertCircle className="w-4 h-4 text-[var(--error)]" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-[var(--error)]">Validation Error</p>
+                      <p className="text-[var(--error)]/80 mt-0.5">{error}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Arabic Name */}
+            <div className="space-y-2.5">
+              <Label htmlFor="edit_name_ar" required className="text-[var(--text-primary)]">
+                School Name (Arabic)
+              </Label>
+              <Input
+                id="edit_name_ar"
+                value={editForm.name_ar}
+                onChange={(e) => {
+                  setEditForm(prev => ({ ...prev, name_ar: e.target.value }))
+                  setError("")
+                }}
+                placeholder="School name in Arabic..."
+                dir="rtl"
+                variant="filled"
+                className="h-12 text-base font-medium"
+              />
+            </div>
+
+            {/* English Name */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="edit_name_en" className="text-[var(--text-primary)]">
+                  School Name (English)
+                </Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="edit_name_en"
+                value={editForm.name_en}
+                onChange={(e) => setEditForm(prev => ({ ...prev, name_en: e.target.value }))}
+                placeholder="e.g. Al-Sabah Secondary School"
+                variant="filled"
+              />
+            </div>
+
+            {/* Governorate */}
+            <div className="space-y-2.5">
+              <Label className="text-[var(--text-primary)]">Governorate</Label>
+              <Select
+                value={editForm.governorate || "none"}
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, governorate: value === "none" ? "" : value as Governorate }))}
+              >
+                <SelectTrigger className="h-11">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-[var(--text-muted)]" />
+                    <SelectValue placeholder="Select governorate" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No governorate</SelectItem>
+                  {GOVERNORATES.map((gov) => (
+                    <SelectItem key={gov.value} value={gov.value}>
+                      {gov.labelAr} ({gov.label})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Gender */}
+            <div className="space-y-2.5">
+              <Label required className="text-[var(--text-primary)]">Gender</Label>
+              <Select
+                value={editForm.gender || "none"}
+                onValueChange={(value) => {
+                  setEditForm(prev => ({ ...prev, gender: value === "none" ? "" : value as SchoolGender }))
+                  setError("")
+                }}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" disabled>Select gender</SelectItem>
+                  {SCHOOL_GENDERS.map((g) => (
+                    <SelectItem key={g.value} value={g.value}>
+                      {g.labelAr} ({g.label})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* School Type */}
+            <div className="space-y-2.5">
+              <Label className="text-[var(--text-primary)]">School Type</Label>
+              <Select
+                value={editForm.school_type || "none"}
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, school_type: value === "none" ? "" : value as SchoolType }))}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No type</SelectItem>
+                  {SCHOOL_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label} - {t.labelAr}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Location */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="edit_location" className="text-[var(--text-primary)]">Location</Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="edit_location"
+                value={editForm.location}
+                onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="e.g. Block 3, Salmiya"
+                variant="filled"
+              />
+            </div>
+
+            {/* Principal */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="edit_principal_name" className="text-[var(--text-primary)]">Principal / Manager</Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="edit_principal_name"
+                value={editForm.principal_name}
+                onChange={(e) => setEditForm(prev => ({ ...prev, principal_name: e.target.value }))}
+                placeholder="e.g. Ahmad Al-Sabah"
+                variant="filled"
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="edit_phone_number" className="text-[var(--text-primary)]">Phone Number</Label>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+              </div>
+              <Input
+                id="edit_phone_number"
+                value={editForm.phone_number}
+                onChange={(e) => setEditForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                placeholder="e.g. +965 2222 3333"
+                dir="ltr"
+                variant="filled"
+              />
+            </div>
+          </DialogBody>
+
+          <DialogFooter className="px-7 py-5 bg-[var(--bg-sunken)]/50">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowEditModal(false)
+                setEditingSchool(null)
+                setError("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSchool}
+              disabled={saving || !editForm.name_ar.trim() || !editForm.gender}
+              variant="gradient"
+              className="min-w-[140px] shadow-md shadow-[var(--primary)]/15"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

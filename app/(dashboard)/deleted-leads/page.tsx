@@ -109,7 +109,7 @@ export default function DeletedLeadsPage() {
         subtitle="View and restore leads deleted by agents"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="p-4">

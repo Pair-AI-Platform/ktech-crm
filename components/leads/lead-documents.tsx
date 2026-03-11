@@ -12,11 +12,14 @@ import {
   File,
   Loader2,
   Eye,
-  ChevronDown
+  ChevronDown,
+  CheckSquare,
+  Square
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { SF_DOCUMENTS, type Lead } from "@/types"
 
 interface LeadDocument {
   id: string
@@ -30,6 +33,8 @@ interface LeadDocument {
 
 interface LeadDocumentsProps {
   leadId: string
+  lead?: Lead
+  onDocumentToggle?: (key: string, value: boolean) => Promise<void>
   className?: string
 }
 
@@ -51,12 +56,15 @@ function getFileIcon(type: string) {
   return FILE_ICONS[type] || File
 }
 
-export function LeadDocuments({ leadId, className }: LeadDocumentsProps) {
+export function LeadDocuments({ leadId, lead, onDocumentToggle, className }: LeadDocumentsProps) {
   const [documents, setDocuments] = useState<LeadDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [togglingKey, setTogglingKey] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const isSelfFunded = lead?.funding_type === 'self_funded'
 
   // Load documents from localStorage (since we're not using database migrations)
   useEffect(() => {
@@ -166,6 +174,21 @@ export function LeadDocuments({ leadId, className }: LeadDocumentsProps) {
     window.open(doc.url, '_blank')
   }
 
+  const handleToggleDocument = async (key: string, currentValue: boolean) => {
+    if (!onDocumentToggle || togglingKey) return
+    setTogglingKey(key)
+    try {
+      await onDocumentToggle(key, !currentValue)
+    } finally {
+      setTogglingKey(null)
+    }
+  }
+
+  // Count checked SF documents
+  const sfCheckedCount = isSelfFunded && lead
+    ? SF_DOCUMENTS.filter(doc => lead[doc.key as keyof Lead] === true).length
+    : 0
+
   return (
     <div data-documents-section className={cn("bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl overflow-hidden", className)}>
       {/* Header */}
@@ -178,7 +201,10 @@ export function LeadDocuments({ leadId, className }: LeadDocumentsProps) {
             <Paperclip className="w-4 h-4" />
           </div>
           <span className="font-semibold text-[var(--text-primary)]">
-            Documents {documents.length > 0 && `(${documents.length})`}
+            Documents {isSelfFunded
+              ? sfCheckedCount > 0 && `(${sfCheckedCount}/${SF_DOCUMENTS.length})`
+              : documents.length > 0 && `(${documents.length})`
+            }
           </span>
         </div>
         <ChevronDown className={cn(
@@ -197,99 +223,146 @@ export function LeadDocuments({ leadId, className }: LeadDocumentsProps) {
             transition={{ duration: 0.2 }}
             className="px-4 pb-4"
           >
-            {/* Upload Button */}
-            <div className="mb-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleUpload}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full gap-2"
-              >
-                {uploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Upload className="w-4 h-4" />
-                )}
-                {uploading ? 'Uploading...' : 'Upload Document'}
-              </Button>
-            </div>
-
-            {/* Documents List */}
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
-              </div>
-            ) : documents.length === 0 ? (
-              <div className="text-center py-6">
-                <FileText className="w-8 h-8 mx-auto text-[var(--text-muted)] opacity-40 mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">No documents yet</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {documents.map((doc) => {
-                  const FileIcon = getFileIcon(doc.type)
+            {isSelfFunded && lead ? (
+              /* Self-Funded: Checkbox list */
+              <div className="space-y-1">
+                {SF_DOCUMENTS.map((doc) => {
+                  const isChecked = lead[doc.key as keyof Lead] === true
+                  const isToggling = togglingKey === doc.key
                   return (
-                    <div
-                      key={doc.id}
-                      className="group flex items-center gap-3 p-2.5 rounded-xl bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)] transition-colors"
+                    <button
+                      key={doc.key}
+                      onClick={() => handleToggleDocument(doc.key, isChecked)}
+                      disabled={isToggling}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left",
+                        isChecked
+                          ? "bg-emerald-50 dark:bg-emerald-950/20"
+                          : "bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)]",
+                        isToggling && "opacity-60"
+                      )}
                     >
-                      <div className={cn(
-                        "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                        doc.type.startsWith('image/') ? "bg-violet-100" : "bg-blue-100"
-                      )}>
-                        <FileIcon className={cn(
-                          "w-4 h-4",
-                          doc.type.startsWith('image/') ? "text-violet-600" : "text-blue-600"
-                        )} />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-primary)] truncate font-medium">
-                          {doc.name}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {formatFileSize(doc.size)}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {doc.type.startsWith('image/') && (
-                          <button
-                            onClick={() => handleDownload(doc)}
-                            className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                            title="Preview"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                      <div className="shrink-0">
+                        {isToggling ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+                        ) : isChecked ? (
+                          <CheckSquare className="w-5 h-5 text-emerald-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-[var(--text-muted)]" />
                         )}
-                        <button
-                          onClick={() => handleDownload(doc)}
-                          className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                          title="Download"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(doc)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
-                    </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-medium",
+                          isChecked ? "text-emerald-700 dark:text-emerald-400" : "text-[var(--text-primary)]"
+                        )}>
+                          {doc.label}
+                        </p>
+                        {'transferOnly' in doc && doc.transferOnly && (
+                          <p className="text-xs text-[var(--text-muted)]">Required if transfer student</p>
+                        )}
+                      </div>
+                    </button>
                   )
                 })}
               </div>
+            ) : (
+              <>
+                {/* Upload Button */}
+                <div className="mb-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleUpload}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full gap-2"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    {uploading ? 'Uploading...' : 'Upload Document'}
+                  </Button>
+                </div>
+
+                {/* Documents List */}
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="text-center py-6">
+                    <FileText className="w-8 h-8 mx-auto text-[var(--text-muted)] opacity-40 mb-2" />
+                    <p className="text-sm text-[var(--text-muted)]">No documents yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {documents.map((doc) => {
+                      const FileIcon = getFileIcon(doc.type)
+                      return (
+                        <div
+                          key={doc.id}
+                          className="group flex items-center gap-3 p-2.5 rounded-xl bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)] transition-colors"
+                        >
+                          <div className={cn(
+                            "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+                            doc.type.startsWith('image/') ? "bg-violet-100" : "bg-blue-100"
+                          )}>
+                            <FileIcon className={cn(
+                              "w-4 h-4",
+                              doc.type.startsWith('image/') ? "text-violet-600" : "text-blue-600"
+                            )} />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-[var(--text-primary)] truncate font-medium">
+                              {doc.name}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {formatFileSize(doc.size)}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {doc.type.startsWith('image/') && (
+                              <button
+                                onClick={() => handleDownload(doc)}
+                                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                                title="Preview"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDownload(doc)}
+                              className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                              title="Download"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(doc)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         )}

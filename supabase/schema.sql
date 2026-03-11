@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ENUMS
 -- =============================================
 
-CREATE TYPE user_role AS ENUM ('admin', 'agent');
+CREATE TYPE user_role AS ENUM ('admin', 'agent', 'user');
 
 CREATE TYPE lead_source_category AS ENUM (
   'direct', 'events', 'digital', 'referrals', 'outreach'
@@ -49,7 +49,7 @@ CREATE TYPE placement_level AS ENUM ('foundation_1', 'foundation_2', 'majors');
 CREATE TYPE payment_status AS ENUM ('pending', 'seat_reserved', 'full_tuition');
 
 CREATE TYPE discount_type AS ENUM (
-  'kuwaiti_student', 'non_kuwaiti', 'athletes', 'marketing',
+  'kuwaiti_new_certificate', 'kuwaiti_old_certificate', 'non_kuwaiti', 'athletes', 'marketing',
   'employee', 'athletes_full', 'president', 'charity',
   'non_kuwaiti_ministry', 'service_civil_commission'
 );

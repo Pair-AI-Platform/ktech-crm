@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Plus,
   Download,
@@ -14,8 +15,8 @@ import {
   GraduationCap,
   BookOpen,
 } from "lucide-react"
-import { type PipelineStage, type Lead } from "@/types"
-import { useLeads, useLeadStats, useLeadMutations } from "@/lib/hooks/use-leads"
+import { type PipelineStage, type Lead, type LeadStatus, PIPELINE_STAGES } from "@/types"
+import { useLeads, useLeadStats, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
 import { LeadForm } from "@/components/leads/lead-form"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
@@ -26,11 +27,13 @@ import { PUCImportDialog } from "@/components/leads/puc-import-dialog"
 import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
+import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { ErrorState } from "@/components/ui/error-state"
+import { RoleGuard } from "@/components/auth/role-guard"
 
 const defaultFilters: LeadFilters = {
   searchQuery: "",
@@ -51,20 +54,27 @@ const defaultFilters: LeadFilters = {
   gpaMax: null,
   isKuwaiti: null,
   ministryBlocked: "all",
+  blockReasons: [],
   hasNotes: "all",
   paymentStatus: "all",
+  paymentAmountMin: 0,
+  paymentAmountMax: 5000,
+  academicTrack: "all",
+  lostReasonIds: [],
 }
 
 export default function LeadsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { profile } = useUser()
+  const { reasons: lostReasons } = useLostReasons()
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
   const [filters, setFilters] = useState<LeadFilters>(defaultFilters)
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
   const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
+  const [lostAtFilter, setLostAtFilter] = useState<PipelineStage | "all">("all")
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showLostModal, setShowLostModal] = useState(false)
@@ -72,13 +82,34 @@ export default function LeadsPage() {
   const [showPUCImportModal, setShowPUCImportModal] = useState(false)
   const [showPSPTransferModal, setShowPSPTransferModal] = useState(false)
 const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
+  const [showRSVPModal, setShowRSVPModal] = useState(false)
   const [showMinistryImportModal, setShowMinistryImportModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
   const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
   const initialCheckDone = useRef(false)
+  const pendingScrollRestore = useRef<number | null>(null)
+  const viewStateRestored = useRef(false)
   const [studentPaymentMap, setStudentPaymentMap] = useState<Map<string, string>>(new Map())
+
+  // Restore view state from sessionStorage on mount (for back navigation)
+  useEffect(() => {
+    const saved = sessionStorage.getItem("leads-view-state")
+    if (!saved) return
+    sessionStorage.removeItem("leads-view-state")
+    // Don't restore if URL already has params driving state
+    if (searchParams.get("stage") || searchParams.get("new")) return
+    try {
+      const state = JSON.parse(saved)
+      viewStateRestored.current = true
+      if (state.searchQuery) setFilters(prev => ({ ...prev, searchQuery: state.searchQuery }))
+      if (state.stageFilter) setStageFilter(state.stageFilter)
+      if (state.lostAtFilter) setLostAtFilter(state.lostAtFilter)
+      if (state.scrollTop) pendingScrollRestore.current = state.scrollTop
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Check URL params for opening the form (only once on mount)
   useEffect(() => {
@@ -95,40 +126,117 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
 
   // Sync filters from URL params (for sidebar sub-tab navigation like PUC SRJ)
   useEffect(() => {
+    // Skip the initial sync if we just restored view state from sessionStorage
+    if (viewStateRestored.current) {
+      viewStateRestored.current = false
+      return
+    }
+
     const stageParam = searchParams.get("stage") as PipelineStage | null
     if (stageParam) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing URL params to local state
       setStageFilter(stageParam)
+      if (stageParam !== "lost") setLostAtFilter("all")
+    } else {
+      // No stage param = "All Contacts" view, reset from any previous stage
+      setStageFilter("all")
+      setLostAtFilter("all")
     }
 
     const fundingTypeParam = searchParams.get("funding_type") as "self_funded" | "puc" | null
     const gpaMinParam = searchParams.get("gpa_min")
+    const gpaMaxParam = searchParams.get("gpa_max")
     const isKuwaitiParam = searchParams.get("is_kuwaiti")
     const paymentStatusParam = searchParams.get("payment_status") as "pending" | "seat_reserved" | "full_tuition" | null
+    const searchQueryParam = searchParams.get("q")
+    const statusesParam = searchParams.get("statuses")
+    const sourcesParam = searchParams.get("sources")
+    const dateRangeParam = searchParams.get("date_range")
+    const assignedToParam = searchParams.get("assigned_to")
+    const academicTrackParam = searchParams.get("academic_track")
+    const lostAtParam = searchParams.get("lost_at") as PipelineStage | null
 
-    if (fundingTypeParam || gpaMinParam || isKuwaitiParam || paymentStatusParam) {
+    if (lostAtParam) {
+      setLostAtFilter(lostAtParam)
+    }
 
+    const hasFilterParams = fundingTypeParam || gpaMinParam || gpaMaxParam || isKuwaitiParam || paymentStatusParam || searchQueryParam || statusesParam || sourcesParam || dateRangeParam || assignedToParam || academicTrackParam
+
+    if (hasFilterParams) {
       setFilters(prev => ({
         ...prev,
+        ...(searchQueryParam ? { searchQuery: searchQueryParam } : {}),
         ...(fundingTypeParam ? { fundingType: fundingTypeParam } : {}),
         ...(gpaMinParam ? { gpaMin: parseFloat(gpaMinParam) } : {}),
+        ...(gpaMaxParam ? { gpaMax: parseFloat(gpaMaxParam) } : {}),
         ...(isKuwaitiParam === "true" ? { isKuwaiti: true } : isKuwaitiParam === "false" ? { isKuwaiti: false } : {}),
         ...(paymentStatusParam ? { paymentStatus: paymentStatusParam } : {}),
+        ...(statusesParam ? { statuses: statusesParam.split(",") as LeadStatus[] } : {}),
+        ...(sourcesParam ? { sources: sourcesParam.split(",") as LeadFilters['sources'] } : {}),
+        ...(dateRangeParam ? { dateRange: dateRangeParam as LeadFilters['dateRange'] } : {}),
+        ...(assignedToParam ? { assignedTo: assignedToParam } : {}),
+        ...(academicTrackParam ? { academicTrack: academicTrackParam as LeadFilters['academicTrack'] } : {}),
       }))
     }
   }, [searchParams])
 
-  const { leads, loading, error, refetch } = useLeads({
+  // Sync filter state to URL search params (for shareability and back-navigation)
+  useEffect(() => {
+    const params = new URLSearchParams()
+
+    if (stageFilter !== "all") params.set("stage", stageFilter)
+    if (filters.searchQuery) params.set("q", filters.searchQuery)
+    if (filters.fundingType !== "all") params.set("funding_type", filters.fundingType)
+    if (filters.statuses.length > 0) params.set("statuses", filters.statuses.join(","))
+    if (filters.sources.length > 0) params.set("sources", filters.sources.join(","))
+    if (filters.dateRange !== "all") params.set("date_range", filters.dateRange)
+    if (filters.assignedTo) params.set("assigned_to", filters.assignedTo)
+    if (filters.gpaMin !== null) params.set("gpa_min", String(filters.gpaMin))
+    if (filters.gpaMax !== null) params.set("gpa_max", String(filters.gpaMax))
+    if (filters.isKuwaiti !== null) params.set("is_kuwaiti", String(filters.isKuwaiti))
+    if (filters.academicTrack !== "all") params.set("academic_track", filters.academicTrack)
+    if (lostAtFilter !== "all") params.set("lost_at", lostAtFilter)
+
+    const newUrl = params.toString() ? `?${params.toString()}` : "/leads"
+    // Use replaceState to avoid polluting browser history with every filter change
+    window.history.replaceState(null, "", newUrl)
+  }, [stageFilter, lostAtFilter, filters.searchQuery, filters.fundingType, filters.statuses, filters.sources, filters.dateRange, filters.assignedTo, filters.gpaMin, filters.gpaMax, filters.isKuwaiti, filters.academicTrack])
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 50
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [stageFilter, filters.searchQuery, filters.fundingType])
+
+  const { leads, loading, error, totalCount, totalPages, refetch } = useLeads({
     stage: stageFilter,
     searchQuery: filters.searchQuery,
-    limit: 100,
+    page: currentPage,
+    pageSize,
   })
 
   const { stats } = useLeadStats()
 
+  // Restore scroll position after leads finish loading
+  useEffect(() => {
+    if (!loading && pendingScrollRestore.current !== null) {
+      const scrollTop = pendingScrollRestore.current
+      pendingScrollRestore.current = null
+      requestAnimationFrame(() => {
+        const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
+        if (scrollEl) scrollEl.scrollTop = scrollTop
+      })
+    }
+  }, [loading])
+
+  // Check if payment range filter is active
+  const isPaymentRangeActive = filters.paymentAmountMin > 0 || filters.paymentAmountMax < 5000
+
   // Fetch student payment data when payment filter is active
   useEffect(() => {
-    if (filters.paymentStatus === "all") {
+    if (filters.paymentStatus === "all" && !isPaymentRangeActive) {
       setStudentPaymentMap(new Map())
       return
     }
@@ -154,12 +262,16 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         setStudentPaymentMap(map)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.paymentStatus, leads])
+  }, [filters.paymentStatus, isPaymentRangeActive, leads])
 
   // Client-side filtering for advanced filters
   const filteredLeads = leads.filter((lead) => {
-    // Exclude lost/withdraw leads from "all" view (they have their own sidebar tabs)
-    if (stageFilter === "all" && (lead.pipeline_stage === "lost" || lead.pipeline_stage === "withdraw")) return false
+    // Exclude lost leads from "all" view (they have their own sidebar tab)
+    if (stageFilter === "all" && lead.pipeline_stage === "lost") return false
+    // Lost at stage filter (from the stage tabs in lost view)
+    if (stageFilter === "lost" && lostAtFilter !== "all") {
+      if (lead.lost_at_stage !== lostAtFilter) return false
+    }
     // Status filter
     if (filters.statuses.length > 0 && (!lead.status || !filters.statuses.includes(lead.status))) {
       return false
@@ -170,6 +282,10 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     }
     // School filter
     if (filters.schools.length > 0 && lead.school && !filters.schools.includes(lead.school)) {
+      return false
+    }
+    // Academic track (type) filter
+    if (filters.academicTrack !== "all" && lead.academic_track !== filters.academicTrack) {
       return false
     }
     // Funding type filter
@@ -215,6 +331,10 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     // Ministry blocked filter
     if (filters.ministryBlocked === "blocked" && !lead.ministry_blocked) return false
     if (filters.ministryBlocked === "not_blocked" && lead.ministry_blocked) return false
+    // Block reason filter
+    if (filters.blockReasons.length > 0) {
+      if (!lead.submission_blocked_reason || !filters.blockReasons.includes(lead.submission_blocked_reason)) return false
+    }
     // Submission substage filter
     if (filters.submissionSubstages.length > 0) {
       if (!lead.submission_substage || !filters.submissionSubstages.includes(lead.submission_substage)) return false
@@ -226,6 +346,10 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     // Lost at stage filter - filter lost leads by the stage they were in before being marked lost
     if (filters.lostAtStages.length > 0) {
       if (!lead.lost_at_stage || !filters.lostAtStages.includes(lead.lost_at_stage)) return false
+    }
+    // Lost reason filter
+    if (filters.lostReasonIds.length > 0) {
+      if (!lead.lost_reason?.id || !filters.lostReasonIds.includes(lead.lost_reason.id)) return false
     }
     // Kuwaiti filter
     if (filters.isKuwaiti !== null) {
@@ -241,8 +365,30 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       const status = studentPaymentMap.get(lead.id) ?? "pending"
       if (status !== filters.paymentStatus) return false
     }
+    // Payment amount range filter (self-funded only)
+    if (isPaymentRangeActive) {
+      if (lead.funding_type !== "self_funded") return false
+      const status = studentPaymentMap.get(lead.id) ?? "pending"
+      // Map status to amount ranges: pending=0-149, seat_reserved=150-549, full_tuition=550+
+      const statusRanges: Record<string, [number, number]> = {
+        pending: [0, 149],
+        seat_reserved: [150, 549],
+        full_tuition: [550, 1000],
+      }
+      const range = statusRanges[status] ?? [0, 149]
+      // Include if the status range overlaps with the filter range
+      if (range[1] < filters.paymentAmountMin || range[0] > filters.paymentAmountMax) return false
+    }
     return true
   })
+
+  // Compute lost-at stage counts for the lost view tabs
+  const lostAtStats = stageFilter === "lost" ? leads.reduce<Record<string, number>>((acc, lead) => {
+    if (lead.pipeline_stage === "lost" && lead.lost_at_stage) {
+      acc[lead.lost_at_stage] = (acc[lead.lost_at_stage] || 0) + 1
+    }
+    return acc
+  }, {}) : {}
 
   const toggleSelectAll = () => {
     if (selectedLeads.length === filteredLeads.length) {
@@ -395,10 +541,11 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   )
 
   return (
-    <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0">
+    <RoleGuard allowedRoles={['admin', 'agent']}>
+    <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0 min-w-0">
       <Header
         user={profile}
-        title="Leads"
+        title={stageFilter === "lost" ? "Lost" : "All Contacts"}
         action={{
           label: "Add Lead",
           onClick: () => setShowAddForm(true),
@@ -406,10 +553,10 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         }}
       />
 
-      <div className="p-6 gap-6 page-enter flex flex-col flex-1 min-h-0 h-full">
+      <div className="px-3 py-4 sm:p-6 gap-4 sm:gap-6 page-enter flex flex-col flex-1 min-h-0 min-w-0 h-full">
         {/* Stats Bar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             {/* SF/PUC Toggle */}
             <div className="flex items-center p-1 bg-[var(--bg-surface)] rounded-lg border border-[var(--border)]">
               {[
@@ -420,6 +567,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
                 <button
                   key={option.value}
                   onClick={() => setFilters(prev => ({ ...prev, fundingType: option.value }))}
+                  aria-pressed={filters.fundingType === option.value}
                   className={cn(
                     "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
                     filters.fundingType === option.value
@@ -431,25 +579,25 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
                 </button>
               ))}
             </div>
-
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Refresh Button */}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => refetch()}
-              className="text-[var(--text-muted)]"
+              className="text-[var(--text-muted)] w-8 h-8 sm:w-9 sm:h-9"
+              aria-label="Refresh leads"
             >
               <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
             </Button>
 
-            {/* Import/Export */}
+            {/* Import/Export - hidden on small mobile, shown sm+ */}
             <Button
               variant="ghost"
               size="icon"
-              className="text-[var(--text-muted)]"
+              className="hidden sm:inline-flex text-[var(--text-muted)]"
               onClick={() => setShowImportModal(true)}
               title="Import CSV"
             >
@@ -458,7 +606,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             <Button
               variant="ghost"
               size="icon"
-              className="text-[var(--text-muted)]"
+              className="hidden sm:inline-flex text-[var(--text-muted)]"
               onClick={() => setShowPUCImportModal(true)}
               title="Import PUC List"
             >
@@ -467,7 +615,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             <Button
               variant="ghost"
               size="icon"
-              className="text-[var(--text-muted)]"
+              className="hidden sm:inline-flex text-[var(--text-muted)]"
               onClick={() => setShowMinistryImportModal(true)}
               title="Import Ministry GPA List"
             >
@@ -476,33 +624,61 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             <Button
               variant="ghost"
               size="icon"
-              className="text-[var(--text-muted)]"
+              className="text-[var(--text-muted)] w-8 h-8 sm:w-9 sm:h-9"
               onClick={handleExportCSV}
               title="Export CSV"
               disabled={filteredLeads.length === 0}
+              aria-label="Export leads"
             >
               <Download className="w-4 h-4" />
+            </Button>
+            {/* Mobile-only import button (collapsed) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="sm:hidden text-[var(--text-muted)] w-8 h-8"
+              onClick={() => setShowImportModal(true)}
+              title="Import"
+            >
+              <Upload className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
         {/* Quick Filters */}
-        <QuickFilters
-          searchQuery={filters.searchQuery}
-          onSearchChange={(query) => setFilters(prev => ({ ...prev, searchQuery: query }))}
-          activeStage={stageFilter}
-          onStageChange={setStageFilter}
-          onOpenAdvanced={() => setShowFiltersPanel(true)}
-          stats={stats.byStage}
-          total={stats.total}
-        />
+        {stageFilter === "lost" ? (
+          <QuickFilters
+            searchQuery={filters.searchQuery}
+            onSearchChange={(query) => setFilters(prev => ({ ...prev, searchQuery: query }))}
+            activeStage={lostAtFilter}
+            onStageChange={(stage) => setLostAtFilter(stage)}
+            onOpenAdvanced={() => setShowFiltersPanel(true)}
+            stats={lostAtStats as Record<PipelineStage, number>}
+            total={leads.filter(l => l.pipeline_stage === "lost").length}
+            lostAtMode
+            lostReasonFilter={filters.lostReasonIds}
+            onLostReasonFilterChange={(ids) => setFilters(prev => ({ ...prev, lostReasonIds: ids }))}
+            lostReasons={lostReasons}
+          />
+        ) : (
+          <QuickFilters
+            searchQuery={filters.searchQuery}
+            onSearchChange={(query) => setFilters(prev => ({ ...prev, searchQuery: query }))}
+            activeStage={stageFilter}
+            onStageChange={setStageFilter}
+            onOpenAdvanced={() => setShowFiltersPanel(true)}
+            stats={stats.byStage}
+            total={stats.total}
+            hideStages
+          />
+        )}
 
         {/* Main Content */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="flex-1 flex flex-col min-h-0 h-full"
+          className="flex-1 flex flex-col min-h-0 min-w-0 h-full"
         >
           <LeadTable
             leads={filteredLeads}
@@ -511,11 +687,24 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             onSelectLead={toggleSelectLead}
             onSelectAll={toggleSelectAll}
             onLeadClick={(lead) => {
+              // Save view state so we can restore it on back navigation
+              const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
+              sessionStorage.setItem("leads-view-state", JSON.stringify({
+                searchQuery: filters.searchQuery,
+                stageFilter,
+                lostAtFilter,
+                scrollTop: scrollEl?.scrollTop ?? 0,
+              }))
               router.push(`/leads/${lead.id}${stageFilter && stageFilter !== "all" ? `?stage=${stageFilter}` : ""}`)
             }}
             onEditLead={handleEditLead}
             currentStageFilter={stageFilter}
             fundingTypeFilter={filters.fundingType}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
           />
         </motion.div>
 
@@ -570,6 +759,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               onDelete={handleBulkDelete}
               onClear={() => setSelectedLeads([])}
               onMOEFetch={() => setShowMOEFetchModal(true)}
+              onSendRSVP={() => setShowRSVPModal(true)}
             />
           )}
         </AnimatePresence>
@@ -670,6 +860,19 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         onSuccess={handleMOEFetchSuccess}
       />
 
+      {/* Send RSVP Modal */}
+      <SendRSVPDialog
+        isOpen={showRSVPModal}
+        onClose={() => setShowRSVPModal(false)}
+        selectedLeads={selectedLeadObjects}
+        onSuccess={() => {
+          refetch()
+          setSuccessMessage("RSVP links generated successfully")
+          setShowSuccessToast(true)
+        }}
+      />
+
     </div>
+    </RoleGuard>
   )
 }

@@ -10,14 +10,13 @@ import type { SubmissionSubstage } from "@/types"
  * Compute the auto-calculated PUC document status for a lead.
  *
  * Documents stage priority: Missing Document > Pending Payment > Ready to Apply
- * Submissions stage: Applied or Blocked
- * Lost stage: returns null (no status shown)
+ * Submissions stage: Applied
+ * Applicant stage: returns null (no status shown)
  */
 export function computePUCDocumentStatus(
   substage: SubmissionSubstage | null | undefined,
   allDocsComplete: boolean,
   paymentComplete: boolean,
-  isBlocked?: boolean
 ): PUCDocumentStatus | null {
   const effectiveSubstage = substage || "documents"
 
@@ -28,10 +27,9 @@ export function computePUCDocumentStatus(
       return "ready_to_apply"
 
     case "submissions":
-      if (isBlocked) return "blocked"
       return "applied"
 
-    case "lost":
+    case "applicant":
       return null
 
     default:
@@ -60,10 +58,5 @@ export const STATUS_BADGE_STYLES: Record<PUCDocumentStatus, { bg: string; text: 
     bg: "bg-blue-50 dark:bg-blue-950/30",
     text: "text-blue-700 dark:text-blue-400",
     border: "border-blue-200 dark:border-blue-800",
-  },
-  blocked: {
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    text: "text-orange-700 dark:text-orange-400",
-    border: "border-orange-200 dark:border-orange-800",
   },
 }

@@ -2,13 +2,32 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 // This endpoint runs the payment_transactions migration
-// Only accessible by admins when ENABLE_MIGRATION_API=true
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function POST(_request: NextRequest) {
+// Only accessible by admins when ENABLE_MIGRATION_API=true AND a valid migration token is provided
+export async function POST(request: NextRequest) {
   // Gate behind environment variable — must never be enabled in production
   if (process.env.ENABLE_MIGRATION_API !== 'true') {
     return NextResponse.json(
       { error: 'Migration API is disabled. Set ENABLE_MIGRATION_API=true to enable.' },
+      { status: 403 }
+    )
+  }
+
+  // Require a one-time migration token as additional safeguard
+  // Generate with: openssl rand -hex 32, then set MIGRATION_TOKEN env var
+  const migrationToken = process.env.MIGRATION_TOKEN
+  if (!migrationToken) {
+    return NextResponse.json(
+      { error: 'MIGRATION_TOKEN environment variable is not set.' },
+      { status: 500 }
+    )
+  }
+
+  const body = await request.json().catch(() => ({}))
+  const providedToken = body.token || request.headers.get('x-migration-token')
+
+  if (!providedToken || providedToken !== migrationToken) {
+    return NextResponse.json(
+      { error: 'Invalid or missing migration token.' },
       { status: 403 }
     )
   }

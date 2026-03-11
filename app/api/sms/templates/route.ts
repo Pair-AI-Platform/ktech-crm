@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET() {
-  try {
-    const supabase = await createServerSupabaseClient()
-
+export const GET = withApiHandler(
+  { context: 'sms-templates-list' },
+  async ({ supabase, logger }) => {
     const { data: templates, error } = await supabase
       .from('sms_templates')
       .select('*')
@@ -12,28 +11,18 @@ export async function GET() {
       .order('name')
 
     if (error) {
+      logger.error('Failed to fetch SMS templates', { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ templates })
-  } catch (error) {
-    console.error('Error fetching templates:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const body = await request.json()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const POST = withApiHandler(
+  { context: 'sms-templates-create' },
+  async ({ req, supabase, user, logger }) => {
+    const body = await req.json()
 
     // Extract variables from content (format: {{variable_name}})
     const variableRegex = /\{\{(\w+)\}\}/g
@@ -60,28 +49,18 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
+      logger.error('Failed to create SMS template', { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ template })
-  } catch (error) {
-    console.error('Error creating template:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
 
-export async function PUT(request: Request) {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const body = await request.json()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const PUT = withApiHandler(
+  { context: 'sms-templates-update' },
+  async ({ req, supabase, logger }) => {
+    const body = await req.json()
 
     // Extract variables from content
     const variableRegex = /\{\{(\w+)\}\}/g
@@ -109,23 +88,18 @@ export async function PUT(request: Request) {
       .single()
 
     if (error) {
+      logger.error('Failed to update SMS template', { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ template })
-  } catch (error) {
-    console.error('Error updating template:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
 
-export async function DELETE(request: Request) {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const { searchParams } = new URL(request.url)
+export const DELETE = withApiHandler(
+  { context: 'sms-templates-delete' },
+  async ({ req, supabase, logger }) => {
+    const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
     if (!id) {
@@ -138,15 +112,10 @@ export async function DELETE(request: Request) {
       .eq('id', id)
 
     if (error) {
+      logger.error('Failed to delete SMS template', { error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting template:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

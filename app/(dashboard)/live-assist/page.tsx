@@ -86,7 +86,7 @@ export default function LiveAssistPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="px-3 py-4 sm:p-8">
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
@@ -99,7 +99,7 @@ export default function LiveAssistPage() {
       </div>
 
       {/* Two Panel Layout */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Left Panel - Active Conversation */}
         <div className="bg-white border border-gray-200 rounded-lg flex flex-col h-[calc(100vh-220px)]">
           {/* Conversation Header */}

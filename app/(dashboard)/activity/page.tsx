@@ -168,7 +168,7 @@ export default function ActivityPage() {
         }}
       />
 
-      <div className="p-6 space-y-6 page-enter">
+      <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <motion.div

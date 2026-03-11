@@ -128,16 +128,7 @@ function ListItemRow({
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Icon */}
-      {item.icon && (
-        <div
-          className={cn(
-            "flex items-center justify-center rounded-lg bg-[var(--bg-sunken)]",
-            compact ? "w-7 h-7" : "w-9 h-9"
-          )}
-        >
-          {item.icon}
-        </div>
-      )}
+      {item.icon && item.icon}
 
       {/* Content */}
       <div className="flex-1 min-w-0">

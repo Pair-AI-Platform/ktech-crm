@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import twilio from "twilio"
 import { getPaymentStatus, verifyWebhookSignature } from "@/lib/myfatoorah/client"
+import { escapeHtml } from "@/lib/utils"
 
-// Initialize Twilio client for sending receipts
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
+// Lazy-initialize Twilio client for sending receipts
+function getTwilioClient() {
+  const sid = process.env.TWILIO_ACCOUNT_SID
+  const token = process.env.TWILIO_AUTH_TOKEN
+  if (!sid || !token) throw new Error('Twilio credentials not configured')
+  return twilio(sid, token)
+}
 
 // Use service role for webhook (no user session)
 function createServiceClient() {
@@ -86,15 +89,15 @@ function generateInvoiceHtml(data: {
         <div class="info-grid">
           <div class="info-item">
             <div class="info-label">Receipt Number</div>
-            <div class="info-value">${data.invoiceNumber}</div>
+            <div class="info-value">${escapeHtml(data.invoiceNumber)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Payment Date</div>
-            <div class="info-value">${formattedDate}</div>
+            <div class="info-value">${escapeHtml(formattedDate)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Payment Method</div>
-            <div class="info-value">${data.paymentMethod}</div>
+            <div class="info-value">${escapeHtml(data.paymentMethod)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Status</div>
@@ -107,19 +110,19 @@ function generateInvoiceHtml(data: {
         <div class="info-grid">
           <div class="info-item">
             <div class="info-label">Name</div>
-            <div class="info-value">${data.leadName}</div>
+            <div class="info-value">${escapeHtml(data.leadName)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Civil ID</div>
-            <div class="info-value">${data.civilId}</div>
+            <div class="info-value">${escapeHtml(data.civilId)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Phone</div>
-            <div class="info-value">${data.phone}</div>
+            <div class="info-value">${escapeHtml(data.phone)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Email</div>
-            <div class="info-value">${data.email || 'N/A'}</div>
+            <div class="info-value">${escapeHtml(data.email || 'N/A')}</div>
           </div>
         </div>
       </div>
@@ -135,7 +138,7 @@ function generateInvoiceHtml(data: {
           <tbody>
             ${data.fees?.map(fee => `
               <tr>
-                <td>${fee.label}</td>
+                <td>${escapeHtml(fee.label)}</td>
                 <td class="amount">${fee.amount} KD</td>
               </tr>
             `).join('') || `
@@ -180,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     const body = JSON.parse(rawBody)
 
-    console.log("[PSP Payment Webhook] Received:", JSON.stringify(body))
+    console.log("[PSP Payment Webhook] Received:", { transactionId: body?.transactionId, status: body?.status })
 
     // MyFatoorah typically sends InvoiceId in the webhook
     const invoiceId = body.InvoiceId || body.Data?.InvoiceId
@@ -289,45 +292,44 @@ export async function POST(request: NextRequest) {
         .from("documents")
         .getPublicUrl(storagePath)
 
-      // Insert invoice record into psp_documents
-      // First check if a payment receipt already exists
-      const { data: existingDoc } = await supabase
-        .from("psp_documents")
-        .select("id")
-        .eq("lead_id", lead.id)
-        .eq("document_type", "puc_receipt")
-        .single()
+      // Insert payment receipt into psp_documents for all graduate types
+      // so it appears in the document checklist regardless of which type is selected
+      const GRADUATE_TYPES = ["gov", "us", "uk", "ksa", "others"]
+      const receiptDocData = {
+        file_name: `${invoiceNumber}.html`,
+        file_type: "text/html",
+        storage_path: storagePath,
+        public_url: urlData?.publicUrl,
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+        verification_notes: "Auto-verified: Payment confirmed via MyFatoorah",
+      }
 
-      if (existingDoc) {
-        // Update existing document
-        await supabase
+      for (const gt of GRADUATE_TYPES) {
+        // Upsert payment_receipt for each graduate type
+        const { data: existingDoc } = await supabase
           .from("psp_documents")
-          .update({
-            file_name: `${invoiceNumber}.html`,
-            file_type: "text/html",
-            storage_path: storagePath,
-            public_url: urlData?.publicUrl,
-            is_verified: true,
-            verified_at: new Date().toISOString(),
-            verification_notes: "Auto-verified: Payment confirmed via MyFatoorah",
-          })
-          .eq("id", existingDoc.id)
-      } else {
-        // Insert new document
-        await supabase
-          .from("psp_documents")
-          .insert({
-            lead_id: lead.id,
-            document_type: "puc_receipt",
-            graduate_type: "GOV", // Default, will be updated by wizard
-            file_name: `${invoiceNumber}.html`,
-            file_type: "text/html",
-            storage_path: storagePath,
-            public_url: urlData?.publicUrl,
-            is_verified: true,
-            verified_at: new Date().toISOString(),
-            verification_notes: "Auto-verified: Payment confirmed via MyFatoorah",
-          })
+          .select("id")
+          .eq("lead_id", lead.id)
+          .eq("document_type", "payment_receipt")
+          .eq("graduate_type", gt)
+          .single()
+
+        if (existingDoc) {
+          await supabase
+            .from("psp_documents")
+            .update(receiptDocData)
+            .eq("id", existingDoc.id)
+        } else {
+          await supabase
+            .from("psp_documents")
+            .insert({
+              lead_id: lead.id,
+              document_type: "payment_receipt",
+              graduate_type: gt,
+              ...receiptDocData,
+            })
+        }
       }
 
       // Log successful payment activity
@@ -380,7 +382,7 @@ ${urlData?.publicUrl ? `Receipt Link: ${urlData.publicUrl}` : ""}
 شكراً لكم / Thank you
 Kuwait Technical College`
 
-        const twilioMessage = await twilioClient.messages.create({
+        const twilioMessage = await getTwilioClient().messages.create({
           body: receiptMessage,
           from: whatsappFrom,
           to: whatsappTo,

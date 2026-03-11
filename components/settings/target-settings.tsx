@@ -14,7 +14,10 @@ import {
   Save,
   User,
   GraduationCap,
-  Wallet
+  Wallet,
+  Calendar,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
 import type { Profile, TargetMode } from "@/types"
 import { createClient } from "@/lib/supabase/client"
@@ -33,6 +36,7 @@ export function TargetSettings() {
     target_puc: number
     target_sf: number
   }>>({})
+  const [expandedAgents, setExpandedAgents] = useState<Record<string, boolean>>({})
 
   const supabase = createClient()
 
@@ -140,6 +144,51 @@ export function TargetSettings() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const toggleAgentExpanded = (agentId: string) => {
+    setExpandedAgents(prev => ({ ...prev, [agentId]: !prev[agentId] }))
+  }
+
+  // Compute weekly breakdown from a monthly target
+  const getWeeklyBreakdown = (monthlyTarget: number) => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const monthName = firstDay.toLocaleDateString('en-US', { month: 'short' })
+
+    const weeks: { label: string; target: number; isCurrent: boolean }[] = []
+    let weekStart = new Date(firstDay)
+    let weekNum = 1
+
+    while (weekStart <= lastDay) {
+      const weekEnd = new Date(weekStart)
+      const daysUntilSat = (6 - weekStart.getDay() + 7) % 7
+      weekEnd.setDate(weekStart.getDate() + daysUntilSat)
+      if (weekEnd > lastDay) weekEnd.setTime(lastDay.getTime())
+
+      const isCurrent = now >= weekStart && now <= new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59)
+      weeks.push({
+        label: `Week ${weekNum} (${monthName} ${weekStart.getDate()}-${weekEnd.getDate()})`,
+        target: 0,
+        isCurrent,
+      })
+
+      weekStart = new Date(weekEnd)
+      weekStart.setDate(weekStart.getDate() + 1)
+      weekNum++
+    }
+
+    // Distribute target
+    const basePerWeek = Math.floor(monthlyTarget / weeks.length)
+    const remainder = monthlyTarget - basePerWeek * weeks.length
+    weeks.forEach((w, i) => {
+      w.target = basePerWeek + (i === weeks.length - 1 ? remainder : 0)
+    })
+
+    return weeks
   }
 
   const getModeDescription = (mode: TargetMode) => {
@@ -349,6 +398,62 @@ export function TargetSettings() {
                         placeholder="0"
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* Weekly Breakdown */}
+                {getTotalTarget(agent.id) > 0 && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => toggleAgentExpanded(agent.id)}
+                      className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Weekly Breakdown
+                      {expandedAgents[agent.id] ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                    {expandedAgents[agent.id] && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2"
+                      >
+                        {getWeeklyBreakdown(getTotalTarget(agent.id)).map((week) => (
+                          <div
+                            key={week.label}
+                            className={cn(
+                              "p-3 rounded-lg border text-center",
+                              week.isCurrent
+                                ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                                : "border-[var(--border)] bg-[var(--bg-elevated)]"
+                            )}
+                          >
+                            <p className={cn(
+                              "text-xs font-medium mb-1",
+                              week.isCurrent ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                            )}>
+                              {week.label.split(' (')[0]}
+                            </p>
+                            <p className="text-lg font-bold text-[var(--text-primary)]">
+                              {week.target}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {week.label.match(/\((.+)\)/)?.[1]}
+                            </p>
+                            {week.isCurrent && (
+                              <Badge variant="default" className="mt-1 text-[10px] px-1.5 py-0">
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
                   </div>
                 )}
               </motion.div>

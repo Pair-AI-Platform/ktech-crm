@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
 import {
@@ -418,7 +418,7 @@ export function SMSTemplatesManager() {
                 rows={3}
                 dir="rtl"
                 className="text-right"
-                placeholder="الرسالة بالعربية..."
+                placeholder="Arabic message content..."
               />
             </div>
 

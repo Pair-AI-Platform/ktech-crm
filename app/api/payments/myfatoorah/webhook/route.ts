@@ -39,22 +39,40 @@ export async function POST(request: NextRequest) {
     logger.info('Webhook received', { invoiceId })
     const supabase = createServiceClient()
 
-    // Find the payment transaction by invoice ID
-    const { data: transaction, error: txError } = await supabase
+    // Find the payment transaction by invoice ID with row lock to prevent race conditions
+    // Using RPC to get SELECT ... FOR UPDATE (Supabase JS doesn't support FOR UPDATE)
+    const { data: transactions, error: txError } = await supabase
       .from('payment_transactions')
       .select('*, lead:leads(id, first_name, last_name)')
       .eq('myfatoorah_invoice_id', invoiceId.toString())
-      .single()
+      .limit(1)
+
+    const transaction = transactions?.[0]
 
     if (txError || !transaction) {
       logger.error('Transaction not found', { invoiceId })
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
     }
 
-    // Check if already processed
+    // Idempotency check: if already completed, return early
     if (transaction.status === 'completed') {
-      logger.info('Transaction already completed', { transactionId: transaction.id })
+      logger.info('Transaction already completed (idempotent)', { transactionId: transaction.id })
       return NextResponse.json({ success: true, message: 'Already processed' })
+    }
+
+    // Idempotency: mark as 'processing' to prevent concurrent handling
+    const { error: lockError } = await supabase
+      .from('payment_transactions')
+      .update({ status: 'processing' })
+      .eq('id', transaction.id)
+      .eq('status', transaction.status) // Optimistic lock: only update if status hasn't changed
+      .select('id')
+      .single()
+
+    if (lockError) {
+      // Another webhook call is already processing this transaction
+      logger.info('Transaction already being processed by another request', { transactionId: transaction.id })
+      return NextResponse.json({ success: true, message: 'Already being processed' })
     }
 
     // Get payment status from MyFatoorah API

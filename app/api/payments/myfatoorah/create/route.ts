@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { leadId, civilId } = body
+    const { leadId, civilId, amount: customAmount } = body
 
     // Validate required fields
     if (!leadId) {
@@ -66,13 +66,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Determine payment amount (custom or default)
+    const paymentAmount = typeof customAmount === "number" && customAmount > 0
+      ? customAmount
+      : ENROLLMENT_PAYMENT_AMOUNT
+
     // Create MyFatoorah payment link
     const paymentResult = await createPaymentLink({
       customerName: `${lead.first_name} ${lead.last_name}`,
       customerEmail: lead.email || undefined,
       customerMobile: lead.phone,
       customerCivilId: civilId,
-      invoiceValue: ENROLLMENT_PAYMENT_AMOUNT,
+      invoiceValue: paymentAmount,
       displayCurrencyIso: "KWD",
       language: "en",
       customerReference: leadId,
@@ -90,7 +95,7 @@ export async function POST(request: NextRequest) {
       .from("payment_transactions")
       .insert({
         lead_id: leadId,
-        amount: ENROLLMENT_PAYMENT_AMOUNT,
+        amount: paymentAmount,
         currency: "KWD",
         payment_method: "myfatoorah",
         status: "pending",
@@ -115,11 +120,11 @@ export async function POST(request: NextRequest) {
       lead_id: leadId,
       activity_type: "payment_link_created",
       title: "Payment Link Created",
-      description: `Payment link for ${ENROLLMENT_PAYMENT_AMOUNT} KWD created via MyFatoorah`,
+      description: `Payment link for ${paymentAmount} KWD created via MyFatoorah`,
       metadata: {
         transaction_id: transaction.id,
         invoice_id: paymentResult.invoiceId,
-        amount: ENROLLMENT_PAYMENT_AMOUNT,
+        amount: paymentAmount,
       },
       created_by: user.id,
     })

@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback, startTransition } from "react"
+import { useCallback } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+import { queryKeys } from "./query-keys"
 import type { AutomationRule } from "@/lib/automation/engine"
 
 export type { AutomationRule }
@@ -46,6 +48,7 @@ const DEMO_RULES: AutomationRule[] = [
 interface UseAutomationRulesReturn {
   rules: AutomationRule[]
   loading: boolean
+  error: string | null
   createRule: (rule: Omit<AutomationRule, "id" | "priority">) => Promise<void>
   updateRule: (id: string, updates: Partial<AutomationRule>) => Promise<void>
   deleteRule: (id: string) => Promise<void>
@@ -54,103 +57,160 @@ interface UseAutomationRulesReturn {
 }
 
 export function useAutomationRules(): UseAutomationRulesReturn {
-  const [rules, setRules] = useState<AutomationRule[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  const fetchRules = useCallback(async () => {
-    if (isDemoMode()) {
-      startTransition(() => {
-        setRules(DEMO_RULES)
-        setLoading(false)
-      })
-      return
-    }
-
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("automation_rules")
-      .select("*")
-      .order("priority", { ascending: false })
-
-    if (!error && data) {
-      setRules(data as AutomationRule[])
-    }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    startTransition(() => { fetchRules() })
-  }, [fetchRules])
-
-  const createRule = useCallback(async (rule: Omit<AutomationRule, "id" | "priority">) => {
-    if (isDemoMode()) {
-      const newRule: AutomationRule = {
-        ...rule,
-        id: `demo-rule-${Date.now()}`,
-        priority: 0,
+  const { data: rules = [], isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: queryKeys.automationRules.all,
+    queryFn: async () => {
+      if (isDemoMode()) {
+        return DEMO_RULES
       }
-      setRules(prev => [newRule, ...prev])
-      return
-    }
 
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("automation_rules")
-      .insert({ ...rule, created_by: user?.id })
-      .select()
-      .single()
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("automation_rules")
+        .select("*")
+        .order("priority", { ascending: false })
 
-    if (!error && data) {
-      setRules(prev => [data as AutomationRule, ...prev])
-    }
-  }, [])
+      if (error) throw error
+      return (data as AutomationRule[]) ?? []
+    },
+    staleTime: 30_000,
+  })
 
-  const updateRule = useCallback(async (id: string, updates: Partial<AutomationRule>) => {
-    if (isDemoMode()) {
-      setRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r))
-      return
-    }
+  const error = queryError?.message ?? null
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from("automation_rules")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
+  const createRuleMutation = useMutation({
+    mutationFn: async (rule: Omit<AutomationRule, "id" | "priority">) => {
+      if (isDemoMode()) {
+        const newRule: AutomationRule = {
+          ...rule,
+          id: `demo-rule-${Date.now()}`,
+          priority: 0,
+        }
+        return newRule
+      }
 
-    if (!error) {
-      setRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r))
-    }
-  }, [])
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase
+        .from("automation_rules")
+        .insert({ ...rule, created_by: user?.id })
+        .select()
+        .single()
 
-  const deleteRule = useCallback(async (id: string) => {
-    if (isDemoMode()) {
-      setRules(prev => prev.filter(r => r.id !== id))
-      return
-    }
+      if (error) throw error
+      return data as AutomationRule
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.automationRules.all })
+    },
+  })
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from("automation_rules")
-      .delete()
-      .eq("id", id)
+  const updateRuleMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<AutomationRule> }) => {
+      if (isDemoMode()) return
 
-    if (!error) {
-      setRules(prev => prev.filter(r => r.id !== id))
-    }
-  }, [])
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("automation_rules")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
 
-  const toggleRule = useCallback(async (id: string, isActive: boolean) => {
-    await updateRule(id, { is_active: isActive })
-  }, [updateRule])
+      if (error) throw error
+    },
+    onMutate: async ({ id, updates }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.automationRules.all })
+
+      const previousRules = queryClient.getQueryData<AutomationRule[]>(queryKeys.automationRules.all)
+
+      queryClient.setQueryData<AutomationRule[]>(
+        queryKeys.automationRules.all,
+        (old) => old?.map((r) => (r.id === id ? { ...r, ...updates } : r)) ?? []
+      )
+
+      return { previousRules }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousRules) {
+        queryClient.setQueryData(queryKeys.automationRules.all, context.previousRules)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.automationRules.all })
+    },
+  })
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemoMode()) return
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("automation_rules")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.automationRules.all })
+
+      const previousRules = queryClient.getQueryData<AutomationRule[]>(queryKeys.automationRules.all)
+
+      queryClient.setQueryData<AutomationRule[]>(
+        queryKeys.automationRules.all,
+        (old) => old?.filter((r) => r.id !== id) ?? []
+      )
+
+      return { previousRules }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousRules) {
+        queryClient.setQueryData(queryKeys.automationRules.all, context.previousRules)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.automationRules.all })
+    },
+  })
+
+  const createRule = useCallback(
+    async (rule: Omit<AutomationRule, "id" | "priority">) => {
+      await createRuleMutation.mutateAsync(rule)
+    },
+    [createRuleMutation]
+  )
+
+  const updateRule = useCallback(
+    async (id: string, updates: Partial<AutomationRule>) => {
+      await updateRuleMutation.mutateAsync({ id, updates })
+    },
+    [updateRuleMutation]
+  )
+
+  const deleteRule = useCallback(
+    async (id: string) => {
+      await deleteRuleMutation.mutateAsync(id)
+    },
+    [deleteRuleMutation]
+  )
+
+  const toggleRule = useCallback(
+    async (id: string, isActive: boolean) => {
+      await updateRule(id, { is_active: isActive })
+    },
+    [updateRule]
+  )
 
   return {
     rules,
     loading,
+    error,
     createRule,
     updateRule,
     deleteRule,
     toggleRule,
-    refetch: fetchRules,
+    refetch: async () => { await refetch() },
   }
 }

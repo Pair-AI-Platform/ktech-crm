@@ -18,9 +18,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const hasError = Boolean(error)
 
     const sizeClasses = {
-      sm: "h-9 px-3 text-xs rounded-md",
-      default: "h-10 px-4 text-sm rounded-lg",
-      lg: "h-12 px-5 text-base rounded-lg"
+      sm: "h-9 px-3 text-xs rounded-md leading-normal",
+      default: "h-11 px-4 text-sm rounded-lg leading-normal",
+      lg: "h-12 px-5 text-base rounded-lg leading-normal"
     }
 
     const variantClasses = {

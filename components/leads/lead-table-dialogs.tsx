@@ -1,0 +1,213 @@
+"use client"
+
+import React from "react"
+import type { Lead, PipelineStage, LeadStatus } from "@/types"
+import type { SubmissionBlockedReason } from "@/types"
+import { AppointmentBooking } from "@/components/calendar/appointment-booking"
+import { AppointmentDetail } from "@/components/calendar/appointment-detail"
+import { CallbackScheduler } from "@/components/leads/callback-scheduler"
+import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
+import { ContactedStatusDialog } from "@/components/leads/contacted-status-dialog"
+import { BlockedReasonDialog } from "@/components/leads/blocked-reason-dialog"
+import { WithdrawReasonDialog } from "@/components/leads/withdraw-reason-dialog"
+import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
+import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
+
+export interface LeadTableDialogsProps {
+  bookingLead: Lead | null
+  bookingCallbackMode: boolean
+  callbackLead: Lead | null
+  callbackFromStage: PipelineStage | undefined
+  lostDialogLead: Lead | null
+  contactedDialogLead: Lead | null
+  blockedDialogLead: Lead | null
+  withdrawDialogLead: Lead | null
+  paymentDialogLead: Lead | null
+  pspWizardLead: Lead | null
+  viewingAppointment: import("@/types").Appointment | null
+  setBookingLead: (lead: Lead | null) => void
+  setBookingSimpleMode: (val: boolean) => void
+  setBookingCallbackMode: (val: boolean) => void
+  setCallbackLead: (lead: Lead | null) => void
+  setCallbackFromStage: (stage: PipelineStage | undefined) => void
+  setLostDialogLead: (lead: Lead | null) => void
+  setContactedDialogLead: (lead: Lead | null) => void
+  setBlockedDialogLead: (lead: Lead | null) => void
+  setWithdrawDialogLead: (lead: Lead | null) => void
+  setPaymentDialogLead: (lead: Lead | null) => void
+  setPspWizardLead: (lead: Lead | null) => void
+  setViewingAppointment: (apt: import("@/types").Appointment | null) => void
+  handleLostConfirm: (reasonId: string, notes?: string) => Promise<void>
+  handleContactedConfirm: (status: LeadStatus) => Promise<void>
+  handleBlockedConfirm: (reason: SubmissionBlockedReason, notes?: string) => Promise<void>
+  handleWithdrawConfirm: (reason: string, notes?: string) => Promise<void>
+  editWithdrawReasonLead: Lead | null
+  setEditWithdrawReasonLead: (lead: Lead | null) => void
+  handleEditWithdrawReasonConfirm: (reason: string, notes?: string) => Promise<void>
+  incrementContactCount: (leadId: string) => void
+  updateLead?: (id: string, updates: Partial<Lead>) => Promise<unknown>
+  refreshPucDocCounts: () => void
+  refreshPucPaymentStatus: () => void
+}
+
+export function LeadTableDialogs({
+  bookingLead,
+  bookingCallbackMode,
+  callbackLead,
+  callbackFromStage,
+  lostDialogLead,
+  contactedDialogLead,
+  blockedDialogLead,
+  withdrawDialogLead,
+  paymentDialogLead,
+  pspWizardLead,
+  viewingAppointment,
+  setBookingLead,
+  setBookingSimpleMode,
+  setBookingCallbackMode,
+  setCallbackLead,
+  setCallbackFromStage,
+  setLostDialogLead,
+  setContactedDialogLead,
+  setBlockedDialogLead,
+  setWithdrawDialogLead,
+  setPaymentDialogLead,
+  setPspWizardLead,
+  setViewingAppointment,
+  handleLostConfirm,
+  handleContactedConfirm,
+  handleBlockedConfirm,
+  handleWithdrawConfirm,
+  editWithdrawReasonLead,
+  setEditWithdrawReasonLead,
+  handleEditWithdrawReasonConfirm,
+  incrementContactCount,
+  updateLead,
+  refreshPucDocCounts,
+  refreshPucPaymentStatus,
+}: LeadTableDialogsProps) {
+  return (
+    <>
+      {/* Appointment Booking Popup */}
+      <AppointmentBooking
+        isOpen={!!bookingLead}
+        onClose={() => {
+          setBookingLead(null)
+          setBookingSimpleMode(false)
+          setBookingCallbackMode(false)
+        }}
+        onSuccess={() => {
+          // Don't close the modal here - let the success animation play
+          // The modal will auto-close after 2.5s via its own setTimeout -> onClose
+        }}
+        preselectedLead={bookingLead || undefined}
+        singleFormMode={true}
+        callbackMode={bookingCallbackMode}
+      />
+
+      {/* Callback Scheduler Popup */}
+      <CallbackScheduler
+        isOpen={!!callbackLead}
+        onClose={() => {
+          setCallbackLead(null)
+          setCallbackFromStage(undefined)
+        }}
+        onSuccess={() => {
+          if (callbackLead) {
+            incrementContactCount(callbackLead.id)
+          }
+          setCallbackLead(null)
+          setCallbackFromStage(undefined)
+        }}
+        onUpdateLead={updateLead}
+        lead={callbackLead}
+        fromStage={callbackFromStage}
+      />
+
+      {/* Mark Lost Dialog */}
+      <MarkLostDialog
+        open={!!lostDialogLead}
+        onOpenChange={(open) => {
+          if (!open) setLostDialogLead(null)
+        }}
+        leadName={lostDialogLead ? `${lostDialogLead.first_name} ${lostDialogLead.last_name}` : ''}
+        onConfirm={handleLostConfirm}
+      />
+
+      {/* Contacted Status Required Dialog */}
+      <ContactedStatusDialog
+        open={!!contactedDialogLead}
+        onOpenChange={(open) => {
+          if (!open) setContactedDialogLead(null)
+        }}
+        leadName={contactedDialogLead ? `${contactedDialogLead.first_name} ${contactedDialogLead.last_name}` : ''}
+        currentStatus={contactedDialogLead?.status as LeadStatus | null | undefined}
+        onConfirm={handleContactedConfirm}
+      />
+
+      {/* Withdraw Reason Dialog */}
+      <WithdrawReasonDialog
+        open={!!withdrawDialogLead}
+        onOpenChange={(open) => {
+          if (!open) setWithdrawDialogLead(null)
+        }}
+        leadName={withdrawDialogLead ? `${withdrawDialogLead.first_name} ${withdrawDialogLead.last_name}` : ''}
+        onConfirm={handleWithdrawConfirm}
+      />
+
+      {/* Edit Withdraw Reason Dialog (for existing withdrawn leads) */}
+      <WithdrawReasonDialog
+        open={!!editWithdrawReasonLead}
+        onOpenChange={(open) => {
+          if (!open) setEditWithdrawReasonLead(null)
+        }}
+        leadName={editWithdrawReasonLead ? `${editWithdrawReasonLead.first_name} ${editWithdrawReasonLead.last_name}` : ''}
+        onConfirm={handleEditWithdrawReasonConfirm}
+      />
+
+      {/* Blocked Reason Dialog (PUC SRJ) */}
+      <BlockedReasonDialog
+        open={!!blockedDialogLead}
+        onOpenChange={(open) => {
+          if (!open) setBlockedDialogLead(null)
+        }}
+        leadName={blockedDialogLead ? `${blockedDialogLead.first_name} ${blockedDialogLead.last_name}` : ''}
+        onConfirm={handleBlockedConfirm}
+      />
+
+      {/* Enrollment Payment Dialog - shown after moving lead to Applicant without paying */}
+      {paymentDialogLead && (
+        <EnrollmentPaymentDialog
+          open={!!paymentDialogLead}
+          onOpenChange={(open) => { if (!open) setPaymentDialogLead(null) }}
+          lead={paymentDialogLead}
+          onSuccess={async () => { setPaymentDialogLead(null) }}
+        />
+      )}
+
+      {/* PSP Submission Wizard - shown after moving PUC lead to Document Submission */}
+      <PSPSubmissionWizard
+        isOpen={!!pspWizardLead}
+        onClose={() => {
+          setPspWizardLead(null)
+          // Refresh doc status data after wizard closes (docs may have been uploaded / payment made)
+          refreshPucDocCounts()
+          refreshPucPaymentStatus()
+        }}
+        lead={pspWizardLead}
+        onSuccess={() => {
+          setPspWizardLead(null)
+          refreshPucDocCounts()
+          refreshPucPaymentStatus()
+        }}
+      />
+
+      {/* Appointment Detail Modal */}
+      <AppointmentDetail
+        appointment={viewingAppointment}
+        isOpen={!!viewingAppointment}
+        onClose={() => setViewingAppointment(null)}
+      />
+    </>
+  )
+}

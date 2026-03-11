@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { syncFromMoodle, checkMoodleConnection } from '@/lib/lms/moodle'
-import { createLogger } from '@/lib/logger'
 
 /**
  * POST /api/lms/sync
@@ -136,15 +135,10 @@ export const POST = withApiHandler({ context: 'lms-sync' }, async ({ req, supaba
  * GET /api/lms/sync
  * Check Moodle connection status
  */
-export async function GET() {
-  const logger = createLogger('lms-connection')
-  try {
+export const GET = withApiHandler(
+  { context: 'lms-connection' },
+  async ({ logger }) => {
     const status = await checkMoodleConnection()
     return NextResponse.json(status)
-  } catch (error) {
-    logger.error('Connection check failed', {
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return NextResponse.json({ connected: false, error: 'Failed to check connection' }, { status: 500 })
   }
-}
+)

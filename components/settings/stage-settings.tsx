@@ -28,6 +28,8 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
   enrolled: "bg-[var(--stage-enrolled)]",
   withdraw: "bg-red-500",
   lost: "bg-[var(--stage-lost)]",
+  puc_document_submission: "bg-cyan-500",
+  puc_application_submission: "bg-emerald-500",
 }
 
 export function StageSettings() {

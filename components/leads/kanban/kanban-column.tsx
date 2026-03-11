@@ -34,6 +34,8 @@ export const stageConfig: Record<PipelineStage, { title: string; color: string; 
   enrolled: { title: "Enrolled", color: "bg-green-500", bgColor: "bg-green-50" },
   lost: { title: "Lost", color: "bg-red-500", bgColor: "bg-red-50" },
   withdraw: { title: "Withdrawn", color: "bg-gray-500", bgColor: "bg-gray-50" },
+  puc_document_submission: { title: "Doc Submission", color: "bg-cyan-500", bgColor: "bg-cyan-50" },
+  puc_application_submission: { title: "App Submission", color: "bg-emerald-500", bgColor: "bg-emerald-50" },
 }
 
 export const KanbanColumn = memo(function KanbanColumn({

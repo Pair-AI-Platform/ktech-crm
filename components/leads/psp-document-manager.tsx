@@ -23,7 +23,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import {
   type GraduateType,
@@ -138,7 +137,7 @@ export function PSPDocumentManager({
     loadDocuments()
   }, [leadId, graduateType]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const mergeDocuments = (dbDocs: PSPDocumentFromDB[]) => {
+  const mergeDocuments = (dbDocs: PSPDocumentFromDB[], profileDocs?: PSPDocumentFromDB[]) => {
     // Generate base document list from config (with conditional flags) instead
     // of relying on the `documents` prop which may be stale due to closure timing
     const configDocs = getDocumentsForGraduateType(graduateType as GraduateType, conditionalFlags)
@@ -152,9 +151,16 @@ export function PSPDocumentManager({
       : documents
 
     const merged = baseDocs.map((doc) => {
-      const dbDoc = dbDocs.find(
+      // First try to find a doc for the current graduate type
+      let dbDoc = dbDocs.find(
         (d: PSPDocumentFromDB) => d.document_type === doc.id
       )
+      // Fall back to profile-uploaded documents if none found for this graduate type
+      if (!dbDoc && profileDocs) {
+        dbDoc = profileDocs.find(
+          (d: PSPDocumentFromDB) => d.document_type === doc.id
+        )
+      }
       if (dbDoc) {
         return {
           ...doc,
@@ -177,8 +183,9 @@ export function PSPDocumentManager({
       return doc
     })
 
+    const allDocs = [...dbDocs, ...(profileDocs || [])]
     const expDates: Record<string, string> = {}
-    dbDocs.forEach((d: PSPDocumentFromDB) => {
+    allDocs.forEach((d: PSPDocumentFromDB) => {
       if (d.expiration_date) {
         expDates[d.document_type] = d.expiration_date
       }
@@ -190,16 +197,24 @@ export function PSPDocumentManager({
   const loadDocuments = async () => {
     // Check preloaded cache first for instant load
     const cached = getCachedDocuments(leadId, graduateType)
+    const cachedProfile = getCachedDocuments(leadId, "_profile")
     if (cached) {
-      mergeDocuments(cached as unknown as PSPDocumentFromDB[])
+      mergeDocuments(
+        cached as unknown as PSPDocumentFromDB[],
+        (cachedProfile as unknown as PSPDocumentFromDB[]) || undefined
+      )
       setLoading(false)
       return
     }
 
     setLoading(true)
     try {
-      const dbDocs = await preloadDocuments(leadId, graduateType) as unknown as PSPDocumentFromDB[]
-      mergeDocuments(dbDocs)
+      // Fetch both graduate-type-specific and profile-uploaded documents
+      const [dbDocs, profileDocs] = await Promise.all([
+        preloadDocuments(leadId, graduateType) as unknown as Promise<PSPDocumentFromDB[]>,
+        preloadDocuments(leadId, "_profile").catch(() => [] as unknown[]) as unknown as Promise<PSPDocumentFromDB[]>,
+      ])
+      mergeDocuments(dbDocs, profileDocs)
     } catch (err) {
       console.error("Failed to load documents:", err)
       // Fall back to localStorage for offline support
@@ -246,57 +261,29 @@ export function PSPDocumentManager({
     }
 
     setUploading(docId)
-    const supabase = createClient()
 
     try {
-      const timestamp = Date.now()
-      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-      const storagePath = `leads/${leadId}/psp/${graduateType}/${docId}/${timestamp}-${safeName}`
-
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(storagePath, file, {
-          cacheControl: "3600",
-          upsert: false,
-        })
-
-      if (uploadError) {
-        console.error("Upload error:", uploadError)
-        if (uploadError.message.includes("Bucket not found")) {
-          alert("Document storage is not configured. Please contact support.")
-          return
-        }
-        throw uploadError
+      // Upload via server API (handles storage with service role)
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("lead_id", leadId)
+      formData.append("document_type", docId)
+      formData.append("graduate_type", graduateType)
+      if (expirationDates[docId]) {
+        formData.append("expiration_date", expirationDates[docId])
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("documents")
-        .getPublicUrl(storagePath)
-
-      // Save to database
-      const response = await fetch("/api/psp/documents", {
+      const response = await fetch("/api/psp/documents/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lead_id: leadId,
-          document_type: docId,
-          graduate_type: graduateType,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          storage_path: storagePath,
-          public_url: urlData?.publicUrl,
-          expiration_date: expirationDates[docId] || null,
-        }),
+        body: formData,
       })
 
       if (!response.ok) {
-        throw new Error("Failed to save document record")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to upload file")
       }
 
-      const { document: savedDoc } = await response.json()
+      const { document: savedDoc, public_url, storage_path: storagePath } = await response.json()
 
       // Update local state
       const uploadedFile: UploadedFile = {
@@ -304,9 +291,9 @@ export function PSPDocumentManager({
         name: file.name,
         type: file.type,
         size: file.size,
-        url: urlData?.publicUrl || URL.createObjectURL(file),
+        url: public_url || savedDoc.public_url || URL.createObjectURL(file),
         uploaded_at: new Date().toISOString(),
-        storage_path: storagePath,
+        storage_path: storagePath || savedDoc.storage_path,
         is_verified: false,
         expiration_date: expirationDates[docId] || null,
         is_expired: false,
@@ -485,7 +472,10 @@ export function PSPDocumentManager({
     const dragIcon = document.createElement("div")
     dragIcon.className =
       "bg-[var(--bg-surface)] p-2 rounded-lg shadow-lg border border-[var(--border)] flex items-center gap-2"
-    dragIcon.innerHTML = `<span style="font-size: 12px;">📄 ${file.name}</span>`
+    const span = document.createElement("span")
+    span.style.fontSize = "12px"
+    span.textContent = `📄 ${file.name}`
+    dragIcon.appendChild(span)
     dragIcon.style.position = "absolute"
     dragIcon.style.top = "-1000px"
     document.body.appendChild(dragIcon)
@@ -503,7 +493,8 @@ export function PSPDocumentManager({
     .map((d) => d.id as DocumentTypeId)
   const completionStatus = getDocumentCompletionStatus(
     graduateType as GraduateType,
-    uploadedDocIds
+    uploadedDocIds,
+    conditionalFlags
   )
 
   // Get expiration warnings
@@ -667,6 +658,11 @@ export function PSPDocumentManager({
                     {doc.required && !hasFile && (
                       <Badge variant="destructive" size="sm">
                         Required
+                      </Badge>
+                    )}
+                    {doc.required && hasFile && !doc.file?.is_verified && (
+                      <Badge variant="success" size="sm">
+                        Uploaded
                       </Badge>
                     )}
                     {hasFile && doc.file?.is_verified && (

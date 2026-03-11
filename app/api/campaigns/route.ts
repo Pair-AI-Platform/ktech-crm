@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
     const offset = parseInt(searchParams.get('offset') || '0')
 
     let query = supabase
@@ -149,6 +149,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to create campaign' },
         { status: 500 }
+      )
+    }
+
+    // Validate uploaded contacts limit
+    const MAX_CONTACTS = 1000
+    if (body.uploadedContacts && body.uploadedContacts.length > MAX_CONTACTS) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_CONTACTS} contacts allowed per upload` },
+        { status: 400 }
       )
     }
 

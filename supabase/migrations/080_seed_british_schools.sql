@@ -1,0 +1,22 @@
+-- Seed British curriculum schools in Kuwait
+INSERT INTO schools (name_en, name_ar, school_type, is_active) VALUES
+('The English School of Kuwait (ESK)', 'المدرسة الإنجليزية في الكويت', 'uk', true),
+('The British School of Kuwait (BSK)', 'المدرسة البريطانية في الكويت', 'uk', true),
+('New English School (NES)', 'مدرسة نيو إنجلش', 'uk', true),
+('Kuwait English School (KES)', 'مدرسة الكويت الإنجليزية', 'uk', true),
+('The English Academy (TEA)', 'الأكاديمية الإنجليزية', 'uk', true),
+('British Academy of International Arts (BAIA)', 'الأكاديمية البريطانية للفنون الدولية', 'uk', true),
+('Khalifa British Academy', 'أكاديمية خليفة البريطانية', 'uk', true),
+('Al-Essa British Academy', 'أكاديمية العيسى البريطانية', 'uk', true),
+('Regent British School', 'مدرسة ريجنت البريطانية', 'uk', true),
+('Cambridge English High School', 'مدرسة كامبريدج الإنجليزية الثانوية', 'uk', true),
+('Gulf British Academy (GBA)', 'أكاديمية الخليج البريطانية', 'uk', true),
+('British International School of Kuwait', 'المدرسة البريطانية الدولية في الكويت', 'uk', true),
+('Sunshine English School', 'مدرسة صن شاين الإنجليزية', 'uk', true),
+('Al-Ressala Bilingual School', 'مدرسة الرسالة ثنائية اللغة', 'uk', true),
+('London Academy Kuwait', 'أكاديمية لندن الكويت', 'uk', true),
+('Capital Bilingual School (CBS)', 'مدرسة العاصمة ثنائية اللغة', 'uk', true),
+('Horizon Bilingual School', 'مدرسة الأفق ثنائية اللغة', 'uk', true),
+('Elite English School', 'مدرسة إيليت الإنجليزية', 'uk', true),
+('Imperial English School', 'مدرسة إمبريال الإنجليزية', 'uk', true),
+('Al-Thuraya English School', 'مدرسة الثريا الإنجليزية', 'uk', true);

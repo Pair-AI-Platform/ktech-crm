@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useCallback } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+import { queryKeys } from "./query-keys"
 import type { PipelineStage } from "@/types"
 
 export interface StageSettings {
@@ -54,68 +56,48 @@ function saveDemoStageSettings(settings: StageSettings[]) {
 }
 
 export function useStageSettings() {
-  const [settings, setSettings] = useState<StageSettings[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetchSettings = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const { data: settings = [], isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: queryKeys.stageSettings.all,
+    queryFn: async () => {
+      if (isDemoMode()) {
+        return getDemoStageSettings()
+      }
 
-    if (isDemoMode()) {
-      setSettings(getDemoStageSettings())
-      setLoading(false)
-      return
-    }
+      const supabase = createClient()
 
-    const supabase = createClient()
-
-    try {
       const { data, error } = await supabase
         .from("pipeline_stage_settings")
         .select("*")
         .order("display_order", { ascending: true })
 
       if (error) throw error
-      setSettings(data || [])
-    } catch (err) {
-      console.error("Error fetching stage settings:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch stage settings")
-      // Fall back to default settings if table doesn't exist yet
-      setSettings(DEFAULT_STAGE_SETTINGS)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+      return (data || []) as StageSettings[]
+    },
+    staleTime: 60_000,
+  })
 
-  useEffect(() => {
-    fetchSettings()
-  }, [fetchSettings])
+  const error = queryError?.message ?? null
 
-  const toggleStage = useCallback(async (stage: PipelineStage, isActive: boolean) => {
-    // Prevent deactivating 'new' stage - leads always need a starting point
-    if (stage === 'new' && !isActive) {
-      setError("Cannot deactivate the 'New' stage - it's required as the initial stage")
-      return false
-    }
+  const toggleStageMutation = useMutation({
+    mutationFn: async ({ stage, isActive }: { stage: PipelineStage; isActive: boolean }) => {
+      // Prevent deactivating 'new' stage - leads always need a starting point
+      if (stage === 'new' && !isActive) {
+        throw new Error("Cannot deactivate the 'New' stage - it's required as the initial stage")
+      }
 
-    // Optimistically update UI
-    setSettings(prev =>
-      prev.map(s => s.stage === stage ? { ...s, is_active: isActive, updated_at: new Date().toISOString() } : s)
-    )
+      if (isDemoMode()) {
+        const currentSettings = getDemoStageSettings()
+        const updated = currentSettings.map(s =>
+          s.stage === stage ? { ...s, is_active: isActive, updated_at: new Date().toISOString() } : s
+        )
+        saveDemoStageSettings(updated)
+        return true
+      }
 
-    if (isDemoMode()) {
-      const currentSettings = getDemoStageSettings()
-      const updated = currentSettings.map(s =>
-        s.stage === stage ? { ...s, is_active: isActive, updated_at: new Date().toISOString() } : s
-      )
-      saveDemoStageSettings(updated)
-      return true
-    }
+      const supabase = createClient()
 
-    const supabase = createClient()
-
-    try {
       const { error } = await supabase
         .from("pipeline_stage_settings")
         .update({ is_active: isActive })
@@ -123,14 +105,45 @@ export function useStageSettings() {
 
       if (error) throw error
       return true
-    } catch (err) {
-      console.error("Error updating stage setting:", err)
-      setError(err instanceof Error ? err.message : "Failed to update stage setting")
-      // Revert optimistic update
-      await fetchSettings()
-      return false
-    }
-  }, [fetchSettings])
+    },
+    onMutate: async ({ stage, isActive }) => {
+      // Prevent deactivating 'new' stage before making optimistic update
+      if (stage === 'new' && !isActive) return
+
+      await queryClient.cancelQueries({ queryKey: queryKeys.stageSettings.all })
+
+      const previousSettings = queryClient.getQueryData<StageSettings[]>(queryKeys.stageSettings.all)
+
+      queryClient.setQueryData<StageSettings[]>(
+        queryKeys.stageSettings.all,
+        (old) => old?.map(s =>
+          s.stage === stage ? { ...s, is_active: isActive, updated_at: new Date().toISOString() } : s
+        ) ?? []
+      )
+
+      return { previousSettings }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousSettings) {
+        queryClient.setQueryData(queryKeys.stageSettings.all, context.previousSettings)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stageSettings.all })
+    },
+  })
+
+  const toggleStage = useCallback(
+    async (stage: PipelineStage, isActive: boolean) => {
+      try {
+        await toggleStageMutation.mutateAsync({ stage, isActive })
+        return true
+      } catch {
+        return false
+      }
+    },
+    [toggleStageMutation]
+  )
 
   // Helper to get only active stages
   const activeStages = settings.filter(s => s.is_active).map(s => s.stage)
@@ -148,6 +161,6 @@ export function useStageSettings() {
     toggleStage,
     activeStages,
     isStageActive,
-    refetch: fetchSettings,
+    refetch: async () => { await refetch() },
   }
 }

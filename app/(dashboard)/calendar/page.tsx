@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -12,6 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 import {
   Plus,
   Calendar,
@@ -25,42 +32,40 @@ import {
   PhoneMissed,
   PhoneOff,
   XCircle,
-  Eye
+  Eye,
+  Search,
+  ChevronDown,
 } from "lucide-react"
 import { APPOINTMENT_TYPES, APPOINTMENT_STATUSES } from "@/types"
 import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
-import { useAppointments, useAppointmentStats, useTodayAppointments, useNoUpdatedAppointments } from "@/lib/hooks/use-appointments"
+import { useAppointments, useTodayAppointments } from "@/lib/hooks/use-appointments"
 import { useUser, useAgents } from "@/lib/hooks/use-user"
 import { CalendarView } from "@/components/calendar/calendar-view"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { AppointmentDetail } from "@/components/calendar/appointment-detail"
 import { SlotManager } from "@/components/calendar/slot-manager"
-import { NoUpdatedAppointments } from "@/components/calendar/no-updated-appointments"
 import { cn, toDateString } from "@/lib/utils"
 
 type TimeRange = "day" | "week" | "month"
 type DisplayMode = "calendar" | "table"
 type CalendarMode = "all" | "appointments" | "callbacks"
 
-// Static date for initial render to prevent hydration mismatch
-const INITIAL_DATE = new Date(2026, 0, 5) // January 5, 2026
-
 export default function CalendarPage() {
   const { profile } = useUser()
   const { agents } = useAgents()
   const [timeRange, setTimeRange] = useState<TimeRange>("week")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar")
-  const [currentDate, setCurrentDate] = useState<Date>(() => {
-    // Use INITIAL_DATE for SSR, will be updated on client
-    if (typeof window === 'undefined') return INITIAL_DATE
-    return new Date()
-  })
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
+
+  // Ensure the date is set to today on mount (handles SSR hydration)
+  useEffect(() => {
+    setCurrentDate(new Date())
+  }, [])
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("appointments")
   const [selectedTypes, setSelectedTypes] = useState<AppointmentType[]>([])
   const [selectedAgent, setSelectedAgent] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
-  const [showNoUpdated, setShowNoUpdated] = useState(false)
-  const [showNoUpdatedModal, setShowNoUpdatedModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const [showBookingWizard, setShowBookingWizard] = useState(false)
   const [showSlotManager, setShowSlotManager] = useState(false)
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
@@ -93,27 +98,48 @@ export default function CalendarPage() {
     }
   }, [currentDate, timeRange])
 
-  const { appointments, loading, refetch } = useAppointments({
-    startDate: showNoUpdated ? undefined : dateRange.startDate,
-    endDate: showNoUpdated ? undefined : dateRange.endDate,
+  const { appointments, loading, error: appointmentsError, refetch } = useAppointments({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
     type: selectedTypes.length === 0 ? "all" : selectedTypes,
     status: selectedStatus === "all" ? "all" : selectedStatus as AppointmentStatus,
     agentId: selectedAgent === "all" ? undefined : selectedAgent,
-    noUpdated: showNoUpdated,
   })
 
-  const { appointments: todayAppointments, loading: todayLoading } = useTodayAppointments()
-  const { appointments: noUpdatedAppointments, loading: noUpdatedLoading, refetch: refetchNoUpdated } = useNoUpdatedAppointments()
-  const { stats, loading: statsLoading } = useAppointmentStats()
+  const { appointments: todayAppointments, loading: todayLoading, refetch: refetchToday } = useTodayAppointments()
+
+  const filteredAppointments = useMemo(() => {
+    if (!searchQuery.trim()) return appointments
+    const q = searchQuery.trim().toLowerCase()
+    return appointments.filter(apt => {
+      const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
+      if (apt.lead) leads.push(apt.lead)
+      return leads.some(lead =>
+        `${lead!.first_name} ${lead!.last_name}`.toLowerCase().includes(q) ||
+        lead!.phone?.includes(q)
+      )
+    })
+  }, [appointments, searchQuery])
 
   const getAppointmentColor = (type: string) => {
     switch (type) {
-      case "new_appointment": return "bg-[var(--primary)]"
-      case "puc_documents": return "bg-[var(--accent)]"
-      case "puc_application": return "bg-[var(--warning)]"
-      case "retest": return "bg-[var(--success)]"
-      case "sf_appointment": return "bg-[var(--info)]"
-      default: return "bg-[var(--primary)]"
+      case "new_appointment": return "bg-blue-500"
+      case "puc_documents": return "bg-violet-500"
+      case "puc_application": return "bg-amber-500"
+      case "retest": return "bg-green-500"
+      case "sf_appointment": return "bg-cyan-500"
+      default: return "bg-blue-500"
+    }
+  }
+
+  const getTypeButtonSelectedClass = (type: string) => {
+    switch (type) {
+      case "new_appointment": return "bg-blue-500 text-white shadow-sm border-blue-500"
+      case "puc_documents": return "bg-violet-500 text-white shadow-sm border-violet-500"
+      case "puc_application": return "bg-amber-500 text-white shadow-sm border-amber-500"
+      case "retest": return "bg-green-500 text-white shadow-sm border-green-500"
+      case "sf_appointment": return "bg-cyan-500 text-white shadow-sm border-cyan-500"
+      default: return "bg-blue-500 text-white shadow-sm border-blue-500"
     }
   }
 
@@ -131,6 +157,8 @@ export default function CalendarPage() {
         return <PhoneOff className="w-3 h-3 text-[var(--error)]" />
       case "will_see":
         return <Eye className="w-3 h-3 text-[var(--info)]" />
+      case "cancelled":
+        return <XCircle className="w-3 h-3 text-[var(--error)]" />
       default:
         return null
     }
@@ -158,7 +186,10 @@ export default function CalendarPage() {
 
   const handleBookingSuccess = () => {
     refetch()
-    refetchNoUpdated()
+    // Refetch again after a brief delay to ensure database consistency
+    setTimeout(() => {
+      refetch()
+    }, 1500)
     setPreselectedDate(undefined)
     setPreselectedTime(undefined)
   }
@@ -176,131 +207,7 @@ export default function CalendarPage() {
         }}
       />
 
-      <div className="p-6 space-y-6 page-enter">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[var(--primary)]/10 to-transparent rounded-bl-full" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-[var(--primary)]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
-                      {statsLoading ? "..." : stats.today}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">Today</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#8992c8]/15 to-transparent rounded-bl-full" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#8992c8]/15 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-[#5a71c4]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
-                      {statsLoading ? "..." : stats.pending}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">Pending</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[var(--success)]/10 to-transparent rounded-bl-full" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--success)]/10 flex items-center justify-center">
-                    <CheckCircle2 className="w-5 h-5 text-[var(--success)]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
-                      {statsLoading ? "..." : stats.confirmed}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">Attended</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[var(--error)]/10 to-transparent rounded-bl-full" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--error)]/10 flex items-center justify-center">
-                    <XCircle className="w-5 h-5 text-[var(--error)]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
-                      {statsLoading ? "..." : stats.noShow}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">No-Show</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card
-              className={cn(
-                "relative overflow-hidden cursor-pointer transition-all",
-                showNoUpdated && "ring-2 ring-[var(--warning)]"
-              )}
-              onClick={() => setShowNoUpdated(!showNoUpdated)}
-              title="Appointments that passed without status update"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[var(--warning)]/10 to-transparent rounded-bl-full" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--warning)]/10 flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-[var(--warning)]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
-                      {statsLoading ? "..." : stats.noUpdated}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">No Updated</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
+      <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
         {/* Filter Bar */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -309,48 +216,59 @@ export default function CalendarPage() {
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
         >
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Type Filter - Multi-select */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-[var(--text-muted)] flex items-center gap-1.5">
-                <Filter className="w-4 h-4" />
-                Types:
-              </span>
-              {APPOINTMENT_TYPES.map((type) => {
-                const isSelected = selectedTypes.includes(type.value)
-                return (
-                  <button
+            {/* Type Filter - Dropdown Multi-select */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex h-10 w-[180px] items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm transition-all duration-200 hover:border-[var(--border-emphasis)] focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-[var(--primary)] focus:ring-[var(--primary-muted)]">
+                  <span className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-[var(--text-muted)]" />
+                    <span className="line-clamp-1">
+                      {selectedTypes.length === 0
+                        ? "All Types"
+                        : selectedTypes.length === 1
+                          ? APPOINTMENT_TYPES.find(t => t.value === selectedTypes[0])?.label
+                          : `${selectedTypes.length} Types`}
+                    </span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {APPOINTMENT_TYPES.map((type) => (
+                  <DropdownMenuCheckboxItem
                     key={type.value}
-                    onClick={() => {
+                    checked={selectedTypes.includes(type.value)}
+                    onCheckedChange={(checked) => {
                       setSelectedTypes(prev =>
-                        prev.includes(type.value)
-                          ? prev.filter(t => t !== type.value)
-                          : [...prev, type.value]
+                        checked
+                          ? [...prev, type.value]
+                          : prev.filter(t => t !== type.value)
                       )
                     }}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5",
-                      isSelected
-                        ? "bg-[var(--primary)] text-white shadow-sm"
-                        : "bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border)]"
-                    )}
+                    onSelect={(e) => e.preventDefault()}
                   >
-                    <div className={cn("w-2 h-2 rounded-full", getAppointmentColor(type.value))} />
-                    {type.label}
-                  </button>
-                )
-              })}
-              {selectedTypes.length > 0 && (
-                <button
-                  onClick={() => setSelectedTypes([])}
-                  className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] underline"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+                    <div className="flex items-center gap-2">
+                      <div className={cn("w-2 h-2 rounded-full", getAppointmentColor(type.value))} />
+                      {type.label}
+                    </div>
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {selectedTypes.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={false}
+                      onCheckedChange={() => setSelectedTypes([])}
+                    >
+                      Clear all
+                    </DropdownMenuCheckboxItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[180px]">
                 <Users className="w-4 h-4 mr-2 text-[var(--text-muted)]" />
                 <SelectValue placeholder="All Employees" />
               </SelectTrigger>
@@ -384,19 +302,17 @@ export default function CalendarPage() {
               </SelectContent>
             </Select>
 
-            {showNoUpdated && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowNoUpdated(false)}
-                className="border-[var(--warning)] text-[var(--warning)] hover:bg-[var(--warning)]/10"
-                title="Appointments that passed without status update"
-              >
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Showing: No Updated
-                <XCircle className="w-3 h-3 ml-2" />
-              </Button>
-            )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name or phone..."
+                className="h-9 w-[220px] pl-9 pr-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50"
+              />
+            </div>
+
           </div>
 
           {/* Calendar Mode Toggle (CB/Appointments) */}
@@ -428,219 +344,40 @@ export default function CalendarPage() {
           </div>
         </motion.div>
 
+        {/* Fetch Error Banner */}
+        {appointmentsError && (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800">
+            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm">Failed to load appointments: {appointmentsError}</p>
+            <Button variant="ghost" size="sm" onClick={() => refetch()} className="ml-auto text-red-600 hover:text-red-800 hover:bg-red-100">
+              Retry
+            </Button>
+          </div>
+        )}
+
         {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          {/* Calendar Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="xl:col-span-3"
-          >
-            <Card className="p-4">
-              <CalendarView
-                appointments={appointments}
-                loading={loading}
-                timeRange={timeRange}
-                onTimeRangeChange={setTimeRange}
-                displayMode={displayMode}
-                onDisplayModeChange={setDisplayMode}
-                currentDate={currentDate}
-                onDateChange={setCurrentDate}
-                onAppointmentClick={setSelectedAppointment}
-                onSlotClick={handleSlotClick}
-                calendarMode={calendarMode}
-                onCalendarModeChange={setCalendarMode}
-              />
-            </Card>
-          </motion.div>
-
-          {/* Sidebar */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="space-y-6"
-          >
-            {/* Today's Schedule */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-[var(--primary)]" />
-                  </div>
-                  Today&apos;s Schedule
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {todayLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--primary)]" />
-                  </div>
-                ) : todayAppointments.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="w-12 h-12 rounded-xl bg-[var(--bg-sunken)] flex items-center justify-center mx-auto mb-3">
-                      <Calendar className="w-6 h-6 text-[var(--text-muted)]" />
-                    </div>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      No appointments today
-                    </p>
-                  </div>
-                ) : (
-                  <AnimatePresence>
-                    {todayAppointments.slice(0, 5).map((apt, index) => {
-                      const employeeName = apt.assigned_agent_profile?.full_name
-                      return (
-                        <motion.div
-                          key={apt.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          onClick={() => setSelectedAppointment(apt)}
-                          className="p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-[var(--primary)]/50 transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={cn(
-                                "w-2 h-2 rounded-full",
-                                getAppointmentColor(apt.appointment_type?.[0] || "new_appointment")
-                              )} />
-                              <span className="font-medium text-sm text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
-                                {getAppointmentName(apt)}
-                              </span>
-                            </div>
-                            {getStatusIcon(apt.status)}
-                          </div>
-                          <p className="text-xs text-[var(--text-muted)] mt-1 ml-4">
-                            {(apt.appointment_type || []).map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2 ml-4 text-xs text-[var(--text-muted)]">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {apt.scheduled_time?.slice(0, 5)}
-                            </span>
-                            {employeeName && (
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {employeeName}
-                              </span>
-                            )}
-                          </div>
-                        </motion.div>
-                      )
-                    })}
-                  </AnimatePresence>
-                )}
-                {todayAppointments.length > 5 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-[var(--text-muted)]"
-                    onClick={() => {
-                      setCurrentDate(new Date())
-                      setTimeRange("day")
-                    }}
-                  >
-                    View all {todayAppointments.length} appointments
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* No Updated - Need Attention Section */}
-            {noUpdatedAppointments.length > 0 && (
-              <Card
-                className={cn(
-                  "border-[var(--warning)]/50 bg-[var(--warning)]/5 cursor-pointer transition-all hover:border-[var(--warning)] hover:shadow-lg hover:shadow-[var(--warning)]/10",
-                  showNoUpdated && "ring-2 ring-[var(--warning)]"
-                )}
-                onClick={() => setShowNoUpdated(true)}
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-[var(--warning)]/20 flex items-center justify-center">
-                        <AlertTriangle className="w-4 h-4 text-[var(--warning)]" />
-                      </div>
-                      <span>No Updated</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 text-sm font-bold rounded-full bg-[var(--warning)] text-white">
-                        {noUpdatedAppointments.length}
-                      </span>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                  {noUpdatedLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--warning)]" />
-                    </div>
-                  ) : (
-                    <AnimatePresence>
-                      {noUpdatedAppointments.slice(0, 5).map((apt, index) => {
-                        const employeeName = apt.assigned_agent_profile?.full_name
-                        return (
-                          <motion.div
-                            key={apt.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.03 }}
-                            onClick={() => setSelectedAppointment(apt)}
-                            className="p-3 rounded-xl border border-[var(--warning)]/30 bg-[var(--bg-sunken)] hover:border-[var(--warning)] transition-all cursor-pointer group"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className={cn(
-                                  "w-2 h-2 rounded-full",
-                                  getAppointmentColor(apt.appointment_type?.[0] || "new_appointment")
-                                )} />
-                                <span className="font-medium text-sm text-[var(--text-primary)] group-hover:text-[var(--warning)] transition-colors">
-                                  {getAppointmentName(apt)}
-                                </span>
-                              </div>
-                              <AlertTriangle className="w-3 h-3 text-[var(--warning)]" />
-                            </div>
-                            <p className="text-xs text-[var(--text-muted)] mt-1 ml-4">
-                              {(apt.appointment_type || []).map(t => APPOINTMENT_TYPES.find(at => at.value === t)?.label).join(", ")}
-                            </p>
-                            <div className="flex items-center gap-3 mt-2 ml-4 text-xs text-[var(--text-muted)]">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {apt.scheduled_date}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {apt.scheduled_time?.slice(0, 5)}
-                              </span>
-                            </div>
-                            {employeeName && (
-                              <div className="flex items-center gap-1 mt-1 ml-4 text-xs text-[var(--text-muted)]">
-                                <Users className="w-3 h-3" />
-                                {employeeName}
-                              </div>
-                            )}
-                          </motion.div>
-                        )
-                      })}
-                    </AnimatePresence>
-                  )}
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-[var(--warning)] hover:bg-[var(--warning)]/90 text-white"
-                    onClick={(e) => { e.stopPropagation(); setShowNoUpdatedModal(true); }}
-                  >
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    View All & Update ({noUpdatedAppointments.length})
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-
-          </motion.div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="p-2 sm:p-4">
+            <CalendarView
+              appointments={filteredAppointments}
+              loading={loading}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+              displayMode={displayMode}
+              onDisplayModeChange={setDisplayMode}
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              onAppointmentClick={setSelectedAppointment}
+              onSlotClick={handleSlotClick}
+              calendarMode={calendarMode}
+              onCalendarModeChange={setCalendarMode}
+            />
+          </Card>
+        </motion.div>
       </div>
 
       {/* Modals */}
@@ -661,25 +398,14 @@ export default function CalendarPage() {
         appointment={selectedAppointment}
         isOpen={!!selectedAppointment}
         onClose={() => setSelectedAppointment(null)}
-        onUpdate={() => { refetch(); refetchNoUpdated(); }}
+        onUpdate={() => { refetch(); refetchToday(); }}
       />
 
       <SlotManager
         isOpen={showSlotManager}
         onClose={() => setShowSlotManager(false)}
-        onSuccess={() => { refetch(); refetchNoUpdated(); }}
+        onSuccess={() => refetch()}
         preselectedDate={currentDate}
-      />
-
-      <NoUpdatedAppointments
-        appointments={noUpdatedAppointments}
-        isOpen={showNoUpdatedModal}
-        onClose={() => setShowNoUpdatedModal(false)}
-        onUpdate={() => { refetch(); refetchNoUpdated(); }}
-        onAppointmentClick={(apt) => {
-          setShowNoUpdatedModal(false)
-          setSelectedAppointment(apt)
-        }}
       />
     </div>
   )

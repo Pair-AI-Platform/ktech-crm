@@ -116,7 +116,7 @@ export default function ProfilePage() {
         subtitle="View and manage your profile"
       />
 
-      <div className="p-6 space-y-6 page-enter">
+      <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
         {/* Profile Header Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

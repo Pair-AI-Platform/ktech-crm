@@ -60,6 +60,7 @@ export async function sendSMS(
           'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        signal: AbortSignal.timeout(30_000),
         body: new URLSearchParams({
           To: formattedPhone,
           From: fromNumber,

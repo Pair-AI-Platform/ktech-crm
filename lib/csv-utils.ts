@@ -45,10 +45,9 @@ const VALID_SOURCE_CATEGORIES: LeadSourceCategory[] = [
 
 const VALID_FUNDING_TYPES: FundingType[] = ["self_funded", "puc"]
 
-const VALID_SCHOOLS: School[] = [
-  "alsalmiya_girls", "aljahra_private_boys", "aljahra_girls",
-  "sabah_alsalem_girls", "other"
-]
+// School validation is handled by the School type (150+ values).
+// Instead of maintaining a duplicate list, accept any non-empty string
+// and let the database/type system enforce valid values.
 
 const VALID_GRADE_LEVELS: GradeLevel[] = ["10th", "11th", "12th"]
 
@@ -209,9 +208,9 @@ export function parseLeadFromCSV(row: string[], headerMap: Map<string, number>):
     fundingType = "self_funded"
   }
 
-  // School validation
+  // School validation - accept any non-empty value (full list is in the School type)
   let school = getValue("school").toLowerCase().replace(/[\s-]/g, "_") as School | undefined
-  if (school && !VALID_SCHOOLS.includes(school)) {
+  if (!school) {
     school = undefined
   }
 

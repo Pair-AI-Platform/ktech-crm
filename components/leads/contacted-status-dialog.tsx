@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Loader2, Phone, Check } from "lucide-react"
 import {
   Dialog,
@@ -20,7 +20,7 @@ const CONTACTED_STATUSES: LeadStatus[] = [
   'no_answer', 'switched_off', 'interested',
   'not_interested', 'high_gpa', 'wrong_number', 'will_see',
   'by_mistake', 'disconnected', 'rude', 'asking_bachelors', 'courses_masters',
-  'current_student', 'seeking_job', 'cant_reach',
+  'current_student', 'seeking_job', 'cant_reach', 'competitor',
 ]
 
 interface ContactedStatusDialogProps {
@@ -28,6 +28,7 @@ interface ContactedStatusDialogProps {
   onOpenChange: (open: boolean) => void
   onConfirm: (status: LeadStatus) => Promise<void>
   leadName: string
+  currentStatus?: LeadStatus | null
 }
 
 export function ContactedStatusDialog({
@@ -35,9 +36,16 @@ export function ContactedStatusDialog({
   onOpenChange,
   onConfirm,
   leadName,
+  currentStatus,
 }: ContactedStatusDialogProps) {
-  const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(currentStatus ?? null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setSelectedStatus(currentStatus ?? null)
+    }
+  }, [open, currentStatus])
 
   const statusOptions = LEAD_STATUSES.filter(s => CONTACTED_STATUSES.includes(s.value))
 

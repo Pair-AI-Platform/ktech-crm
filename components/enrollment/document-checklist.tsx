@@ -19,9 +19,9 @@ import { Button } from "@/components/ui/button"
 import {
   SF_DOCUMENTS,
   PUC_DOCUMENTS,
-  PUC_FEE_AMOUNT,
   HIGH_SCHOOL_CERTIFICATE_TYPES,
 } from "@/types"
+import { PUC_FEE_AMOUNT } from "@/lib/config/constants"
 import type { Student, HighSchoolCertificateType } from "@/types"
 import { PUCFeePaymentDialog } from "./puc-fee-payment-dialog"
 

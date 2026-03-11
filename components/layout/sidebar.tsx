@@ -24,6 +24,7 @@ import {
   Ban,
   UserMinus,
   Wallet,
+  ChevronRight,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -45,6 +46,7 @@ type NavItem = {
   description: string
   badge?: string
   children?: NavItem[]
+  roles?: ("admin" | "agent")[]
 }
 
 interface NavLinkProps {
@@ -91,6 +93,12 @@ function useIsNavActive(item: NavItem) {
 
 function NavLink({ item, index, pathname, isCollapsed, onNavigate }: NavLinkProps) {
   const isActive = useIsNavActive(item)
+  const hasChildren = item.children && item.children.length > 0
+  const isAnyChildActive = item.children?.some(child => pathname === child.href.split("?")[0] && child.href.includes("?"))
+  const [childrenOpen, setChildrenOpen] = useState(isAnyChildActive ?? false)
+
+  // Don't show parent as active when children are expanded (child handles its own active state)
+  const showActive = isActive && !(hasChildren && childrenOpen)
 
   return (
     <>
@@ -98,15 +106,24 @@ function NavLink({ item, index, pathname, isCollapsed, onNavigate }: NavLinkProp
         href={item.href}
         className={cn(
           "nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",
-          isActive
+          showActive
             ? "active bg-[var(--bg-hover)] text-[var(--text-primary)]"
-            : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            : hasChildren && childrenOpen
+              ? "text-[var(--text-primary)]"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         )}
-        onClick={onNavigate}
+        onClick={(e) => {
+          if (hasChildren) {
+            e.preventDefault()
+            setChildrenOpen(prev => !prev)
+          } else {
+            onNavigate()
+          }
+        }}
         style={{ animationDelay: `${index * 50}ms` }}
       >
         {/* Active indicator bar */}
-        {isActive && (
+        {showActive && (
           <motion.span
             layoutId="activeNavIndicator"
             className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[var(--primary)] rounded-full"
@@ -130,6 +147,12 @@ function NavLink({ item, index, pathname, isCollapsed, onNavigate }: NavLinkProp
                 {item.badge}
               </Badge>
             )}
+            {hasChildren && (
+              <ChevronRight className={cn(
+                "w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ml-1 shrink-0",
+                childrenOpen && "rotate-90"
+              )} />
+            )}
           </div>
         )}
         {isCollapsed && (
@@ -146,14 +169,24 @@ function NavLink({ item, index, pathname, isCollapsed, onNavigate }: NavLinkProp
           </div>
         )}
       </Link>
-      {/* Sub-items */}
-      {item.children && item.children.length > 0 && (
-        <div className={cn("space-y-0.5", !isCollapsed && "ml-5")}>
-          {item.children.map((child, childIndex) => (
-            <SubNavLink key={child.name} item={child} index={index + childIndex + 1} isCollapsed={isCollapsed} onNavigate={onNavigate} />
-          ))}
-        </div>
-      )}
+      {/* Sub-items - toggle on click */}
+      <AnimatePresence>
+        {hasChildren && childrenOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            className={cn("overflow-hidden space-y-0.5", !isCollapsed && "ml-8 mt-0.5")}
+          >
+            {/* Link to parent page */}
+            <SubNavLink item={{ ...item, name: `All ${item.name}` }} index={index} isCollapsed={isCollapsed} onNavigate={onNavigate} />
+            {item.children!.map((child, childIndex) => (
+              <SubNavLink key={child.name} item={child} index={index + childIndex + 1} isCollapsed={isCollapsed} onNavigate={onNavigate} />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
@@ -166,23 +199,23 @@ function SubNavLink({ item, index, isCollapsed, onNavigate }: Omit<NavLinkProps,
       href={item.href}
       className={cn(
         "nav-item flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 group relative",
-        isCollapsed ? "px-3 py-2.5" : "px-3 py-2",
+        isCollapsed ? "px-3 py-2.5" : "px-3 py-1.5",
         isActive
-          ? "active bg-[var(--bg-hover)] text-[var(--text-primary)]"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          ? "text-[var(--text-primary)]"
+          : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
       )}
       onClick={onNavigate}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       {isActive && (
         <motion.span
-          layoutId="activeNavIndicator"
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[var(--primary)] rounded-full"
+          layoutId="activeSubNavIndicator"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-[var(--primary)] rounded-full"
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         />
       )}
       <span className={cn(
-        "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 shrink-0",
+        "flex items-center justify-center w-6 h-6 rounded-md transition-all duration-200 shrink-0",
         isActive
           ? "text-[var(--text-primary)]"
           : "text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]"
@@ -204,16 +237,15 @@ function SubNavLink({ item, index, isCollapsed, onNavigate }: Omit<NavLinkProps,
 
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & stats" },
-  { name: "Contacts", href: "/leads", icon: Users, description: "Manage prospects", children: [
+  { name: "Contacts", href: "/leads", icon: Users, description: "Manage prospects", roles: ["admin", "agent"], children: [
     { name: "Lost", href: "/leads?stage=lost", icon: Ban, description: "Lost leads" },
-    { name: "Withdraw", href: "/leads?stage=withdraw", icon: UserMinus, description: "Withdrawn leads" },
   ]},
-  { name: "PUC SRJ", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions" },
-  { name: "Self Funded SRJ", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded SRJ submissions" },
+  { name: "PUC", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions", roles: ["admin", "agent"] },
+  { name: "Self Funded", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded submissions", roles: ["admin", "agent"] },
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
   // { name: "Voice", href: "/voice", icon: Phone, description: "Kadi AI & calls" },
-  { name: "Reports", href: "/reports", icon: BarChart3, description: "Analytics & insights" },
-  { name: "Activity", href: "/activity", icon: Activity, description: "Recent activity" },
+  { name: "Reports", href: "/reports", icon: BarChart3, description: "Analytics & insights", roles: ["admin", "agent"] },
+  { name: "Activity", href: "/activity", icon: Activity, description: "Recent activity", roles: ["admin", "agent"] },
 ]
 
 const secondaryNavigation = [
@@ -242,6 +274,11 @@ export function Sidebar({ user }: SidebarProps) {
   }
 
   const handleNavigate = () => setMobileOpen(false)
+
+  const userRole = user?.role || "agent"
+  const filteredNavigation = navigation.filter(
+    (item) => !item.roles || item.roles.includes(userRole)
+  )
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -319,7 +356,7 @@ export function Sidebar({ user }: SidebarProps) {
           </p>
         )}
         <div className="space-y-1">
-          {navigation.map((item, index) => (
+          {filteredNavigation.map((item, index) => (
             <NavLink key={item.name} item={item} index={index} pathname={pathname} isCollapsed={isCollapsed} onNavigate={handleNavigate} />
           ))}
         </div>
@@ -394,7 +431,7 @@ export function Sidebar({ user }: SidebarProps) {
           <div className="relative">
             <Avatar size="sm" status="online">
               <AvatarImage src={user?.avatar_url || undefined} />
-              <AvatarFallback className="bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold">
+              <AvatarFallback className="bg-[#2D347D] text-white font-semibold">
                 {mounted ? (user?.full_name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U") : "U"}
               </AvatarFallback>
             </Avatar>
