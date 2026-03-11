@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createPaymentLink, validateCivilId } from "@/lib/myfatoorah/client"
 import { PUC_FEE_AMOUNT } from "@/types"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
+      )
+    }
+
+    const rateLimitResult = await rateLimit(`payment:${user.id}`, RATE_LIMITS.payment)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
       )
     }
 

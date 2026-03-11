@@ -1,19 +1,30 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import twilio from "twilio"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { withApiHandler } from "@/lib/api-handler"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
+// Lazy-initialize Twilio client
+function getTwilioClient() {
+  const sid = process.env.TWILIO_ACCOUNT_SID
+  const token = process.env.TWILIO_AUTH_TOKEN
+  if (!sid || !token) throw new Error('Twilio credentials not configured')
+  return twilio(sid, token)
+}
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const body = await request.json()
+export const POST = withApiHandler(
+  { context: 'whatsapp-send' },
+  async ({ req, supabase, user, logger }) => {
+    const rateLimitResult = await rateLimit(`whatsapp:${user.id}`, RATE_LIMITS.whatsapp)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
+      )
+    }
 
-    const { phone, message, leadId, studentId, templateId, agentId } = body
+    const body = await req.json()
+
+    const { phone, message, leadId, studentId, templateId } = body
 
     // Validate required fields
     if (!phone || !message) {
@@ -32,13 +43,13 @@ export async function POST(request: NextRequest) {
     const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
     // Send WhatsApp message via Twilio
-    const twilioMessage = await twilioClient.messages.create({
+    const twilioMessage = await getTwilioClient().messages.create({
       body: message,
       from: whatsappFrom,
       to: whatsappTo,
     })
 
-    console.log(`[WhatsApp] Message sent, SID: ${twilioMessage.sid}`)
+    logger.info(`WhatsApp message sent`, { sid: twilioMessage.sid })
 
     // Log the message to database
     const { error: insertError } = await supabase
@@ -53,14 +64,14 @@ export async function POST(request: NextRequest) {
         lead_id: leadId || null,
         student_id: studentId || null,
         template_id: templateId || null,
-        agent_id: agentId || null,
+        agent_id: user.id,
         sent_at: new Date().toISOString(),
       })
       .select()
       .single()
 
     if (insertError) {
-      console.error("[WhatsApp] Failed to log message:", insertError)
+      logger.warn("Failed to log WhatsApp message", { error: insertError.message })
       // Don't fail the request, message was sent successfully
     }
 
@@ -69,17 +80,8 @@ export async function POST(request: NextRequest) {
       messageSid: twilioMessage.sid,
       status: twilioMessage.status,
     })
-  } catch (error: unknown) {
-    console.error("[WhatsApp] Send error:", error)
-
-    const errorMessage = error instanceof Error ? error.message : "Failed to send WhatsApp message"
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
   }
-}
+)
 
 export async function GET() {
   return NextResponse.json({ status: "ok", service: "whatsapp" })

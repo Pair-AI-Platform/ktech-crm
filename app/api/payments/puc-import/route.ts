@@ -7,6 +7,7 @@ import {
   normalizeName,
   namesMatch,
 } from "@/lib/puc-import"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,13 +21,32 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: admin access required' }, { status: 403 })
+    }
+
+    const rateLimitResult = await rateLimit(`import:${user.id}`, RATE_LIMITS.import)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
+      )
+    }
 
     const body = await request.json()
     const { records } = body as { records: PUCRecord[] }
 
-    if (!records || !Array.isArray(records) || records.length === 0) {
+    const MAX_RECORDS = 500
+    if (!Array.isArray(records) || records.length === 0) {
       return NextResponse.json(
         { error: "No records provided" },
+        { status: 400 }
+      )
+    }
+    if (records.length > MAX_RECORDS) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_RECORDS} records allowed per import` },
         { status: 400 }
       )
     }

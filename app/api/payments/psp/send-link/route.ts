@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import twilio from "twilio"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
+// Lazy-initialize Twilio client
+function getTwilioClient() {
+  const sid = process.env.TWILIO_ACCOUNT_SID
+  const token = process.env.TWILIO_AUTH_TOKEN
+  if (!sid || !token) throw new Error('Twilio credentials not configured')
+  return twilio(sid, token)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +21,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
+      )
+    }
+
+    const rateLimitResult = await rateLimit(`payment:${user.id}`, RATE_LIMITS.payment)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
       )
     }
 
@@ -89,7 +100,7 @@ ${transaction.myfatoorah_invoice_url}
 شكراً لكم / Thank you`
 
     // Send WhatsApp message
-    const twilioMessage = await twilioClient.messages.create({
+    const twilioMessage = await getTwilioClient().messages.create({
       body: message,
       from: whatsappFrom,
       to: whatsappTo,

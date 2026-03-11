@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { sendSMS, replaceTemplateVariables } from '@/lib/sms/provider'
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 export const POST = withApiHandler({ context: 'sms-send' }, async ({ req, supabase, user, logger }) => {
+  const rateLimitResult = await rateLimit(`sms:${user.id}`, RATE_LIMITS.sms)
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
+    )
+  }
+
   const body = await req.json()
   const { phone, message, leadId, studentId, templateId, variables } = body
 

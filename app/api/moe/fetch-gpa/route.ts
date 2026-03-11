@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { fetchGPABatch, closeBrowser } from "@/lib/moe/scraper"
 import type { MOEFetchRequest, MOEFetchResponse, EligibleLead } from "@/lib/moe/types"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
+      )
+    }
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: admin access required' }, { status: 403 })
+    }
+
+    const rateLimitResult = await rateLimit(`import:${user.id}`, RATE_LIMITS.import)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
       )
     }
 

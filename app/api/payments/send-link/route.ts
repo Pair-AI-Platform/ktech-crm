@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import twilio from "twilio"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+// Transaction amount is read from the database (supports custom amounts)
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
+// Lazy-initialize Twilio client
+function getTwilioClient() {
+  const sid = process.env.TWILIO_ACCOUNT_SID
+  const token = process.env.TWILIO_AUTH_TOKEN
+  if (!sid || !token) throw new Error('Twilio credentials not configured')
+  return twilio(sid, token)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +22,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
+      )
+    }
+
+    const rateLimitResult = await rateLimit(`payment:${user.id}`, RATE_LIMITS.payment)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)) } }
       )
     }
 
@@ -75,7 +86,7 @@ export async function POST(request: NextRequest) {
     // Compose payment message
     const message = `مرحباً ${lead.first_name}،
 
-لإتمام عملية التسجيل في كلية الكويت التقنية، يرجى دفع رسوم التسجيل بقيمة ${ENROLLMENT_PAYMENT_AMOUNT} د.ك من خلال الرابط التالي:
+لإتمام عملية التسجيل في كلية الكويت التقنية، يرجى دفع رسوم التسجيل بقيمة ${transaction.amount} د.ك من خلال الرابط التالي:
 
 ${transaction.myfatoorah_invoice_url}
 
@@ -83,14 +94,14 @@ ${transaction.myfatoorah_invoice_url}
 
 Hello ${lead.first_name},
 
-To complete your enrollment at Kuwait Technical College, please pay the registration fee of ${ENROLLMENT_PAYMENT_AMOUNT} KD using the following link:
+To complete your enrollment at Kuwait Technical College, please pay the registration fee of ${transaction.amount} KD using the following link:
 
 ${transaction.myfatoorah_invoice_url}
 
 شكراً لكم / Thank you`
 
     // Send WhatsApp message
-    const twilioMessage = await twilioClient.messages.create({
+    const twilioMessage = await getTwilioClient().messages.create({
       body: message,
       from: whatsappFrom,
       to: whatsappTo,
@@ -129,7 +140,7 @@ ${transaction.myfatoorah_invoice_url}
       lead_id: lead.id,
       activity_type: "payment_link_sent",
       title: "Payment Link Sent",
-      description: `Payment link for ${ENROLLMENT_PAYMENT_AMOUNT} KWD sent via WhatsApp`,
+      description: `Payment link for ${transaction.amount} KWD sent via WhatsApp`,
       metadata: {
         transaction_id: transactionId,
         whatsapp_message_sid: twilioMessage.sid,
