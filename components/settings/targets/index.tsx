@@ -30,9 +30,6 @@ export function TargetSettings() {
     updateTarget,
     updateWeekly,
     saveAll,
-    createSeason,
-    updateSeason,
-    deleteSeason,
   } = useTargetSettings()
 
   const directionRef = { current: 1 as 1 | -1 }
@@ -125,9 +122,6 @@ export function TargetSettings() {
         seasons={seasons}
         selectedSeason={selectedSeason}
         onChangeSeason={changeSeason}
-        onCreateSeason={createSeason}
-        onUpdateSeason={updateSeason}
-        onDeleteSeason={deleteSeason}
       />
 
       <div className="overflow-hidden">

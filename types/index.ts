@@ -191,15 +191,8 @@ export interface TargetSettings {
 // New target system — 4 fixed categories
 export type TargetCategory = 'puc_files' | 'sf_files' | 'sf_applicants' | 'puc_app_submission'
 
-// Seasonal periods for SF Applicants + PUC App Submission
-export interface TargetSeason {
-  id: string
-  name: string
-  start_date: string  // ISO date 'YYYY-MM-DD'
-  end_date: string    // ISO date 'YYYY-MM-DD'
-  created_at?: string
-  updated_at?: string
-}
+// TargetSeason is now unified with Semester (see Semester interface below)
+export type TargetSeason = Semester
 
 export interface AgentSeasonalTarget {
   id: string

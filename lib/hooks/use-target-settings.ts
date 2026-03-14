@@ -4,7 +4,7 @@ import { useState, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { queryKeys } from "./query-keys"
-import type { Profile, AgentTarget, TargetSeason, AgentSeasonalTarget } from "@/types"
+import type { Profile, Semester, AgentTarget, AgentSeasonalTarget } from "@/types"
 
 function getCurrentMonth(): string {
   const now = new Date()
@@ -55,25 +55,25 @@ export function useTargetSettings() {
     staleTime: 30_000,
   })
 
-  // ── Seasons list ──────────────────────────────────────────────────────
-  const { data: seasons = [], isLoading: seasonsLoading } = useQuery<TargetSeason[]>({
-    queryKey: queryKeys.targetSeasons.all,
+  // ── Semesters list (replaces target_seasons) ────────────────────────
+  const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Semester[]>({
+    queryKey: queryKeys.semesters.all,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("target_seasons")
+        .from("semesters")
         .select("*")
         .order("start_date", { ascending: false })
       if (error) throw error
-      return (data || []) as TargetSeason[]
+      return (data || []) as Semester[]
     },
     staleTime: 60_000,
-    // Auto-select current or latest season once loaded
-    select: (data) => data,
   })
 
   // Derive effective season id after seasons load
   const effectiveSeasonId = selectedSeasonId ?? (() => {
     if (seasons.length === 0) return null
+    const active = seasons.find(s => s.is_active)
+    if (active) return active.id
     const today = new Date().toISOString().slice(0, 10)
     const current = seasons.find(s => s.start_date <= today && s.end_date >= today)
     return current?.id ?? seasons[0].id
@@ -201,51 +201,6 @@ export function useTargetSettings() {
     }
   }, [])
 
-  // ── Season CRUD ───────────────────────────────────────────────────────
-  const { mutateAsync: createSeason } = useMutation({
-    mutationFn: async ({ name, start_date, end_date }: { name: string; start_date: string; end_date: string }) => {
-      const { data, error } = await supabase
-        .from("target_seasons")
-        .insert({ name, start_date, end_date })
-        .select()
-        .single()
-      if (error) throw error
-      return data as TargetSeason
-    },
-    onSuccess: (newSeason) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.targetSeasons.all })
-      setSelectedSeasonId(newSeason.id)
-    },
-  })
-
-  const { mutateAsync: updateSeason } = useMutation({
-    mutationFn: async ({ id, name, start_date, end_date }: { id: string; name: string; start_date: string; end_date: string }) => {
-      const { error } = await supabase
-        .from("target_seasons")
-        .update({ name, start_date, end_date })
-        .eq("id", id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.targetSeasons.all })
-    },
-  })
-
-  const { mutateAsync: deleteSeason } = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("target_seasons")
-        .delete()
-        .eq("id", id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.targetSeasons.all })
-      queryClient.invalidateQueries({ queryKey: queryKeys.agentSeasonalTargets.all })
-      if (selectedSeasonId === effectiveSeasonId) setSelectedSeasonId(null)
-    },
-  })
-
   // ── Save all ──────────────────────────────────────────────────────────
   const { mutateAsync: saveAll, isPending: saving } = useMutation({
     mutationFn: async () => {
@@ -362,9 +317,6 @@ export function useTargetSettings() {
     updateTarget,
     updateWeekly,
     saveAll,
-    createSeason,
-    updateSeason,
-    deleteSeason,
     seasonalLoading,
   }
 }

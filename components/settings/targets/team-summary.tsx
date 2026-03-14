@@ -4,14 +4,14 @@ import { Badge } from "@/components/ui/badge"
 import { Users, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AgentTargetDraft } from "@/lib/hooks/use-target-settings"
-import type { Profile, TargetSeason } from "@/types"
+import type { Profile, Semester } from "@/types"
 import type { TargetCategory, SEASONAL_CATEGORIES } from "./target-header"
 
 interface TeamSummaryProps {
   agents: Profile[]
   getEffectiveTarget: (agentId: string, field: keyof AgentTargetDraft) => number
   activeCategories: Set<TargetCategory>
-  selectedSeason?: TargetSeason | null
+  selectedSeason?: Semester | null
 }
 
 const categoryBase = [

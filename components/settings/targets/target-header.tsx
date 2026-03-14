@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Target, Save, Check, Calendar, ChevronLeft, ChevronRight } from "lucide-react"
 import { SeasonSelector } from "./season-selector"
-import type { TargetSeason } from "@/types"
+import type { Semester } from "@/types"
 
 export type TargetCategory = 'puc_files' | 'sf_files' | 'sf_applicants' | 'puc_app_submission'
 
@@ -24,13 +24,10 @@ interface TargetHeaderProps {
   hasUnsavedChanges?: boolean
   activeCategories: Set<TargetCategory>
   onToggleCategory: (cat: TargetCategory) => void
-  // Season props
-  seasons: TargetSeason[]
-  selectedSeason: TargetSeason | null
+  // Season props (read-only — semesters managed in Enrollment Cycles)
+  seasons: Semester[]
+  selectedSeason: Semester | null
   onChangeSeason: (id: string) => void
-  onCreateSeason: (data: { name: string; start_date: string; end_date: string }) => Promise<TargetSeason>
-  onUpdateSeason: (data: { id: string; name: string; start_date: string; end_date: string }) => Promise<void>
-  onDeleteSeason: (id: string) => Promise<void>
 }
 
 const categoryConfig: { key: TargetCategory; label: string; color: string }[] = [
@@ -54,9 +51,6 @@ export function TargetHeader({
   seasons,
   selectedSeason,
   onChangeSeason,
-  onCreateSeason,
-  onUpdateSeason,
-  onDeleteSeason,
 }: TargetHeaderProps) {
   const [year, m] = month.split('-')
   const monthLabel = new Date(parseInt(year), parseInt(m) - 1, 1).toLocaleDateString('en-US', {
@@ -198,9 +192,6 @@ export function TargetHeader({
               seasons={seasons}
               selectedSeason={selectedSeason}
               onChangeSeason={onChangeSeason}
-              onCreateSeason={onCreateSeason}
-              onUpdateSeason={onUpdateSeason}
-              onDeleteSeason={onDeleteSeason}
             />
           </div>
         )}

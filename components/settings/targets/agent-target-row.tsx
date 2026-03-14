@@ -8,7 +8,7 @@ import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CategoryInput } from "./category-input"
 import { WeeklyBreakdown } from "./weekly-breakdown"
-import type { Profile, TargetSeason } from "@/types"
+import type { Profile, Semester } from "@/types"
 import type { AgentTargetDraft } from "@/lib/hooks/use-target-settings"
 import type { TargetCategory } from "./target-header"
 
@@ -24,7 +24,7 @@ interface AgentTargetRowProps {
   weeklyPucAppSubmission?: number[] | null
   defaultExpanded?: boolean
   activeCategories: Set<TargetCategory>
-  selectedSeason?: TargetSeason | null
+  selectedSeason?: Semester | null
 }
 
 export function AgentTargetRow({

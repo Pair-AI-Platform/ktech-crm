@@ -9,13 +9,13 @@ import { cn } from "@/lib/utils"
 import { UsersRound, ChevronDown, Zap } from "lucide-react"
 import type { AgentTargetDraft } from "@/lib/hooks/use-target-settings"
 import type { TargetCategory } from "./target-header"
-import type { TargetSeason } from "@/types"
+import type { Semester } from "@/types"
 
 interface TeamTargetInputProps {
   onApplyToAll: (field: keyof AgentTargetDraft, value: number) => void
   agentCount: number
   activeCategories: Set<TargetCategory>
-  selectedSeason?: TargetSeason | null
+  selectedSeason?: Semester | null
 }
 
 export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, selectedSeason }: TeamTargetInputProps) {
