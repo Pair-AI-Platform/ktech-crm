@@ -16,14 +16,19 @@ export interface StageSettings {
   updated_at: string
 }
 
-// Default stage settings for demo mode
+// Default stage settings — all pipeline stages
 const DEFAULT_STAGE_SETTINGS: StageSettings[] = [
   { id: '1', stage: 'new', is_active: true, display_order: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '2', stage: 'test', is_active: true, display_order: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '4', stage: 'application', is_active: true, display_order: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '5', stage: 'lost', is_active: true, display_order: 5, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '6', stage: 'applicant', is_active: true, display_order: 6, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: '7', stage: 'enrolled', is_active: true, display_order: 7, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '2', stage: 'contacted', is_active: true, display_order: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '3', stage: 'visit', is_active: true, display_order: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '4', stage: 'test', is_active: true, display_order: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '5', stage: 'application', is_active: true, display_order: 5, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '6', stage: 'puc_document_submission', is_active: true, display_order: 6, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '7', stage: 'puc_application_submission', is_active: true, display_order: 7, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '8', stage: 'applicant', is_active: true, display_order: 8, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '9', stage: 'enrolled', is_active: true, display_order: 9, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '10', stage: 'withdraw', is_active: true, display_order: 10, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: '11', stage: 'lost', is_active: true, display_order: 11, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ]
 
 const DEMO_STORAGE_KEY = 'ktech_demo_stage_settings'
@@ -73,7 +78,33 @@ export function useStageSettings() {
         .order("display_order", { ascending: true })
 
       if (error) throw error
-      return (data || []) as StageSettings[]
+      const existing = (data || []) as StageSettings[]
+
+      // Auto-seed any missing stages into the DB
+      const existingStages = new Set(existing.map(s => s.stage))
+      const maxOrder = existing.reduce((max, s) => Math.max(max, s.display_order), 0)
+      const missingDefaults = DEFAULT_STAGE_SETTINGS.filter(d => !existingStages.has(d.stage))
+
+      if (missingDefaults.length > 0) {
+        const inserts = missingDefaults.map((d, i) => ({
+          stage: d.stage,
+          is_active: d.is_active,
+          display_order: maxOrder + i + 1,
+        }))
+
+        const { data: inserted, error: insertError } = await supabase
+          .from("pipeline_stage_settings")
+          .insert(inserts)
+          .select()
+
+        if (!insertError && inserted) {
+          const merged = [...existing, ...(inserted as StageSettings[])]
+            .sort((a, b) => a.display_order - b.display_order)
+          return merged
+        }
+      }
+
+      return existing
     },
     staleTime: 60_000,
   })
@@ -133,6 +164,62 @@ export function useStageSettings() {
     },
   })
 
+  const reorderStagesMutation = useMutation({
+    mutationFn: async (reorderedStages: { stage: PipelineStage; display_order: number }[]) => {
+      if (isDemoMode()) {
+        const currentSettings = getDemoStageSettings()
+        const updated = currentSettings.map(s => {
+          const newOrder = reorderedStages.find(r => r.stage === s.stage)
+          return newOrder ? { ...s, display_order: newOrder.display_order, updated_at: new Date().toISOString() } : s
+        })
+        saveDemoStageSettings(updated)
+        return true
+      }
+
+      const supabase = createClient()
+
+      // Update all display_order values in parallel
+      const updates = reorderedStages.map(({ stage, display_order }) =>
+        supabase
+          .from("pipeline_stage_settings")
+          .update({ display_order })
+          .eq("stage", stage)
+      )
+
+      const results = await Promise.all(updates)
+      const failed = results.find(r => r.error)
+      if (failed?.error) throw failed.error
+      return true
+    },
+    onMutate: async (reorderedStages) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.stageSettings.all })
+
+      const previousSettings = queryClient.getQueryData<StageSettings[]>(queryKeys.stageSettings.all)
+
+      queryClient.setQueryData<StageSettings[]>(
+        queryKeys.stageSettings.all,
+        (old) => {
+          if (!old) return []
+          const updated = old.map(s => {
+            const newOrder = reorderedStages.find(r => r.stage === s.stage)
+            return newOrder ? { ...s, display_order: newOrder.display_order } : s
+          })
+          return updated.sort((a, b) => a.display_order - b.display_order)
+        }
+      )
+
+      return { previousSettings }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousSettings) {
+        queryClient.setQueryData(queryKeys.stageSettings.all, context.previousSettings)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stageSettings.all })
+    },
+  })
+
   const toggleStage = useCallback(
     async (stage: PipelineStage, isActive: boolean) => {
       try {
@@ -143,6 +230,18 @@ export function useStageSettings() {
       }
     },
     [toggleStageMutation]
+  )
+
+  const reorderStages = useCallback(
+    async (reorderedStages: { stage: PipelineStage; display_order: number }[]) => {
+      try {
+        await reorderStagesMutation.mutateAsync(reorderedStages)
+        return true
+      } catch {
+        return false
+      }
+    },
+    [reorderStagesMutation]
   )
 
   // Helper to get only active stages
@@ -159,6 +258,7 @@ export function useStageSettings() {
     loading,
     error,
     toggleStage,
+    reorderStages,
     activeStages,
     isStageActive,
     refetch: async () => { await refetch() },

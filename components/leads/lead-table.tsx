@@ -23,6 +23,7 @@ import {
 import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES, SF_DOCUMENTS, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus, type OrientationStatus, type PUCDocumentStatus } from "@/types"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { useStageSettings } from "@/lib/hooks/use-stage-settings"
 import { createClient } from "@/lib/supabase/client"
 import type { SubmissionBlockedReason } from "@/types"
 
@@ -64,6 +65,7 @@ export function LeadTable({
   onPageChange,
 }: LeadTableProps) {
   const { updateLeadStage, updateLead, incrementContactCount } = useLeadMutations()
+  const { settings: stageSettings } = useStageSettings()
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   const [editingStage, setEditingStage] = useState<string | null>(null)
@@ -71,6 +73,7 @@ export function LeadTable({
   const [editingStatus, setEditingStatus] = useState<string | null>(null)
   const [editingGpa, setEditingGpa] = useState<{ leadId: string; field: 'expected_gpa' | 'actual_gpa' } | null>(null)
   const [gpaInputValue, setGpaInputValue] = useState<string>("")
+  const [openPreferenceForLead, setOpenPreferenceForLead] = useState<string | null>(null)
   const [editingSubmissionSubstage, setEditingSubmissionSubstage] = useState<string | null>(null)
   const [editingSubmissionStatus, setEditingSubmissionStatus] = useState<string | null>(null)
   const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null)
@@ -108,6 +111,7 @@ export function LeadTable({
   // PUC Doc Submission view: show doc status column
   const isPucDocSubmissionView = isPucSrjView && currentStageFilter === 'puc_document_submission'
   const isPucContactedView = isPucSrjView && currentStageFilter === 'contacted'
+  const isPucAppSubmissionView = isPucSrjView && currentStageFilter === 'puc_application_submission'
 
   // Function to refresh document completion status
   const refreshDocumentStatus = React.useCallback(() => {
@@ -363,14 +367,23 @@ export function LeadTable({
     }
   }
 
+  const PRIORITY_WEIGHT: Record<string, number> = { critical: 0, important: 1, normal: 2 }
+
   const sortedLeads = [...leads].sort((a, b) => {
+    // Always sort by priority first (critical > important > normal/undefined)
+    const aPriority = PRIORITY_WEIGHT[a.priority || 'normal'] ?? 2
+    const bPriority = PRIORITY_WEIGHT[b.priority || 'normal'] ?? 2
+    if (aPriority !== bPriority) return aPriority - bPriority
+
     let comparison = 0
     switch (sortField) {
       case "name":
         comparison = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
         break
       case "pipeline_stage":
-        const stageOrder = PIPELINE_STAGES.map(s => s.value)
+        const stageOrder = stageSettings.length > 0
+          ? stageSettings.map(s => s.stage)
+          : PIPELINE_STAGES.map(s => s.value)
         comparison = stageOrder.indexOf(a.pipeline_stage) - stageOrder.indexOf(b.pipeline_stage)
         break
       case "source":
@@ -433,13 +446,13 @@ export function LeadTable({
     const nextCount = getNextCount(leadId)
     setPendingUpdates(prev => ({
       ...prev,
-      [leadId]: { ...prev[leadId], pipeline_stage: newStage, status: undefined as unknown as LeadStatus, contact_count: nextCount }
+      [leadId]: { ...prev[leadId], pipeline_stage: newStage, status: undefined, contact_count: nextCount }
     }))
     setEditingStage(leadId)
 
     // Update stage and clear status
     let result
-    result = await updateLead(leadId, { pipeline_stage: newStage, status: undefined as unknown as LeadStatus })
+    result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
 
     setEditingStage(null)
     // Clear pending update after API call (whether success or failure)
@@ -661,6 +674,34 @@ export function LeadTable({
     }
   }
 
+  // Maps blocked statuses to their corresponding preferred college
+  const STATUS_TO_COLLEGE: Record<string, string> = {
+    blocked_ku: 'KU',
+    blocked_paaet: 'PAAET',
+    blocked_aasu: 'AASU',
+    blocked_abroad: 'abroad',
+    blocked_auk: 'AUK',
+    blocked_gust: 'GUST',
+    blocked_acm: 'ACM',
+    blocked_other: 'other',
+  }
+
+  const handleCollegeChange = async (leadId: string, value: string) => {
+    const college = value || undefined
+    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], preferred_college: college } }))
+    const result = await updateLead(leadId, { preferred_college: college })
+    if (result.error) {
+      setPendingUpdates(prev => {
+        const updated = { ...prev }
+        if (updated[leadId]) {
+          delete updated[leadId].preferred_college
+          if (Object.keys(updated[leadId]).length === 0) delete updated[leadId]
+        }
+        return updated
+      })
+    }
+  }
+
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
     // Optimistic update - increment contact_count on every status change
     const nextCount = getNextCount(leadId)
@@ -707,11 +748,22 @@ export function LeadTable({
           setBookingLead(lead)
         }
       }
+      // If status changed to changed_preferences, open the preference dropdown
+      if (newStatus === 'changed_preferences') {
+        setOpenPreferenceForLead(leadId)
+      }
+
       // If status changed to a blocked variant (App Submission), open blocked reason dialog
       if (newStatus.startsWith('blocked_')) {
         const lead = leads.find(l => l.id === leadId)
         if (lead) {
           setBlockedDialogLead(lead)
+        }
+        // Auto-set preferred_college if this blocked status maps to a college and none is set yet
+        const mappedCollege = STATUS_TO_COLLEGE[newStatus]
+        const currentCollege = pendingUpdates[leadId]?.preferred_college ?? leads.find(l => l.id === leadId)?.preferred_college
+        if (mappedCollege && !currentCollege) {
+          handleCollegeChange(leadId, mappedCollege)
         }
       }
     }
@@ -922,6 +974,7 @@ export function LeadTable({
             isPucApplicantView={isPucApplicantView}
             isPucDocSubmissionView={isPucDocSubmissionView}
             isPucContactedView={isPucContactedView}
+            isPucAppSubmissionView={isPucAppSubmissionView}
             showSubstageColumn={showSubstageColumn}
             selectedLeads={selectedLeads}
             leads={leads}
@@ -943,6 +996,7 @@ export function LeadTable({
                 isPucApplicantView={isPucApplicantView}
                 isPucDocSubmissionView={isPucDocSubmissionView}
                 isPucContactedView={isPucContactedView}
+                isPucAppSubmissionView={isPucAppSubmissionView}
                 showSubstageColumn={showSubstageColumn}
                 currentStageFilter={currentStageFilter}
                 documentCompleteLeads={documentCompleteLeads}
@@ -974,6 +1028,9 @@ export function LeadTable({
                 handleGpaSave={handleGpaSave}
                 setEditingGpa={setEditingGpa}
                 setGpaInputValue={setGpaInputValue}
+                handleCollegeChange={handleCollegeChange}
+                openPreferenceForLead={openPreferenceForLead}
+                onPreferenceOpened={() => setOpenPreferenceForLead(null)}
                 setBookingLead={setBookingLead}
                 setBookingSimpleMode={setBookingSimpleMode}
                 setBookingCallbackMode={setBookingCallbackMode}

@@ -10,6 +10,26 @@ import { GPA_SELF_FUNDED_THRESHOLD, PUC_SRJ_AUTO_ROUTE } from "@/lib/config/cons
 import { executeAutomations } from "@/lib/automation/engine"
 import { queryKeys } from "./query-keys"
 
+interface UseLeadsFilters {
+  statuses?: string[]
+  sources?: string[]
+  schools?: string[]
+  academicTrack?: string
+  dateRange?: string
+  assignedTo?: string
+  gpaMin?: number | null
+  gpaMax?: number | null
+  isKuwaiti?: boolean | null
+  ministryBlocked?: string
+  blockReasons?: string[]
+  submissionSubstages?: string[]
+  submissionStatuses?: string[]
+  lostAtStages?: string[]
+  lostAtFilter?: string
+  hasNotes?: string
+  lostReasonIds?: string[]
+}
+
 interface UseLeadsOptions {
   stage?: PipelineStage | "all"
   fundingType?: FundingType | "all"
@@ -17,14 +37,15 @@ interface UseLeadsOptions {
   limit?: number
   page?: number
   pageSize?: number
+  filters?: UseLeadsFilters
 }
 
 export function useLeads(options: UseLeadsOptions = {}) {
-  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25 } = options
+  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25, filters: advancedFilters } = options
   const usePagination = page !== undefined
   const queryClient = useQueryClient()
 
-  const filters = { stage, fundingType, searchQuery, limit, page, pageSize }
+  const filters = { stage, fundingType, searchQuery, limit, page, pageSize, ...advancedFilters }
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.leads.list(filters),
@@ -95,6 +116,83 @@ export function useLeads(options: UseLeadsOptions = {}) {
 
         if (searchQuery) {
           q = q.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,civil_id.ilike.%${searchQuery}%`)
+        }
+
+        // Advanced filters (server-side)
+        if (advancedFilters) {
+          if (advancedFilters.statuses && advancedFilters.statuses.length > 0) {
+            q = q.in("status", advancedFilters.statuses)
+          }
+          if (advancedFilters.sources && advancedFilters.sources.length > 0) {
+            q = q.in("source", advancedFilters.sources)
+          }
+          if (advancedFilters.schools && advancedFilters.schools.length > 0) {
+            q = q.in("school_id", advancedFilters.schools)
+          }
+          if (advancedFilters.academicTrack && advancedFilters.academicTrack !== "all") {
+            q = q.eq("academic_track", advancedFilters.academicTrack)
+          }
+          if (advancedFilters.assignedTo) {
+            q = q.eq("assigned_to", advancedFilters.assignedTo)
+          }
+          if (advancedFilters.isKuwaiti !== null && advancedFilters.isKuwaiti !== undefined) {
+            q = q.eq("is_kuwaiti", advancedFilters.isKuwaiti)
+          }
+          if (advancedFilters.gpaMin !== null && advancedFilters.gpaMin !== undefined) {
+            q = q.or(`gpa_grade_12_expected.gte.${advancedFilters.gpaMin},gpa_grade_11.gte.${advancedFilters.gpaMin},gpa_grade_10.gte.${advancedFilters.gpaMin}`)
+          }
+          if (advancedFilters.gpaMax !== null && advancedFilters.gpaMax !== undefined) {
+            q = q.or(`gpa_grade_12_expected.lte.${advancedFilters.gpaMax},gpa_grade_11.lte.${advancedFilters.gpaMax},gpa_grade_10.lte.${advancedFilters.gpaMax}`)
+          }
+          if (advancedFilters.ministryBlocked === "blocked") {
+            q = q.eq("ministry_blocked", true)
+          } else if (advancedFilters.ministryBlocked === "not_blocked") {
+            q = q.eq("ministry_blocked", false)
+          }
+          if (advancedFilters.blockReasons && advancedFilters.blockReasons.length > 0) {
+            q = q.in("submission_blocked_reason", advancedFilters.blockReasons)
+          }
+          if (advancedFilters.submissionSubstages && advancedFilters.submissionSubstages.length > 0) {
+            q = q.in("submission_substage", advancedFilters.submissionSubstages)
+          }
+          if (advancedFilters.submissionStatuses && advancedFilters.submissionStatuses.length > 0) {
+            q = q.in("submission_status", advancedFilters.submissionStatuses)
+          }
+          if (advancedFilters.lostAtStages && advancedFilters.lostAtStages.length > 0) {
+            q = q.in("lost_at_stage", advancedFilters.lostAtStages)
+          }
+          if (advancedFilters.lostAtFilter && advancedFilters.lostAtFilter !== "all") {
+            q = q.eq("lost_at_stage", advancedFilters.lostAtFilter)
+          }
+          if (advancedFilters.lostReasonIds && advancedFilters.lostReasonIds.length > 0) {
+            q = q.in("lost_reason_id", advancedFilters.lostReasonIds)
+          }
+          if (advancedFilters.hasNotes === "with_notes") {
+            q = q.neq("notes", "").not("notes", "is", null)
+          } else if (advancedFilters.hasNotes === "without_notes") {
+            q = q.or("notes.is.null,notes.eq.")
+          }
+          if (advancedFilters.dateRange && advancedFilters.dateRange !== "all") {
+            const now = new Date()
+            let cutoff: Date
+            switch (advancedFilters.dateRange) {
+              case "today":
+                cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                break
+              case "week":
+                cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+                break
+              case "month":
+                cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+                break
+              case "quarter":
+                cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+                break
+              default:
+                cutoff = new Date(0)
+            }
+            q = q.gte("created_at", cutoff.toISOString())
+          }
         }
 
         return q
@@ -380,7 +478,7 @@ export function useLeadMutations() {
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override")
+        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, preferred_college")
         .eq("id", id)
         .single()
 
@@ -519,6 +617,31 @@ export function useLeadMutations() {
           },
           created_by: user?.id,
         })
+      }
+
+      // Fire automation trigger for preference change on applied leads (fire-and-forget)
+      const APPLIED_STAGES = ['applicant', 'application', 'puc_application_submission', 'puc_document_submission']
+      const majorChanged = (
+        updates.intended_major !== undefined && oldLead && updates.intended_major !== oldLead.intended_major
+      ) || (
+        updates.preferred_major !== undefined && oldLead && updates.preferred_major !== oldLead.preferred_major
+      )
+      const collegeChanged = updates.preferred_college !== undefined && oldLead && updates.preferred_college !== (oldLead as Record<string, unknown>).preferred_college
+      if ((majorChanged || collegeChanged) && oldLead && APPLIED_STAGES.includes(oldLead.pipeline_stage as string)) {
+        const oldMajor = (updates.intended_major !== undefined ? oldLead?.intended_major : oldLead?.preferred_major) || null
+        const newMajor = updates.intended_major ?? updates.preferred_major ?? null
+        executeAutomations({
+          trigger: 'preference_changed',
+          leadId: id,
+          leadData: { ...oldLead, ...updates } as unknown as Record<string, unknown>,
+          userId: user?.id,
+          metadata: {
+            old_major: oldMajor,
+            new_major: newMajor,
+            new_college: updates.preferred_college ?? null,
+            pipeline_stage: oldLead.pipeline_stage,
+          },
+        }).catch(() => {}) // fire-and-forget
       }
 
       // Log activity for automatic funding type change due to low GPA
@@ -787,7 +910,7 @@ export function useLeadMutations() {
 
     // Clear status when moving to enrolled (no longer relevant)
     if (stage === "enrolled") {
-      updates.status = null as unknown as LeadStatus
+      updates.status = null as unknown as Lead['status']
     }
 
     // Get old stage before update to check for test → application transition

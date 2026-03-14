@@ -215,7 +215,7 @@ export function StaticBlock({
   collapsible = true,
   defaultCollapsed = false,
   headerActions,
-}: Omit<DashboardBlockProps, "id" | "onTitleChange" | "onDelete" | "onDuplicate">) {
+}: Omit<DashboardBlockProps, "id" | "onTitleChange" | "onDelete" | "onDuplicate" | "title"> & { title: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
   return (

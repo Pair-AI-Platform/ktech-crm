@@ -27,7 +27,7 @@ import {
   Phone,
   Upload,
 } from "lucide-react"
-import { SCHOOLS } from "@/types"
+import { SCHOOLS, PREFERRED_COLLEGES } from "@/types"
 import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationType } from "@/types"
 import { cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
@@ -129,6 +129,7 @@ export function PSPWizardContent({
   const [graduationYear, setGraduationYear] = useState("")
   const [actualGpa, setActualGpa] = useState("")
   const [intendedMajor, setIntendedMajor] = useState("")
+  const [preferredCollege, setPreferredCollege] = useState("")
   const fundingType: FundingType = lead?.funding_type || "puc"
   const [seatNumber, setSeatNumber] = useState("")
 
@@ -213,6 +214,7 @@ export function PSPWizardContent({
       setGraduationYear((lead as unknown as Record<string, unknown>).graduation_year?.toString() || "")
       setActualGpa(lead.gpa_grade_11?.toString() || "")
       setIntendedMajor((lead as unknown as Record<string, unknown>).intended_major as string || "")
+      setPreferredCollege((lead as unknown as Record<string, unknown>).preferred_college as string || "")
       setSeatNumber((lead as unknown as Record<string, unknown>).seat_number as string || "")
 
       // Initialize graduate type from lead's education_type if available
@@ -753,6 +755,7 @@ Kuwait Technical College`
         graduation_year: graduationYear ? parseInt(graduationYear) : undefined,
         gpa_grade_11: actualGpa ? parseFloat(actualGpa) : undefined,
         intended_major: (intendedMajor as IntendedMajor) || undefined,
+        preferred_college: preferredCollege.trim() || undefined,
         funding_type: fundingType,
         education_type: graduateType ? (graduateType === 'OTHER' ? 'other' : graduateType) as EducationType : undefined,
         seat_number: seatNumber || undefined,
@@ -1070,6 +1073,22 @@ Kuwait Technical College`
                   max={100}
                   step={0.01}
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                  Preferred College
+                </label>
+                <select
+                  value={preferredCollege}
+                  onChange={(e) => setPreferredCollege(e.target.value)}
+                  className="w-full text-sm border border-[var(--border)] rounded-md px-3 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                >
+                  <option value="">— Select college —</option>
+                  {PREFERRED_COLLEGES.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Documents Section */}
@@ -1740,6 +1759,14 @@ Kuwait Technical College`
                         {actualGpa || "N/A"}
                       </span>
                     </div>
+                    {preferredCollege && (
+                      <div>
+                        <span className="text-[var(--text-muted)]">Preferred College:</span>
+                        <span className="ml-2 text-[var(--text-primary)] font-medium">
+                          {PREFERRED_COLLEGES.find(c => c.value === preferredCollege)?.label ?? preferredCollege}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

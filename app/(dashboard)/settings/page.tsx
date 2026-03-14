@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,10 +10,9 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { TeamManagement } from "@/components/settings/team-management"
-import { SMSTemplatesManager } from "@/components/settings/sms-templates-manager"
 import { LeadAssignmentRules } from "@/components/settings/lead-assignment-rules"
 import { StageSettings } from "@/components/settings/stage-settings"
-import { TargetSettings } from "@/components/settings/target-settings"
+import { TargetSettings } from "@/components/settings/targets"
 import { SchoolManagement } from "@/components/settings/school-management"
 import { AutomationRulesManager } from "@/components/settings/automation-rules-manager"
 import { DocumentConfigManagement } from "@/components/settings/document-config-management"
@@ -27,7 +26,6 @@ import {
 import {
   User,
   Bell,
-  Globe,
   Shield,
   Palette,
   Upload,
@@ -43,32 +41,37 @@ import {
   Camera,
   Lock,
   ChevronRight,
-  MessageSquare,
   Clock,
   Zap,
   ExternalLink,
   GitBranch,
   Target,
   School,
-  FileText
+  FileText,
+  MessageSquare,
+  Smartphone,
+  CalendarClock,
+  AlertTriangle,
+  BellRing,
+  Volume2,
+  VolumeX
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "sms" | "pipeline" | "targets" | "schools" | "documents" | "automations"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "schools" | "documents" | "automations"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "security", label: "Security", icon: Shield },
-  { id: "pipeline", label: "Pipeline", icon: GitBranch, adminOnly: true },
+  { id: "pipeline", label: "Stages", icon: GitBranch, adminOnly: true },
   { id: "targets", label: "Targets", icon: Target, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
-  { id: "sms", label: "SMS", icon: MessageSquare, adminOnly: true },
   { id: "automations", label: "Automations", icon: Zap, adminOnly: true },
   { id: "team", label: "Team", icon: Users, adminOnly: true },
 ]
@@ -79,6 +82,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   // Profile state
   const [fullName, setFullName] = useState("")
@@ -89,8 +94,6 @@ export default function SettingsPage() {
 
   // Appearance state
   const [theme, setThemeState] = useState<"light" | "dark" | "system">("system")
-  const [language, setLanguage] = useState("en")
-  const [timezone, setTimezone] = useState("asia-kuwait")
 
   // Sync theme with localStorage and DOM
   useEffect(() => {
@@ -104,6 +107,8 @@ export default function SettingsPage() {
     try {
       await updatePreferences({
         email_notifications: preferences.email_notifications,
+        sms_notifications: preferences.sms_notifications,
+        push_notifications: preferences.push_notifications,
         appointment_reminders: preferences.appointment_reminders,
         lead_updates: preferences.lead_updates,
         system_alerts: preferences.system_alerts,
@@ -143,6 +148,51 @@ export default function SettingsPage() {
       setPhone(profile.phone || "")
     }
   }, [profile])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File too large. Max 2MB.")
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 30000)
+
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeout)
+
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || "Failed to upload photo")
+        return
+      }
+
+      // Reload to reflect new avatar everywhere
+      window.location.reload()
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        alert("Upload timed out. Please try again.")
+      } else {
+        alert("Failed to upload photo")
+      }
+    } finally {
+      setUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ""
+    }
+  }
 
   const handleSaveProfile = async () => {
     if (!profile) return
@@ -252,7 +302,17 @@ export default function SettingsPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center gap-6">
-                          <div className="relative group">
+                          <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif"
+                            className="hidden"
+                            onChange={handleAvatarUpload}
+                          />
+                          <div
+                            className="relative group cursor-pointer"
+                            onClick={() => avatarInputRef.current?.click()}
+                          >
                             <Avatar className="w-24 h-24">
                               <AvatarImage src={profile?.avatar_url} />
                               <AvatarFallback className="text-3xl bg-[#2D347D] text-white">
@@ -263,14 +323,19 @@ export default function SettingsPage() {
                                   .toUpperCase() || "U"}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                            <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Camera className="w-6 h-6 text-white" />
                             </div>
                           </div>
                           <div>
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={uploadingAvatar}
+                              onClick={() => avatarInputRef.current?.click()}
+                            >
                               <Upload className="w-4 h-4 mr-2" />
-                              Upload Photo
+                              {uploadingAvatar ? "Uploading..." : "Upload Photo"}
                             </Button>
                             <p className="text-xs text-[var(--text-muted)] mt-2">
                               JPG, PNG or GIF. Max 2MB.
@@ -383,32 +448,51 @@ export default function SettingsPage() {
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--primary)]" />
                           </div>
                         ) : (
-                          <div className="space-y-4">
-                            <NotificationToggle
-                              title="Email Notifications"
-                              description="Receive email updates for new leads and activities"
-                              checked={preferences.email_notifications}
-                              onCheckedChange={(val) => updatePreferences({ email_notifications: val })}
-                            />
-                            <NotificationToggle
-                              title="Appointment Reminders"
-                              description="Get reminded 1 hour before appointments"
-                              checked={preferences.appointment_reminders}
-                              onCheckedChange={(val) => updatePreferences({ appointment_reminders: val })}
-                            />
-                            <NotificationToggle
-                              title="Lead Updates"
-                              description="Notify when leads are assigned or updated"
-                              checked={preferences.lead_updates}
-                              onCheckedChange={(val) => updatePreferences({ lead_updates: val })}
-                            />
-                            <NotificationToggle
-                              title="System Alerts"
-                              description="Important system notifications and alerts"
-                              checked={preferences.system_alerts}
-                              onCheckedChange={(val) => updatePreferences({ system_alerts: val })}
-                            />
-                          </div>
+                          <>
+                            {/* Delivery Channels */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Volume2 className="w-4 h-4 text-[var(--text-muted)]" />
+                                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Delivery Channels</h3>
+                              </div>
+                              <NotificationToggle
+                                icon={Smartphone}
+                                title="Push Notifications"
+                                description="Browser push notifications for real-time alerts"
+                                checked={preferences.push_notifications}
+                                onCheckedChange={(val) => updatePreferences({ push_notifications: val })}
+                              />
+                            </div>
+
+                            {/* Notification Types */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <BellRing className="w-4 h-4 text-[var(--text-muted)]" />
+                                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Notification Types</h3>
+                              </div>
+                              <NotificationToggle
+                                icon={CalendarClock}
+                                title="Appointment Reminders"
+                                description="Get reminded 1 hour before scheduled appointments"
+                                checked={preferences.appointment_reminders}
+                                onCheckedChange={(val) => updatePreferences({ appointment_reminders: val })}
+                              />
+                              <NotificationToggle
+                                icon={Users}
+                                title="Lead Updates"
+                                description="Notify when leads are assigned, updated, or change stage"
+                                checked={preferences.lead_updates}
+                                onCheckedChange={(val) => updatePreferences({ lead_updates: val })}
+                              />
+                              <NotificationToggle
+                                icon={AlertTriangle}
+                                title="System Alerts"
+                                description="Important system notifications, errors, and security alerts"
+                                checked={preferences.system_alerts}
+                                onCheckedChange={(val) => updatePreferences({ system_alerts: val })}
+                              />
+                            </div>
+                          </>
                         )}
 
                         <div className="flex items-center gap-3 pt-4 border-t border-[var(--border)]">
@@ -472,50 +556,6 @@ export default function SettingsPage() {
                       </CardContent>
                     </Card>
 
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Globe className="w-5 h-5 text-[var(--accent)]" />
-                          Language & Region
-                        </CardTitle>
-                        <CardDescription>
-                          Set your preferred language and timezone
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-[var(--text-secondary)]">
-                              Language
-                            </label>
-                            <Select value={language} onValueChange={setLanguage}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="en">English</SelectItem>
-                                <SelectItem value="ar">Arabic</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-[var(--text-secondary)]">
-                              Timezone
-                            </label>
-                            <Select value={timezone} onValueChange={setTimezone}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="asia-kuwait">Asia/Kuwait (GMT+3)</SelectItem>
-                                <SelectItem value="asia-riyadh">Asia/Riyadh (GMT+3)</SelectItem>
-                                <SelectItem value="asia-dubai">Asia/Dubai (GMT+4)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
                   </motion.div>
                 )}
 
@@ -572,23 +612,6 @@ export default function SettingsPage() {
                           </div>
                           <Button variant="outline">Enable</Button>
                         </div>
-
-                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-[#8992c8]/15 flex items-center justify-center">
-                              <Settings className="w-6 h-6 text-[#8992c8]" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-[var(--text-primary)]">
-                                Active Sessions
-                              </p>
-                              <p className="text-sm text-[var(--text-muted)]">
-                                Manage devices where you&apos;re signed in
-                              </p>
-                            </div>
-                          </div>
-                          <Button variant="outline">Manage</Button>
-                        </div>
                       </CardContent>
                     </Card>
 
@@ -603,135 +626,6 @@ export default function SettingsPage() {
                         <Button variant="destructive">Delete Account</Button>
                       </CardContent>
                     </Card>
-                  </motion.div>
-                )}
-
-                {/* SMS Tab */}
-                {activeTab === "sms" && isAdmin && (
-                  <motion.div
-                    key="sms"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="space-y-6"
-                  >
-                    {/* Twilio Configuration */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <MessageSquare className="w-5 h-5 text-[var(--primary)]" />
-                          SMS Provider (Twilio)
-                        </CardTitle>
-                        <CardDescription>
-                          Configure Twilio credentials for SMS messaging
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="p-4 rounded-xl bg-[var(--info-bg)] border border-[var(--info)]/30">
-                          <p className="text-sm text-[var(--info)]">
-                            SMS credentials are configured via environment variables for security.
-                            Contact your administrator to update Twilio settings.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
-                                  <Check className="w-5 h-5 text-[var(--success)]" />
-                                </div>
-                                <div>
-                                  <p className="font-medium text-[var(--text-primary)]">Account SID</p>
-                                  <p className="text-xs text-[var(--text-muted)]">Configured</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
-                                <Check className="w-5 h-5 text-[var(--success)]" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-[var(--text-primary)]">Auth Token</p>
-                                <p className="text-xs text-[var(--text-muted)]">Configured</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
-                                <Phone className="w-5 h-5 text-[var(--success)]" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-[var(--text-primary)]">Sender Number</p>
-                                <p className="text-xs text-[var(--text-muted)]">+965 XXXX XXXX</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-[var(--warning)]/10 flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-[var(--warning)]" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-[var(--text-primary)]">Demo Mode</p>
-                                <p className="text-xs text-[var(--text-muted)]">No API calls made</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <Button variant="outline" className="mt-4" asChild>
-                          <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer">
-                            Open Twilio Console
-                            <ExternalLink className="w-4 h-4 ml-2" />
-                          </a>
-                        </Button>
-                      </CardContent>
-                    </Card>
-
-                    {/* Auto Reminders */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Clock className="w-5 h-5 text-amber-500" />
-                          Automatic Reminders
-                        </CardTitle>
-                        <CardDescription>
-                          Configure automatic SMS reminders for appointments
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-4">
-                          <NotificationToggle
-                            title="24-Hour Reminder"
-                            description="Send reminder SMS 24 hours before appointment"
-                            checked={true}
-                            onCheckedChange={() => {}}
-                          />
-                          <NotificationToggle
-                            title="2-Hour Reminder"
-                            description="Send reminder SMS 2 hours before appointment"
-                            checked={true}
-                            onCheckedChange={() => {}}
-                          />
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                          <p className="text-sm text-[var(--text-secondary)] mb-3">
-                            Reminders are sent automatically via scheduled jobs. Set up a cron job to call:
-                          </p>
-                          <code className="block p-3 rounded-lg bg-[var(--bg-surface)] text-xs font-mono text-[var(--text-primary)]">
-                            POST /api/sms/reminders {"{"} type: &quot;24h&quot; | &quot;2h&quot; {"}"}
-                          </code>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* SMS Templates Manager */}
-                    <SMSTemplatesManager />
                   </motion.div>
                 )}
 
@@ -824,21 +718,33 @@ export default function SettingsPage() {
 
 // Helper Components
 function NotificationToggle({
+  icon: Icon,
   title,
   description,
   checked,
   onCheckedChange,
 }: {
+  icon?: typeof Bell
   title: string
   description: string
   checked: boolean
   onCheckedChange: (checked: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-      <div>
-        <p className="font-medium text-[var(--text-primary)]">{title}</p>
-        <p className="text-sm text-[var(--text-muted)]">{description}</p>
+    <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] transition-colors hover:border-[var(--border-hover)]">
+      <div className="flex items-center gap-3">
+        {Icon && (
+          <div className={cn(
+            "flex items-center justify-center w-9 h-9 rounded-lg shrink-0",
+            checked ? "bg-[var(--primary)]/10 text-[var(--primary)]" : "bg-[var(--bg-sunken)] text-[var(--text-muted)]"
+          )}>
+            <Icon className="w-4.5 h-4.5" />
+          </div>
+        )}
+        <div>
+          <p className="font-medium text-[var(--text-primary)]">{title}</p>
+          <p className="text-sm text-[var(--text-muted)]">{description}</p>
+        </div>
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>

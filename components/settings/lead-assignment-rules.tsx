@@ -50,9 +50,28 @@ interface AssignmentRule {
 
 interface RuleCondition {
   field: string
-  operator: "equals" | "contains" | "in"
-  value: string | string[]
+  operator: "equals" | "contains" | "in" | "greater_than" | "less_than" | "greater_than_or_equal" | "less_than_or_equal" | "between"
+  value: string | string[] | number | [number, number]
 }
+
+const GPA_CONDITION_FIELDS = [
+  { value: "actual_gpa", label: "Actual GPA" },
+  { value: "expected_gpa", label: "Expected GPA" },
+  { value: "gpa_grade_10", label: "GPA Grade 10" },
+  { value: "gpa_grade_11", label: "GPA Grade 11" },
+  { value: "gpa_grade_12_expected", label: "GPA Grade 12 (Expected)" },
+]
+
+const NUMERIC_OPERATORS = [
+  { value: "greater_than", label: "greater than" },
+  { value: "less_than", label: "less than" },
+  { value: "greater_than_or_equal", label: ">= (at least)" },
+  { value: "less_than_or_equal", label: "<= (at most)" },
+  { value: "between", label: "between" },
+  { value: "equals", label: "equals" },
+]
+
+const isGpaField = (field: string) => GPA_CONDITION_FIELDS.some((f) => f.value === field)
 
 const RULE_TYPES = [
   {
@@ -129,7 +148,7 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
           description: "Assign leads from social media to specialized team",
           rule_type: "source_based",
           conditions: [
-            { field: "source", operator: "in", value: ["instagram", "tiktok", "snapchat"] },
+            { field: "source", operator: "in", value: ["instagram"] },
           ],
           assigned_agents: agentData?.slice(0, 2).map((a) => a.id) || [],
           priority: 90,
@@ -542,6 +561,15 @@ function RuleModal({
     setConditions([...conditions, newCondition])
   }
 
+  const handleAddGpaCondition = () => {
+    const newCondition: RuleCondition = {
+      field: "actual_gpa",
+      operator: "greater_than_or_equal",
+      value: 0,
+    }
+    setConditions([...conditions, newCondition])
+  }
+
   const handleUpdateCondition = (index: number, updates: Partial<RuleCondition>) => {
     setConditions((prev) =>
       prev.map((c, i) => (i === index ? { ...c, ...updates } : c))
@@ -587,8 +615,8 @@ function RuleModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>
             {rule ? "Edit Assignment Rule" : "Create Assignment Rule"}
           </DialogTitle>
@@ -597,7 +625,7 @@ function RuleModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 px-6 pb-4">
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -683,10 +711,16 @@ function RuleModal({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Conditions</Label>
-                <Button variant="outline" size="sm" onClick={handleAddCondition}>
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add Condition
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleAddGpaCondition}>
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add GPA Condition
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleAddCondition}>
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Condition
+                  </Button>
+                </div>
               </div>
 
               {conditions.length === 0 ? (
@@ -700,38 +734,131 @@ function RuleModal({
                       key={index}
                       className="flex items-center gap-2 p-3 bg-[var(--bg-sunken)] rounded-lg"
                     >
-                      <span className="text-sm text-[var(--text-muted)] w-24">
-                        {condition.field}
-                      </span>
-                      <Select
-                        value={condition.operator}
-                        onValueChange={(v) =>
-                          handleUpdateCondition(index, { operator: v as RuleCondition["operator"] })
-                        }
-                      >
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="equals">equals</SelectItem>
-                          <SelectItem value="in">is one of</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={Array.isArray(condition.value) ? condition.value[0] : condition.value}
-                        onValueChange={(v) => handleUpdateCondition(index, { value: v })}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Select value..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConditionOptions().map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {isGpaField(condition.field) ? (
+                        <>
+                          <Select
+                            value={condition.field}
+                            onValueChange={(v) =>
+                              handleUpdateCondition(index, { field: v })
+                            }
+                          >
+                            <SelectTrigger className="w-44">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {GPA_CONDITION_FIELDS.map((f) => (
+                                <SelectItem key={f.value} value={f.value}>
+                                  {f.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={condition.operator}
+                            onValueChange={(v) => {
+                              const updates: Partial<RuleCondition> = { operator: v as RuleCondition["operator"] }
+                              if (v === "between") {
+                                updates.value = [0, 4]
+                              } else if (condition.operator === "between") {
+                                updates.value = 0
+                              }
+                              handleUpdateCondition(index, updates)
+                            }}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {NUMERIC_OPERATORS.map((op) => (
+                                <SelectItem key={op.value} value={op.value}>
+                                  {op.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {condition.operator === "between" ? (
+                            <div className="flex items-center gap-1 flex-1">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="4"
+                                value={Array.isArray(condition.value) ? condition.value[0] : 0}
+                                onChange={(e) =>
+                                  handleUpdateCondition(index, {
+                                    value: [parseFloat(e.target.value) || 0, Array.isArray(condition.value) ? Number(condition.value[1]) : 4] as [number, number],
+                                  })
+                                }
+                                className="w-20"
+                                placeholder="Min"
+                              />
+                              <span className="text-sm text-[var(--text-muted)]">and</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="4"
+                                value={Array.isArray(condition.value) ? condition.value[1] : 4}
+                                onChange={(e) =>
+                                  handleUpdateCondition(index, {
+                                    value: [Array.isArray(condition.value) ? Number(condition.value[0]) : 0, parseFloat(e.target.value) || 4] as [number, number],
+                                  })
+                                }
+                                className="w-20"
+                                placeholder="Max"
+                              />
+                            </div>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="4"
+                              value={typeof condition.value === "number" ? condition.value : ""}
+                              onChange={(e) =>
+                                handleUpdateCondition(index, { value: parseFloat(e.target.value) || 0 })
+                              }
+                              className="flex-1"
+                              placeholder="Enter GPA value..."
+                            />
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm text-[var(--text-muted)] w-24">
+                            {condition.field}
+                          </span>
+                          <Select
+                            value={condition.operator}
+                            onValueChange={(v) =>
+                              handleUpdateCondition(index, { operator: v as RuleCondition["operator"] })
+                            }
+                          >
+                            <SelectTrigger className="w-28">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="equals">equals</SelectItem>
+                              <SelectItem value="in">is one of</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={Array.isArray(condition.value) ? condition.value[0] as string : condition.value as string}
+                            onValueChange={(v) => handleUpdateCondition(index, { value: v })}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Select value..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getConditionOptions().map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -809,7 +936,7 @@ function RuleModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border)]">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

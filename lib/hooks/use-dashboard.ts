@@ -21,7 +21,7 @@ export function useDashboard({ dateRange, isAdmin, profileId }: UseDashboardOpti
   const { leads: allLeads, loading: leadsLoading } = useLeads({ limit: 500 })
   const { appointments: todayAppointments, loading: appointmentsLoading } = useTodayAppointments()
   const { stats: appointmentStats, loading: statsLoading } = useAppointmentStats()
-  const { progress: myTargetProgress, allAgentsProgress, loading: targetLoading, targetMode } =
+  const { progress: myTargetProgress, allAgentsProgress, loading: targetLoading } =
     useAgentTargetProgress(profileId ?? undefined)
 
   // Conversion funnel
@@ -130,7 +130,6 @@ export function useDashboard({ dateRange, isAdmin, profileId }: UseDashboardOpti
     appointmentStats,
     myTargetProgress,
     allAgentsProgress,
-    targetMode,
     funnelData,
     activities,
     insights,

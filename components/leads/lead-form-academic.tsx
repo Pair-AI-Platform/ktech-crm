@@ -47,7 +47,7 @@ import {
   School as SchoolIcon,
   type LucideIcon,
 } from "lucide-react"
-import { EDUCATION_TYPES, MAJORS, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type PipelineStage, type LeadStatus, type SchoolEntity } from "@/types"
+import { EDUCATION_TYPES, MAJORS, PREFERRED_COLLEGES, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type PipelineStage, type LeadStatus, type SchoolEntity } from "@/types"
 import { cn } from "@/lib/utils"
 import type { LeadFormData } from "./lead-form-types"
 import type { Dispatch, SetStateAction } from "react"
@@ -102,6 +102,7 @@ const LEAD_STATUS_ICONS: Record<LeadStatus, LucideIcon> = {
   documents_missing: AlertCircle,
   payment_pending: Wallet,
   blocked_other: Ban,
+  changed_preferences: RefreshCw,
 }
 
 const LEAD_STATUS_COLORS: Record<string, string> = {
@@ -131,6 +132,7 @@ interface LeadFormAcademicProps {
   availablePipelineStages: typeof PIPELINE_STAGES
   isAtTestStage: boolean
   agents: { id: string; full_name: string; email: string; avatar_url: string | null }[]
+  semesters: { id: string; name: string; is_active: boolean }[]
 }
 
 export function LeadFormAcademic({
@@ -149,6 +151,7 @@ export function LeadFormAcademic({
   availableStatuses,
   availablePipelineStages,
   agents,
+  semesters,
 }: LeadFormAcademicProps) {
   // Check if source is walk-in
   const isWalkIn = formData.source === 'walk_in'
@@ -508,6 +511,28 @@ export function LeadFormAcademic({
             </div>
           </div>
 
+          {/* Cycle / Semester */}
+          {semesters.length > 0 && (
+            <div className="space-y-2">
+              <Label>Cycle</Label>
+              <Select
+                value={formData.semester_id}
+                onValueChange={(value) => handleChange("semester_id", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select cycle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {semesters.map((semester) => (
+                    <SelectItem key={semester.id} value={semester.id}>
+                      {semester.name}{semester.is_active ? " (Current)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Ministry Blocked Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -605,6 +630,23 @@ export function LeadFormAcademic({
                 onChange={(e) => handleChange("preferred_major", e.target.value)}
                 placeholder="Enter preferred major"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="preferred_college">Preferred College</Label>
+              <Select
+                value={formData.preferred_college ?? ""}
+                onValueChange={(value) => handleChange("preferred_college", value === "__clear__" ? "" : value)}
+              >
+                <SelectTrigger id="preferred_college">
+                  <SelectValue placeholder="Select college" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__clear__">— None —</SelectItem>
+                  {PREFERRED_COLLEGES.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

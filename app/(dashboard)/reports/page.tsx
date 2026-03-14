@@ -873,7 +873,7 @@ export default function ReportsPage() {
 
           {/* Agents Tab */}
           {activeTab === 'agents' && (
-            <AgentLeaderboard data={data.leaderboard} targetMode={data.targetMode} />
+            <AgentLeaderboard data={data.leaderboard} />
           )}
 
           {/* Payments Tab */}

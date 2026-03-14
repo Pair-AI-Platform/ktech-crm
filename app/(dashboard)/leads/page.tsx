@@ -138,7 +138,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       setStageFilter(stageParam)
       if (stageParam !== "lost") setLostAtFilter("all")
     } else {
-      // No stage param = "All Contacts" view, reset from any previous stage
+      // No stage param = "All Leads" view, reset from any previous stage
       setStageFilter("all")
       setLostAtFilter("all")
     }
@@ -205,19 +205,49 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 50
 
-  // Reset to page 1 when filters change
+  // Build server-side filters object
+  const serverFilters = {
+    statuses: filters.statuses,
+    sources: filters.sources,
+    schools: filters.schools,
+    academicTrack: filters.academicTrack,
+    dateRange: filters.dateRange,
+    assignedTo: filters.assignedTo,
+    gpaMin: filters.gpaMin,
+    gpaMax: filters.gpaMax,
+    isKuwaiti: filters.isKuwaiti,
+    ministryBlocked: filters.ministryBlocked,
+    blockReasons: filters.blockReasons,
+    submissionSubstages: filters.submissionSubstages,
+    submissionStatuses: filters.submissionStatuses,
+    lostAtStages: filters.lostAtStages,
+    lostAtFilter: stageFilter === "lost" ? lostAtFilter : undefined,
+    hasNotes: filters.hasNotes,
+    lostReasonIds: filters.lostReasonIds,
+  }
+
+  // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [stageFilter, filters.searchQuery, filters.fundingType])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageFilter, filters.searchQuery, filters.fundingType, filters.statuses, filters.sources, filters.schools, filters.academicTrack, filters.dateRange, filters.assignedTo, filters.gpaMin, filters.gpaMax, filters.isKuwaiti, filters.ministryBlocked, filters.blockReasons, filters.submissionSubstages, filters.submissionStatuses, filters.lostAtStages, filters.hasNotes, filters.lostReasonIds, filters.paymentStatus, filters.paymentAmountMin, filters.paymentAmountMax, filters.appointmentTypes, lostAtFilter])
 
   const { leads, loading, error, totalCount, totalPages, refetch } = useLeads({
     stage: stageFilter,
+    fundingType: filters.fundingType,
     searchQuery: filters.searchQuery,
     page: currentPage,
     pageSize,
+    filters: serverFilters,
   })
 
   const { stats } = useLeadStats()
+
+  // Check if payment range filter is active
+  const isPaymentRangeActive = filters.paymentAmountMin > 0 || filters.paymentAmountMax < 5000
+
+  // Track whether client-side-only filters are active (payment, appointments)
+  const hasClientSideFilters = filters.paymentStatus !== "all" || isPaymentRangeActive || filters.appointmentTypes.length > 0 || (stageFilter === "all")
 
   // Restore scroll position after leads finish loading
   useEffect(() => {
@@ -230,9 +260,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       })
     }
   }, [loading])
-
-  // Check if payment range filter is active
-  const isPaymentRangeActive = filters.paymentAmountMin > 0 || filters.paymentAmountMax < 5000
 
   // Fetch student payment data when payment filter is active
   useEffect(() => {
@@ -264,63 +291,13 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.paymentStatus, isPaymentRangeActive, leads])
 
-  // Client-side filtering for advanced filters
+  // Client-side filtering (only for filters that can't be done server-side)
   const filteredLeads = leads.filter((lead) => {
     // Exclude lost leads from "all" view (they have their own sidebar tab)
     if (stageFilter === "all" && lead.pipeline_stage === "lost") return false
-    // Lost at stage filter (from the stage tabs in lost view)
-    if (stageFilter === "lost" && lostAtFilter !== "all") {
-      if (lead.lost_at_stage !== lostAtFilter) return false
-    }
-    // Status filter
-    if (filters.statuses.length > 0 && (!lead.status || !filters.statuses.includes(lead.status))) {
-      return false
-    }
-    // Source filter
-    if (filters.sources.length > 0 && !filters.sources.includes(lead.source)) {
-      return false
-    }
-    // School filter
-    if (filters.schools.length > 0 && lead.school && !filters.schools.includes(lead.school)) {
-      return false
-    }
-    // Academic track (type) filter
-    if (filters.academicTrack !== "all" && lead.academic_track !== filters.academicTrack) {
-      return false
-    }
-    // Funding type filter
-    if (filters.fundingType !== "all" && lead.funding_type !== filters.fundingType) {
-      return false
-    }
-    // Date range filter
-    if (filters.dateRange !== "all") {
-      const leadDate = new Date(lead.created_at)
-      const now = new Date()
-      const diffDays = Math.floor((now.getTime() - leadDate.getTime()) / (1000 * 60 * 60 * 24))
-
-      switch (filters.dateRange) {
-        case "today":
-          if (diffDays > 0) return false
-          break
-        case "week":
-          if (diffDays > 7) return false
-          break
-        case "month":
-          if (diffDays > 30) return false
-          break
-        case "quarter":
-          if (diffDays > 90) return false
-          break
-      }
-    }
-    // GPA filter - use highest available GPA
-    if (filters.gpaMin !== null || filters.gpaMax !== null) {
-      const leadGpa = lead.gpa_grade_12_expected ?? lead.gpa_grade_11 ?? lead.gpa_grade_10
-      if (leadGpa === undefined || leadGpa === null) return false
-      if (filters.gpaMin !== null && leadGpa < filters.gpaMin) return false
-      if (filters.gpaMax !== null && leadGpa > filters.gpaMax) return false
-    }
-    // Appointment type filter
+    // Funding type filter (also applied server-side, but kept for "all" stage lost exclusion consistency)
+    if (filters.fundingType !== "all" && lead.funding_type !== filters.fundingType) return false
+    // Appointment type filter (requires join - can't easily do server-side)
     if (filters.appointmentTypes.length > 0) {
       const leadAppointments = lead.appointments || []
       const hasMatchingAppointment = leadAppointments.some(apt =>
@@ -328,38 +305,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       )
       if (!hasMatchingAppointment) return false
     }
-    // Ministry blocked filter
-    if (filters.ministryBlocked === "blocked" && !lead.ministry_blocked) return false
-    if (filters.ministryBlocked === "not_blocked" && lead.ministry_blocked) return false
-    // Block reason filter
-    if (filters.blockReasons.length > 0) {
-      if (!lead.submission_blocked_reason || !filters.blockReasons.includes(lead.submission_blocked_reason)) return false
-    }
-    // Submission substage filter
-    if (filters.submissionSubstages.length > 0) {
-      if (!lead.submission_substage || !filters.submissionSubstages.includes(lead.submission_substage)) return false
-    }
-    // Submission status filter
-    if (filters.submissionStatuses.length > 0) {
-      if (!lead.submission_status || !filters.submissionStatuses.includes(lead.submission_status)) return false
-    }
-    // Lost at stage filter - filter lost leads by the stage they were in before being marked lost
-    if (filters.lostAtStages.length > 0) {
-      if (!lead.lost_at_stage || !filters.lostAtStages.includes(lead.lost_at_stage)) return false
-    }
-    // Lost reason filter
-    if (filters.lostReasonIds.length > 0) {
-      if (!lead.lost_reason?.id || !filters.lostReasonIds.includes(lead.lost_reason.id)) return false
-    }
-    // Kuwaiti filter
-    if (filters.isKuwaiti !== null) {
-      if (filters.isKuwaiti && !lead.is_kuwaiti) return false
-      if (!filters.isKuwaiti && lead.is_kuwaiti) return false
-    }
-    // Has notes filter
-    if (filters.hasNotes === "with_notes" && (!lead.notes || lead.notes.trim() === "")) return false
-    if (filters.hasNotes === "without_notes" && lead.notes && lead.notes.trim() !== "") return false
-    // Payment status filter (self-funded only)
+    // Payment status filter (self-funded only, requires students table join)
     if (filters.paymentStatus !== "all") {
       if (lead.funding_type !== "self_funded") return false
       const status = studentPaymentMap.get(lead.id) ?? "pending"
@@ -369,14 +315,12 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     if (isPaymentRangeActive) {
       if (lead.funding_type !== "self_funded") return false
       const status = studentPaymentMap.get(lead.id) ?? "pending"
-      // Map status to amount ranges: pending=0-149, seat_reserved=150-549, full_tuition=550+
       const statusRanges: Record<string, [number, number]> = {
         pending: [0, 149],
         seat_reserved: [150, 549],
         full_tuition: [550, 1000],
       }
       const range = statusRanges[status] ?? [0, 149]
-      // Include if the status range overlaps with the filter range
       if (range[1] < filters.paymentAmountMin || range[0] > filters.paymentAmountMax) return false
     }
     return true
@@ -545,7 +489,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0 min-w-0">
       <Header
         user={profile}
-        title={stageFilter === "lost" ? "Lost" : "All Contacts"}
+        title={stageFilter === "lost" ? "Lost" : "All Leads"}
         action={{
           label: "Add Lead",
           onClick: () => setShowAddForm(true),
@@ -701,8 +645,8 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             currentStageFilter={stageFilter}
             fundingTypeFilter={filters.fundingType}
             currentPage={currentPage}
-            totalPages={totalPages}
-            totalCount={totalCount}
+            totalPages={hasClientSideFilters ? Math.ceil(filteredLeads.length / pageSize) || 1 : totalPages}
+            totalCount={hasClientSideFilters ? filteredLeads.length : totalCount}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
           />

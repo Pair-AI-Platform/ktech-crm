@@ -464,12 +464,24 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         .from("lost_reasons")
         .select("*")
 
-      // Fetch target mode from system settings
+      // Fetch target mode from system settings (kept for backward compat)
       const targetModeQuery = supabase
         .from("system_settings")
         .select("value")
         .eq("key", "target_mode")
         .single()
+
+      // Fetch agent targets for current month + overall SF applicant targets
+      const currentMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
+      const agentTargetsQuery = supabase
+        .from("agent_targets")
+        .select("*")
+        .eq("month", currentMonth)
+
+      const overallTargetsQuery = supabase
+        .from("agent_targets")
+        .select("*")
+        .eq("month", "overall")
 
       // Previous week data for comparison
       const weekAgo = getWeekAgo()
@@ -504,6 +516,8 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         { data: prevLeads },
         { data: prevAppointments },
         { data: prevStudents },
+        { data: agentTargetsData },
+        { data: overallTargetsData },
       ] = await Promise.all([
         leadsQuery,
         studentsQuery,
@@ -514,6 +528,8 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         prevLeadsQuery,
         prevAppointmentsQuery,
         prevStudentsQuery,
+        agentTargetsQuery,
+        overallTargetsQuery,
       ])
 
       // Get target mode from database or fallback to localStorage
@@ -540,12 +556,46 @@ export function useReports(filters: ReportFilters = defaultFilters) {
       const agentsData = (agents || []) as Profile[]
       const lostReasonsData = (lostReasons || []) as LostReason[]
 
+      // Build agent targets map from agent_targets table
+      // SF applicants targets come from the 'overall' row, not the monthly row
+      const overallSfApplicantsMap = new Map<string, number>()
+      if (overallTargetsData) {
+        for (const t of overallTargetsData) {
+          overallSfApplicantsMap.set(t.agent_id, t.sf_applicants || 0)
+        }
+      }
+      const agentTargetsMap = new Map<string, { puc_files: number; sf_files: number; sf_applicants: number }>()
+      if (agentTargetsData) {
+        for (const t of agentTargetsData) {
+          agentTargetsMap.set(t.agent_id, {
+            puc_files: t.puc_files || 0,
+            sf_files: t.sf_files || 0,
+            sf_applicants: overallSfApplicantsMap.get(t.agent_id) || 0,
+          })
+        }
+      }
+      // Also add agents that only have overall targets but no monthly targets
+      if (overallTargetsData) {
+        for (const t of overallTargetsData) {
+          if (!agentTargetsMap.has(t.agent_id)) {
+            agentTargetsMap.set(t.agent_id, { puc_files: 0, sf_files: 0, sf_applicants: t.sf_applicants || 0 })
+          }
+        }
+      }
+
+      // Augment agent profiles with targets from agent_targets table
+      const agentsWithTargets = agentsData.map(a => ({
+        ...a,
+        target_puc: agentTargetsMap.get(a.id)?.puc_files || a.target_puc || 0,
+        target_sf: agentTargetsMap.get(a.id)?.sf_files || a.target_sf || 0,
+      }))
+
       // Calculate reports
       return calculateReports(
         leadsData,
         studentsData,
         appointmentsData,
-        agentsData,
+        agentsWithTargets as Profile[],
         lostReasonsData,
         (prevLeads || []) as Lead[],
         (prevAppointments || []) as Appointment[],
@@ -751,10 +801,11 @@ function calculateReports(
   const sourceLabels: Record<LeadSource, string> = {
     walk_in: 'Walk-in', call_center: 'Call Center', whatsapp: 'WhatsApp', email: 'Email',
     school_visit: 'School Visit', expo: 'Expo', exhibitions: 'Exhibitions',
-    website_form: 'Website Form', facebook: 'Facebook', instagram: 'Instagram', snapchat: 'Snapchat',
+    website_form: 'Website Form', facebook: 'Facebook', instagram: 'Instagram',
     current_student_referral: 'Student Referral', staff_referral: 'Staff Referral', friend_referral: 'Friend Referral',
     old_contacts: 'Old Contacts', paaet_rejected: 'PAAET Rejected', gpa_lists: 'GPA Lists',
-    karnival: 'Karnival'
+    karnival: 'Karnival',
+    whatsapp_ai: 'WhatsApp AI'
   }
   const categoryLabels: Record<LeadSourceCategory, string> = {
     direct: 'Direct', events: 'Events', digital: 'Digital', referrals: 'Referrals', outreach: 'Outreach'
@@ -847,52 +898,39 @@ function calculateReports(
     const agentApplications = agentLeads.filter(l => ['test', 'application'].includes(l.pipeline_stage))
     const agentEnrolled = students.filter(s => s.assigned_to === agent.id && !s.is_withdrawn)
 
-    // Calculate categorized applications
+    // PUC Submission = leads who reached puc_document_submission or puc_application_submission
+    const pucSubmissions = agentLeads.filter(l =>
+      ['puc_document_submission', 'puc_application_submission'].includes(l.pipeline_stage)
+    )
+    // SF Application = self-funded leads who reached application stage
+    const sfApplications = agentLeads.filter(l =>
+      l.funding_type === 'self_funded' && l.pipeline_stage === 'application'
+    )
+    // Gender breakdown (across all applications)
     const maleApplications = agentApplications.filter(l => l.gender === 'male')
     const femaleApplications = agentApplications.filter(l => l.gender === 'female')
-    const pucApplications = agentApplications.filter(l => l.funding_type === 'puc')
-    const sfApplications = agentApplications.filter(l => l.funding_type === 'self_funded')
 
-    // Determine target based on mode
-    let target = 0
-    let categories: LeaderboardData['categories'] = undefined
+    // Always use 3 fixed categories
+    const targetPuc = agent.target_puc || 0
+    const targetSf = agent.target_sf || 0
+    const target = targetPuc + targetSf
 
-    if (targetMode === 'simple') {
-      target = agent.monthly_target || 0
-    } else if (targetMode === 'gender') {
-      const targetMale = agent.target_male || 0
-      const targetFemale = agent.target_female || 0
-      target = targetMale + targetFemale
+    // SF Applicants = self-funded leads who reached applicant stage
+    const sfApplicantLeads = agentLeads.filter(l =>
+      l.funding_type === 'self_funded' && l.pipeline_stage === 'applicant'
+    )
 
-      categories = {
-        male: {
-          target: targetMale,
-          applications: maleApplications.length,
-          progress: targetMale > 0 ? Math.min(100, Math.round((maleApplications.length / targetMale) * 100)) : 0
-        },
-        female: {
-          target: targetFemale,
-          applications: femaleApplications.length,
-          progress: targetFemale > 0 ? Math.min(100, Math.round((femaleApplications.length / targetFemale) * 100)) : 0
-        }
-      }
-    } else if (targetMode === 'funding') {
-      const targetPuc = agent.target_puc || 0
-      const targetSf = agent.target_sf || 0
-      target = targetPuc + targetSf
-
-      categories = {
-        puc: {
-          target: targetPuc,
-          applications: pucApplications.length,
-          progress: targetPuc > 0 ? Math.min(100, Math.round((pucApplications.length / targetPuc) * 100)) : 0
-        },
-        sf: {
-          target: targetSf,
-          applications: sfApplications.length,
-          progress: targetSf > 0 ? Math.min(100, Math.round((sfApplications.length / targetSf) * 100)) : 0
-        }
-      }
+    const categories: LeaderboardData['categories'] = {
+      puc: {
+        target: targetPuc,
+        applications: pucSubmissions.length,
+        progress: targetPuc > 0 ? Math.min(100, Math.round((pucSubmissions.length / targetPuc) * 100)) : 0
+      },
+      sf: {
+        target: targetSf,
+        applications: sfApplications.length,
+        progress: targetSf > 0 ? Math.min(100, Math.round((sfApplications.length / targetSf) * 100)) : 0
+      },
     }
 
     return {
@@ -1306,7 +1344,7 @@ export interface AgentTargetProgress {
   // Weekly breakdown
   weeklyTargets?: WeeklyTarget[]
   currentWeek?: WeeklyTarget
-  // Categorized targets (when mode is 'gender' or 'funding')
+  // Categorized targets (when mode is 'custom' or 'funding')
   categories?: {
     male?: { target: number; applications: number; progress: number }
     female?: { target: number; applications: number; progress: number }
@@ -1315,7 +1353,7 @@ export interface AgentTargetProgress {
   }
 }
 
-export type TargetMode = 'simple' | 'gender' | 'funding'
+export type TargetMode = 'simple' | 'custom' | 'funding'
 
 // Helper: get weekly breakdown for a given month
 function getWeeksInMonth(year: number, month: number): { start: Date; end: Date; label: string; weekNum: number }[] {
@@ -1388,192 +1426,100 @@ function computeWeeklyTargets(
 }
 
 export function useAgentTargetProgress(agentId?: string) {
-  const { data: queryData, isLoading: loading } = useQuery<{ allProgress: AgentTargetProgress[]; targetMode: TargetMode }>({
+  const { data: queryData, isLoading: loading } = useQuery<{ allProgress: AgentTargetProgress[] }>({
     queryKey: ['agent-target-progress', agentId],
     queryFn: async () => {
-      // Get target mode
-      const mode = (typeof window !== 'undefined' ? localStorage.getItem('ktech-target-mode') : 'simple') as TargetMode || 'simple'
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
 
       // Check for demo mode
       if (isDemoMode()) {
         const demoLeads = getDemoLeads()
-        const applicationStages: PipelineStage[] = ['test', 'application']
-
-        // Get current month range
-        const now = new Date()
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-
         const allProgress: AgentTargetProgress[] = DEMO_AGENTS.map(agent => {
           const agentLeads = demoLeads.filter(l => {
             const createdAt = new Date(l.created_at)
             return l.assigned_to === agent.id &&
-              applicationStages.includes(l.pipeline_stage) &&
-              createdAt >= startOfMonth &&
-              createdAt <= endOfMonth
+              createdAt >= new Date(now.getFullYear(), now.getMonth(), 1) &&
+              createdAt <= new Date(now.getFullYear(), now.getMonth() + 1, 0)
           })
+          // PUC Files
+          const pucLeads = agentLeads.filter(l => l.funding_type === 'puc' && l.pipeline_stage === 'application')
+          // SF Files
+          const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'application')
+          // SF Applicants
+          const sfApplicantLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'applicant')
 
-          // Calculate total applications
-          const applications = agentLeads.length
-
-          // Calculate categorized stats
-          const maleLeads = agentLeads.filter(l => l.gender === 'male')
-          const femaleLeads = agentLeads.filter(l => l.gender === 'female')
-          const pucLeads = agentLeads.filter(l => l.funding_type === 'puc')
-          const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded')
-
-          // Get agent targets based on mode
-          let target = 0
-          let categories: AgentTargetProgress['categories'] = undefined
-
-          if (mode === 'simple') {
-            target = agent.monthly_target || 0
-          } else if (mode === 'gender') {
-            const targetMale = agent.target_male || Math.floor((agent.monthly_target || 0) / 2)
-            const targetFemale = agent.target_female || Math.floor((agent.monthly_target || 0) / 2)
-            target = targetMale + targetFemale
-
-            categories = {
-              male: {
-                target: targetMale,
-                applications: maleLeads.length,
-                progress: targetMale > 0 ? Math.min(100, Math.round((maleLeads.length / targetMale) * 100)) : 0
-              },
-              female: {
-                target: targetFemale,
-                applications: femaleLeads.length,
-                progress: targetFemale > 0 ? Math.min(100, Math.round((femaleLeads.length / targetFemale) * 100)) : 0
-              }
-            }
-          } else if (mode === 'funding') {
-            const targetPuc = agent.target_puc || Math.floor((agent.monthly_target || 0) / 2)
-            const targetSf = agent.target_sf || Math.floor((agent.monthly_target || 0) / 2)
-            target = targetPuc + targetSf
-
-            categories = {
-              puc: {
-                target: targetPuc,
-                applications: pucLeads.length,
-                progress: targetPuc > 0 ? Math.min(100, Math.round((pucLeads.length / targetPuc) * 100)) : 0
-              },
-              sf: {
-                target: targetSf,
-                applications: sfLeads.length,
-                progress: targetSf > 0 ? Math.min(100, Math.round((sfLeads.length / targetSf) * 100)) : 0
-              }
-            }
-          }
-
-          const progressPercent = target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0
-
-          // Compute weekly breakdown
-          const weeklyTargets = computeWeeklyTargets(
-            target,
-            agentLeads.map(l => ({ created_at: l.created_at })),
-            now.getFullYear(),
-            now.getMonth(),
-            now
-          )
-          const currentWeek = weeklyTargets.find(w => w.isCurrent)
+          const targetPuc = agent.target_puc || 0
+          const targetSf = agent.target_sf || 0
+          const target = targetPuc + targetSf
+          const applications = pucLeads.length + sfLeads.length
 
           return {
             agentId: agent.id,
             agentName: agent.full_name,
             target,
             applications,
-            progress: progressPercent,
+            progress: target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0,
             remaining: Math.max(0, target - applications),
-            weeklyTargets,
-            currentWeek,
-            categories
+            categories: {
+              puc: { target: targetPuc, applications: pucLeads.length, progress: targetPuc > 0 ? Math.min(100, Math.round((pucLeads.length / targetPuc) * 100)) : 0 },
+              sf: { target: targetSf, applications: sfLeads.length, progress: targetSf > 0 ? Math.min(100, Math.round((sfLeads.length / targetSf) * 100)) : 0 },
+            },
           }
         })
-
-        return { allProgress, targetMode: mode }
+        return { allProgress }
       }
 
       const supabase = createClient()
 
-      // Get current month range
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
-
-      // Fetch all agents with categorized targets
-      const { data: agents, error: agentsError } = await supabase
-        .from("profiles")
-        .select("id, full_name, monthly_target, target_male, target_female, target_puc, target_sf")
-        .eq("is_active", true)
+      // Fetch targets from agent_targets table + overall SF applicant targets
+      const [
+        { data: targets },
+        { data: overallTargets },
+        { data: agents, error: agentsError },
+        { data: leads, error: leadsError },
+      ] = await Promise.all([
+        supabase.from("agent_targets").select("*").eq("month", currentMonth),
+        supabase.from("agent_targets").select("*").eq("month", "overall"),
+        supabase.from("profiles").select("id, full_name").eq("is_active", true),
+        supabase.from("leads")
+          .select("id, assigned_to, pipeline_stage, created_at, gender, funding_type")
+          .in("pipeline_stage", ['application', 'applicant', 'puc_document_submission', 'puc_application_submission'])
+          .gte("created_at", startOfMonth)
+          .lte("created_at", endOfMonth + "T23:59:59"),
+      ])
 
       if (agentsError) throw agentsError
-
-      // Fetch leads that reached application stages this month (with gender and funding_type)
-      const applicationStages: PipelineStage[] = ['test', 'application']
-      const { data: leads, error: leadsError } = await supabase
-        .from("leads")
-        .select("id, assigned_to, pipeline_stage, created_at, gender, funding_type")
-        .in("pipeline_stage", applicationStages)
-        .gte("created_at", startOfMonth)
-        .lte("created_at", endOfMonth + "T23:59:59")
-
       if (leadsError) throw leadsError
 
+      // SF applicant targets come from the 'overall' row
+      const overallSfAppMap = new Map((overallTargets || []).map(t => [t.agent_id, t.sf_applicants || 0]))
+      const targetsMap = new Map((targets || []).map(t => [t.agent_id, {
+        ...t,
+        sf_applicants: overallSfAppMap.get(t.agent_id) || 0,
+      }]))
+
       const allProgress: AgentTargetProgress[] = (agents || []).map(agent => {
+        const agentTarget = targetsMap.get(agent.id)
         const agentLeads = (leads || []).filter(l => l.assigned_to === agent.id)
-        const applications = agentLeads.length
 
-        // Calculate categorized stats
-        const maleLeads = agentLeads.filter(l => l.gender === 'male')
-        const femaleLeads = agentLeads.filter(l => l.gender === 'female')
-        const pucLeads = agentLeads.filter(l => l.funding_type === 'puc')
-        const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded')
+        // PUC Files: funding_type=puc AND pipeline_stage=application
+        const pucLeads = agentLeads.filter(l => l.funding_type === 'puc' && l.pipeline_stage === 'application')
+        // SF Files: funding_type=self_funded AND pipeline_stage=application
+        const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'application')
+        // SF Applicants: funding_type=self_funded AND pipeline_stage=applicant
+        const sfApplicantLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'applicant')
 
-        // Get agent targets based on mode
-        let target = 0
-        let categories: AgentTargetProgress['categories'] = undefined
-
-        if (mode === 'simple') {
-          target = agent.monthly_target || 0
-        } else if (mode === 'gender') {
-          const targetMale = agent.target_male || 0
-          const targetFemale = agent.target_female || 0
-          target = targetMale + targetFemale
-
-          categories = {
-            male: {
-              target: targetMale,
-              applications: maleLeads.length,
-              progress: targetMale > 0 ? Math.min(100, Math.round((maleLeads.length / targetMale) * 100)) : 0
-            },
-            female: {
-              target: targetFemale,
-              applications: femaleLeads.length,
-              progress: targetFemale > 0 ? Math.min(100, Math.round((femaleLeads.length / targetFemale) * 100)) : 0
-            }
-          }
-        } else if (mode === 'funding') {
-          const targetPuc = agent.target_puc || 0
-          const targetSf = agent.target_sf || 0
-          target = targetPuc + targetSf
-
-          categories = {
-            puc: {
-              target: targetPuc,
-              applications: pucLeads.length,
-              progress: targetPuc > 0 ? Math.min(100, Math.round((pucLeads.length / targetPuc) * 100)) : 0
-            },
-            sf: {
-              target: targetSf,
-              applications: sfLeads.length,
-              progress: targetSf > 0 ? Math.min(100, Math.round((sfLeads.length / targetSf) * 100)) : 0
-            }
-          }
-        }
-
+        const targetPuc = agentTarget?.puc_files || 0
+        const targetSf = agentTarget?.sf_files || 0
+        const targetSfApp = agentTarget?.sf_applicants || 0
+        const target = targetPuc + targetSf + targetSfApp
+        const applications = pucLeads.length + sfLeads.length + sfApplicantLeads.length
         const progressPercent = target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0
 
-        // Compute weekly breakdown
-        const now = new Date()
+        // Compute weekly breakdown using total target
         const weeklyTargets = computeWeeklyTargets(
           target,
           agentLeads.map(l => ({ created_at: l.created_at })),
@@ -1592,23 +1538,25 @@ export function useAgentTargetProgress(agentId?: string) {
           remaining: Math.max(0, target - applications),
           weeklyTargets,
           currentWeek,
-          categories
+          categories: {
+            puc: { target: targetPuc, applications: pucLeads.length, progress: targetPuc > 0 ? Math.min(100, Math.round((pucLeads.length / targetPuc) * 100)) : 0 },
+            sf: { target: targetSf, applications: sfLeads.length, progress: targetSf > 0 ? Math.min(100, Math.round((sfLeads.length / targetSf) * 100)) : 0 },
+          },
         }
       })
 
-      return { allProgress, targetMode: mode }
+      return { allProgress }
     },
     staleTime: 60_000,
   })
 
   const allAgentsProgress = queryData?.allProgress ?? []
-  const targetMode = queryData?.targetMode ?? 'simple'
   const progress = useMemo(() => {
     if (!agentId) return null
     return allAgentsProgress.find(p => p.agentId === agentId) ?? null
   }, [agentId, allAgentsProgress])
 
-  return { progress, allAgentsProgress, loading, targetMode }
+  return { progress, allAgentsProgress, loading }
 }
 
 // =============================================
@@ -1628,10 +1576,7 @@ export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) 
   const { data: history = [], isLoading: loading } = useQuery<MonthlyTargetHistory[]>({
     queryKey: ['agent-target-history', agentId, monthsBack],
     queryFn: async () => {
-      const mode = (typeof window !== 'undefined' ? localStorage.getItem('ktech-target-mode') : 'simple') as TargetMode || 'simple'
-
       if (isDemoMode()) {
-        // Generate demo history
         const demoHistory: MonthlyTargetHistory[] = []
         const now = new Date()
         for (let i = 1; i <= monthsBack; i++) {
@@ -1659,84 +1604,81 @@ export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) 
             }
           })
 
-          demoHistory.push({
-            month: monthKey,
-            monthLabel,
-            target,
-            applications,
-            progress: target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0,
-            weeklyTargets,
-          })
+          demoHistory.push({ month: monthKey, monthLabel, target, applications, progress: target > 0 ? Math.min(100, Math.round((applications / target) * 100)) : 0, weeklyTargets })
         }
         return demoHistory
       }
 
       const supabase = createClient()
-
-      // Fetch agent profile for current targets
-      const { data: agent } = await supabase
-        .from("profiles")
-        .select("monthly_target, target_male, target_female, target_puc, target_sf")
-        .eq("id", agentId!)
-        .single()
-
-      if (!agent) return []
-
-      let monthlyTarget = 0
-      if (mode === 'simple') {
-        monthlyTarget = agent.monthly_target || 0
-      } else if (mode === 'gender') {
-        monthlyTarget = (agent.target_male || 0) + (agent.target_female || 0)
-      } else if (mode === 'funding') {
-        monthlyTarget = (agent.target_puc || 0) + (agent.target_sf || 0)
-      }
-
       const now = new Date()
-      const applicationStages: PipelineStage[] = ['test', 'application']
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-      // Fetch leads for all historical months at once
+      // Fetch historical targets from agent_targets table + overall SF applicant target
+      const [{ data: pastTargets }, { data: overallRow }] = await Promise.all([
+        supabase
+          .from("agent_targets")
+          .select("*")
+          .eq("agent_id", agentId!)
+          .neq("month", currentMonth)
+          .neq("month", "overall")
+          .order("month", { ascending: false })
+          .limit(monthsBack),
+        supabase
+          .from("agent_targets")
+          .select("sf_applicants")
+          .eq("agent_id", agentId!)
+          .eq("month", "overall")
+          .maybeSingle(),
+      ])
+
+      if (!pastTargets || pastTargets.length === 0) return []
+      const overallSfApplicants = overallRow?.sf_applicants || 0
+
+      // Fetch leads for historical months
       const oldestDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1)
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
       const { data: leads } = await supabase
         .from("leads")
-        .select("id, created_at")
+        .select("id, created_at, pipeline_stage, funding_type")
         .eq("assigned_to", agentId!)
-        .in("pipeline_stage", applicationStages)
+        .in("pipeline_stage", ['application', 'applicant', 'puc_document_submission', 'puc_application_submission'])
         .gte("created_at", oldestDate.toISOString().split('T')[0])
         .lt("created_at", currentMonthStart.toISOString().split('T')[0])
 
-      const monthlyHistory: MonthlyTargetHistory[] = []
-      for (let i = 1; i <= monthsBack; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-        const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const monthlyHistory: MonthlyTargetHistory[] = pastTargets.map(t => {
+        const [y, m] = t.month.split('-').map(Number)
+        const monthStart = new Date(y, m - 1, 1)
+        const monthEnd = new Date(y, m, 0)
+        const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
         const monthLeads = (leads || []).filter(l => {
           const ld = new Date(l.created_at)
-          return ld >= d && ld <= monthEnd
+          return ld >= monthStart && ld <= monthEnd
         })
+
+        // Use overall sf_applicants target (monthly row sf_applicants is 0 for new data)
+        const sfAppTarget = (t.sf_applicants || 0) > 0 ? t.sf_applicants : overallSfApplicants
+        const monthlyTarget = (t.puc_files || 0) + (t.sf_files || 0) + sfAppTarget
 
         const weeklyTargets = computeWeeklyTargets(
           monthlyTarget,
           monthLeads.map(l => ({ created_at: l.created_at })),
-          d.getFullYear(),
-          d.getMonth(),
-          d // past month, no "current" week
+          y,
+          m - 1,
+          monthStart
         )
-        // Mark none as current since these are past months
         weeklyTargets.forEach(w => w.isCurrent = false)
 
-        monthlyHistory.push({
-          month: monthKey,
+        return {
+          month: t.month,
           monthLabel,
           target: monthlyTarget,
           applications: monthLeads.length,
           progress: monthlyTarget > 0 ? Math.min(100, Math.round((monthLeads.length / monthlyTarget) * 100)) : 0,
           weeklyTargets,
-        })
-      }
+        }
+      })
 
       return monthlyHistory
     },

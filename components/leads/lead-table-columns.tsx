@@ -13,6 +13,7 @@ interface LeadTableHeaderProps {
   isPucApplicantView: boolean
   isPucDocSubmissionView: boolean
   isPucContactedView: boolean
+  isPucAppSubmissionView: boolean
   showSubstageColumn: boolean
   selectedLeads: string[]
   leads: Lead[]
@@ -29,6 +30,7 @@ export function LeadTableHeader({
   isPucApplicantView,
   isPucDocSubmissionView,
   isPucContactedView,
+  isPucAppSubmissionView,
   showSubstageColumn,
   selectedLeads,
   leads,
@@ -98,6 +100,13 @@ export function LeadTableHeader({
                 Doc Status
               </span>
             </th>
+            )}
+            {isPucAppSubmissionView && (
+              <th className="px-3 py-1.5 text-left min-w-[130px] w-[150px]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Preference
+                </span>
+              </th>
             )}
             {isPucContactedView && (
               <>

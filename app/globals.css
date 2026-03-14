@@ -223,97 +223,104 @@ html.light, .light {
 }
 
 /* ============================================
-   Dark Theme - KTECH Navy Mode
-   Deep navy, brand-aligned dark
+   Dark Theme - KTECH Premium Dark
+   True-black base, brand indigo, clear elevation
    ============================================ */
 html.dark, .dark {
-  /* Backgrounds - Cool charcoal with navy undertone */
-  --bg-base: #1a1d2e;
-  --bg-surface: #242840;
-  --bg-elevated: #2e3350;
-  --bg-sunken: #131526;
-  --bg-hover: #353a58;
-  --bg-active: #3f4568;
-  --bg-canvas: #131526;
+  /* Backgrounds - Deep, clearly distinct elevation steps */
+  --bg-base: #0b0d18;
+  --bg-surface: #111525;
+  --bg-elevated: #181d30;
+  --bg-sunken: #07080f;
+  --bg-hover: #1d2438;
+  --bg-active: #232c48;
+  --bg-canvas: #07080f;
 
-  /* Primary - Light for dark mode */
-  --primary: #F8FAFC;
-  --primary-hover: #E2E8F0;
-  --primary-muted: rgba(248, 250, 252, 0.10);
-  --primary-subtle: rgba(248, 250, 252, 0.05);
-  --primary-foreground: #1a1d2e;
-  --primary-gradient: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%);
+  /* Primary - KTECH brand indigo */
+  --primary: #5a72d4;
+  --primary-hover: #6b83e5;
+  --primary-muted: rgba(90, 114, 212, 0.15);
+  --primary-subtle: rgba(90, 114, 212, 0.07);
+  --primary-foreground: #ffffff;
+  --primary-gradient: linear-gradient(135deg, #5a72d4 0%, #7a5fcc 100%);
 
-  /* Accent - KTECH Light Blue */
-  --accent: #8b9dc3;
-  --accent-hover: #a3b3d4;
-  --accent-muted: rgba(139, 157, 195, 0.12);
-  --accent-foreground: #1F1D1A;
+  /* Accent - Vibrant blue */
+  --accent: #7b9ce8;
+  --accent-hover: #93b0f5;
+  --accent-muted: rgba(123, 156, 232, 0.14);
+  --accent-foreground: #ffffff;
 
   /* Secondary */
   --secondary: #94A3B8;
   --secondary-hover: #CBD5E1;
   --secondary-muted: rgba(148, 163, 184, 0.12);
 
-  /* Text - High contrast cool */
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-tertiary: #64748B;
-  --text-muted: #475569;
-  --text-disabled: #334155;
-  --text-inverse: #1a1d2e;
+  /* Text - Cool hierarchy, no harsh pure white */
+  --text-primary: #dce4f5;
+  --text-secondary: #8a97b8;
+  --text-tertiary: #5c6a8a;
+  --text-muted: #3d4d6a;
+  --text-disabled: #28334d;
+  --text-inverse: #0b0d18;
 
-  /* Borders - Cool */
-  --border: #334155;
-  --border-subtle: #2e3350;
-  --border-emphasis: #475569;
+  /* Borders - Glass-morphism style transparent */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-emphasis: rgba(255, 255, 255, 0.14);
   --border-focus: var(--primary);
 
-  /* Semantic - Warm dark variants */
-  --success: #4ADE80;
-  --success-muted: rgba(74, 222, 128, 0.12);
-  --success-bg: rgba(74, 222, 128, 0.08);
-  --success-foreground: #1F1D1A;
+  /* Semantic - Vibrant dark variants */
+  --success: #3dd68c;
+  --success-muted: rgba(61, 214, 140, 0.12);
+  --success-bg: rgba(61, 214, 140, 0.08);
+  --success-foreground: #07080f;
 
-  --warning: #FCD34D;
-  --warning-muted: rgba(252, 211, 77, 0.12);
-  --warning-bg: rgba(252, 211, 77, 0.08);
-  --warning-foreground: #1F1D1A;
+  --warning: #f5c842;
+  --warning-muted: rgba(245, 200, 66, 0.12);
+  --warning-bg: rgba(245, 200, 66, 0.08);
+  --warning-foreground: #07080f;
 
-  --error: #F87171;
-  --error-muted: rgba(248, 113, 113, 0.12);
-  --error-bg: rgba(248, 113, 113, 0.08);
-  --error-foreground: #1F1D1A;
+  --error: #f06b6b;
+  --error-muted: rgba(240, 107, 107, 0.12);
+  --error-bg: rgba(240, 107, 107, 0.08);
+  --error-foreground: #07080f;
 
-  --info: #8b9dc3;
-  --info-muted: rgba(139, 157, 195, 0.12);
-  --info-bg: rgba(139, 157, 195, 0.08);
+  --info: #7b9ce8;
+  --info-muted: rgba(123, 156, 232, 0.12);
+  --info-bg: rgba(123, 156, 232, 0.08);
 
-  /* Pipeline Stages - KTECH blue tones */
-  --stage-new: #94A3B8;
-  --stage-contacted: #a3b3d4;
-  --stage-appointed: #8b9dc3;
-  --stage-visited: #a3b3d4;
-  --stage-applied: #A3E635;
-  --stage-tested: #FCD34D;
-  --stage-application: #FBBF24;
-  --stage-payment: #4ADE80;
-  --stage-enrolled: #34D399;
-  --stage-lost: #F87171;
+  /* Pipeline Stages - Vibrant, distinct */
+  --stage-new: #7a8aaa;
+  --stage-contacted: #7b9ce8;
+  --stage-appointed: #5a72d4;
+  --stage-visited: #8b7dde;
+  --stage-applied: #86d96a;
+  --stage-tested: #f5c842;
+  --stage-application: #f0a030;
+  --stage-payment: #3dd68c;
+  --stage-enrolled: #2fc885;
+  --stage-lost: #f06b6b;
 
-  /* Shadows - Deep warm */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
-  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.15);
-  --shadow-focus: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--primary-muted);
-  --shadow-glow: 0 0 32px rgba(139, 157, 195, 0.08);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
+  /* Shadows - Blue-ambient depth system */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 10px 20px -3px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-xl: 0 20px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-focus: 0 0 0 2px var(--bg-surface), 0 0 0 4px rgba(90, 114, 212, 0.4);
+  --shadow-glow: 0 0 40px rgba(90, 114, 212, 0.12);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(90, 114, 212, 0.2);
+}
 
+/* Sidebar subtle gradient */
+html.dark .sidebar,
+html.dark [data-sidebar],
+html.dark nav[class*="sidebar"] {
+  background: linear-gradient(180deg, #111525 0%, #0e1220 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* RTL */

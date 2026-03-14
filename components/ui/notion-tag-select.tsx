@@ -312,6 +312,8 @@ interface InlineTagSelectProps {
   className?: string
   rowVariant?: RowVariant // When provided, uses row-based coloring instead of tag-specific colors
   compact?: boolean // When true, renders a simple dropdown without search/footer
+  forceOpen?: boolean // When true, opens the dropdown immediately
+  onForceOpenHandled?: () => void // Called after forceOpen is processed
 }
 
 export function InlineTagSelect({
@@ -323,6 +325,8 @@ export function InlineTagSelect({
   className,
   rowVariant,
   compact = false,
+  forceOpen = false,
+  onForceOpenHandled,
 }: InlineTagSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -422,6 +426,14 @@ export function InlineTagSelect({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
+
+  useEffect(() => {
+    if (forceOpen && !disabled && !loading) {
+      setIsOpen(true)
+      onForceOpenHandled?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceOpen])
 
   const handleSelect = (optionValue: string) => {
     onChange(optionValue)

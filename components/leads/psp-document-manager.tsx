@@ -216,7 +216,7 @@ export function PSPDocumentManager({
       ])
       mergeDocuments(dbDocs, profileDocs)
     } catch (err) {
-      console.error("Failed to load documents:", err)
+      console.warn("Failed to load documents:", err)
       // Fall back to localStorage for offline support
       const storageKey = `psp-documents-${leadId}-${graduateType}`
       const stored = localStorage.getItem(storageKey)

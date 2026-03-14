@@ -53,4 +53,33 @@ export const queryKeys = {
     all: ['conversion-funnel'] as const,
     detail: (filters: Record<string, unknown>) => [...queryKeys.conversionFunnel.all, filters] as const,
   },
+  stageDropoff: {
+    all: ['stage-dropoff'] as const,
+  },
+  agentPresence: {
+    all: ['agent-presence'] as const,
+  },
+  teamAppointments: {
+    all: ['team-appointments'] as const,
+  },
+  todayChanges: {
+    all: ['today-changes'] as const,
+  },
+  agentAppointmentsToday: {
+    all: ['agent-appointments-today'] as const,
+  },
+  lastMonthLeadCounts: {
+    all: ['last-month-lead-counts'] as const,
+  },
+  agentTargets: {
+    all: ['agent-targets'] as const,
+    month: (month: string) => ['agent-targets', month] as const,
+  },
+  targetSeasons: {
+    all: ['target-seasons'] as const,
+  },
+  agentSeasonalTargets: {
+    all: ['agent-seasonal-targets'] as const,
+    season: (seasonId: string) => ['agent-seasonal-targets', seasonId] as const,
+  },
 }

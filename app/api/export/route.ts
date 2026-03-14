@@ -63,7 +63,7 @@ function formatLeadRows(leads: Lead[]): ExportData['rows'] {
 }
 
 export const POST = withApiHandler(
-  { context: 'export' },
+  { context: 'export', roles: ['admin'] },
   async ({ req, supabase, user, logger }) => {
     const rateLimitResult = await rateLimit(`export:${user.id}`, RATE_LIMITS.export)
     if (!rateLimitResult.success) {

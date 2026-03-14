@@ -316,7 +316,7 @@ function InviteMemberModal({
   const [email, setEmail] = useState("")
   const [fullName, setFullName] = useState("")
   const [role, setRole] = useState<"admin" | "agent">("agent")
-  const [monthlyTarget, setMonthlyTarget] = useState("20")
+  const [monthlyTarget, setMonthlyTarget] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async () => {
@@ -333,13 +333,13 @@ function InviteMemberModal({
     setEmail("")
     setFullName("")
     setRole("agent")
-    setMonthlyTarget("20")
+    setMonthlyTarget("")
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[460px] overflow-hidden p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-[var(--primary)]" />
             Invite Team Member
@@ -349,7 +349,7 @@ function InviteMemberModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 px-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
               Full Name
@@ -400,18 +400,19 @@ function InviteMemberModal({
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
-              Monthly Target
+              Monthly Target <span className="text-xs font-normal text-[var(--text-muted)]">(optional)</span>
             </label>
             <Input
               type="number"
-              placeholder="20"
+              min={0}
+              placeholder="Leave empty for trainees"
               value={monthlyTarget}
               onChange={(e) => setMonthlyTarget(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 px-6 pb-6 pt-2">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -530,11 +531,12 @@ function EditMemberModal({
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
-              Monthly Target
+              Monthly Target <span className="text-xs font-normal text-[var(--text-muted)]">(optional)</span>
             </label>
             <Input
               type="number"
-              placeholder="20"
+              min={0}
+              placeholder="Leave empty for trainees"
               value={monthlyTarget}
               onChange={(e) => setMonthlyTarget(e.target.value)}
             />

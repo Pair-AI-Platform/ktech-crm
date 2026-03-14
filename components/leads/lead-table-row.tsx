@@ -20,6 +20,8 @@ import {
   XCircle,
   CheckCircle2,
   Wand2,
+  Flame,
+  Star,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import {
@@ -34,6 +36,7 @@ import {
   PUC_DOCUMENT_STATUSES,
   ORIENTATION_STATUSES,
   MAJORS,
+  PREFERRED_COLLEGES,
   type Lead,
   type PipelineStage,
   type LeadStatus,
@@ -65,6 +68,7 @@ export interface LeadTableRowProps {
   isPucApplicantView: boolean
   isPucDocSubmissionView: boolean
   isPucContactedView: boolean
+  isPucAppSubmissionView: boolean
   showSubstageColumn: boolean
   currentStageFilter?: PipelineStage | "all"
   documentCompleteLeads: Set<string>
@@ -96,6 +100,9 @@ export interface LeadTableRowProps {
   handleGpaSave: () => void
   setEditingGpa: (val: { leadId: string; field: 'expected_gpa' | 'actual_gpa' } | null) => void
   setGpaInputValue: (val: string) => void
+  handleCollegeChange: (leadId: string, value: string) => void
+  openPreferenceForLead: string | null
+  onPreferenceOpened: () => void
   setBookingLead: (lead: Lead) => void
   setBookingSimpleMode: (val: boolean) => void
   setBookingCallbackMode: (val: boolean) => void
@@ -119,6 +126,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   isPucApplicantView,
   isPucDocSubmissionView,
   isPucContactedView,
+  isPucAppSubmissionView,
   showSubstageColumn,
   currentStageFilter,
   documentCompleteLeads,
@@ -150,6 +158,9 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   handleGpaSave,
   setEditingGpa,
   setGpaInputValue,
+  handleCollegeChange,
+  openPreferenceForLead,
+  onPreferenceOpened,
   setBookingLead,
   setBookingSimpleMode,
   setBookingCallbackMode,
@@ -396,6 +407,16 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   )
                 })()}
                 <div className="flex items-center gap-1.5">
+                  {lead.priority === 'critical' && (
+                    <SimpleTooltip content="Critical priority">
+                      <Flame className="w-3.5 h-3.5 text-red-500 shrink-0 animate-pulse" />
+                    </SimpleTooltip>
+                  )}
+                  {lead.priority === 'important' && (
+                    <SimpleTooltip content="Important priority">
+                      <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    </SimpleTooltip>
+                  )}
                   <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate">
                     {lead.first_name} {lead.last_name}
                   </p>
@@ -583,7 +604,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   enrolled: 'none',
                   withdraw: 'none',
                   puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
-                  puc_application_submission: ['applied', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
+                  puc_application_submission: ['applied', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
                 }
 
                 const stageConfig = PUC_STAGE_STATUSES[effectiveStage] ?? 'none'
@@ -731,6 +752,33 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 rowVariant={rowVariant}
               />
           </td>
+          )}
+          {/* PUC App Submission: Preference (preferred college) */}
+          {isPucAppSubmissionView && (
+            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+              {(() => {
+                const STATUS_TO_COLLEGE: Record<string, string> = {
+                  blocked_ku: 'KU', blocked_paaet: 'PAAET', blocked_aasu: 'AASU',
+                  blocked_abroad: 'abroad', blocked_auk: 'AUK', blocked_gust: 'GUST',
+                  blocked_acm: 'ACM', blocked_other: 'other',
+                }
+                const currentCollege = getEffectiveValue(lead.id, 'preferred_college', lead.preferred_college) ?? ""
+                const currentStatus = getEffectiveValue(lead.id, 'status', lead.status) ?? ""
+                const statusMappedCollege = STATUS_TO_COLLEGE[currentStatus]
+                const matchesStatus = !!statusMappedCollege && statusMappedCollege === currentCollege
+                return (
+                  <InlineTagSelect
+                    value={currentCollege}
+                    options={PREFERRED_COLLEGES.map(c => ({ value: c.value, label: c.label }))}
+                    onChange={(val) => handleCollegeChange(lead.id, val as string)}
+                    rowVariant={matchesStatus ? rowVariant : undefined}
+                    disabled={currentStatus !== 'changed_preferences'}
+                    forceOpen={openPreferenceForLead === lead.id}
+                    onForceOpenHandled={onPreferenceOpened}
+                  />
+                )
+              })()}
+            </td>
           )}
           {/* PUC Contacted: Intended Major + GPA columns */}
           {isPucContactedView && (
@@ -1019,7 +1067,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 enrolled: 'none',
                 withdraw: 'all',
                 puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
-                puc_application_submission: ['applied', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
+                puc_application_submission: ['applied', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
               }
               const stageConfig = effectiveStage ? STAGE_STATUSES[effectiveStage as PipelineStage] : 'all'
               const isStatusDisabled = stageConfig === 'none'

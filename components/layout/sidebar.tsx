@@ -24,7 +24,11 @@ import {
   Ban,
   UserMinus,
   Wallet,
+  Archive,
   ChevronRight,
+  Video,
+  Coffee,
+  Circle,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -33,6 +37,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useSidebar } from "@/components/layout/dashboard-shell"
+import { useAgentStatus } from "@/components/layout/heartbeat-provider"
+import type { ManualStatus } from "@/lib/hooks/use-heartbeat"
 import type { Profile } from "@/types"
 
 interface SidebarProps {
@@ -237,11 +243,12 @@ function SubNavLink({ item, index, isCollapsed, onNavigate }: Omit<NavLinkProps,
 
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & stats" },
-  { name: "Contacts", href: "/leads", icon: Users, description: "Manage prospects", roles: ["admin", "agent"], children: [
+  { name: "Leads", href: "/leads", icon: Users, description: "Manage prospects", roles: ["admin", "agent"], children: [
+    { name: "PUC", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions" },
+    { name: "Self Funded", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded submissions" },
+    { name: "Archive", href: "/leads/archive", icon: Archive, description: "Previous yearly cycles" },
     { name: "Lost", href: "/leads?stage=lost", icon: Ban, description: "Lost leads" },
   ]},
-  { name: "PUC", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions", roles: ["admin", "agent"] },
-  { name: "Self Funded", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded submissions", roles: ["admin", "agent"] },
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
   // { name: "Voice", href: "/voice", icon: Phone, description: "Kadi AI & calls" },
   { name: "Reports", href: "/reports", icon: BarChart3, description: "Analytics & insights", roles: ["admin", "agent"] },
@@ -254,6 +261,113 @@ const secondaryNavigation = [
 ]
 
 const emptySubscribe = () => () => {}
+
+const statusOptions: { value: ManualStatus; label: string; icon: React.ElementType; color: string; dot: string }[] = [
+  { value: null, label: "Online", icon: Circle, color: "text-emerald-600", dot: "bg-emerald-500" },
+  { value: "meeting", label: "In Meeting", icon: Video, color: "text-blue-600", dot: "bg-blue-500" },
+  { value: "break", label: "On Break", icon: Coffee, color: "text-amber-600", dot: "bg-amber-400" },
+]
+
+function UserCard({ user, mounted, isCollapsed, onSignOut }: {
+  user: Profile | null
+  mounted: boolean
+  isCollapsed: boolean
+  onSignOut: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const { manualStatus, setManualStatus } = useAgentStatus()
+
+  const currentOption = statusOptions.find(o => o.value === manualStatus) || statusOptions[0]
+
+  return (
+    <div className="space-y-1">
+      <div className={cn(
+        "group flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
+        "bg-[var(--bg-sunken)]",
+        "border border-[var(--border)] hover:border-[var(--border-emphasis)]",
+        isCollapsed && "justify-center p-2.5"
+      )}>
+        <div className="relative">
+          <Avatar size="sm" status="online">
+            <AvatarImage src={user?.avatar_url || undefined} />
+            <AvatarFallback className="bg-[#2D347D] text-white font-semibold">
+              {mounted ? (user?.full_name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U") : "U"}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        {!isCollapsed && (
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{mounted ? (user?.full_name || "User") : "User"}</p>
+            <button
+              onClick={() => setOpen(!open)}
+              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            >
+              <span className={cn("w-1.5 h-1.5 rounded-full", currentOption.dot)} />
+              <p className={cn("text-[11px] font-medium truncate", currentOption.color)}>
+                {currentOption.label}
+              </p>
+              <ChevronRight className={cn(
+                "w-3 h-3 text-[var(--text-tertiary)] transition-transform",
+                open && "rotate-90"
+              )} />
+            </button>
+          </div>
+        )}
+        {!isCollapsed && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onSignOut}
+            className="text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--error-bg)] transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Status Selector */}
+      <AnimatePresence>
+        {open && !isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-1 p-1 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
+              {statusOptions.map((opt) => {
+                const Icon = opt.icon
+                const isActive = manualStatus === opt.value
+                return (
+                  <button
+                    key={opt.value ?? "online"}
+                    onClick={() => {
+                      setManualStatus(opt.value)
+                      setOpen(false)
+                    }}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all",
+                      isActive
+                        ? "bg-[var(--bg-surface)] shadow-sm border border-[var(--border)]"
+                        : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]",
+                      isActive && opt.color
+                    )}
+                    title={opt.label}
+                  >
+                    <Icon className="w-3 h-3" />
+                    <span className="hidden xl:inline">{opt.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
@@ -422,41 +536,12 @@ export function Sidebar({ user }: SidebarProps) {
         )}
 
         {/* User Card */}
-        <div className={cn(
-          "group flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
-          "bg-[var(--bg-sunken)]",
-          "border border-[var(--border)] hover:border-[var(--border-emphasis)]",
-          isCollapsed && "justify-center p-2.5"
-        )}>
-          <div className="relative">
-            <Avatar size="sm" status="online">
-              <AvatarImage src={user?.avatar_url || undefined} />
-              <AvatarFallback className="bg-[#2D347D] text-white font-semibold">
-                {mounted ? (user?.full_name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U") : "U"}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{mounted ? (user?.full_name || "User") : "User"}</p>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />
-                <p className="text-[11px] text-[var(--text-secondary)] truncate capitalize">{mounted ? (user?.role || "Agent") : "Agent"}</p>
-              </div>
-            </div>
-          )}
-          {!isCollapsed && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleSignOut}
-              className="text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--error-bg)] opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
+        <UserCard
+          user={user}
+          mounted={mounted}
+          isCollapsed={isCollapsed}
+          onSignOut={handleSignOut}
+        />
       </div>
     </div>
   )

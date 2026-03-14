@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack } from "@/types"
 import { cn } from "@/lib/utils"
+import { useStageSettings } from "@/lib/hooks/use-stage-settings"
 
 export interface LeadFilters {
   searchQuery: string
@@ -1190,11 +1191,17 @@ export function QuickFilters({
   lostReasons,
 }: QuickFiltersProps) {
   const stagePillsRef = useRef<HTMLDivElement>(null)
+  const { settings: stageSettings } = useStageSettings()
+
+  // Use dynamic display_order from DB; fall back to hardcoded PIPELINE_STAGES if not loaded yet
+  const orderedStages = stageSettings.length > 0
+    ? stageSettings.map(s => PIPELINE_STAGES.find(p => p.value === s.stage)).filter(Boolean) as typeof PIPELINE_STAGES
+    : PIPELINE_STAGES
 
   // In lost-at mode, show stages where leads can be lost (exclude lost/withdraw)
   const stagesToShow = lostAtMode
-    ? PIPELINE_STAGES.filter(s => s.value !== 'lost' && s.value !== 'withdraw')
-    : PIPELINE_STAGES.filter(s => s.value !== 'lost')
+    ? orderedStages.filter(s => s.value !== 'lost' && s.value !== 'withdraw')
+    : orderedStages.filter(s => s.value !== 'lost')
 
   // Scroll active stage pill into view
   useEffect(() => {

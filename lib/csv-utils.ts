@@ -34,7 +34,7 @@ export const LEAD_CSV_COLUMNS: { key: string; label: string; required?: boolean 
 const VALID_SOURCES: LeadSource[] = [
   "walk_in", "call_center", "whatsapp", "email",
   "school_visit", "expo", "exhibitions", "karnival",
-  "website_form", "facebook", "instagram", "snapchat",
+  "website_form", "facebook", "instagram",
   "current_student_referral", "staff_referral", "friend_referral",
   "old_contacts", "paaet_rejected", "gpa_lists"
 ]

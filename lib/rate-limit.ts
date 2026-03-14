@@ -46,8 +46,11 @@ function getLimiter(config: RateLimitConfig): Ratelimit | null {
 export async function rateLimit(key: string, config: RateLimitConfig): Promise<{ success: boolean; remaining: number; resetIn: number }> {
   const limiter = getLimiter(config)
 
-  // Graceful fallback: if no Upstash config, allow all requests (dev mode)
+  // Graceful fallback: if no Upstash config, allow all requests
   if (!limiter) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Rate Limit] Upstash not configured in production — all requests allowed')
+    }
     return { success: true, remaining: config.limit, resetIn: 0 }
   }
 
@@ -56,7 +59,7 @@ export async function rateLimit(key: string, config: RateLimitConfig): Promise<{
   return {
     success: result.success,
     remaining: result.remaining,
-    resetIn: result.reset - Date.now(),
+    resetIn: Math.max(0, result.reset - Date.now()),
   }
 }
 
@@ -65,7 +68,10 @@ export const RATE_LIMITS = {
   sms: { interval: 60_000, limit: 10 },        // 10 SMS per minute
   whatsapp: { interval: 60_000, limit: 10 },    // 10 WhatsApp per minute
   payment: { interval: 60_000, limit: 5 },      // 5 payment links per minute
-  import: { interval: 300_000, limit: 3 },       // 3 bulk imports per 5 min
+  import: { interval: 300_000, limit: 3 },         // 3 bulk imports per 5 min
+  'moe-gpa': { interval: 300_000, limit: 3 },     // 3 GPA fetches per 5 min
+  'ministry-import': { interval: 300_000, limit: 3 }, // 3 ministry imports per 5 min
   export: { interval: 60_000, limit: 5 },        // 5 exports per minute
+  'ai-transfer': { interval: 60_000, limit: 30 }, // 30 AI transfer webhooks per minute
   api: { interval: 60_000, limit: 60 },          // 60 general API calls per minute
 } as const

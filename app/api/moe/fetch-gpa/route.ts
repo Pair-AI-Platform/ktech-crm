@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: admin access required' }, { status: 403 })
     }
 
-    const rateLimitResult = await rateLimit(`import:${user.id}`, RATE_LIMITS.import)
+    const rateLimitResult = await rateLimit(`moe-gpa:${user.id}`, RATE_LIMITS['moe-gpa'])
     if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Try again later.' },

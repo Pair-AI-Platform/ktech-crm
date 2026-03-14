@@ -6,6 +6,7 @@ export type NotificationType =
   | "payment_received"
   | "stage_change"
   | "system_alert"
+  | "priority_reminder"
 
 interface CreateNotificationInput {
   userId: string

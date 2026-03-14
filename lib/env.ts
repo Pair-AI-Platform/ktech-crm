@@ -43,7 +43,6 @@ export const env = {
   MOODLE_API_TOKEN: optional('MOODLE_API_TOKEN'),
 
   // Webhooks (mandatory when their features are active)
-  AVAYA_WEBHOOK_SECRET: optional('AVAYA_WEBHOOK_SECRET'),
   MYFATOORAH_WEBHOOK_SECRET: optional('MYFATOORAH_WEBHOOK_SECRET'),
 
   // CRON
@@ -51,6 +50,9 @@ export const env = {
 
   // OpenAI
   OPENAI_API_KEY: optional('OPENAI_API_KEY'),
+
+  // AI Transfer Webhook
+  AI_TRANSFER_WEBHOOK_SECRET: optional('AI_TRANSFER_WEBHOOK_SECRET'),
 
   // Upstash Redis (rate limiting)
   UPSTASH_REDIS_REST_URL: optional('UPSTASH_REDIS_REST_URL'),
@@ -71,28 +73,16 @@ if (typeof window === 'undefined') {
     }
   }
   if (!env.MYFATOORAH_WEBHOOK_SECRET) {
-    if (isProduction) {
-      errors.push('MYFATOORAH_WEBHOOK_SECRET must be set in production — payment webhooks are unprotected')
-    } else {
-      warnings.push('MYFATOORAH_WEBHOOK_SECRET not set — payment webhook signature validation disabled')
-    }
-  }
-  if (!env.AVAYA_WEBHOOK_SECRET) {
-    if (isProduction) {
-      errors.push('AVAYA_WEBHOOK_SECRET must be set in production — Avaya webhooks are unprotected')
-    } else {
-      warnings.push('AVAYA_WEBHOOK_SECRET not set — Avaya webhooks will be rejected')
-    }
+    warnings.push('MYFATOORAH_WEBHOOK_SECRET not set — payment webhook signature validation disabled')
   }
   if (!env.TWILIO_AUTH_TOKEN) {
     warnings.push('TWILIO_AUTH_TOKEN not set — SMS and webhook validation disabled')
   }
+  if (!env.AI_TRANSFER_WEBHOOK_SECRET) {
+    warnings.push('AI_TRANSFER_WEBHOOK_SECRET not set — AI transfer webhook will reject all requests')
+  }
   if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
-    if (isProduction) {
-      errors.push('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in production — rate limiting is disabled')
-    } else {
-      warnings.push('Upstash Redis not configured — rate limiting disabled (all requests allowed)')
-    }
+    warnings.push('Upstash Redis not configured — rate limiting disabled (all requests allowed)')
   }
 
   if (errors.length > 0) {

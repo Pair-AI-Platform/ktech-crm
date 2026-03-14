@@ -25,11 +25,11 @@ import {
   Loader2,
   ArrowRight,
   Bell,
-  MessageSquare,
   UserPlus,
   Clock,
   GitBranch,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAutomationRules, type AutomationRule } from "@/lib/hooks/use-automation-rules"
@@ -40,12 +40,12 @@ const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string 
   { value: "lead_created", label: "Lead Created", description: "When a new lead is created" },
   { value: "appointment_scheduled", label: "Appointment Scheduled", description: "When an appointment is booked" },
   { value: "payment_received", label: "Payment Received", description: "When a payment is recorded" },
+  { value: "preference_changed", label: "Preference Changed", description: "When an applied lead changes their major/program preference" },
 ]
 
 const ACTION_OPTIONS: { value: AutomationRule["action_type"]; label: string; icon: typeof Bell }[] = [
   { value: "create_notification", label: "Send Notification", icon: Bell },
   { value: "create_follow_up", label: "Create Follow-Up", icon: Clock },
-  { value: "send_sms", label: "Send SMS", icon: MessageSquare },
   { value: "assign_lead", label: "Assign Lead", icon: UserPlus },
   { value: "change_stage", label: "Change Stage", icon: GitBranch },
 ]
@@ -55,6 +55,7 @@ const TRIGGER_ICONS: Record<string, typeof Zap> = {
   lead_created: Plus,
   appointment_scheduled: Clock,
   payment_received: AlertCircle,
+  preference_changed: RefreshCw,
 }
 
 interface RuleFormData {
@@ -390,7 +391,7 @@ export function AutomationRulesManager() {
                 rows={3}
               />
               <p className="text-xs text-[var(--text-muted)]">
-                Conditions to match. For stage_change: {`{"new_stage": "contacted"}`}
+                Conditions to match. For stage_change: {`{"new_stage": "contacted"}`} · For preference_changed: {`{"new_major": "cis"}`}
               </p>
             </div>
 

@@ -24,10 +24,12 @@ export interface DashboardLead {
   last_contacted_at: string | null
   callback_date: string | null
   date_of_birth: string | null
+  priority: string | null
+  source: string | null
 }
 
 const DASHBOARD_LEAD_COLUMNS =
-  'id, first_name, last_name, phone, pipeline_stage, status, funding_type, assigned_to, created_at, updated_at, last_contacted_at, callback_date, date_of_birth'
+  'id, first_name, last_name, phone, pipeline_stage, status, funding_type, assigned_to, created_at, updated_at, last_contacted_at, callback_date, date_of_birth, priority, source'
 
 /**
  * Single lightweight query that replaces the three useLeads(limit:200) calls
@@ -60,6 +62,8 @@ export function useDashboardStats() {
           last_contacted_at: l.last_contacted_at ?? null,
           callback_date: l.callback_date ?? null,
           date_of_birth: l.date_of_birth ?? null,
+          priority: null,
+          source: l.source ?? null,
         }))
         setAllLeads(mapped)
         setLoading(false)

@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { getUserProfile } from "@/lib/supabase/server"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
+import { HeartbeatProvider } from "@/components/layout/heartbeat-provider"
 
 export default async function DashboardLayout({
   children,
@@ -12,7 +13,9 @@ export default async function DashboardLayout({
   return (
     <Suspense>
       <DashboardShell user={profile}>
-        {children}
+        <HeartbeatProvider>
+          {children}
+        </HeartbeatProvider>
       </DashboardShell>
     </Suspense>
   )

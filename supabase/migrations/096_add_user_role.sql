@@ -41,8 +41,8 @@ CREATE POLICY leads_delete_policy ON leads
   );
 
 -- Activity log: user role can only see their own activities (which will be none)
-DROP POLICY IF EXISTS activity_log_select_policy ON activity_log;
-CREATE POLICY activity_log_select_policy ON activity_log
+DROP POLICY IF EXISTS activities_select_policy ON activities;
+CREATE POLICY activities_select_policy ON activities
   FOR SELECT
   TO authenticated
   USING (

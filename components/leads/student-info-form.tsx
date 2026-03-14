@@ -66,6 +66,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     last_name: lead.last_name || "",
     gender: lead.gender || "",
     phone: lead.phone || "",
+    phone_secondary: lead.phone_secondary || "",
     civil_id: lead.civil_id || "",
     seat_number: lead.seat_number || "",
     school: lead.school_id || lead.school || "",
@@ -163,6 +164,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       last_name: formData.last_name,
       gender: formData.gender || undefined,
       phone: formData.phone.replace(/\D/g, ""),
+      phone_secondary: formData.phone_secondary.replace(/\D/g, "") || undefined,
       civil_id: formData.civil_id.replace(/\D/g, ""),
       seat_number: formData.seat_number.trim(),
       school: dbSchools.length > 0 ? undefined : (formData.school || undefined) as School | undefined,
@@ -371,7 +373,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           </div>
           <h4 className="font-semibold text-[var(--text-primary)]">Mobile</h4>
         </div>
-        <div className="pl-10">
+        <div className="pl-10 grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="phone">Mobile Number *</Label>
             <Input
@@ -386,6 +388,17 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             {errors.phone && (
               <p className="text-xs text-[var(--error)]">{errors.phone}</p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone_secondary">Secondary Number</Label>
+            <Input
+              id="phone_secondary"
+              value={formData.phone_secondary}
+              onChange={(e) => handleChange("phone_secondary", e.target.value)}
+              placeholder="9876 5432"
+              maxLength={8}
+              icon={<Phone className="w-4 h-4" />}
+            />
           </div>
         </div>
       </div>

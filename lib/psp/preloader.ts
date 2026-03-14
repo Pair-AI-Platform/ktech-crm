@@ -95,9 +95,9 @@ export async function preloadDocuments(leadId: string, graduateType: string): Pr
     const response = await fetch(
       `/api/psp/documents?lead_id=${leadId}&graduate_type=${graduateType}`
     )
-    if (!response.ok) throw new Error("Failed to preload documents")
+    if (!response.ok) return [] as PreloadedDocument[]
     const { documents } = await response.json()
-    return documents as PreloadedDocument[]
+    return (documents ?? []) as PreloadedDocument[]
   })
 }
 

@@ -39,9 +39,10 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [agents, setAgents] = useState<{ id: string; full_name: string; email: string; avatar_url: string | null }[]>([])
+  const [semesters, setSemesters] = useState<{ id: string; name: string; is_active: boolean }[]>([])
   const isEditing = !!lead
 
-  // Fetch schools and agents from database
+  // Fetch schools, agents, and semesters from database
   useEffect(() => {
     const supabase = createClient()
     supabase
@@ -59,6 +60,22 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       .order("full_name")
       .then(({ data }) => {
         if (data) setAgents(data)
+      })
+    supabase
+      .from("semesters")
+      .select("id, name, is_active")
+      .order("start_date", { ascending: false })
+      .then(({ data }) => {
+        if (data) {
+          setSemesters(data)
+          // Auto-select active semester for new leads
+          if (!lead) {
+            const active = data.find((s) => s.is_active)
+            if (active) {
+              setFormData((prev) => ({ ...prev, semester_id: active.id }))
+            }
+          }
+        }
       })
   }, [])
 
@@ -80,6 +97,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     funding_type: lead?.funding_type || "self_funded",
     intended_major: lead?.intended_major || "",
     preferred_major: lead?.preferred_major || "",
+    preferred_college: lead?.preferred_college || "",
     pipeline_stage: lead?.pipeline_stage || "new",
     status: lead?.status || "",
     graduation_year: lead?.graduation_year?.toString() || "",
@@ -117,6 +135,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     discount_type: lead?.discount_type || "",
     discount_percentage: lead?.discount_percentage?.toString() || "",
     discount_notes: lead?.discount_notes || "",
+    semester_id: lead?.semester_id || "",
     assigned_to: lead?.assigned_to || "",
   })
 
@@ -296,6 +315,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       funding_type: formData.funding_type as FundingType,
       intended_major: (formData.intended_major || undefined) as IntendedMajor | undefined,
       preferred_major: formData.preferred_major.trim() || undefined,
+      preferred_college: formData.preferred_college.trim() || undefined,
       expected_gpa: formData.expected_gpa ? parseFloat(formData.expected_gpa) : undefined,
       actual_gpa: formData.actual_gpa ? parseFloat(formData.actual_gpa) : undefined,
       grade_level: (formData.grade_level || undefined) as GradeLevel | undefined,
@@ -334,6 +354,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       discount_type: formData.funding_type === 'self_funded' && formData.discount_type ? formData.discount_type as DiscountType : undefined,
       discount_percentage: formData.funding_type === 'self_funded' && formData.discount_percentage ? parseFloat(formData.discount_percentage) : undefined,
       discount_notes: formData.funding_type === 'self_funded' && formData.discount_notes.trim() ? formData.discount_notes.trim() : undefined,
+      semester_id: formData.semester_id || undefined,
       assigned_to: formData.assigned_to || undefined,
     }
 
@@ -545,7 +566,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     const categoryMap: Record<string, string[]> = {
       direct: ["walk_in", "call_center", "whatsapp", "email"],
       events: ["school_visit", "expo", "exhibitions", "karnival"],
-      digital: ["website_form", "facebook", "instagram", "snapchat"],
+      digital: ["website_form", "facebook", "instagram"],
       referrals: ["current_student_referral", "staff_referral", "friend_referral"],
       outreach: ["old_contacts", "paaet_rejected", "gpa_lists"],
     }
@@ -626,6 +647,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
             availablePipelineStages={availablePipelineStages}
             isAtTestStage={isAtTestStage}
             agents={agents}
+            semesters={semesters}
           />
 
           {/* Section 4: Discount + Placement Test + Notes */}

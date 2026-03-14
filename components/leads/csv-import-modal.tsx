@@ -74,6 +74,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
   const [importProgress, setImportProgress] = useState(0)
   const [importedCount, setImportedCount] = useState(0)
+  const [updatedCount, setUpdatedCount] = useState(0)
   const [errorCount, setErrorCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -130,6 +131,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
     setParsedRows([])
     setImportProgress(0)
     setImportedCount(0)
+    setUpdatedCount(0)
     setErrorCount(0)
     // Reset assignment state
     setAssignmentMode("none")
@@ -224,37 +226,97 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
 
     setStep("importing")
     let imported = 0
+    let updated = 0
     let errors = 0
+
+    // Collect all phones to check for existing leads in bulk
+    const phones = validRows
+      .map(r => r.data?.phone)
+      .filter((p): p is string => !!p)
+
+    let existingLeadsMap = new Map<string, { id: string; source: string | null }>()
+
+    if (!isDemoMode() && phones.length > 0) {
+      const supabase = createClient()
+      // Query in batches of 100 to avoid URL length limits
+      for (let batch = 0; batch < phones.length; batch += 100) {
+        const phoneBatch = phones.slice(batch, batch + 100)
+        const { data: existingLeads } = await supabase
+          .from("leads")
+          .select("id, phone, source")
+          .in("phone", phoneBatch)
+        if (existingLeads) {
+          for (const lead of existingLeads) {
+            if (lead.phone) {
+              existingLeadsMap.set(lead.phone, { id: lead.id, source: lead.source })
+            }
+          }
+        }
+      }
+    }
+
+    const supabase = createClient()
 
     for (let i = 0; i < validRows.length; i++) {
       const row = validRows[i]
       if (row.data) {
-        // Apply assignment based on selected mode
-        const assignedTo = getAssignedAgent(row.data, i)
-        const leadDataWithAssignment = {
-          ...row.data,
-          ...(assignedTo && {
-            assigned_to: assignedTo,
-            assigned_at: new Date().toISOString()
-          })
-        }
+        const existingLead = row.data.phone ? existingLeadsMap.get(row.data.phone) : null
 
-        const result = await createLead(leadDataWithAssignment)
-        if (result.error) {
-          errors++
+        if (existingLead) {
+          // Lead already exists — update source fields
+          try {
+            if (!isDemoMode()) {
+              const sourceUpdates: Record<string, unknown> = {
+                source: row.data.source,
+                source_category: row.data.source_category,
+              }
+              if (row.data.source_detail) {
+                sourceUpdates.source_detail = row.data.source_detail
+              }
+              const { error } = await supabase
+                .from("leads")
+                .update(sourceUpdates)
+                .eq("id", existingLead.id)
+              if (error) {
+                errors++
+              } else {
+                updated++
+              }
+            } else {
+              updated++
+            }
+          } catch {
+            errors++
+          }
         } else {
-          imported++
+          // New lead — create it
+          const assignedTo = getAssignedAgent(row.data, i)
+          const leadDataWithAssignment = {
+            ...row.data,
+            ...(assignedTo && {
+              assigned_to: assignedTo,
+              assigned_at: new Date().toISOString()
+            })
+          }
+
+          const result = await createLead(leadDataWithAssignment)
+          if (result.error) {
+            errors++
+          } else {
+            imported++
+          }
         }
       }
       setImportProgress(Math.round(((i + 1) / validRows.length) * 100))
     }
 
     setImportedCount(imported)
+    setUpdatedCount(updated)
     setErrorCount(errors)
     setStep("complete")
 
-    if (imported > 0) {
-      onSuccess(imported)
+    if (imported > 0 || updated > 0) {
+      onSuccess(imported + updated)
     }
   }, [parsedRows, createLead, onSuccess, getAssignedAgent])
 
@@ -823,8 +885,10 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                   Import Complete
                 </p>
                 <p className="text-[var(--text-muted)] mb-6">
-                  Successfully imported {importedCount} lead{importedCount !== 1 ? "s" : ""}
-                  {errorCount > 0 && ` (${errorCount} failed)`}
+                  {importedCount > 0 && <>Successfully imported {importedCount} new lead{importedCount !== 1 ? "s" : ""}</>}
+                  {importedCount > 0 && updatedCount > 0 && <br />}
+                  {updatedCount > 0 && <>Updated source for {updatedCount} existing lead{updatedCount !== 1 ? "s" : ""}</>}
+                  {errorCount > 0 && <> ({errorCount} failed)</>}
                 </p>
                 <Button onClick={handleClose}>
                   Done

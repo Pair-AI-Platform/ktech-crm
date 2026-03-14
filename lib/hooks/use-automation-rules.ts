@@ -32,17 +32,6 @@ const DEMO_RULES: AutomationRule[] = [
     is_active: true,
     priority: 5,
   },
-  {
-    id: "demo-rule-3",
-    name: "SMS on appointment scheduled",
-    description: "Sends a confirmation SMS when an appointment is scheduled",
-    trigger_type: "appointment_scheduled",
-    trigger_conditions: {},
-    action_type: "send_sms",
-    action_config: { message: "Hi {lead_name}, your appointment at KTECH has been confirmed. See you soon!" },
-    is_active: false,
-    priority: 3,
-  },
 ]
 
 interface UseAutomationRulesReturn {

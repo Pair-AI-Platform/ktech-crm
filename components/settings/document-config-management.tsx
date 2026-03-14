@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { GRADUATE_TYPE_CONFIGS } from "@/lib/psp/document-rules"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
@@ -19,7 +20,6 @@ import {
   Pencil,
   AlertCircle,
   Check,
-  ChevronDown,
 } from "lucide-react"
 
 interface DocumentConfig {
@@ -52,6 +52,29 @@ const emptyForm = {
   description: "",
 }
 
+/** Build fallback configs from the hardcoded document-rules.ts */
+function buildFallbackConfigs(): DocumentConfig[] {
+  const configs: DocumentConfig[] = []
+  for (const typeConfig of GRADUATE_TYPE_CONFIGS) {
+    for (let i = 0; i < typeConfig.documents.length; i++) {
+      const doc = typeConfig.documents[i]
+      configs.push({
+        id: `${typeConfig.type}_${doc.id}`,
+        graduate_type: typeConfig.type,
+        document_id: doc.id,
+        name: doc.name,
+        name_ar: doc.nameAr,
+        required: doc.required,
+        sort_order: i + 1,
+        is_active: true,
+        has_expiration: doc.hasExpiration,
+        description: doc.description || "",
+      })
+    }
+  }
+  return configs
+}
+
 export function DocumentConfigManagement() {
   const [configs, setConfigs] = useState<DocumentConfig[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,10 +86,58 @@ export function DocumentConfigManagement() {
   const [editingDoc, setEditingDoc] = useState<DocumentConfig | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [usingFallback, setUsingFallback] = useState(false)
+
+  const fetchConfigs = useCallback(async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const res = await fetch("/api/settings/document-configs")
+      if (!res.ok) {
+        // API failed — fall back to hardcoded rules but still allow editing via API
+        console.warn("Failed to fetch from API, using fallback")
+        setConfigs(buildFallbackConfigs())
+        setUsingFallback(true)
+        return
+      }
+
+      const data = await res.json()
+      if (data && data.length > 0) {
+        setConfigs(data)
+        setUsingFallback(false)
+      } else {
+        // DB table is empty — auto-seed from hardcoded rules
+        try {
+          const seedRes = await fetch("/api/settings/document-configs/seed", { method: "POST" })
+          if (seedRes.ok) {
+            // Re-fetch after seeding
+            const refetchRes = await fetch("/api/settings/document-configs")
+            if (refetchRes.ok) {
+              const seededData = await refetchRes.json()
+              if (seededData && seededData.length > 0) {
+                setConfigs(seededData)
+                setUsingFallback(false)
+                return
+              }
+            }
+          }
+        } catch {
+          // Seed failed — continue with fallback
+        }
+        setConfigs(buildFallbackConfigs())
+        setUsingFallback(true)
+      }
+    } catch {
+      setConfigs(buildFallbackConfigs())
+      setUsingFallback(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     fetchConfigs()
-  }, [])
+  }, [fetchConfigs])
 
   useEffect(() => {
     if (successMessage) {
@@ -75,19 +146,6 @@ export function DocumentConfigManagement() {
     }
   }, [successMessage])
 
-  const fetchConfigs = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/settings/document-configs")
-      if (res.ok) {
-        const data = await res.json()
-        setConfigs(data)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const filteredDocs = configs
     .filter(c => c.graduate_type === selectedType)
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -95,15 +153,52 @@ export function DocumentConfigManagement() {
   const requiredCount = filteredDocs.filter(d => d.required).length
   const totalCount = filteredDocs.length
 
+  const handleSeedToDatabase = async () => {
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch("/api/settings/document-configs/seed", { method: "POST" })
+      if (!res.ok) {
+        const data = await res.json()
+        setError("Failed to seed documents: " + (data.error || "Unknown error"))
+        return
+      }
+      setSuccessMessage("Documents synced to database successfully")
+      setUsingFallback(false)
+      fetchConfigs()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleAdd = async () => {
     if (!form.document_id.trim() || !form.name.trim()) {
       setError("Document ID and Name are required")
       return
     }
 
-    // Check for duplicate document_id within this type
     if (filteredDocs.some(d => d.document_id === form.document_id)) {
       setError("A document with this ID already exists for this type")
+      return
+    }
+
+    if (usingFallback) {
+      // In fallback mode, add locally
+      setConfigs(prev => [...prev, {
+        id: `${selectedType}_${form.document_id}`,
+        graduate_type: selectedType,
+        document_id: form.document_id,
+        name: form.name,
+        name_ar: form.name_ar,
+        required: form.required,
+        sort_order: filteredDocs.length + 1,
+        is_active: true,
+        has_expiration: form.has_expiration,
+        description: form.description,
+      }])
+      setShowAddModal(false)
+      setForm(emptyForm)
+      setSuccessMessage("Document added successfully")
       return
     }
 
@@ -145,6 +240,22 @@ export function DocumentConfigManagement() {
       return
     }
 
+    if (usingFallback) {
+      // In fallback mode, update locally
+      setConfigs(prev => prev.map(c => c.id === editingDoc.id ? {
+        ...c,
+        name: form.name,
+        name_ar: form.name_ar,
+        required: form.required,
+        has_expiration: form.has_expiration,
+        description: form.description,
+      } : c))
+      setEditingDoc(null)
+      setForm(emptyForm)
+      setSuccessMessage("Document updated successfully")
+      return
+    }
+
     setSaving(true)
     setError("")
     try {
@@ -175,6 +286,14 @@ export function DocumentConfigManagement() {
   }
 
   const handleDelete = async (id: string) => {
+    if (usingFallback) {
+      // In fallback mode, only update locally
+      setConfigs(prev => prev.filter(c => c.id !== id))
+      setSuccessMessage("Document removed")
+      setDeleteConfirm(null)
+      return
+    }
+
     try {
       const res = await fetch(`/api/settings/document-configs?id=${id}`, { method: "DELETE" })
       if (res.ok) {
@@ -188,14 +307,24 @@ export function DocumentConfigManagement() {
   }
 
   const handleToggleRequired = async (doc: DocumentConfig) => {
+    // Optimistic update
+    setConfigs(prev => prev.map(c => c.id === doc.id ? { ...c, required: !c.required } : c))
+
+    if (usingFallback) return // In fallback mode, only update locally
+
     try {
-      await fetch("/api/settings/document-configs", {
+      const res = await fetch("/api/settings/document-configs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: doc.id, required: !doc.required }),
       })
-      fetchConfigs()
+      if (!res.ok) {
+        // Revert on failure
+        setConfigs(prev => prev.map(c => c.id === doc.id ? { ...c, required: doc.required } : c))
+        setError("Failed to update")
+      }
     } catch {
+      setConfigs(prev => prev.map(c => c.id === doc.id ? { ...c, required: doc.required } : c))
       setError("Failed to update")
     }
   }
@@ -239,6 +368,36 @@ export function DocumentConfigManagement() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Error message */}
+        {error && !showAddModal && !editingDoc && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400 text-sm"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+            <Button size="sm" variant="ghost" className="ml-auto text-red-600 hover:text-red-700" onClick={() => { setError(""); fetchConfigs() }}>
+              Retry
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Fallback notice */}
+        {usingFallback && !error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 text-sm"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            Showing default document rules. Sync to database to enable editing.
+            <Button size="sm" variant="ghost" className="ml-auto text-amber-600 hover:text-amber-700" onClick={handleSeedToDatabase} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sync to DB"}
+            </Button>
+          </motion.div>
+        )}
+
         {/* Success message */}
         {successMessage && (
           <motion.div

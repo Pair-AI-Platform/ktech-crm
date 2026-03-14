@@ -4,16 +4,17 @@
 
 export type UserRole = 'admin' | 'agent'
 
-export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'cancelled' | 'online' | 'on_campus' | 'on_the_way' | 'cant_reach' | 'contacted' | 'seeking_job' | 'current_student' | 'asking_bachelors' | 'courses_masters' | 'rude' | 'informed' | 'travelling' | 'might_withdraw' | 'pay_later' | 'interested' | 'high_gpa' | 'competitor' | 'applied' | 'blocked_ku' | 'blocked_paaet' | 'blocked_abroad' | 'blocked_aasu' | 'blocked_paci' | 'blocked_puc' | 'blocked_gpa' | 'documents_missing' | 'payment_pending' | 'blocked_other'
+export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'cancelled' | 'online' | 'on_campus' | 'on_the_way' | 'cant_reach' | 'contacted' | 'seeking_job' | 'current_student' | 'asking_bachelors' | 'courses_masters' | 'rude' | 'informed' | 'travelling' | 'might_withdraw' | 'pay_later' | 'interested' | 'high_gpa' | 'competitor' | 'applied' | 'blocked_ku' | 'blocked_paaet' | 'blocked_abroad' | 'blocked_aasu' | 'blocked_paci' | 'blocked_puc' | 'blocked_gpa' | 'documents_missing' | 'payment_pending' | 'blocked_other' | 'changed_preferences'
 
 export type LeadSourceCategory = 'direct' | 'events' | 'digital' | 'referrals' | 'outreach'
 
 export type LeadSource =
   | 'walk_in' | 'call_center' | 'whatsapp' | 'email'
   | 'school_visit' | 'expo' | 'exhibitions' | 'karnival'
-  | 'website_form' | 'facebook' | 'instagram' | 'snapchat'
+  | 'website_form' | 'facebook' | 'instagram'
   | 'current_student_referral' | 'staff_referral' | 'friend_referral'
   | 'old_contacts' | 'paaet_rejected' | 'gpa_lists'
+  | 'whatsapp_ai'
 
 export type PipelineStage =
   | 'new' | 'contacted' | 'visit' | 'test' | 'application' | 'lost' | 'applicant' | 'enrolled' | 'withdraw'
@@ -42,13 +43,13 @@ export type School =
   | 'jaber_alahmad_hawalli' | 'fahd_alduwiri' | 'abdullah_abdullatif_alrajeeb' | 'ahmad_alrabei'
   | 'nasser_almuhsin_alsaeed' | 'salah_aldin' | 'alrajaa_boys' | 'alnoor_boys'
   | 'alamal_boys' | 'alwataniya_private' | 'alikhlas_boys' | 'kuwait_academy'
-  | 'alnajat_boys' | 'institute_qurtuba_boys'
+  | 'alnajat_hawalli_boys' | 'institute_qurtuba_boys'
   // Hawalli (حولي) - Girls (19)
   | 'mushrif_girls' | 'salwa_girls' | 'khalida_bint_alaswad' | 'omama_bint_bishr'
   | 'february25_girls' | 'alsalmiya_girls' | 'aljabriya_girls' | 'bayan_girls'
   | 'fatima_alsarawi' | 'maria_alqibtiya' | 'alnoor_girls' | 'alrajaa_girls'
   | 'alamal_girls' | 'aljeel_aljadeed' | 'arabian_academy' | 'alikhlas_girls'
-  | 'alnajat_girls' | 'aldana_girls' | 'institute_qurtuba_girls_hawalli'
+  | 'alnajat_salmiya_girls' | 'aldana_girls' | 'institute_qurtuba_girls_hawalli'
   // Farwaniya (الفروانية) - Boys (21)
   | 'aldawgha' | 'tariq_bin_ziyad' | 'shujaa_bin_alaslam' | 'labid_bin_alrabee'
   | 'juleib_alshuyoukh' | 'aljahiz' | 'alsabah_farwaniya' | 'abdullatif_thunayan'
@@ -68,14 +69,14 @@ export type School =
   | 'talha_bin_ubaid' | 'omar_bin_alkhattab' | 'mohammed_alnashmi' | 'alkindi'
   | 'hisham_bin_alaas' | 'alsabahiya_boys' | 'alqurtubi' | 'balat_alshuhada'
   | 'salem_almubarak' | 'saeed_bin_amer' | 'issa_alhouli' | 'abdullah_alahmad_alsabah'
-  | 'harun_alrashid' | 'institute_south_sabahiya' | 'institute_aliman' | 'almaarifa_boys'
+  | 'harun_alrashid' | 'institute_south_sabahiya' | 'institute_aliman' | 'almaarifa_boys' | 'alnajat_mangaf_boys'
   // Ahmadi (الأحمدي) - Girls (23)
   | 'moudhi_alissa' | 'alkhairan_girls' | 'ghunaimah_almarzouk' | 'shakriya_alsaeedi'
   | 'jumana_bint_alhasan' | 'alrawdatain_girls' | 'um_alhaiman' | 'fatima_bint_asad'
   | 'latifa_alfares' | 'amah_bint_khaled' | 'alsabahiya_girls' | 'lubna_bint_alharith'
   | 'alritqa_girls' | 'alraqqa_girls' | 'hadiya_girls' | 'um_alala_alansariya'
   | 'anisa_bint_khabib' | 'awatif_khalifa_alathbi' | 'muadhah_alghifariya'
-  | 'almaarifa_girls' | 'alnajat_ahmadi_girls' | 'um_alqura' | 'zainab_bint_mazoun'
+  | 'almaarifa_girls' | 'alnajat_mangaf_girls' | 'um_alqura' | 'zainab_bint_mazoun'
   // Jahra (الجهراء) - Boys (9)
   | 'thabit_bin_qais' | 'orwa_bin_alzubayr' | 'saad_alabdullah_alsabah'
   | 'mohammed_almuhaini' | 'khaled_bin_saeed' | 'sabah_alnasser' | 'alwaha'
@@ -179,12 +180,95 @@ export interface Profile {
   updated_at: string
 }
 
-// Target configuration mode
-export type TargetMode = 'simple' | 'gender' | 'funding'
+// Target configuration mode (deprecated - kept for backward compat)
+export type TargetMode = 'simple' | 'custom' | 'funding'
 
 export interface TargetSettings {
   mode: TargetMode
   updated_at?: string
+}
+
+// New target system — 4 fixed categories
+export type TargetCategory = 'puc_files' | 'sf_files' | 'sf_applicants' | 'puc_app_submission'
+
+// Seasonal periods for SF Applicants + PUC App Submission
+export interface TargetSeason {
+  id: string
+  name: string
+  start_date: string  // ISO date 'YYYY-MM-DD'
+  end_date: string    // ISO date 'YYYY-MM-DD'
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AgentSeasonalTarget {
+  id: string
+  agent_id: string
+  season_id: string
+  sf_applicants: number
+  puc_app_submission: number
+  weekly_sf_applicants?: number[] | null
+  weekly_puc_app_submission?: number[] | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AgentTarget {
+  id: string
+  agent_id: string
+  month: string
+  puc_files: number
+  sf_files: number
+  sf_applicants: number
+  puc_app_submission: number
+  puc_files_male?: number | null
+  puc_files_female?: number | null
+  sf_files_male?: number | null
+  sf_files_female?: number | null
+  weekly_puc_files?: number[] | null
+  weekly_sf_files?: number[] | null
+  weekly_sf_applicants?: number[] | null
+  weekly_puc_app_submission?: number[] | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CategoryProgress {
+  target: number
+  achieved: number
+  progress: number
+  male?: { target: number; achieved: number; progress: number }
+  female?: { target: number; achieved: number; progress: number }
+}
+
+export interface AgentTargetProgressV2 {
+  agentId: string
+  agentName: string
+  month: string
+  categories: {
+    puc_files: CategoryProgress
+    sf_files: CategoryProgress
+    sf_applicants: CategoryProgress
+    puc_app_submission: CategoryProgress
+  }
+  totalTarget: number
+  totalAchieved: number
+  totalProgress: number
+  weeklyBreakdown?: {
+    puc_files?: WeeklyTarget[]
+    sf_files?: WeeklyTarget[]
+    sf_applicants?: WeeklyTarget[]
+    puc_app_submission?: WeeklyTarget[]
+  }
+}
+
+export interface WeeklyTarget {
+  weekNumber: number
+  weekLabel: string
+  target: number
+  achieved: number
+  progress: number
+  isCurrent?: boolean
 }
 
 // =============================================
@@ -237,6 +321,7 @@ export interface Lead {
   intended_major?: IntendedMajor
   custom_major?: string
   preferred_major?: string
+  preferred_college?: string
   graduation_year?: number
   expected_gpa?: number
   actual_lead?: boolean
@@ -281,6 +366,10 @@ export interface Lead {
   source_detail?: string
   referral_code?: string
   referred_by_lead_id?: string
+
+  // Cycle
+  semester_id?: string
+  semester?: Semester
 
   // Pipeline
   status?: LeadStatus
@@ -335,6 +424,11 @@ export interface Lead {
   // Callback
   callback_date?: string
 
+  // Priority
+  priority?: 'normal' | 'important' | 'critical'
+  priority_set_by?: string
+  priority_set_at?: string
+
   // Joined relations (from queries)
   appointments?: { id: string; appointment_type: AppointmentType[]; status: AppointmentStatus; scheduled_date: string }[]
 }
@@ -378,6 +472,7 @@ export interface LeadFormData {
   intended_major?: IntendedMajor
   custom_major?: string
   preferred_major?: string
+  preferred_college?: string
   graduation_year?: number
   expected_gpa?: number
   actual_gpa?: number
@@ -914,6 +1009,7 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; labelAr: string;
   { value: 'documents_missing', label: 'Documents Missing', labelAr: 'مستندات ناقصة', color: 'warning' },
   { value: 'payment_pending', label: 'Payment Pending', labelAr: 'بانتظار الدفع', color: 'warning' },
   { value: 'blocked_other', label: 'Other', labelAr: 'أخرى', color: 'secondary' },
+  { value: 'changed_preferences', label: 'Changed Preferences', labelAr: 'غير تفضيلاته', color: 'purple' },
 ]
 
 // Statuses that are exclusive to the Applicant stage
@@ -938,6 +1034,7 @@ export const PIPELINE_STAGES: { value: PipelineStage; label: string; labelAr: st
   { value: 'puc_application_submission', label: 'Application Submission', labelAr: 'تقديم الطلب' },
   { value: 'applicant', label: 'Applicant', labelAr: 'متقدم' },
   { value: 'enrolled', label: 'Enrolled', labelAr: 'مسجل' },
+  { value: 'lost', label: 'Lost', labelAr: 'خسارة' },
   { value: 'withdraw', label: 'Withdraw', labelAr: 'انسحاب' },
 ]
 
@@ -1141,7 +1238,7 @@ export const SCHOOLS: { value: School; label: string; labelEn: string; labelAr: 
   { value: 'alwataniya_private', label: 'الوطنية الاهلية', labelEn: 'Alwataniya Private', labelAr: 'الوطنية الاهلية', governorate: 'hawalli', gender: 'boys' },
   { value: 'alikhlas_boys', label: 'الإخلاص الأهلية بنين', labelEn: 'Alikhlas Boys', labelAr: 'الإخلاص الأهلية بنين', governorate: 'hawalli', gender: 'boys' },
   { value: 'kuwait_academy', label: 'أكاديمية الكويت التعليمية', labelEn: 'Kuwait Academy', labelAr: 'أكاديمية الكويت التعليمية', governorate: 'hawalli', gender: 'boys' },
-  { value: 'alnajat_boys', label: 'النجاة بنين', labelEn: 'Alnajat Boys', labelAr: 'النجاة بنين', governorate: 'hawalli', gender: 'boys' },
+  { value: 'alnajat_hawalli_boys', label: 'النجاة بنين حولي', labelEn: 'Al-Najat Boys Hawally', labelAr: 'النجاة بنين حولي', governorate: 'hawalli', gender: 'boys' },
   { value: 'institute_qurtuba_boys', label: 'المعهد الديني قرطبة (بنين)', labelEn: 'Institute Qurtuba Boys', labelAr: 'المعهد الديني قرطبة (بنين)', governorate: 'hawalli', gender: 'boys' },
 
   // =============================================
@@ -1163,7 +1260,7 @@ export const SCHOOLS: { value: School; label: string; labelEn: string; labelAr: 
   { value: 'aljeel_aljadeed', label: 'الجيل الجديد', labelEn: 'Aljeel Aljadeed', labelAr: 'الجيل الجديد', governorate: 'hawalli', gender: 'girls' },
   { value: 'arabian_academy', label: 'الأكاديمية العربية', labelEn: 'Arabian Academy', labelAr: 'الأكاديمية العربية', governorate: 'hawalli', gender: 'girls' },
   { value: 'alikhlas_girls', label: 'الإخلاص الأهلية بنات', labelEn: 'Alikhlas Girls', labelAr: 'الإخلاص الأهلية بنات', governorate: 'hawalli', gender: 'girls' },
-  { value: 'alnajat_girls', label: 'النجاة بنات', labelEn: 'Alnajat Girls', labelAr: 'النجاة بنات', governorate: 'hawalli', gender: 'girls' },
+  { value: 'alnajat_salmiya_girls', label: 'النجاة بنات السالمية', labelEn: 'Al-Najat Girls Salmiya', labelAr: 'النجاة بنات السالمية', governorate: 'hawalli', gender: 'girls' },
   { value: 'aldana_girls', label: 'الدانة', labelEn: 'Aldana Girls', labelAr: 'الدانة', governorate: 'hawalli', gender: 'girls' },
   { value: 'institute_qurtuba_girls_hawalli', label: 'المعهد الديني قرطبة (بنات)', labelEn: 'Institute Qurtuba Girls Hawalli', labelAr: 'المعهد الديني قرطبة (بنات)', governorate: 'hawalli', gender: 'girls' },
 
@@ -1239,6 +1336,7 @@ export const SCHOOLS: { value: School; label: string; labelEn: string; labelAr: 
   { value: 'institute_south_sabahiya', label: 'المعهد الديني (جنوب الصباحية)', labelEn: 'Institute South Sabahiya', labelAr: 'المعهد الديني (جنوب الصباحية)', governorate: 'ahmadi', gender: 'boys' },
   { value: 'institute_aliman', label: 'معهد الإيمان الشرعي الأهلية', labelEn: 'Institute Aliman', labelAr: 'معهد الإيمان الشرعي الأهلية', governorate: 'ahmadi', gender: 'boys' },
   { value: 'almaarifa_boys', label: 'المعرفة النموذجية بنين', labelEn: 'Almaarifa Boys', labelAr: 'المعرفة النموذجية بنين', governorate: 'ahmadi', gender: 'boys' },
+  { value: 'alnajat_mangaf_boys', label: 'النجاة بنين المقف', labelEn: 'Al-Najat Boys Mangaf', labelAr: 'النجاة بنين المقف', governorate: 'ahmadi', gender: 'boys' },
 
   // =============================================
   // AHMADI (الأحمدي) - GIRLS (23)
@@ -1263,7 +1361,7 @@ export const SCHOOLS: { value: School; label: string; labelEn: string; labelAr: 
   { value: 'awatif_khalifa_alathbi', label: 'عواطف خليفة العذبي الصباح', labelEn: 'Awatif Khalifa Alathbi', labelAr: 'عواطف خليفة العذبي الصباح', governorate: 'ahmadi', gender: 'girls' },
   { value: 'muadhah_alghifariya', label: 'معاذة الغفارية', labelEn: 'Muadhah Alghifariya', labelAr: 'معاذة الغفارية', governorate: 'ahmadi', gender: 'girls' },
   { value: 'almaarifa_girls', label: 'المعرفة النموذجية بنات', labelEn: 'Almaarifa Girls', labelAr: 'المعرفة النموذجية بنات', governorate: 'ahmadi', gender: 'girls' },
-  { value: 'alnajat_ahmadi_girls', label: 'النجاة بنات', labelEn: 'Alnajat Ahmadi Girls', labelAr: 'النجاة بنات', governorate: 'ahmadi', gender: 'girls' },
+  { value: 'alnajat_mangaf_girls', label: 'النجاة بنات المنقف', labelEn: 'Al-Najat Girls Mangaf', labelAr: 'النجاة بنات المنقف', governorate: 'ahmadi', gender: 'girls' },
   { value: 'um_alqura', label: 'أم القرى', labelEn: 'Um Alqura', labelAr: 'أم القرى', governorate: 'ahmadi', gender: 'girls' },
   { value: 'zainab_bint_mazoun', label: 'زينب بنت مظعون', labelEn: 'Zainab Bint Mazoun', labelAr: 'زينب بنت مظعون', governorate: 'ahmadi', gender: 'girls' },
 
@@ -1347,13 +1445,13 @@ export const LEAD_SOURCES: { value: LeadSource; label: string; category: LeadSou
   { value: 'website_form', label: 'Website Form', category: 'digital' },
   { value: 'facebook', label: 'Facebook', category: 'digital' },
   { value: 'instagram', label: 'Instagram', category: 'digital' },
-  { value: 'snapchat', label: 'Snapchat', category: 'digital' },
   { value: 'current_student_referral', label: 'Student Referral', category: 'referrals' },
   { value: 'staff_referral', label: 'Staff Referral', category: 'referrals' },
   { value: 'friend_referral', label: 'Friend Referral', category: 'referrals' },
   { value: 'old_contacts', label: 'Old Contacts', category: 'outreach' },
   { value: 'paaet_rejected', label: 'PAAET Rejected', category: 'outreach' },
-  { value: 'gpa_lists', label: 'GPA Lists', category: 'outreach' }
+  { value: 'gpa_lists', label: 'GPA Lists', category: 'outreach' },
+  { value: 'whatsapp_ai', label: 'WhatsApp AI', category: 'digital' }
 ]
 
 export const EDUCATION_TYPES: { value: EducationType; label: string; description: string }[] = [
@@ -1372,6 +1470,21 @@ export const MAJORS: { value: IntendedMajor; label: string }[] = [
   { value: 'mis', label: 'نظم المعلومات الإدارية' },
   { value: 'network_security', label: 'أمن الشبكات' },
   { value: 'other', label: 'أخرى' }
+]
+
+export const PREFERRED_COLLEGES: { value: string; label: string }[] = [
+  { value: 'AUM', label: 'AUM' },
+  { value: 'ACM', label: 'ACM' },
+  { value: 'GUST', label: 'GUST' },
+  { value: 'AIU', label: 'AIU' },
+  { value: 'AUK', label: 'AUK' },
+  { value: 'AU', label: 'AU' },
+  { value: 'BOXHILL', label: 'BOXHILL' },
+  { value: 'KILAW', label: 'KILAW' },
+  { value: 'KCST', label: 'KCST' },
+  { value: 'CCK', label: 'CCK' },
+  { value: 'CAT', label: 'CAT' },
+  { value: 'IUK', label: 'IUK' },
 ]
 
 export const NATIONALITIES: { value: string; label: string; labelAr: string }[] = [

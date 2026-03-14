@@ -19,7 +19,7 @@ const Avatar = React.forwardRef<
     xl: "h-16 w-16 text-lg",
   }
 
-  const statusColors = {
+  const statusDotColors: Record<string, string> = {
     online: "bg-[var(--success)]",
     offline: "bg-[var(--text-muted)]",
     busy: "bg-[var(--error)]",
@@ -43,7 +43,7 @@ const Avatar = React.forwardRef<
         <span
           className={cn(
             "absolute bottom-0 right-0 block rounded-full ring-2 ring-[var(--bg-surface)]",
-            statusColors[status],
+            statusDotColors[status],
             size === "xs" && "h-1.5 w-1.5",
             size === "sm" && "h-2 w-2",
             size === "md" && "h-2.5 w-2.5",

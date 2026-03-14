@@ -44,6 +44,7 @@ import { CalendarView } from "@/components/calendar/calendar-view"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { AppointmentDetail } from "@/components/calendar/appointment-detail"
 import { SlotManager } from "@/components/calendar/slot-manager"
+import { useSearchParams } from "next/navigation"
 import { cn, toDateString } from "@/lib/utils"
 
 type TimeRange = "day" | "week" | "month"
@@ -53,14 +54,23 @@ type CalendarMode = "all" | "appointments" | "callbacks"
 export default function CalendarPage() {
   const { profile } = useUser()
   const { agents } = useAgents()
+  const searchParams = useSearchParams()
   const [timeRange, setTimeRange] = useState<TimeRange>("week")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar")
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
 
   // Ensure the date is set to today on mount (handles SSR hydration)
   useEffect(() => {
+    const dateParam = searchParams.get('date')
+    if (dateParam) {
+      const parsed = new Date(dateParam + 'T00:00:00')
+      if (!isNaN(parsed.getTime())) {
+        setCurrentDate(parsed)
+        return
+      }
+    }
     setCurrentDate(new Date())
-  }, [])
+  }, [searchParams])
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("appointments")
   const [selectedTypes, setSelectedTypes] = useState<AppointmentType[]>([])
   const [selectedAgent, setSelectedAgent] = useState<string>("all")
@@ -107,6 +117,17 @@ export default function CalendarPage() {
   })
 
   const { appointments: todayAppointments, loading: todayLoading, refetch: refetchToday } = useTodayAppointments()
+
+  // Auto-open appointment from URL param
+  useEffect(() => {
+    const appointmentId = searchParams.get('appointmentId')
+    if (appointmentId && !loading && appointments.length > 0) {
+      const apt = appointments.find(a => a.id === appointmentId)
+      if (apt) {
+        setSelectedAppointment(apt)
+      }
+    }
+  }, [searchParams, loading, appointments])
 
   const filteredAppointments = useMemo(() => {
     if (!searchQuery.trim()) return appointments

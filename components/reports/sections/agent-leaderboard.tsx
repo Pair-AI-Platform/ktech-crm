@@ -16,16 +16,15 @@ import {
   Crown,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { LeaderboardData, TargetMode } from "@/lib/hooks/use-reports"
+import type { LeaderboardData } from "@/lib/hooks/use-reports"
 
 interface AgentLeaderboardProps {
   data: LeaderboardData[]
-  targetMode?: TargetMode
 }
 
 type SortKey = 'rank' | 'leads' | 'appointments' | 'applications' | 'enrolled' | 'conversionRate'
 
-export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboardProps) {
+export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortKey>('enrolled')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
@@ -110,103 +109,13 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
                   <Stat label="Progress" value={`${agent.progress}%`} />
                 </div>
 
-                {/* Application Target Progress */}
-                <div className="mt-4">
-                  {targetMode === 'simple' && (
-                    <>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-[var(--text-muted)]">Application Target</span>
-                        <span className="text-xs font-medium text-[var(--text-primary)]">
-                          {agent.applications} / {agent.target}
-                        </span>
-                      </div>
-                      <ProgressBar
-                        value={agent.progress}
-                        max={100}
-                        size="sm"
-                        variant={agent.progress >= 100 ? 'success' : agent.progress >= 50 ? 'warning' : 'gradient'}
-                      />
-                    </>
+                {/* Target Progress - always 3 categories */}
+                <div className="mt-4 space-y-2">
+                  {agent.categories?.puc && agent.categories.puc.target > 0 && (
+                    <CategoryBar label="PUC Files" color="green" cat={agent.categories.puc} />
                   )}
-                  {targetMode === 'gender' && agent.categories && (
-                    <div className="space-y-2">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-blue-500" />
-                            Male
-                          </span>
-                          <span className="text-xs font-medium text-[var(--text-primary)]">
-                            {agent.categories.male?.applications || 0} / {agent.categories.male?.target || 0}
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={agent.categories.male?.progress || 0}
-                          max={100}
-                          size="sm"
-                          className="[--progress-gradient-from:theme(colors.blue.400)] [--progress-gradient-to:theme(colors.blue.600)]"
-                          variant={(agent.categories.male?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-pink-500" />
-                            Female
-                          </span>
-                          <span className="text-xs font-medium text-[var(--text-primary)]">
-                            {agent.categories.female?.applications || 0} / {agent.categories.female?.target || 0}
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={agent.categories.female?.progress || 0}
-                          max={100}
-                          size="sm"
-                          className="[--progress-gradient-from:theme(colors.pink.400)] [--progress-gradient-to:theme(colors.pink.600)]"
-                          variant={(agent.categories.female?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {targetMode === 'funding' && agent.categories && (
-                    <div className="space-y-2">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                            PUC
-                          </span>
-                          <span className="text-xs font-medium text-[var(--text-primary)]">
-                            {agent.categories.puc?.applications || 0} / {agent.categories.puc?.target || 0}
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={agent.categories.puc?.progress || 0}
-                          max={100}
-                          size="sm"
-                          className="[--progress-gradient-from:theme(colors.green.400)] [--progress-gradient-to:theme(colors.green.600)]"
-                          variant={(agent.categories.puc?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-orange-500" />
-                            Self-Funded
-                          </span>
-                          <span className="text-xs font-medium text-[var(--text-primary)]">
-                            {agent.categories.sf?.applications || 0} / {agent.categories.sf?.target || 0}
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={agent.categories.sf?.progress || 0}
-                          max={100}
-                          size="sm"
-                          className="[--progress-gradient-from:theme(colors.orange.400)] [--progress-gradient-to:theme(colors.orange.600)]"
-                          variant={(agent.categories.sf?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                        />
-                      </div>
-                    </div>
+                  {agent.categories?.sf && agent.categories.sf.target > 0 && (
+                    <CategoryBar label="SF Files" color="orange" cat={agent.categories.sf} />
                   )}
                 </div>
               </CardContent>
@@ -286,7 +195,7 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
                     <SortHeader label="Enrolled" sortKey="enrolled" currentSort={sortBy} onSort={handleSort} />
                     <SortHeader label="Conv %" sortKey="conversionRate" currentSort={sortBy} onSort={handleSort} />
                     <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)]">
-                      App. Target
+                      Targets
                     </th>
                   </tr>
                 </thead>
@@ -325,89 +234,29 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        {targetMode === 'simple' && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-20">
-                              <ProgressBar
-                                value={agent.progress}
-                                max={100}
-                                size="sm"
-                                variant={agent.progress >= 100 ? 'success' : agent.progress >= 50 ? 'warning' : 'gradient'}
-                              />
-                            </div>
-                            <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
-                              {agent.applications}/{agent.target}
-                            </span>
-                          </div>
-                        )}
-                        {targetMode === 'gender' && agent.categories && (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                              <div className="w-16">
-                                <ProgressBar
-                                  value={agent.categories.male?.progress || 0}
-                                  max={100}
-                                  size="sm"
-                                  className="[--progress-gradient-from:theme(colors.blue.400)] [--progress-gradient-to:theme(colors.blue.600)]"
-                                  variant={(agent.categories.male?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                                />
-                              </div>
-                              <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
-                                {agent.categories.male?.applications || 0}/{agent.categories.male?.target || 0}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-pink-500 flex-shrink-0" />
-                              <div className="w-16">
-                                <ProgressBar
-                                  value={agent.categories.female?.progress || 0}
-                                  max={100}
-                                  size="sm"
-                                  className="[--progress-gradient-from:theme(colors.pink.400)] [--progress-gradient-to:theme(colors.pink.600)]"
-                                  variant={(agent.categories.female?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                                />
-                              </div>
-                              <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
-                                {agent.categories.female?.applications || 0}/{agent.categories.female?.target || 0}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {targetMode === 'funding' && agent.categories && (
-                          <div className="space-y-1">
+                        <div className="space-y-1">
+                          {agent.categories?.puc && agent.categories.puc.target > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
                               <div className="w-16">
-                                <ProgressBar
-                                  value={agent.categories.puc?.progress || 0}
-                                  max={100}
-                                  size="sm"
-                                  className="[--progress-gradient-from:theme(colors.green.400)] [--progress-gradient-to:theme(colors.green.600)]"
-                                  variant={(agent.categories.puc?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                                />
+                                <ProgressBar value={agent.categories.puc.progress} max={100} size="sm" className="[--progress-gradient-from:theme(colors.green.400)] [--progress-gradient-to:theme(colors.green.600)]" variant={agent.categories.puc.progress >= 100 ? 'success' : 'gradient'} />
                               </div>
-                              <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
-                                {agent.categories.puc?.applications || 0}/{agent.categories.puc?.target || 0}
-                              </span>
+                              <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">{agent.categories.puc.applications}/{agent.categories.puc.target}</span>
                             </div>
+                          )}
+                          {agent.categories?.sf && agent.categories.sf.target > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
                               <div className="w-16">
-                                <ProgressBar
-                                  value={agent.categories.sf?.progress || 0}
-                                  max={100}
-                                  size="sm"
-                                  className="[--progress-gradient-from:theme(colors.orange.400)] [--progress-gradient-to:theme(colors.orange.600)]"
-                                  variant={(agent.categories.sf?.progress || 0) >= 100 ? 'success' : 'gradient'}
-                                />
+                                <ProgressBar value={agent.categories.sf.progress} max={100} size="sm" className="[--progress-gradient-from:theme(colors.orange.400)] [--progress-gradient-to:theme(colors.orange.600)]" variant={agent.categories.sf.progress >= 100 ? 'success' : 'gradient'} />
                               </div>
-                              <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
-                                {agent.categories.sf?.applications || 0}/{agent.categories.sf?.target || 0}
-                              </span>
+                              <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">{agent.categories.sf.applications}/{agent.categories.sf.target}</span>
                             </div>
-                          </div>
-                        )}
+                          )}
+                          {(!agent.categories?.puc?.target && !agent.categories?.sf?.target) && (
+                            <span className="text-xs text-[var(--text-muted)]">No target</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -417,6 +266,29 @@ export function AgentLeaderboard({ data, targetMode = 'simple' }: AgentLeaderboa
           </CardContent>
         </Card>
       </motion.div>
+    </div>
+  )
+}
+
+function CategoryBar({ label, color, cat }: { label: string; color: string; cat: { target: number; applications: number; progress: number } }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+          <div className={`w-2 h-2 rounded-full bg-${color}-500`} />
+          {label}
+        </span>
+        <span className="text-xs font-medium text-[var(--text-primary)]">
+          {cat.applications} / {cat.target}
+        </span>
+      </div>
+      <ProgressBar
+        value={cat.progress}
+        max={100}
+        size="sm"
+        className={`[--progress-gradient-from:theme(colors.${color}.400)] [--progress-gradient-to:theme(colors.${color}.600)]`}
+        variant={cat.progress >= 100 ? 'success' : 'gradient'}
+      />
     </div>
   )
 }

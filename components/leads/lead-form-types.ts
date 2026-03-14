@@ -18,6 +18,7 @@ export interface LeadFormData {
   funding_type: string
   intended_major: string
   preferred_major: string
+  preferred_college: string
   pipeline_stage: string
   status: string
   graduation_year: string
@@ -55,6 +56,8 @@ export interface LeadFormData {
   discount_type: string
   discount_percentage: string
   discount_notes: string
+  // Cycle
+  semester_id: string
   // Assignment
   assigned_to: string
 }

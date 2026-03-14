@@ -60,7 +60,7 @@ export const PUT = withApiHandler(
 
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 })
 
-    const allowedFields = ['name', 'description', 'required', 'enabled', 'category', 'file_types', 'max_size']
+    const allowedFields = ['name', 'name_ar', 'description', 'required', 'has_expiration', 'enabled', 'category', 'file_types', 'max_size']
     const updates: Record<string, unknown> = {}
     for (const field of allowedFields) {
       if (field in body) updates[field] = body[field]

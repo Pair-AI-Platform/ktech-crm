@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { AnnouncementButton } from "./announcement-button"
 import { NotificationDropdown } from "./notification-dropdown"
 import Link from "next/link"
 import type { Profile } from "@/lib/hooks/use-user"
@@ -64,6 +65,9 @@ export function Header({ user, title, subtitle, subtitleExtra, action, breadcrum
 
         {/* Right Section - Actions */}
         <div className="flex items-center gap-3">
+          {/* Announcement (admin only) */}
+          <AnnouncementButton isAdmin={user?.role === "admin"} />
+
           {/* Notifications */}
           <NotificationDropdown userId={user?.id} />
 

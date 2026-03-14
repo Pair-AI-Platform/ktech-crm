@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 const logger = createClientLogger("automation-engine")
 
-export type TriggerType = "stage_change" | "lead_created" | "appointment_scheduled" | "payment_received" | "birthday"
+export type TriggerType = "stage_change" | "lead_created" | "appointment_scheduled" | "payment_received" | "birthday" | "preference_changed"
 
 export interface AutomationContext {
   trigger: TriggerType
@@ -20,7 +20,7 @@ export interface AutomationRule {
   description?: string
   trigger_type: TriggerType
   trigger_conditions: Record<string, unknown>
-  action_type: "send_sms" | "assign_lead" | "create_follow_up" | "create_notification" | "change_stage"
+  action_type: "assign_lead" | "create_follow_up" | "create_notification" | "change_stage"
   action_config: Record<string, unknown>
   is_active: boolean
   priority: number
@@ -59,6 +59,10 @@ function matchesConditions(conditions: Record<string, unknown>, leadData: Record
       if (metadata.new_stage !== value) return false
     } else if (key === "old_stage" && metadata) {
       if (metadata.old_stage !== value) return false
+    } else if (key === "new_major" && metadata) {
+      if (metadata.new_major !== value) return false
+    } else if (key === "old_major" && metadata) {
+      if (metadata.old_major !== value) return false
     } else if (key === "source") {
       if (leadData.source !== value) return false
     } else if (key === "funding_type") {
@@ -149,80 +153,6 @@ async function executeAction(
 
         if (error) return { success: false, error: error.message }
         return { success: true, result: { follow_up_due: dueAt.toISOString() } }
-      }
-
-      case "send_sms": {
-        if (!validateConfig<{ message?: string; template_id?: string }>(action_config, [])) {
-          return { success: false, error: "Invalid config for send_sms: missing message or template_id" }
-        }
-        const { template_id, message } = action_config as {
-          template_id?: string
-          message?: string
-        }
-        const phone = ctx.leadData.phone as string
-        if (!phone) return { success: false, error: "No phone number on lead" }
-
-        const resolvedMessage = (message || "")
-          .replace("{lead_name}", `${ctx.leadData.first_name || ""} ${ctx.leadData.last_name || ""}`.trim())
-
-        const MAX_RETRIES = 1
-        let lastError = ""
-
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-          try {
-            const response = await fetch(getApiUrl("/api/sms/send"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                phone,
-                message: resolvedMessage,
-                leadId: ctx.leadId,
-                templateId: template_id,
-              }),
-            })
-
-            if (response.ok) {
-              const data = await response.json()
-              return {
-                success: true,
-                result: {
-                  sms_sent_to: phone,
-                  sms_status: data.status || "sent",
-                  message_sid: data.messageSid,
-                  attempt: attempt + 1,
-                },
-              }
-            }
-
-            const data = await response.json().catch(() => ({}))
-            lastError = data.error || `SMS send failed (HTTP ${response.status})`
-
-            if (attempt < MAX_RETRIES) {
-              logger.warn(`SMS send attempt ${attempt + 1} failed, retrying...`, {
-                phone,
-                error: lastError,
-                ruleId: rule.id,
-              })
-              // Brief delay before retry
-              await new Promise(resolve => setTimeout(resolve, 1000))
-            }
-          } catch (err) {
-            lastError = `SMS request failed: ${err}`
-            if (attempt < MAX_RETRIES) {
-              logger.warn(`SMS request attempt ${attempt + 1} failed, retrying...`, {
-                phone,
-                error: lastError,
-              })
-              await new Promise(resolve => setTimeout(resolve, 1000))
-            }
-          }
-        }
-
-        return {
-          success: false,
-          error: lastError,
-          result: { sms_status: "failed", attempts: MAX_RETRIES + 1 },
-        }
       }
 
       case "assign_lead": {
@@ -336,5 +266,78 @@ export async function executeAutomations(
     return results
   } finally {
     executingLeads.delete(executionKey)
+  }
+}
+
+/**
+ * Handles priority change for a lead.
+ * When priority is set to important/critical: creates a recurring follow-up reminder.
+ * When priority is reset to normal: marks existing recurring reminders as completed.
+ */
+export async function handlePriorityChange(
+  leadId: string,
+  priority: "normal" | "important" | "critical",
+  assignedTo: string | null,
+  userId: string,
+  supabaseClient?: SupabaseClient
+) {
+  const supabase = supabaseClient || createClient()
+
+  if (priority === "normal") {
+    // Mark any existing recurring reminders for this lead as completed
+    await supabase
+      .from("follow_up_reminders")
+      .update({ status: "completed" })
+      .eq("lead_id", leadId)
+      .eq("is_recurring", true)
+      .eq("status", "pending")
+
+    logger.info("Cleared recurring reminders for lead", { leadId })
+    return
+  }
+
+  const intervalHours = priority === "critical" ? 24 : 48
+  const targetUserId = assignedTo || userId
+
+  // Check if a recurring reminder already exists
+  const { data: existing } = await supabase
+    .from("follow_up_reminders")
+    .select("id, recurrence_interval_hours")
+    .eq("lead_id", leadId)
+    .eq("is_recurring", true)
+    .eq("status", "pending")
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    // Update existing reminder interval if priority changed
+    if (existing[0].recurrence_interval_hours !== intervalHours) {
+      await supabase
+        .from("follow_up_reminders")
+        .update({ recurrence_interval_hours: intervalHours })
+        .eq("id", existing[0].id)
+    }
+    return
+  }
+
+  // Create new recurring reminder
+  const dueAt = new Date()
+  dueAt.setHours(dueAt.getHours() + intervalHours)
+
+  const { error } = await supabase.from("follow_up_reminders").insert({
+    lead_id: leadId,
+    assigned_to: targetUserId,
+    title: `Priority follow-up (${priority})`,
+    notes: `Auto-created: lead marked as ${priority} priority`,
+    due_at: dueAt.toISOString(),
+    is_recurring: true,
+    recurrence_interval_hours: intervalHours,
+    last_triggered_at: new Date().toISOString(),
+    created_by: userId,
+  })
+
+  if (error) {
+    logger.error("Failed to create recurring reminder", { leadId, error: error.message })
+  } else {
+    logger.info(`Created recurring reminder for ${priority} lead`, { leadId, intervalHours })
   }
 }

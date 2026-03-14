@@ -71,7 +71,109 @@ export function SchoolManagement() {
     phone_number: "",
   })
 
+  // Track if user manually edited English name
+  const [manualEnAdd, setManualEnAdd] = useState(false)
+  const [manualEnEdit, setManualEnEdit] = useState(false)
+
   const supabase = createClient()
+
+  // Arabic → English transliteration for common school name words
+  const arabicToEnglish: Record<string, string> = {
+    "مدرسة": "School",
+    "ثانوية": "Secondary School",
+    "متوسطة": "Intermediate School",
+    "ابتدائية": "Primary School",
+    "روضة": "Kindergarten",
+    "حضانة": "Nursery",
+    "بنين": "Boys",
+    "بنات": "Girls",
+    "الثانوية": "Secondary",
+    "المتوسطة": "Intermediate",
+    "الابتدائية": "Primary",
+    "الصباح": "Al-Sabah",
+    "الجابر": "Al-Jaber",
+    "المبارك": "Al-Mubarak",
+    "الأحمد": "Al-Ahmad",
+    "السالم": "Al-Salem",
+    "العبدالله": "Al-Abdullah",
+    "الخليفة": "Al-Khalifa",
+    "المنصور": "Al-Mansour",
+    "الفارسي": "Al-Farsi",
+    "الشملان": "Al-Shamlan",
+    "الغانم": "Al-Ghanim",
+    "الحمد": "Al-Hamad",
+    "الرشيد": "Al-Rasheed",
+    "العثمان": "Al-Othman",
+    "البدر": "Al-Badr",
+    "الفهد": "Al-Fahad",
+    "النصار": "Al-Nassar",
+    "الخالد": "Al-Khaled",
+    "العلي": "Al-Ali",
+    "الحسين": "Al-Hussain",
+    "الموسى": "Al-Mousa",
+    "العيسى": "Al-Eissa",
+    "السعد": "Al-Saad",
+    "الزهراء": "Al-Zahraa",
+    "الأمين": "Al-Ameen",
+    "النور": "Al-Nour",
+    "الإيمان": "Al-Iman",
+    "التقوى": "Al-Taqwa",
+    "السلام": "Al-Salam",
+    "الهداية": "Al-Hedaya",
+    "الفلاح": "Al-Falah",
+    "النجاح": "Al-Najah",
+    "العروبة": "Al-Orouba",
+    "الوطنية": "National",
+    "الكويت": "Kuwait",
+    "الكويتية": "Kuwaiti",
+    "عبدالله": "Abdullah",
+    "عبدالعزيز": "Abdulaziz",
+    "عبدالرحمن": "Abdulrahman",
+    "عبداللطيف": "Abdullatif",
+    "محمد": "Mohammed",
+    "أحمد": "Ahmad",
+    "خالد": "Khaled",
+    "فاطمة": "Fatima",
+    "عائشة": "Aisha",
+    "مريم": "Mariam",
+    "خديجة": "Khadija",
+    "عمر": "Omar",
+    "علي": "Ali",
+    "حسن": "Hassan",
+    "حسين": "Hussain",
+    "إبراهيم": "Ibrahim",
+    "يوسف": "Youssef",
+    "سعد": "Saad",
+    "فهد": "Fahad",
+    "ناصر": "Nasser",
+    "جاسم": "Jassem",
+    "سالم": "Salem",
+    "مبارك": "Mubarak",
+    "صباح": "Sabah",
+    "جابر": "Jaber",
+    "بدر": "Badr",
+    "طارق": "Tariq",
+    "منصور": "Mansour",
+    "بن": "Bin",
+    "ابن": "Ibn",
+    "آل": "Al",
+    "الشيخ": "Sheikh",
+    "الأمير": "Prince",
+    "الأميرة": "Princess",
+  }
+
+  const transliterateArabic = (arabic: string): string => {
+    if (!arabic.trim()) return ""
+    let result = arabic.trim()
+    // Sort by length (longest first) to match longer phrases before shorter ones
+    const sorted = Object.entries(arabicToEnglish).sort((a, b) => b[0].length - a[0].length)
+    for (const [ar, en] of sorted) {
+      result = result.replaceAll(ar, en)
+    }
+    // Clean up: remove remaining Arabic chars, normalize spaces
+    result = result.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").replace(/\s+/g, " ").trim()
+    return result
+  }
 
   useEffect(() => {
     fetchSchools()
@@ -149,6 +251,7 @@ export function SchoolManagement() {
       }
 
       setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "", school_type: "", location: "", principal_name: "", phone_number: "" })
+      setManualEnAdd(false)
       setShowAddModal(false)
       setSuccessMessage("School added successfully")
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -183,6 +286,8 @@ export function SchoolManagement() {
       phone_number: school.phone_number || "",
     })
     setError("")
+    // If school already has a custom English name, treat as manually set
+    setManualEnEdit(!!school.name_en)
     setShowEditModal(true)
   }
 
@@ -517,26 +622,22 @@ export function SchoolManagement() {
       {/* Add School Modal */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-[480px] p-0 overflow-hidden">
-          {/* Header with decorative accent bar */}
-          <div className="relative">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--primary)] via-[var(--accent)] to-[var(--primary)]" />
-            <DialogHeader className="pt-8 pb-5 px-7 border-b-0">
-              <DialogTitle className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
-                    <School className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--bg-surface)] flex items-center justify-center">
-                    <Plus className="w-3.5 h-3.5 text-[var(--primary)]" />
-                  </div>
+          <DialogHeader className="pt-7 pb-5 px-7 border-b-0">
+            <DialogTitle className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
+                  <School className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">New School</h2>
-                  <p className="text-sm text-[var(--text-muted)] font-normal mt-0.5">Register a school in the system</p>
+                <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--bg-surface)] flex items-center justify-center">
+                  <Plus className="w-3.5 h-3.5 text-[var(--primary)]" />
                 </div>
-              </DialogTitle>
-            </DialogHeader>
-          </div>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">New School</h2>
+                <p className="text-sm text-[var(--text-muted)] font-normal mt-0.5">Register a school in the system</p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
 
           <DialogBody className="px-7 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
             {/* Error display */}
@@ -570,8 +671,14 @@ export function SchoolManagement() {
                 id="name_ar"
                 value={newSchool.name_ar}
                 onChange={(e) => {
-                  setNewSchool(prev => ({ ...prev, name_ar: e.target.value }))
+                  const arValue = e.target.value
                   setError("")
+                  if (!manualEnAdd) {
+                    const translated = transliterateArabic(arValue)
+                    setNewSchool(prev => ({ ...prev, name_ar: arValue, name_en: translated }))
+                  } else {
+                    setNewSchool(prev => ({ ...prev, name_ar: arValue }))
+                  }
                 }}
                 placeholder="School name in Arabic..."
                 dir="rtl"
@@ -586,18 +693,21 @@ export function SchoolManagement() {
                 <Label htmlFor="name_en" className="text-[var(--text-primary)]">
                   School Name (English)
                 </Label>
-                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Auto-filled</span>
               </div>
               <Input
                 id="name_en"
                 value={newSchool.name_en}
-                onChange={(e) => setNewSchool(prev => ({ ...prev, name_en: e.target.value }))}
+                onChange={(e) => {
+                  setManualEnAdd(true)
+                  setNewSchool(prev => ({ ...prev, name_en: e.target.value }))
+                }}
                 placeholder="e.g. Al-Sabah Secondary School"
                 variant="filled"
               />
               <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
                 <span className="inline-block w-1 h-1 rounded-full bg-[var(--text-muted)] opacity-50" />
-                Defaults to Arabic name if empty
+                Auto-translated from Arabic name — edit to override
               </p>
             </div>
 
@@ -729,6 +839,7 @@ export function SchoolManagement() {
               onClick={() => {
                 setShowAddModal(false)
                 setNewSchool({ name_en: "", name_ar: "", governorate: "", gender: "", school_type: "", location: "", principal_name: "", phone_number: "" })
+                setManualEnAdd(false)
                 setError("")
               }}
             >
@@ -760,22 +871,19 @@ export function SchoolManagement() {
         }
       }}>
         <DialogContent className="max-w-[480px] p-0 overflow-hidden">
-          <div className="relative">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--accent)] via-[var(--primary)] to-[var(--accent)]" />
-            <DialogHeader className="pt-8 pb-5 px-7 border-b-0">
-              <DialogTitle className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--primary)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
-                    <Pencil className="w-6 h-6 text-white" />
-                  </div>
+          <DialogHeader className="pt-7 pb-5 px-7 border-b-0">
+            <DialogTitle className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--primary)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
+                  <Pencil className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">Edit School</h2>
-                  <p className="text-sm text-[var(--text-muted)] font-normal mt-0.5">Update school information</p>
-                </div>
-              </DialogTitle>
-            </DialogHeader>
-          </div>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">Edit School</h2>
+                <p className="text-sm text-[var(--text-muted)] font-normal mt-0.5">Update school information</p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
 
           <DialogBody className="px-7 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
             <AnimatePresence>
@@ -808,8 +916,14 @@ export function SchoolManagement() {
                 id="edit_name_ar"
                 value={editForm.name_ar}
                 onChange={(e) => {
-                  setEditForm(prev => ({ ...prev, name_ar: e.target.value }))
+                  const arValue = e.target.value
                   setError("")
+                  if (!manualEnEdit) {
+                    const translated = transliterateArabic(arValue)
+                    setEditForm(prev => ({ ...prev, name_ar: arValue, name_en: translated }))
+                  } else {
+                    setEditForm(prev => ({ ...prev, name_ar: arValue }))
+                  }
                 }}
                 placeholder="School name in Arabic..."
                 dir="rtl"
@@ -824,12 +938,15 @@ export function SchoolManagement() {
                 <Label htmlFor="edit_name_en" className="text-[var(--text-primary)]">
                   School Name (English)
                 </Label>
-                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Optional</span>
+                <span className="text-[11px] text-[var(--text-muted)] tracking-wide uppercase">Auto-filled</span>
               </div>
               <Input
                 id="edit_name_en"
                 value={editForm.name_en}
-                onChange={(e) => setEditForm(prev => ({ ...prev, name_en: e.target.value }))}
+                onChange={(e) => {
+                  setManualEnEdit(true)
+                  setEditForm(prev => ({ ...prev, name_en: e.target.value }))
+                }}
                 placeholder="e.g. Al-Sabah Secondary School"
                 variant="filled"
               />

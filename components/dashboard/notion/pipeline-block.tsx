@@ -25,102 +25,80 @@ export function PipelineBlock({
   total,
   conversionRate,
   loading = false,
-  showLabels = true,
-  showCounts = true,
   onStageClick,
 }: PipelineBlockProps) {
   if (loading) {
     return (
-      <div className="space-y-3 animate-pulse">
-        <div className="h-10 bg-[var(--bg-sunken)] rounded-2xl" />
-        <div className="flex items-center justify-end gap-3">
-          <div className="h-3 w-16 bg-[var(--bg-sunken)] rounded" />
-          <div className="h-3 w-20 bg-[var(--bg-sunken)] rounded" />
+      <div className="animate-pulse space-y-5">
+        <div className="flex gap-6">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex-1 space-y-2">
+              <div className="h-5 bg-[var(--bg-sunken)] rounded w-8 mx-auto" />
+              <div className="h-3 bg-[var(--bg-sunken)] rounded w-12 mx-auto" />
+            </div>
+          ))}
         </div>
       </div>
     )
   }
 
-  const visibleTotal = stages.reduce((sum, s) => sum + s.count, 0)
-
   return (
     <div className="space-y-2">
-      {/* Apple-style segmented bar */}
-      <div className="flex h-10 rounded-[14px] overflow-hidden border border-[var(--border-default)]/40 bg-[var(--bg-primary)]">
-        {stages.map((stage, idx) => {
-          const width = visibleTotal > 0 ? (stage.count / visibleTotal) * 100 : 0
-          if (width === 0) return null
+      {/* Stages */}
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: `repeat(${stages.length}, 1fr)` }}
+      >
+        {stages.map((stage, idx) => (
+          <motion.button
+            key={stage.key}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: idx * 0.03 }}
+            className={cn(
+              "group flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors",
+              "hover:bg-[var(--bg-hover)] cursor-pointer"
+            )}
+            onClick={() => onStageClick?.(stage.key)}
+          >
+            <span className="text-[14px] font-semibold tabular-nums text-[var(--text-primary)]">
+              {stage.count}
+            </span>
+            <span className="text-[9px] tracking-wide uppercase text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">
+              {stage.label}
+            </span>
+          </motion.button>
+        ))}
+      </div>
 
+      {/* Thin proportional bar */}
+      <div className="h-[3px] rounded-full bg-[var(--bg-sunken)] overflow-hidden flex">
+        {stages.map((stage, idx) => {
+          const width = total > 0 ? (stage.count / total) * 100 : 0
+          if (width === 0) return null
           return (
             <motion.div
               key={stage.key}
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: `${width}%`, opacity: 1 }}
-              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: idx * 0.05 }}
-              className="h-full relative group cursor-pointer"
-              onClick={() => onStageClick?.(stage.key)}
-            >
-              {/* Soft gradient fill */}
-              <span
-                className="absolute inset-0 transition-opacity duration-200"
-                style={{
-                  background: `linear-gradient(180deg, ${stage.color}15 0%, ${stage.color}08 100%)`,
-                }}
-              />
-              {/* Hover state */}
-              <span
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                style={{
-                  background: `linear-gradient(180deg, ${stage.color}25 0%, ${stage.color}15 100%)`,
-                }}
-              />
-              {/* Right separator line */}
-              <span
-                className="absolute right-0 top-[6px] bottom-[6px] w-[1px]"
-                style={{ backgroundColor: `${stage.color}30` }}
-              />
-              {/* Content - show label+count, on hover show label+count for narrow ones */}
-              <span className="absolute inset-0 flex items-center justify-center gap-1 px-1.5 select-none z-[1] overflow-hidden whitespace-nowrap">
-                {width > 14 && (
-                  <span
-                    className="text-[11px] font-medium tracking-[-0.01em] truncate group-hover:hidden"
-                    style={{ color: stage.color }}
-                  >
-                    {stage.label}
-                  </span>
-                )}
-                <span
-                  className="text-[12px] font-semibold tabular-nums tracking-[-0.02em] group-hover:hidden"
-                  style={{ color: stage.color }}
-                >
-                  {width > 4 ? stage.count : ""}
-                </span>
-                {/* Hover: always show label + count */}
-                <span
-                  className="hidden group-hover:inline text-[11px] font-semibold tracking-[-0.01em] truncate"
-                  style={{ color: stage.color }}
-                >
-                  {stage.label} {stage.count}
-                </span>
-              </span>
-            </motion.div>
+              initial={{ width: 0 }}
+              animate={{ width: `${width}%` }}
+              transition={{ duration: 0.5, delay: 0.1 + idx * 0.04, ease: "easeOut" }}
+              className="h-full"
+              style={{ backgroundColor: stage.color, opacity: 0.6 }}
+            />
           )
         })}
       </div>
 
-      {/* Summary */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2.5 text-[11px]">
-          <span className="text-[var(--text-tertiary)]">
-            <span className="font-medium text-[var(--text-secondary)] tabular-nums">{total}</span> leads
+      {/* Footer */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-[var(--text-muted)]">
+          <span className="tabular-nums font-medium text-[var(--text-secondary)]">{total}</span> leads
+        </span>
+        {conversionRate !== undefined && (
+          <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="tabular-nums font-medium text-[var(--text-secondary)]">{conversionRate}%</span> enrolled
           </span>
-          {conversionRate !== undefined && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--success)_10%,transparent)]">
-              <span className="font-semibold text-[var(--success)] tabular-nums">{conversionRate}%</span>
-              <span className="text-[var(--success)] font-medium">enrolled</span>
-            </span>
-          )}
-        </div>
+        )}
       </div>
     </div>
   )
