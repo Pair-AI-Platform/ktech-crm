@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +17,7 @@ import { TargetSettings } from "@/components/settings/targets"
 import { SchoolManagement } from "@/components/settings/school-management"
 import { AutomationRulesManager } from "@/components/settings/automation-rules-manager"
 import { DocumentConfigManagement } from "@/components/settings/document-config-management"
+import { SemesterManagement } from "@/components/settings/semester-management"
 import {
   Select,
   SelectContent,
@@ -61,7 +63,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "schools" | "documents" | "automations"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "schools" | "documents" | "automations" | "enrollment"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -70,6 +72,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "security", label: "Security", icon: Shield },
   { id: "pipeline", label: "Stages", icon: GitBranch, adminOnly: true },
   { id: "targets", label: "Targets", icon: Target, adminOnly: true },
+  { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
   { id: "automations", label: "Automations", icon: Zap, adminOnly: true },
@@ -79,7 +82,9 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
 export default function SettingsPage() {
   const { profile, isAdmin } = useUser()
   const { preferences, loading: prefsLoading, updatePreferences, saving: prefsSaving } = usePreferences()
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams.get("tab") as SettingsTab) || "profile"
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -652,6 +657,19 @@ export default function SettingsPage() {
                     className="space-y-6"
                   >
                     <TargetSettings />
+                  </motion.div>
+                )}
+
+                {/* Enrollment Cycles Tab */}
+                {activeTab === "enrollment" && isAdmin && (
+                  <motion.div
+                    key="enrollment"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <SemesterManagement />
                   </motion.div>
                 )}
 

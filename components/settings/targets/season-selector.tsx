@@ -80,7 +80,7 @@ export function SeasonSelector({
 
       <a
         href="/settings?tab=enrollment"
-        className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+        className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
       >
         <ExternalLink className="w-2.5 h-2.5" />
         Manage in Enrollment Cycles
