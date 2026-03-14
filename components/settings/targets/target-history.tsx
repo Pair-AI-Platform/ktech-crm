@@ -30,21 +30,34 @@ export function TargetHistory({ historyTargets, agents, loading }: TargetHistory
   return (
     <div className={cn(
       "rounded-xl border transition-all",
-      expanded ? "border-[var(--border)] bg-[var(--bg-sunken)]" : "border-dashed border-[var(--border)]"
+      expanded ? "border-[var(--border)] bg-[var(--bg-elevated)] shadow-sm" : "border-dashed border-[var(--border)] bg-[var(--bg-elevated)]"
     )}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full p-3"
+        className="flex items-center justify-between w-full px-4 py-3"
       >
-        <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-[var(--text-muted)]" />
-          <span className="text-sm font-medium text-[var(--text-secondary)]">Past Months</span>
-          <Badge variant="secondary" size="sm">{months.length}</Badge>
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+            expanded ? "bg-[var(--primary)]/10" : "bg-[var(--bg-sunken)]"
+          )}>
+            <History className={cn(
+              "w-4 h-4",
+              expanded ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+            )} />
+          </div>
+          <div>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">Past Months</span>
+            <p className="text-[11px] text-[var(--text-muted)]">View historical target data</p>
+          </div>
         </div>
-        <ChevronDown className={cn(
-          "w-4 h-4 text-[var(--text-muted)] transition-transform",
-          expanded && "rotate-180"
-        )} />
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" size="sm">{months.length}</Badge>
+          <ChevronDown className={cn(
+            "w-4 h-4 text-[var(--text-muted)] transition-transform",
+            expanded && "rotate-180"
+          )} />
+        </div>
       </button>
 
       <AnimatePresence>
@@ -55,7 +68,7 @@ export function TargetHistory({ historyTargets, agents, loading }: TargetHistory
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-2">
+            <div className="px-4 pb-4 space-y-2 border-t border-[var(--border)] pt-3">
               {months.map((month) => {
                 const targets = byMonth[month]
                 const [y, m] = month.split('-')
@@ -72,32 +85,32 @@ export function TargetHistory({ historyTargets, agents, loading }: TargetHistory
                 return (
                   <div
                     key={month}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)]"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
                       <p className="text-[11px] text-[var(--text-muted)]">{targets.length} agents</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5 text-xs">
                         <div className="w-2 h-2 rounded-full bg-green-500" />
-                        <span className="font-medium tabular-nums">{totalPuc}</span>
+                        <span className="font-semibold tabular-nums">{totalPuc}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs">
                         <div className="w-2 h-2 rounded-full bg-orange-500" />
-                        <span className="font-medium tabular-nums">{totalSf}</span>
+                        <span className="font-semibold tabular-nums">{totalSf}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs">
                         <div className="w-2 h-2 rounded-full bg-blue-500" />
-                        <span className="font-medium tabular-nums">{totalApp}</span>
+                        <span className="font-semibold tabular-nums">{totalApp}</span>
                       </div>
                       {totalPucApp > 0 && (
                         <div className="flex items-center gap-1.5 text-xs">
                           <div className="w-2 h-2 rounded-full bg-purple-500" />
-                          <span className="font-medium tabular-nums">{totalPucApp}</span>
+                          <span className="font-semibold tabular-nums">{totalPucApp}</span>
                         </div>
                       )}
-                      <Badge variant="secondary" size="sm" className="ml-1 tabular-nums">
+                      <Badge variant="secondary" size="sm" className="ml-1 tabular-nums min-w-[32px] justify-center">
                         {grandTotal}
                       </Badge>
                     </div>

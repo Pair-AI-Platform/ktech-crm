@@ -9,8 +9,16 @@ import { TeamTargetInput } from "./team-target-input"
 import { AgentTargetRow } from "./agent-target-row"
 import { TargetHistory } from "./target-history"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
+import { Search, Users } from "lucide-react"
+import { cn } from "@/lib/utils"
 import type { AgentTargetDraft } from "@/lib/hooks/use-target-settings"
+
+const categoryLabels: { key: TargetCategory; label: string }[] = [
+  { key: 'puc_files', label: 'PUC' },
+  { key: 'sf_files', label: 'SF' },
+  { key: 'sf_applicants', label: 'SF App' },
+  { key: 'puc_app_submission', label: 'PUC App' },
+]
 
 export function TargetSettings() {
   const {
@@ -106,8 +114,10 @@ export function TargetSettings() {
     exit: (dir: number) => ({ x: dir * -40, opacity: 0 }),
   }
 
+  const activeCats = categoryLabels.filter(c => activeCategories.has(c.key))
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <TargetHeader
         month={month}
         saving={saving}
@@ -134,7 +144,7 @@ export function TargetSettings() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-            className="space-y-5"
+            className="space-y-6"
           >
             <TeamSummary
               agents={agents}
@@ -150,42 +160,70 @@ export function TargetSettings() {
               selectedSeason={selectedSeason}
             />
 
-            {/* Agent search */}
-            {agents.length > 5 && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-                <Input
-                  placeholder="Search agents..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-9"
-                />
+            {/* Agent list section */}
+            <div className="space-y-3">
+              {/* Section header with search */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">Individual Targets</span>
+                  <span className="text-xs text-[var(--text-muted)]">{agents.length} agents</span>
+                </div>
+                {agents.length > 5 && (
+                  <div className="relative w-56">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+                    <Input
+                      placeholder="Search agents..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-9 h-8 text-xs"
+                    />
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Agent list */}
-            <div className="space-y-2">
-              {filteredAgents.map((agent, index) => (
-                <AgentTargetRow
-                  key={agent.id}
-                  agent={agent}
-                  index={index}
-                  getEffectiveTarget={getEffectiveTarget}
-                  updateTarget={updateTarget}
-                  updateWeekly={updateWeekly}
-                  weeklyPucFiles={getWeekly(agent.id, 'weekly_puc_files')}
-                  weeklySfFiles={getWeekly(agent.id, 'weekly_sf_files')}
-                  weeklySfApplicants={getWeekly(agent.id, 'weekly_sf_applicants')}
-                  weeklyPucAppSubmission={getWeekly(agent.id, 'weekly_puc_app_submission')}
-                  activeCategories={activeCategories}
-                  selectedSeason={selectedSeason}
-                />
-              ))}
-              {search && filteredAgents.length === 0 && (
-                <p className="text-sm text-[var(--text-muted)] text-center py-8">
-                  No agents found matching &ldquo;{search}&rdquo;
-                </p>
-              )}
+              {/* Column headers */}
+              <div className="hidden sm:flex items-center px-4 py-2 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-9" /> {/* Avatar spacer */}
+                  <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Agent</span>
+                </div>
+                <div className="grid gap-2 mr-[76px]" style={{ gridTemplateColumns: `repeat(${activeCats.length}, 64px)` }}>
+                  {activeCats.map(cat => (
+                    <span key={cat.key} className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider text-center">
+                      {cat.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Agent list */}
+              <div className="space-y-2">
+                {filteredAgents.map((agent, index) => (
+                  <AgentTargetRow
+                    key={agent.id}
+                    agent={agent}
+                    index={index}
+                    getEffectiveTarget={getEffectiveTarget}
+                    updateTarget={updateTarget}
+                    updateWeekly={updateWeekly}
+                    weeklyPucFiles={getWeekly(agent.id, 'weekly_puc_files')}
+                    weeklySfFiles={getWeekly(agent.id, 'weekly_sf_files')}
+                    weeklySfApplicants={getWeekly(agent.id, 'weekly_sf_applicants')}
+                    weeklyPucAppSubmission={getWeekly(agent.id, 'weekly_puc_app_submission')}
+                    activeCategories={activeCategories}
+                    selectedSeason={selectedSeason}
+                  />
+                ))}
+                {search && filteredAgents.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Search className="w-8 h-8 text-[var(--text-muted)] mb-2 opacity-40" />
+                    <p className="text-sm text-[var(--text-muted)]">
+                      No agents found matching &ldquo;{search}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         </AnimatePresence>

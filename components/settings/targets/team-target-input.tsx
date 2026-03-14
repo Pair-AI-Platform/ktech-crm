@@ -46,25 +46,25 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
     <div className={cn(
       "rounded-xl border transition-all",
       expanded
-        ? "border-[var(--accent)]/30 bg-[var(--accent)]/5"
-        : "border-dashed border-[var(--border)] hover:border-[var(--accent)]/30"
+        ? "border-[var(--accent)]/30 bg-[var(--bg-elevated)] shadow-sm"
+        : "border-dashed border-[var(--border)] hover:border-[var(--accent)]/20 bg-[var(--bg-elevated)]"
     )}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full p-3 text-left"
+        className="flex items-center justify-between w-full px-4 py-3 text-left"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div className={cn(
-            "w-7 h-7 rounded-lg flex items-center justify-center transition-colors",
-            expanded ? "bg-[var(--accent)]/15" : "bg-[var(--bg-elevated)]"
+            "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+            expanded ? "bg-[var(--accent)]/15" : "bg-[var(--bg-sunken)]"
           )}>
             <UsersRound className={cn(
-              "w-3.5 h-3.5",
+              "w-4 h-4",
               expanded ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
             )} />
           </div>
           <div>
-            <span className="text-sm font-medium text-[var(--text-primary)]">
+            <span className="text-sm font-semibold text-[var(--text-primary)]">
               Set Target for Whole Team
             </span>
             <p className="text-[11px] text-[var(--text-muted)]">
@@ -87,15 +87,15 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-3">
+            <div className="px-4 pb-4 space-y-4 border-t border-[var(--border)] pt-3">
               {(() => {
                 const colCount = activeCategories.size
                 const gridClass = colCount === 1 ? "grid-cols-1" : colCount === 2 ? "grid-cols-2" : colCount === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
                 return (
-                  <div className={cn("grid gap-3", gridClass)}>
+                  <div className={cn("grid gap-4", gridClass)}>
                     {activeCategories.has('puc_files') && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full bg-green-500" />
                           PUC Files
                         </label>
@@ -108,40 +108,40 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                           className="h-9 font-semibold"
                         />
                         {puc && (
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            Each agent: {Math.floor((parseInt(puc) || 0) / agentCount)}
+                          <p className="text-[11px] text-[var(--primary)] font-medium">
+                            = {Math.floor((parseInt(puc) || 0) / agentCount)} per agent
                           </p>
                         )}
-                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        <div className="grid grid-cols-2 gap-2 pt-1">
                           <div>
-                            <label className="text-[10px] text-[var(--text-muted)]">Male</label>
+                            <label className="text-[10px] text-[var(--text-muted)] font-medium">Male</label>
                             <Input
                               type="number"
                               value={pucMale}
                               onChange={(e) => setPucMale(e.target.value)}
-                              placeholder="Male"
+                              placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {pucMale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                Each: {Math.floor((parseInt(pucMale) || 0) / agentCount)}
+                                = {Math.floor((parseInt(pucMale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
                           <div>
-                            <label className="text-[10px] text-[var(--text-muted)]">Female</label>
+                            <label className="text-[10px] text-[var(--text-muted)] font-medium">Female</label>
                             <Input
                               type="number"
                               value={pucFemale}
                               onChange={(e) => setPucFemale(e.target.value)}
-                              placeholder="Female"
+                              placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {pucFemale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                Each: {Math.floor((parseInt(pucFemale) || 0) / agentCount)}
+                                = {Math.floor((parseInt(pucFemale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -149,8 +149,8 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                       </div>
                     )}
                     {activeCategories.has('sf_files') && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full bg-orange-500" />
                           SF Files
                         </label>
@@ -163,40 +163,40 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                           className="h-9 font-semibold"
                         />
                         {sf && (
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            Each agent: {Math.floor((parseInt(sf) || 0) / agentCount)}
+                          <p className="text-[11px] text-[var(--primary)] font-medium">
+                            = {Math.floor((parseInt(sf) || 0) / agentCount)} per agent
                           </p>
                         )}
-                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        <div className="grid grid-cols-2 gap-2 pt-1">
                           <div>
-                            <label className="text-[10px] text-[var(--text-muted)]">Male</label>
+                            <label className="text-[10px] text-[var(--text-muted)] font-medium">Male</label>
                             <Input
                               type="number"
                               value={sfMale}
                               onChange={(e) => setSfMale(e.target.value)}
-                              placeholder="Male"
+                              placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {sfMale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                Each: {Math.floor((parseInt(sfMale) || 0) / agentCount)}
+                                = {Math.floor((parseInt(sfMale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
                           <div>
-                            <label className="text-[10px] text-[var(--text-muted)]">Female</label>
+                            <label className="text-[10px] text-[var(--text-muted)] font-medium">Female</label>
                             <Input
                               type="number"
                               value={sfFemale}
                               onChange={(e) => setSfFemale(e.target.value)}
-                              placeholder="Female"
+                              placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {sfFemale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                Each: {Math.floor((parseInt(sfFemale) || 0) / agentCount)}
+                                = {Math.floor((parseInt(sfFemale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -204,8 +204,8 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                       </div>
                     )}
                     {activeCategories.has('sf_applicants') && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full bg-blue-500" />
                           SF Applicants
                           <span className="text-[10px] font-normal bg-[var(--bg-sunken)] px-1.5 py-0.5 rounded">
@@ -221,17 +221,17 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                           className="h-9 font-semibold"
                         />
                         {app && (
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            Each agent: {Math.floor((parseInt(app) || 0) / agentCount)}
+                          <p className="text-[11px] text-[var(--primary)] font-medium">
+                            = {Math.floor((parseInt(app) || 0) / agentCount)} per agent
                           </p>
                         )}
                       </div>
                     )}
                     {activeCategories.has('puc_app_submission') && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full bg-purple-500" />
-                          PUC App Submission
+                          PUC App
                           <span className="text-[10px] font-normal bg-[var(--bg-sunken)] px-1.5 py-0.5 rounded">
                             {selectedSeason?.name ?? 'Season'}
                           </span>
@@ -245,8 +245,8 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                           className="h-9 font-semibold"
                         />
                         {pucApp && (
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            Each agent: {Math.floor((parseInt(pucApp) || 0) / agentCount)}
+                          <p className="text-[11px] text-[var(--primary)] font-medium">
+                            = {Math.floor((parseInt(pucApp) || 0) / agentCount)} per agent
                           </p>
                         )}
                       </div>
@@ -255,9 +255,9 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                 )
               })()}
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  Only filled fields will be applied. Empty fields are skipped.
+                  Only filled fields will be applied
                 </p>
                 <Button
                   size="sm"
