@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState<"admin" | "agent" | null>(null)
   const [error, setError] = useState("")
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
@@ -41,19 +42,23 @@ export default function LoginPage() {
 
   const isDemoAllowed = true
 
-  const handleDemoMode = (role: "admin" | "agent") => {
-    try {
-      // Set demo mode cookie (accessible by middleware)
-      document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax; Secure"
-      localStorage.setItem("ktech-demo-mode", "true")
-      localStorage.setItem("ktech-demo-role", role)
-      // Use window.location for hard redirect to ensure cookie is sent
-      window.location.href = "/dashboard"
-    } catch (err) {
-      console.error("Demo mode error:", err)
-      // Fallback: try redirect even if storage fails
-      document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax; Secure"
-      window.location.href = "/dashboard"
+  const handleDemoMode = async (role: "admin" | "agent") => {
+    setDemoLoading(role)
+    setError("")
+
+    const demoCredentials = {
+      admin: { email: "demo-admin@ktech.edu.kw", password: "demo-admin-2026!" },
+      agent: { email: "demo-agent@ktech.edu.kw", password: "demo-agent-2026!" },
+    }
+
+    const { error } = await supabase.auth.signInWithPassword(demoCredentials[role])
+
+    if (error) {
+      setError("Demo login failed. Please try again.")
+      setDemoLoading(null)
+    } else {
+      router.push("/dashboard")
+      router.refresh()
     }
   }
 
@@ -290,18 +295,28 @@ export default function LoginPage() {
                       type="button"
                       variant="outline"
                       className="h-11 text-sm group"
+                      disabled={demoLoading !== null}
                       onClick={() => handleDemoMode("admin")}
                     >
-                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      {demoLoading === "admin" ? (
+                        <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <ShieldCheck className="w-4 h-4 mr-2" />
+                      )}
                       Admin Demo
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       className="h-11 text-sm group"
+                      disabled={demoLoading !== null}
                       onClick={() => handleDemoMode("agent")}
                     >
-                      <Users className="w-4 h-4 mr-2" />
+                      {demoLoading === "agent" ? (
+                        <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Users className="w-4 h-4 mr-2" />
+                      )}
                       Agent Demo
                     </Button>
                   </div>
