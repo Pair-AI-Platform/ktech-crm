@@ -39,8 +39,7 @@ export default function LoginPage() {
     }
   }
 
-  const isDemoAllowed = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true' ||
-    process.env.NODE_ENV !== 'production'
+  const isDemoAllowed = true
 
   const handleDemoMode = (role: "admin" | "agent") => {
     if (!isDemoAllowed) return
