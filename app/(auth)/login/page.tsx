@@ -42,13 +42,19 @@ export default function LoginPage() {
   const isDemoAllowed = true
 
   const handleDemoMode = (role: "admin" | "agent") => {
-    if (!isDemoAllowed) return
-    // Set demo mode cookie (accessible by middleware)
-    document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax"
-    localStorage.setItem("ktech-demo-mode", "true")
-    localStorage.setItem("ktech-demo-role", role)
-    // Use window.location for hard redirect to ensure cookie is sent
-    window.location.href = "/dashboard"
+    try {
+      // Set demo mode cookie (accessible by middleware)
+      document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax; Secure"
+      localStorage.setItem("ktech-demo-mode", "true")
+      localStorage.setItem("ktech-demo-role", role)
+      // Use window.location for hard redirect to ensure cookie is sent
+      window.location.href = "/dashboard"
+    } catch (err) {
+      console.error("Demo mode error:", err)
+      // Fallback: try redirect even if storage fails
+      document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; SameSite=Lax; Secure"
+      window.location.href = "/dashboard"
+    }
   }
 
   const features = [

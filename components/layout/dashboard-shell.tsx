@@ -39,9 +39,6 @@ function useDemoMode() {
   }, [])
 
   const getSnapshot = useCallback(() => {
-    const isProduction = process.env.NODE_ENV === 'production'
-    const demoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true'
-    if (isProduction && !demoEnabled) return false
     return localStorage.getItem("ktech-demo-mode") === "true"
   }, [])
 

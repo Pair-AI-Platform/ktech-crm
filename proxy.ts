@@ -49,17 +49,6 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Strip demo mode cookie in production to prevent auth bypass
-  const isProduction = process.env.NODE_ENV === 'production'
-  const demoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true'
-
-  if (isProduction && !demoEnabled) {
-    const hasDemoCookie = request.cookies.get('ktech-demo-mode')
-    if (hasDemoCookie) {
-      supabaseResponse.cookies.delete('ktech-demo-mode')
-    }
-  }
-
   // Allow API routes without session auth check (they handle their own auth)
   const isApiRoute = pathname.startsWith('/api')
   if (isApiRoute) {
@@ -67,10 +56,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Check for demo mode
-  const isDemoMode = (() => {
-    if (isProduction && !demoEnabled) return false
-    return request.cookies.get('ktech-demo-mode')?.value === 'true'
-  })()
+  const isDemoMode = request.cookies.get('ktech-demo-mode')?.value === 'true'
 
   const isAuthPage = pathname.startsWith('/login')
 
