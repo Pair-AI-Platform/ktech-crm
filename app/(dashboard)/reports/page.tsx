@@ -61,6 +61,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
+import { useCycles } from "@/lib/hooks/use-cycles"
 import { RoleGuard } from "@/components/auth/role-guard"
 import {
   MAJORS,
@@ -198,6 +199,8 @@ export default function ReportsPage() {
   const [gender, setGender] = useState<string>("all")
   const [paymentStatus, setPaymentStatus] = useState<string>("all")
   const [major, setMajor] = useState<string>("all")
+  const [selectedCycleId, setSelectedCycleId] = useState<string>("all")
+  const { cycles } = useCycles()
 
   // UI states
   const [showFilters, setShowFilters] = useState(false)
@@ -242,6 +245,7 @@ export default function ReportsPage() {
         end: dateTo || null,
         preset: (dateFrom || dateTo) ? 'all' : datePreset as ReportFilters['dateRange']['preset'],
       },
+      cycleId: selectedCycleId === 'all' ? null : selectedCycleId,
       semesterId: null,
       fundingType: fundingType === 'all' ? 'all' : fundingType as ReportFilters['fundingType'],
       agentId: isAgent && profile?.id ? profile.id : (selectedAgent === 'all' ? null : selectedAgent),
@@ -252,7 +256,7 @@ export default function ReportsPage() {
     }
     setFilters(newFilters)
     setLastUpdated(new Date())
-  }, [datePreset, dateFrom, dateTo, sourceCategory, fundingType, selectedAgent, gender, isAgent, profile?.id])
+  }, [datePreset, dateFrom, dateTo, sourceCategory, fundingType, selectedAgent, gender, selectedCycleId, isAgent, profile?.id])
 
   // Handle date preset change
   const handleDatePresetChange = (preset: string) => {
@@ -262,6 +266,7 @@ export default function ReportsPage() {
 
     const newFilters: ReportFilters = {
       ...filters,
+      cycleId: selectedCycleId === 'all' ? null : selectedCycleId,
       dateRange: {
         start: null,
         end: null,
@@ -283,6 +288,7 @@ export default function ReportsPage() {
     setGender("all")
     setPaymentStatus("all")
     setMajor("all")
+    setSelectedCycleId("all")
     const clearedFilters = isAgent && profile?.id
       ? { ...defaultFilters, agentId: profile.id }
       : defaultFilters
@@ -631,7 +637,27 @@ export default function ReportsPage() {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                    {/* Cycle */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
+                        Cycle
+                      </label>
+                      <Select value={selectedCycleId} onValueChange={setSelectedCycleId}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Cycles</SelectItem>
+                          {cycles.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}{c.is_active ? " (Active)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {/* Funding Type */}
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">

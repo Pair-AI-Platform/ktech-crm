@@ -39,7 +39,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [agents, setAgents] = useState<{ id: string; full_name: string; email: string; avatar_url: string | null }[]>([])
-  const [semesters, setSemesters] = useState<{ id: string; name: string; is_active: boolean }[]>([])
+  const [semesters, setSemesters] = useState<{ id: string; name: string; is_active: boolean; is_open: boolean; cycle_id?: string }[]>([])
   const isEditing = !!lead
 
   // Fetch schools, agents, and semesters from database
@@ -63,16 +63,16 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       })
     supabase
       .from("semesters")
-      .select("id, name, is_active")
+      .select("id, name, is_active, is_open, cycle_id")
       .order("start_date", { ascending: false })
       .then(({ data }) => {
         if (data) {
           setSemesters(data)
-          // Auto-select active semester for new leads
+          // Auto-select first open term in active cycle for new leads
           if (!lead) {
-            const active = data.find((s) => s.is_active)
-            if (active) {
-              setFormData((prev) => ({ ...prev, semester_id: active.id }))
+            const openTerm = data.find((s) => s.is_active && s.is_open)
+            if (openTerm) {
+              setFormData((prev) => ({ ...prev, semester_id: openTerm.id }))
             }
           }
         }
@@ -285,6 +285,11 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       newErrors.email = "Invalid email format"
     }
 
+    // Cycle validation
+    if (!formData.semester_id) {
+      newErrors.semester_id = "Enrollment cycle is required"
+    }
+
     // Academic validation
     if (!formData.education_type) {
       newErrors.education_type = "Education type is required"
@@ -354,7 +359,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       discount_type: formData.funding_type === 'self_funded' && formData.discount_type ? formData.discount_type as DiscountType : undefined,
       discount_percentage: formData.funding_type === 'self_funded' && formData.discount_percentage ? parseFloat(formData.discount_percentage) : undefined,
       discount_notes: formData.funding_type === 'self_funded' && formData.discount_notes.trim() ? formData.discount_notes.trim() : undefined,
-      semester_id: formData.semester_id || undefined,
+      semester_id: formData.semester_id,
       assigned_to: formData.assigned_to || undefined,
     }
 

@@ -86,6 +86,16 @@ export async function POST(request: NextRequest) {
       (existingLeads || []).map(lead => [lead.civil_id, lead])
     )
 
+    // Fetch first open term in active cycle for new leads
+    const { data: activeSemester } = await supabase
+      .from("semesters")
+      .select("id")
+      .eq("is_active", true)
+      .eq("is_open", true)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
     const result: MinistryImportResult = {
       updated: [],
       created: [],
@@ -177,6 +187,7 @@ export async function POST(request: NextRequest) {
               pipeline_stage: "new",
               grade_level: "12th", // Assume 12th grade since this is graduation data
               phone: "", // Required field - will need to be filled later
+              ...(activeSemester && { semester_id: activeSemester.id }),
             })
             .select()
             .single()

@@ -77,7 +77,7 @@ export function useStageSettings() {
         .select("*")
         .order("display_order", { ascending: true })
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       const existing = (data || []) as StageSettings[]
 
       // Auto-seed any missing stages into the DB
@@ -134,7 +134,7 @@ export function useStageSettings() {
         .update({ is_active: isActive })
         .eq("stage", stage)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return true
     },
     onMutate: async ({ stage, isActive }) => {
@@ -188,7 +188,7 @@ export function useStageSettings() {
 
       const results = await Promise.all(updates)
       const failed = results.find(r => r.error)
-      if (failed?.error) throw failed.error
+      if (failed?.error) throw new Error(failed.error.message)
       return true
     },
     onMutate: async (reorderedStages) => {

@@ -39,7 +39,7 @@ export function useLeadActivities(leadId: string) {
         .order("created_at", { ascending: false })
         .limit(50)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       setActivities(data || [])
     } catch (err) {
       console.error("Error fetching activities:", err)

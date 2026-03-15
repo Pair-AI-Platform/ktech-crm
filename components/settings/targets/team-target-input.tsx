@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -29,15 +29,32 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
   const [app, setApp] = useState("")
   const [pucApp, setPucApp] = useState("")
 
+  // Auto-fill Male = Total - Female
+  useEffect(() => {
+    const total = parseInt(puc) || 0
+    const female = parseInt(pucFemale) || 0
+    if (puc && total >= female) {
+      setPucMale(String(total - female))
+    }
+  }, [puc, pucFemale])
+
+  useEffect(() => {
+    const total = parseInt(sf) || 0
+    const female = parseInt(sfFemale) || 0
+    if (sf && total >= female) {
+      setSfMale(String(total - female))
+    }
+  }, [sf, sfFemale])
+
   const handleApply = () => {
-    if (puc) onApplyToAll('puc_files', Math.floor((parseInt(puc) || 0) / agentCount))
-    if (pucMale) onApplyToAll('puc_files_male', Math.floor((parseInt(pucMale) || 0) / agentCount))
-    if (pucFemale) onApplyToAll('puc_files_female', Math.floor((parseInt(pucFemale) || 0) / agentCount))
-    if (sf) onApplyToAll('sf_files', Math.floor((parseInt(sf) || 0) / agentCount))
-    if (sfMale) onApplyToAll('sf_files_male', Math.floor((parseInt(sfMale) || 0) / agentCount))
-    if (sfFemale) onApplyToAll('sf_files_female', Math.floor((parseInt(sfFemale) || 0) / agentCount))
-    if (app) onApplyToAll('sf_applicants', Math.floor((parseInt(app) || 0) / agentCount))
-    if (pucApp) onApplyToAll('puc_app_submission', Math.floor((parseInt(pucApp) || 0) / agentCount))
+    if (puc) onApplyToAll('puc_files', parseInt(puc) || 0)
+    if (pucMale) onApplyToAll('puc_files_male', parseInt(pucMale) || 0)
+    if (pucFemale) onApplyToAll('puc_files_female', parseInt(pucFemale) || 0)
+    if (sf) onApplyToAll('sf_files', parseInt(sf) || 0)
+    if (sfMale) onApplyToAll('sf_files_male', parseInt(sfMale) || 0)
+    if (sfFemale) onApplyToAll('sf_files_female', parseInt(sfFemale) || 0)
+    if (app) onApplyToAll('sf_applicants', parseInt(app) || 0)
+    if (pucApp) onApplyToAll('puc_app_submission', parseInt(pucApp) || 0)
   }
 
   const hasValues = puc || pucMale || pucFemale || sf || sfMale || sfFemale || app || pucApp
@@ -109,7 +126,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {puc && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            = {Math.floor((parseInt(puc) || 0) / agentCount)} per agent
+                            ~{Math.floor((parseInt(puc) || 0) / agentCount)} per agent
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-2 pt-1">
@@ -125,7 +142,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             />
                             {pucMale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                = {Math.floor((parseInt(pucMale) || 0) / agentCount)} each
+                                ~{Math.floor((parseInt(pucMale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -141,7 +158,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             />
                             {pucFemale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                = {Math.floor((parseInt(pucFemale) || 0) / agentCount)} each
+                                ~{Math.floor((parseInt(pucFemale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -164,7 +181,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {sf && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            = {Math.floor((parseInt(sf) || 0) / agentCount)} per agent
+                            ~{Math.floor((parseInt(sf) || 0) / agentCount)} per agent
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-2 pt-1">
@@ -180,7 +197,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             />
                             {sfMale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                = {Math.floor((parseInt(sfMale) || 0) / agentCount)} each
+                                ~{Math.floor((parseInt(sfMale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -196,7 +213,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             />
                             {sfFemale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                = {Math.floor((parseInt(sfFemale) || 0) / agentCount)} each
+                                ~{Math.floor((parseInt(sfFemale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -222,7 +239,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {app && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            = {Math.floor((parseInt(app) || 0) / agentCount)} per agent
+                            ~{Math.floor((parseInt(app) || 0) / agentCount)} per agent
                           </p>
                         )}
                       </div>
@@ -246,7 +263,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {pucApp && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            = {Math.floor((parseInt(pucApp) || 0) / agentCount)} per agent
+                            ~{Math.floor((parseInt(pucApp) || 0) / agentCount)} per agent
                           </p>
                         )}
                       </div>

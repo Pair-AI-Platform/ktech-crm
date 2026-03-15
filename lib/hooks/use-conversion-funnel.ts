@@ -110,7 +110,7 @@ export function useConversionFunnel(
       }
 
       const { data: leads, error } = await query
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       const allLeads = leads || []
       const pucLeads = allLeads.filter((l) => l.funding_type === "puc")

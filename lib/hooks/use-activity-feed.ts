@@ -101,7 +101,7 @@ export function useActivityFeed(options: {
       }
 
       const { data, error } = await query
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as Activity[]
     },
     staleTime: 30_000,

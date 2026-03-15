@@ -79,6 +79,10 @@ export const queryKeys = {
     all: ['semesters'] as const,
     active: () => ['semesters', 'active'] as const,
   },
+  cycles: {
+    all: ['cycles'] as const,
+    active: () => ['cycles', 'active'] as const,
+  },
   agentSeasonalTargets: {
     all: ['agent-seasonal-targets'] as const,
     season: (seasonId: string) => ['agent-seasonal-targets', seasonId] as const,

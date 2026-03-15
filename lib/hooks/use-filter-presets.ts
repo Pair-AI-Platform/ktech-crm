@@ -61,7 +61,7 @@ export function useFilterPresets(): UseFilterPresetsReturn {
         .select("*")
         .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data as FilterPreset[]) ?? []
     },
     staleTime: 30_000,
@@ -93,7 +93,7 @@ export function useFilterPresets(): UseFilterPresetsReturn {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data as FilterPreset
     },
     onSuccess: (newPreset) => {
@@ -116,7 +116,7 @@ export function useFilterPresets(): UseFilterPresetsReturn {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data as FilterPreset
     },
     onMutate: async ({ id, updates }) => {
@@ -151,7 +151,7 @@ export function useFilterPresets(): UseFilterPresetsReturn {
         .delete()
         .eq("id", id)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.filterPresets.all })

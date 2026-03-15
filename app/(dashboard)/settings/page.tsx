@@ -17,7 +17,7 @@ import { TargetSettings } from "@/components/settings/targets"
 import { SchoolManagement } from "@/components/settings/school-management"
 import { AutomationRulesManager } from "@/components/settings/automation-rules-manager"
 import { DocumentConfigManagement } from "@/components/settings/document-config-management"
-import { SemesterManagement } from "@/components/settings/semester-management"
+import { CycleManagement } from "@/components/settings/cycle-management"
 import {
   Select,
   SelectContent,
@@ -71,7 +71,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "security", label: "Security", icon: Shield },
   { id: "pipeline", label: "Stages", icon: GitBranch, adminOnly: true },
-  { id: "targets", label: "Targets", icon: Target, adminOnly: true },
+  { id: "targets", label: "Targets", icon: Target },
   { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
@@ -648,7 +648,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Targets Tab */}
-                {activeTab === "targets" && isAdmin && (
+                {activeTab === "targets" && (
                   <motion.div
                     key="targets"
                     initial={{ opacity: 0, y: 20 }}
@@ -669,7 +669,7 @@ export default function SettingsPage() {
                     exit={{ opacity: 0, y: -20 }}
                     className="space-y-6"
                   >
-                    <SemesterManagement />
+                    <CycleManagement />
                   </motion.div>
                 )}
 

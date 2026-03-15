@@ -48,7 +48,7 @@ export function useDuplicateCheck() {
           p_exclude_id: params.excludeId || null,
         })
 
-        if (error) throw error
+        if (error) throw new Error(error.message)
 
         // Deduplicate by lead ID (a lead might match on multiple criteria)
         const uniqueMap = new Map<string, DuplicateMatch>()

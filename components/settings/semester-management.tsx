@@ -12,7 +12,6 @@ import {
   Pencil,
   Check,
   Loader2,
-  AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSemesters, useCreateSemester, useUpdateSemester } from "@/lib/hooks/use-semesters"
@@ -40,7 +39,7 @@ export function SemesterManagement() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<SemesterFormData>(emptyForm)
-  const [showConfirmToggle, setShowConfirmToggle] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const openCreate = () => {
     setEditingId(null)
@@ -61,30 +60,29 @@ export function SemesterManagement() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.start_date || !form.end_date) return
+    setError(null)
 
-    if (editingId) {
-      await updateMutation.mutateAsync({ id: editingId, updates: form })
-    } else {
-      await createMutation.mutateAsync(form)
+    try {
+      if (editingId) {
+        await updateMutation.mutateAsync({ id: editingId, updates: form })
+      } else {
+        await createMutation.mutateAsync(form)
+      }
+      setShowForm(false)
+      setEditingId(null)
+      setForm(emptyForm)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save cycle")
     }
-    setShowForm(false)
-    setEditingId(null)
-    setForm(emptyForm)
   }
 
   const handleToggleActive = async (semester: Semester) => {
-    if (!semester.is_active) {
-      // Activating — confirm first
-      setShowConfirmToggle(semester.id)
-    } else {
-      // Deactivating
-      await updateMutation.mutateAsync({ id: semester.id, updates: { is_active: false } })
+    setError(null)
+    try {
+      await updateMutation.mutateAsync({ id: semester.id, updates: { is_active: !semester.is_active } })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update cycle")
     }
-  }
-
-  const confirmActivate = async (id: string) => {
-    await updateMutation.mutateAsync({ id, updates: { is_active: true } })
-    setShowConfirmToggle(null)
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
@@ -99,6 +97,12 @@ export function SemesterManagement() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-2">&times;</button>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -108,7 +112,7 @@ export function SemesterManagement() {
                 Enrollment Cycles
               </CardTitle>
               <CardDescription>
-                Manage registration cycles. Only one cycle can be active at a time.
+                Manage registration cycles. Multiple cycles can be active at the same time.
               </CardDescription>
             </div>
             <Button onClick={openCreate} size="sm">
@@ -227,7 +231,7 @@ export function SemesterManagement() {
               <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
                 <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">Set as Active</p>
-                  <p className="text-xs text-[var(--text-muted)]">This will deactivate the current active cycle</p>
+                  <p className="text-xs text-[var(--text-muted)]">Active cycles are available for lead assignment</p>
                 </div>
                 <Switch
                   checked={form.is_active}
@@ -255,36 +259,6 @@ export function SemesterManagement() {
         </div>
       )}
 
-      {/* Confirm Activate Dialog */}
-      {showConfirmToggle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowConfirmToggle(null)}>
-          <div
-            className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border)] p-6 w-full max-w-sm mx-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-[var(--text-primary)]">Activate Cycle</h3>
-                <p className="text-sm text-[var(--text-muted)]">
-                  This will deactivate the current active cycle and move its leads to the archive.
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowConfirmToggle(null)}>
-                Cancel
-              </Button>
-              <Button onClick={() => confirmActivate(showConfirmToggle)} disabled={isSaving}>
-                {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
-                Confirm
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -4,20 +4,52 @@ import { NextResponse } from 'next/server'
 export const POST = withApiHandler(
   { context: 're-register-leads', roles: ['admin'] },
   async ({ req, supabase, user, logger }) => {
-    const { lead_ids } = await req.json()
+    const { lead_ids, target_semester_id, assigned_to } = await req.json()
 
     if (!Array.isArray(lead_ids) || lead_ids.length === 0) {
       return NextResponse.json({ error: 'lead_ids array is required' }, { status: 400 })
     }
 
-    // Get active semester
-    const { data: activeSemester, error: semError } = await supabase
-      .from('semesters')
-      .select('id, name')
-      .eq('is_active', true)
-      .single()
+    // Get target semester: use provided ID, or find first open term in active cycle
+    let activeSemester: { id: string; name: string } | null = null
 
-    if (semError || !activeSemester) {
+    if (target_semester_id) {
+      const { data, error } = await supabase
+        .from('semesters')
+        .select('id, name')
+        .eq('id', target_semester_id)
+        .single()
+      if (error || !data) {
+        return NextResponse.json({ error: 'Invalid target semester' }, { status: 400 })
+      }
+      activeSemester = data
+    } else {
+      // Find first open term in active cycle
+      const { data, error } = await supabase
+        .from('semesters')
+        .select('id, name, cycle:education_cycles!inner(is_active)')
+        .eq('is_open', true)
+        .eq('education_cycles.is_active', true)
+        .order('start_date', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!data) {
+        // Fallback: any active semester
+        const { data: fallback } = await supabase
+          .from('semesters')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('start_date', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        activeSemester = fallback
+      } else {
+        activeSemester = { id: data.id, name: data.name }
+      }
+    }
+
+    if (!activeSemester) {
       return NextResponse.json({ error: 'No active semester found' }, { status: 400 })
     }
 
@@ -73,7 +105,7 @@ export const POST = withApiHandler(
       // Set semester & provenance
       semester_id: activeSemester.id,
       re_registered_from: lead.id,
-      assigned_to: user.id,
+      assigned_to: assigned_to || user.id,
       assigned_at: new Date().toISOString(),
     }))
 

@@ -6,7 +6,7 @@ export const GET = withApiHandler(
   async ({ supabase }) => {
     const { data, error } = await supabase
       .from('semesters')
-      .select('*')
+      .select('*, cycle:education_cycles(*)')
       .order('is_active', { ascending: false })
       .order('start_date', { ascending: false })
 
@@ -23,19 +23,6 @@ export const POST = withApiHandler(
 
     if (!name || !start_date || !end_date) {
       return NextResponse.json({ error: 'Name, start_date, and end_date are required' }, { status: 400 })
-    }
-
-    // If setting as active, deactivate all others first
-    if (is_active) {
-      const { error: deactivateError } = await supabase
-        .from('semesters')
-        .update({ is_active: false })
-        .eq('is_active', true)
-
-      if (deactivateError) {
-        logger.error('Failed to deactivate semesters', { error: deactivateError.message })
-        throw deactivateError
-      }
     }
 
     const { data, error } = await supabase
@@ -57,20 +44,6 @@ export const PUT = withApiHandler(
 
     if (!id) {
       return NextResponse.json({ error: 'Semester ID is required' }, { status: 400 })
-    }
-
-    // If toggling to active, deactivate all others first
-    if (updates.is_active === true) {
-      const { error: deactivateError } = await supabase
-        .from('semesters')
-        .update({ is_active: false })
-        .neq('id', id)
-        .eq('is_active', true)
-
-      if (deactivateError) {
-        logger.error('Failed to deactivate semesters', { error: deactivateError.message })
-        throw deactivateError
-      }
     }
 
     const { data, error } = await supabase

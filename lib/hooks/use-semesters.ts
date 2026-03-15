@@ -21,20 +21,21 @@ export function useSemesters() {
   }
 }
 
-export function useActiveSemester() {
+export function useActiveSemesters() {
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.semesters.active(),
     queryFn: async () => {
       const res = await fetch("/api/settings/semesters")
       if (!res.ok) throw new Error("Failed to fetch semesters")
       const semesters = (await res.json()) as Semester[]
-      return semesters.find((s) => s.is_active) || null
+      // Return open terms from the active cycle
+      return semesters.filter((s) => s.is_active && s.is_open)
     },
     staleTime: 5 * 60 * 1000, // 5 min
   })
 
   return {
-    activeSemester: data ?? null,
+    activeSemesters: data ?? [],
     loading: isLoading,
   }
 }
@@ -87,11 +88,11 @@ export function useReRegisterLeads() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (leadIds: string[]) => {
+    mutationFn: async ({ leadIds, targetSemesterId, assignedTo }: { leadIds: string[]; targetSemesterId?: string; assignedTo?: string }) => {
       const res = await fetch("/api/leads/re-register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lead_ids: leadIds }),
+        body: JSON.stringify({ lead_ids: leadIds, target_semester_id: targetSemesterId, assigned_to: assignedTo }),
       })
       if (!res.ok) {
         const data = await res.json()

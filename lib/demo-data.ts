@@ -411,6 +411,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       submission_substage: submissionSubstage,
       puc_choice: stage === "applicant" ? (randomItem(["1", "1", "2", "3", "4"]) as Lead["puc_choice"]) : undefined,
       puc_first_choice_college: undefined,
+      semester_id: "demo-semester",
     })
 
     // Set first choice college for non-1st choice applicants

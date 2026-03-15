@@ -57,6 +57,19 @@ const TEST_LEADS = [
 export const POST = withApiHandler(
   { context: 'seed-test-leads', roles: ['admin'] },
   async ({ supabase, user, logger }) => {
+    // Fetch active semester
+    const { data: activeSemester } = await supabase
+      .from("semesters")
+      .select("id")
+      .eq("is_active", true)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .single()
+
+    if (!activeSemester) {
+      return NextResponse.json({ error: "No active enrollment cycle found. Create one first." }, { status: 400 })
+    }
+
     // Insert test leads
     const { data, error } = await supabase
       .from("leads")
@@ -65,6 +78,7 @@ export const POST = withApiHandler(
           ...lead,
           assigned_to: user.id,
           assigned_at: new Date().toISOString(),
+          semester_id: activeSemester.id,
         }))
       )
       .select()

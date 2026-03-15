@@ -3,11 +3,13 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTargetSettings } from "@/lib/hooks/use-target-settings"
+import { useUser } from "@/lib/hooks/use-user"
 import { TargetHeader, type TargetCategory } from "./target-header"
 import { TeamSummary } from "./team-summary"
 import { TeamTargetInput } from "./team-target-input"
 import { AgentTargetRow } from "./agent-target-row"
 import { TargetHistory } from "./target-history"
+import { AgentTargetView } from "./agent-target-view"
 import { Input } from "@/components/ui/input"
 import { Search, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,6 +23,16 @@ const categoryLabels: { key: TargetCategory; label: string }[] = [
 ]
 
 export function TargetSettings() {
+  const { isAdmin } = useUser()
+
+  if (!isAdmin) {
+    return <AgentTargetView />
+  }
+
+  return <AdminTargetSettings />
+}
+
+function AdminTargetSettings() {
   const {
     agents,
     historyTargets,
@@ -86,8 +98,12 @@ export function TargetSettings() {
     setTimeout(() => setSaveSuccess(false), 2000)
   }
 
-  const applyToAll = (field: keyof AgentTargetDraft, value: number) => {
-    agents.forEach(agent => updateTarget(agent.id, field, value))
+  const applyToAll = (field: keyof AgentTargetDraft, total: number) => {
+    const base = Math.floor(total / agents.length)
+    const remainder = total % agents.length
+    agents.forEach((agent, i) => {
+      updateTarget(agent.id, field, i < remainder ? base + 1 : base)
+    })
   }
 
   if (loading) {

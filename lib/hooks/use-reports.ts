@@ -32,6 +32,7 @@ export interface ReportFilters {
     end: string | null
     preset: 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
   }
+  cycleId: string | null
   semesterId: string | null
   fundingType: FundingType | 'all'
   agentId: string | null
@@ -43,6 +44,7 @@ export interface ReportFilters {
 
 export const defaultFilters: ReportFilters = {
   dateRange: { start: null, end: null, preset: 'month' },
+  cycleId: null,
   semesterId: null,
   fundingType: 'all',
   agentId: null,
@@ -451,6 +453,18 @@ export function useReports(filters: ReportFilters = defaultFilters) {
       if (filters.sourceCategory !== 'all') {
         leadsQuery = leadsQuery.eq('source_category', filters.sourceCategory)
       }
+      if (filters.semesterId) {
+        leadsQuery = leadsQuery.eq('semester_id', filters.semesterId)
+      } else if (filters.cycleId) {
+        // When cycle is selected but no specific term, fetch term IDs for that cycle
+        const { data: cycleTerms } = await supabase
+          .from('semesters')
+          .select('id')
+          .eq('cycle_id', filters.cycleId)
+        if (cycleTerms && cycleTerms.length > 0) {
+          leadsQuery = leadsQuery.in('semester_id', cycleTerms.map(t => t.id))
+        }
+      }
 
       // Fetch agents
       const agentsQuery = supabase
@@ -544,11 +558,11 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         }
       }
 
-      if (leadsError) throw leadsError
-      if (studentsError) throw studentsError
-      if (appointmentsError) throw appointmentsError
-      if (agentsError) throw agentsError
-      if (lostReasonsError) throw lostReasonsError
+      if (leadsError) throw new Error(leadsError.message)
+      if (studentsError) throw new Error(studentsError.message)
+      if (appointmentsError) throw new Error(appointmentsError.message)
+      if (agentsError) throw new Error(agentsError.message)
+      if (lostReasonsError) throw new Error(lostReasonsError.message)
 
       const leadsData = (leads || []) as Lead[]
       const studentsData = (students || []) as Student[]
@@ -1310,7 +1324,7 @@ export function useAgents() {
         .eq("is_active", true)
         .order("full_name")
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as Profile[]
     },
     staleTime: 60_000,
@@ -1491,8 +1505,8 @@ export function useAgentTargetProgress(agentId?: string) {
           .lte("created_at", endOfMonth + "T23:59:59"),
       ])
 
-      if (agentsError) throw agentsError
-      if (leadsError) throw leadsError
+      if (agentsError) throw new Error(agentsError.message)
+      if (leadsError) throw new Error(leadsError.message)
 
       // SF applicant targets come from the 'overall' row
       const overallSfAppMap = new Map((overallTargets || []).map(t => [t.agent_id, t.sf_applicants || 0]))

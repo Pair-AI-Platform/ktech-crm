@@ -132,7 +132,7 @@ interface LeadFormAcademicProps {
   availablePipelineStages: typeof PIPELINE_STAGES
   isAtTestStage: boolean
   agents: { id: string; full_name: string; email: string; avatar_url: string | null }[]
-  semesters: { id: string; name: string; is_active: boolean }[]
+  semesters: { id: string; name: string; is_active: boolean; is_open: boolean; cycle_id?: string }[]
 }
 
 export function LeadFormAcademic({
@@ -512,26 +512,58 @@ export function LeadFormAcademic({
           </div>
 
           {/* Cycle / Semester */}
-          {semesters.length > 0 && (
-            <div className="space-y-2">
-              <Label>Cycle</Label>
-              <Select
-                value={formData.semester_id}
-                onValueChange={(value) => handleChange("semester_id", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select cycle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {semesters.map((semester) => (
-                    <SelectItem key={semester.id} value={semester.id}>
-                      {semester.name}{semester.is_active ? " (Current)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label>Term <span className="text-red-500">*</span></Label>
+            <Select
+              value={formData.semester_id}
+              onValueChange={(value) => handleChange("semester_id", value)}
+            >
+              <SelectTrigger className={errors.semester_id ? "border-red-500" : ""}>
+                <SelectValue placeholder="Select term" />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Open terms first */}
+                {semesters.filter(s => s.is_active && s.is_open).length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Open for Enrollment</div>
+                    {semesters.filter(s => s.is_active && s.is_open).map((semester) => (
+                      <SelectItem key={semester.id} value={semester.id}>
+                        {semester.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                {/* Other active terms (closed) */}
+                {semesters.filter(s => s.is_active && !s.is_open).length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mt-1">Closed</div>
+                    {semesters.filter(s => s.is_active && !s.is_open).map((semester) => (
+                      <SelectItem key={semester.id} value={semester.id} className="opacity-60">
+                        {semester.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                {/* Archived terms */}
+                {semesters.filter(s => !s.is_active).length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mt-1">Archived</div>
+                    {semesters.filter(s => !s.is_active).map((semester) => (
+                      <SelectItem key={semester.id} value={semester.id} className="opacity-40">
+                        {semester.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+            {semesters.filter(s => s.is_active && s.is_open).length === 0 && semesters.length > 0 && (
+              <p className="text-xs text-amber-600">No terms are currently open for enrollment.</p>
+            )}
+            {errors.semester_id && (
+              <p className="text-xs text-red-500">{errors.semester_id}</p>
+            )}
+          </div>
 
           {/* Ministry Blocked Section */}
           <div className="space-y-3">

@@ -34,8 +34,9 @@ export function useTargetSettings() {
         .from("profiles")
         .select("*")
         .eq("is_active", true)
+        .eq("role", "agent")
         .order("full_name")
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data || []
     },
     staleTime: 60_000,
@@ -49,7 +50,7 @@ export function useTargetSettings() {
         .from("agent_targets")
         .select("*")
         .eq("month", month)
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as AgentTarget[]
     },
     staleTime: 30_000,
@@ -63,7 +64,7 @@ export function useTargetSettings() {
         .from("semesters")
         .select("*")
         .order("start_date", { ascending: false })
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as Semester[]
     },
     staleTime: 60_000,
@@ -92,7 +93,7 @@ export function useTargetSettings() {
         .from("agent_seasonal_targets")
         .select("*")
         .eq("season_id", effectiveSeasonId)
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as AgentSeasonalTarget[]
     },
     enabled: !!effectiveSeasonId,
@@ -110,7 +111,7 @@ export function useTargetSettings() {
         .neq("month", "overall")  // exclude legacy overall rows
         .order("month", { ascending: false })
         .limit(100)
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as AgentTarget[]
     },
     staleTime: 60_000,
@@ -232,7 +233,7 @@ export function useTargetSettings() {
           const { error } = await supabase
             .from("agent_targets")
             .upsert(monthlyRow, { onConflict: 'agent_id,month' })
-          if (error) throw error
+          if (error) throw new Error(error.message)
         }
       }
 
@@ -255,7 +256,7 @@ export function useTargetSettings() {
             const { error } = await supabase
               .from("agent_seasonal_targets")
               .upsert(seasonalRow, { onConflict: 'agent_id,season_id' })
-            if (error) throw error
+            if (error) throw new Error(error.message)
           }
         }
       }

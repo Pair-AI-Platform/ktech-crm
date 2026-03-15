@@ -107,48 +107,42 @@ export function TargetHeader({
         </div>
       </div>
 
-      {/* Category filter pills */}
-      <div className="flex flex-wrap items-center gap-2">
-        {categoryConfig.map(cat => {
-          const isActive = activeCategories.has(cat.key)
-          const isSeasonal = SEASONAL_CATEGORIES.has(cat.key)
-          return (
-            <button
-              key={cat.key}
-              onClick={() => onToggleCategory(cat.key)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
-                isActive
-                  ? "bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-primary)] shadow-sm"
-                  : "bg-transparent border-transparent text-[var(--text-muted)] opacity-50 hover:opacity-75"
-              )}
-            >
-              <div className={cn("w-2 h-2 rounded-full", cat.dotColor, !isActive && "opacity-40")} />
-              {cat.label}
-              {isSeasonal && (
-                <span className={cn(
-                  "text-[10px] font-normal px-1 py-0.5 rounded",
-                  isActive ? "bg-[var(--bg-sunken)] text-[var(--text-muted)]" : "text-[var(--text-muted)]"
-                )}>
-                  Season
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Period selectors */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Monthly period */}
-        {showMonthly && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
-            <span className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider">Month</span>
-            <div className="h-4 w-px bg-[var(--border)]" />
+      {/* Period selectors with grouped categories */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Monthly section */}
+        <div className={cn(
+          "rounded-xl border transition-all",
+          showMonthly
+            ? "border-[var(--border)] bg-[var(--bg-elevated)] shadow-sm"
+            : "border-dashed border-[var(--border)] bg-[var(--bg-sunken)] opacity-60"
+        )}>
+          {/* Monthly categories */}
+          <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
+            {categoryConfig.filter(c => MONTHLY_CATEGORIES.has(c.key)).map(cat => {
+              const isActive = activeCategories.has(cat.key)
+              return (
+                <button
+                  key={cat.key}
+                  onClick={() => onToggleCategory(cat.key)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all",
+                    isActive
+                      ? "bg-[var(--bg-sunken)] text-[var(--text-primary)]"
+                      : "text-[var(--text-muted)] opacity-50 hover:opacity-75"
+                  )}
+                >
+                  <div className={cn("w-2 h-2 rounded-full", cat.dotColor, !isActive && "opacity-40")} />
+                  {cat.label}
+                </button>
+              )
+            })}
+          </div>
+          {/* Month navigator */}
+          <div className="flex items-center gap-2 px-3 pb-3">
             {onPrevMonth && (
               <button
                 onClick={handlePrev}
-                className="p-1 hover:bg-[var(--bg-elevated)] rounded transition-colors"
+                className="p-1 hover:bg-[var(--bg-sunken)] rounded transition-colors"
               >
                 <ChevronLeft className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               </button>
@@ -178,28 +172,51 @@ export function TargetHeader({
               <button
                 onClick={handleNext}
                 disabled={!canGoNext}
-                className="p-1 hover:bg-[var(--bg-elevated)] rounded transition-colors disabled:opacity-30"
+                className="p-1 hover:bg-[var(--bg-sunken)] rounded transition-colors disabled:opacity-30"
               >
                 <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               </button>
             )}
-            <div className="flex items-center gap-1 ml-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-            </div>
           </div>
-        )}
+        </div>
 
-        {/* Season period */}
-        {showSeasonal && (
-          <div className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
+        {/* Seasonal section */}
+        <div className={cn(
+          "rounded-xl border transition-all",
+          showSeasonal
+            ? "border-[var(--border)] bg-[var(--bg-elevated)] shadow-sm"
+            : "border-dashed border-[var(--border)] bg-[var(--bg-sunken)] opacity-60"
+        )}>
+          {/* Seasonal categories */}
+          <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
+            {categoryConfig.filter(c => SEASONAL_CATEGORIES.has(c.key)).map(cat => {
+              const isActive = activeCategories.has(cat.key)
+              return (
+                <button
+                  key={cat.key}
+                  onClick={() => onToggleCategory(cat.key)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all",
+                    isActive
+                      ? "bg-[var(--bg-sunken)] text-[var(--text-primary)]"
+                      : "text-[var(--text-muted)] opacity-50 hover:opacity-75"
+                  )}
+                >
+                  <div className={cn("w-2 h-2 rounded-full", cat.dotColor, !isActive && "opacity-40")} />
+                  {cat.label}
+                </button>
+              )
+            })}
+          </div>
+          {/* Season navigator */}
+          <div className="px-3 pb-3">
             <SeasonSelector
               seasons={seasons}
               selectedSeason={selectedSeason}
               onChangeSeason={onChangeSeason}
             />
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

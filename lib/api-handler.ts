@@ -95,7 +95,7 @@ export function withApiHandler(
         .eq('id', user.id)
         .single()
 
-      const userProfile: { role: UserRole } = { role: profile?.role ?? 'user' }
+      const userProfile: { role: UserRole } = { role: profile?.role ?? 'agent' }
 
       // Role-based authorization check
       if ('roles' in options && options.roles && options.roles.length > 0) {

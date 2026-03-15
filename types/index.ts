@@ -361,7 +361,7 @@ export interface Lead {
   referred_by_lead_id?: string
 
   // Cycle
-  semester_id?: string
+  semester_id: string
   semester?: Semester
 
   // Pipeline
@@ -843,12 +843,31 @@ export interface WithdrawalReason {
   is_active: boolean
 }
 
+export type TermType = 'fall' | 'spring' | 'summer'
+
+export interface EducationCycle {
+  id: string
+  name: string           // "2025-2026"
+  start_year: number
+  end_year: number
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+  terms?: Semester[]     // populated via join
+}
+
 export interface Semester {
   id: string
   name: string
   start_date: string
   end_date: string
   is_active: boolean
+  cycle_id?: string
+  cycle?: EducationCycle
+  term_type?: TermType
+  is_open: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 // =============================================

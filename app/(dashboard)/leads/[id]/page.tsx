@@ -69,6 +69,8 @@ import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
+import { useSemesters } from "@/lib/hooks/use-semesters"
+import { useCycles } from "@/lib/hooks/use-cycles"
 
 // Simplified stage order for the pipeline
 const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"] as const
@@ -260,6 +262,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const { appointments } = useLeadAppointments(resolvedParams.id)
   const { activities } = useLeadActivities(resolvedParams.id)
   const { updateLeadStage, updateLead, loading: mutationLoading } = useLeadMutations()
+  const { semesters } = useSemesters()
+  const { cycles } = useCycles()
+  const [showCycleSelector, setShowCycleSelector] = useState(false)
   // Show all pipeline stages in the stepper (excluding 'lost' and 'withdraw' as they're handled separately)
   const activeStageOrder = useMemo(() => {
     return STAGE_ORDER.filter(s => s !== 'lost' && s !== 'withdraw')
@@ -669,7 +674,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
           className={cn(
-            "relative overflow-hidden rounded-lg bg-[var(--bg-surface)] border",
+            "relative rounded-lg bg-[var(--bg-surface)] border",
             lead.priority === 'critical'
               ? "border-red-500/40 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]"
               : "border-[var(--border)]"
@@ -862,6 +867,81 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           Blocked
                         </span>
                       )}
+                      {/* Cycle selector */}
+                      <div className="relative">
+                        <button
+                          onClick={() => isAdmin && setShowCycleSelector(!showCycleSelector)}
+                          className={cn(
+                            "inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium ring-1 transition-colors",
+                            lead.semester
+                              ? "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400 ring-violet-300/30"
+                              : "bg-[var(--bg-sunken)] text-[var(--text-muted)] ring-[var(--border)]",
+                            isAdmin && "cursor-pointer hover:ring-[var(--border-hover)]"
+                          )}
+                        >
+                          <CalendarDays className="w-3 h-3" />
+                          {lead.semester?.name || "No Cycle"}
+                          {isAdmin && <ChevronDown className="w-2.5 h-2.5 ml-0.5" />}
+                        </button>
+                        {showCycleSelector && isAdmin && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowCycleSelector(false)} />
+                            <div className="absolute top-full left-0 mt-1 z-50 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg shadow-lg py-1 min-w-[180px] max-h-[300px] overflow-y-auto">
+                              {cycles.map((cycle) => (
+                                <div key={cycle.id}>
+                                  <div className="px-3 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                                    {cycle.name}
+                                    {cycle.is_active && <span className="text-green-500">●</span>}
+                                  </div>
+                                  {cycle.terms?.map(s => (
+                                    <button
+                                      key={s.id}
+                                      onClick={async () => {
+                                        await updateLead(lead.id, { semester_id: s.id })
+                                        refetchLead()
+                                        setShowCycleSelector(false)
+                                      }}
+                                      className={cn(
+                                        "w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2",
+                                        !cycle.is_active && "text-[var(--text-muted)]",
+                                        lead.semester_id === s.id && "font-semibold text-[var(--primary)]"
+                                      )}
+                                    >
+                                      {s.name}
+                                      {s.is_open && <span className="text-[10px] text-green-500 ml-auto">Open</span>}
+                                      {lead.semester_id === s.id && <Check className="w-3 h-3 ml-auto" />}
+                                    </button>
+                                  ))}
+                                </div>
+                              ))}
+                              {/* Orphan semesters without a cycle */}
+                              {semesters.filter(s => !s.cycle_id).length > 0 && (
+                                <>
+                                  <div className="border-t border-[var(--border)] my-1" />
+                                  <div className="px-3 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Other</div>
+                                  {semesters.filter(s => !s.cycle_id).map(s => (
+                                    <button
+                                      key={s.id}
+                                      onClick={async () => {
+                                        await updateLead(lead.id, { semester_id: s.id })
+                                        refetchLead()
+                                        setShowCycleSelector(false)
+                                      }}
+                                      className={cn(
+                                        "w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2 text-[var(--text-muted)]",
+                                        lead.semester_id === s.id && "font-semibold text-[var(--primary)]"
+                                      )}
+                                    >
+                                      {s.name}
+                                      {lead.semester_id === s.id && <Check className="w-3 h-3 ml-auto" />}
+                                    </button>
+                                  ))}
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </motion.div>
 
 

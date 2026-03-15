@@ -205,7 +205,7 @@ export function useLeads(options: UseLeadsOptions = {}) {
           buildQuery(true),
         ])
 
-        if (dataResult.error) throw dataResult.error
+        if (dataResult.error) throw new Error(dataResult.error.message)
 
         return {
           leads: (dataResult.data as unknown as Lead[] | null) || [],
@@ -214,7 +214,7 @@ export function useLeads(options: UseLeadsOptions = {}) {
       } else {
         const dataResult = await buildQuery(false).limit(limit)
 
-        if (dataResult.error) throw dataResult.error
+        if (dataResult.error) throw new Error(dataResult.error.message)
 
         return {
           leads: (dataResult.data as unknown as Lead[] | null) || [],
@@ -298,12 +298,13 @@ export function useLead(id: string) {
           *,
           school:schools(id, name_en, name_ar),
           assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
-          lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category)
+          lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category),
+          semester:semesters(id, name, is_active)
         `)
         .eq("id", id)
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data as Lead
     },
     enabled: !!id,
@@ -423,7 +424,7 @@ export function useLeadMutations() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Log activity for auto PUC SRJ routing
       if (shouldRouteToPuc && data) {
@@ -533,7 +534,7 @@ export function useLeadMutations() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Log activity for GPA override
       if (isNewGpaOverride && oldLead) {
@@ -745,7 +746,7 @@ export function useLeadMutations() {
           reason: reason || null
         })
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return { error: null, deletedRecordId: data }
     },
     onSuccess: () => {
@@ -772,7 +773,7 @@ export function useLeadMutations() {
         })
         .in("id", leadIds)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Notify the assigned agent
       supabase.from('notifications').insert({
@@ -1047,7 +1048,7 @@ export function useLeadStats() {
         .from("leads")
         .select("pipeline_stage, created_at")
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       const byStage: Record<string, number> = {}
       // Initialize all pipeline stages to 0
@@ -1155,7 +1156,7 @@ export function useLostReasons() {
         .eq('is_active', true)
         .order('category')
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data || []
     },
     staleTime: 5 * 60_000, // Lost reasons rarely change, cache for 5 minutes

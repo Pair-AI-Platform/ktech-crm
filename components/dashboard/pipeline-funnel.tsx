@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { type PipelineStage } from "@/types"
+import { useActiveCycle } from "@/lib/hooks/use-cycles"
 
 interface PipelineFunnelProps {
   byStage: Record<PipelineStage, number>
@@ -12,11 +13,16 @@ interface PipelineFunnelProps {
 export function PipelineFunnel({ byStage, total }: PipelineFunnelProps) {
   const applications = byStage.application || 0
   const conversionRate = total > 0 ? Math.round((applications / total) * 100) : 0
+  const { activeCycle } = useActiveCycle()
 
-  // Determine current semester
-  const month = new Date().getMonth() // 0-11
-  const year = new Date().getFullYear()
-  const semester = month >= 0 && month <= 5 ? 'Spring' : 'Fall'
+  // Derive label from active cycle or fall back to current date
+  const cycleLabel = activeCycle
+    ? activeCycle.name
+    : (() => {
+        const month = new Date().getMonth()
+        const year = new Date().getFullYear()
+        return `${month >= 0 && month <= 5 ? 'Spring' : 'Fall'} ${year}`
+      })()
 
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[280px]">
@@ -31,7 +37,7 @@ export function PipelineFunnel({ byStage, total }: PipelineFunnelProps) {
           {applications}
         </span>
         <p className="text-[14px] text-[var(--text-muted)] mt-2">
-          {semester} {year}
+          {cycleLabel}
         </p>
       </motion.div>
 

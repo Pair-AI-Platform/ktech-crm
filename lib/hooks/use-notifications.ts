@@ -74,7 +74,7 @@ export function useNotifications(userId?: string | null) {
         .order("created_at", { ascending: false })
         .limit(50)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data as Notification[]) ?? []
     },
     staleTime: 30_000,
@@ -118,7 +118,7 @@ export function useNotifications(userId?: string | null) {
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq("id", notificationId)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onMutate: async (notificationId: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all })
@@ -156,7 +156,7 @@ export function useNotifications(userId?: string | null) {
         .eq("user_id", userId)
         .eq("is_read", false)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all })

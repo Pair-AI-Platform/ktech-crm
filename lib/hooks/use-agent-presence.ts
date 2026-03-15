@@ -56,7 +56,7 @@ export function useAgentPresence() {
           .from('profiles')
           .select('id, full_name, last_activity_at, is_active')
           .neq('is_active', false)
-        if (fbErr) throw fbErr
+        if (fbErr) throw new Error(fbErr.message)
         return (fallback ?? []).map((p) => ({
           ...p,
           last_activity_at: null as string | null,

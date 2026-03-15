@@ -111,7 +111,7 @@ export function useDeletedLeads(options: UseDeletedLeadsOptions = {}) {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data || []) as DeletedLead[]
     },
     staleTime: 30_000,
@@ -176,7 +176,7 @@ export function useDeletedLeadMutations() {
           restoring_user_id: user.id
         })
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return { data, error: null }
     },
     onSuccess: () => {
@@ -266,7 +266,7 @@ export function useDeletedLeadMutations() {
         .delete()
         .eq("id", deletedLeadId)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return { error: null }
     },
     onSuccess: () => {
@@ -337,7 +337,7 @@ export function useDeletedLeadsStats() {
         .from("deleted_leads")
         .select("deleted_at, is_restored")
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)

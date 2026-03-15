@@ -152,7 +152,7 @@ export function useAgents() {
           .eq("is_active", true)
           .order("full_name")
 
-        if (error) throw error
+        if (error) throw new Error(error.message)
         setAgents(data || [])
       } catch (error) {
         console.error("Error fetching agents:", error)

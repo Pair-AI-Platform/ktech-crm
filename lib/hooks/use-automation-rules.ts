@@ -61,7 +61,7 @@ export function useAutomationRules(): UseAutomationRulesReturn {
         .select("*")
         .order("priority", { ascending: false })
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return (data as AutomationRule[]) ?? []
     },
     staleTime: 30_000,
@@ -88,7 +88,7 @@ export function useAutomationRules(): UseAutomationRulesReturn {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data as AutomationRule
     },
     onSuccess: () => {
@@ -106,7 +106,7 @@ export function useAutomationRules(): UseAutomationRulesReturn {
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onMutate: async ({ id, updates }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.automationRules.all })
@@ -140,7 +140,7 @@ export function useAutomationRules(): UseAutomationRulesReturn {
         .delete()
         .eq("id", id)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.automationRules.all })

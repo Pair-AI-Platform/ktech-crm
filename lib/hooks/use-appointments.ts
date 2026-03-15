@@ -158,7 +158,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Backfill legacy lead/lead_id from junction table for backward compat
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -325,7 +325,7 @@ export function useAppointmentMutations() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Insert junction records for all leads
       if (leadIds.length > 0 && data) {
@@ -392,7 +392,7 @@ export function useAppointmentMutations() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data
     },
     onSuccess: () => {
@@ -412,7 +412,7 @@ export function useAppointmentMutations() {
         .delete()
         .eq("id", id)
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onSuccess: () => {
       invalidateAppointments()
@@ -628,7 +628,7 @@ export function useAppointmentStats() {
         .gte("scheduled_date", toDateString(startOfWeek))
         .lte("scheduled_date", toDateString(endOfWeek))
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Fetch all past appointments that are still "scheduled" (needs attention)
       const { data: needsAttentionData, error: needsAttentionError } = await supabase
@@ -637,7 +637,7 @@ export function useAppointmentStats() {
         .eq("status", "scheduled")
         .lte("scheduled_date", today)
 
-      if (needsAttentionError) throw needsAttentionError
+      if (needsAttentionError) throw new Error(needsAttentionError.message)
 
       // Filter needs attention by checking if the time has also passed
       const needsAttentionCount = (needsAttentionData || []).filter(apt => {
@@ -760,7 +760,7 @@ export function useRescheduleHistory(appointmentId: string) {
         .eq("action", "UPDATE")
         .order("created_at", { ascending: true })
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
 
       // Filter for entries where date or time changed
       const rescheduleEntries: RescheduleEntry[] = []
