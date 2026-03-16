@@ -73,5 +73,6 @@ export const RATE_LIMITS = {
   'ministry-import': { interval: 300_000, limit: 3 }, // 3 ministry imports per 5 min
   export: { interval: 60_000, limit: 5 },        // 5 exports per minute
   'ai-transfer': { interval: 60_000, limit: 30 }, // 30 AI transfer webhooks per minute
+  'ai-chat': { interval: 60_000, limit: 20 },    // 20 AI chat messages per minute
   api: { interval: 60_000, limit: 60 },          // 60 general API calls per minute
 } as const

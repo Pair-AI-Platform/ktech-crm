@@ -17,7 +17,7 @@ const categoryBase = [
   { key: 'puc_files' as const, label: 'PUC Files', color: 'bg-green-500', lightBg: 'bg-green-50 dark:bg-green-500/10', textColor: 'text-green-700 dark:text-green-400', iconBg: 'bg-green-100 dark:bg-green-500/20', seasonal: false },
   { key: 'sf_files' as const, label: 'SF Files', color: 'bg-orange-500', lightBg: 'bg-orange-50 dark:bg-orange-500/10', textColor: 'text-orange-700 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-500/20', seasonal: false },
   { key: 'sf_applicants' as const, label: 'SF Applicants', color: 'bg-blue-500', lightBg: 'bg-blue-50 dark:bg-blue-500/10', textColor: 'text-blue-700 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-500/20', seasonal: true },
-  { key: 'puc_app_submission' as const, label: 'PUC App Submission', color: 'bg-purple-500', lightBg: 'bg-purple-50 dark:bg-purple-500/10', textColor: 'text-purple-700 dark:text-purple-400', iconBg: 'bg-purple-100 dark:bg-purple-500/20', seasonal: true },
+  { key: 'puc_app_submission' as const, label: 'PUC Submission', color: 'bg-purple-500', lightBg: 'bg-purple-50 dark:bg-purple-500/10', textColor: 'text-purple-700 dark:text-purple-400', iconBg: 'bg-purple-100 dark:bg-purple-500/20', seasonal: true },
 ]
 
 export function TeamSummary({ agents, getEffectiveTarget, activeCategories, selectedSeason }: TeamSummaryProps) {

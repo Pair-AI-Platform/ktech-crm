@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNav, QuickActions } from "@/components/layout/mobile-nav"
 import { QuickFind, useQuickFind } from "@/components/layout/quick-find"
+import { AIChatButton } from "@/components/ai-chat/ai-chat-button"
+import { AIChatPanel } from "@/components/ai-chat/ai-chat-panel"
 import { cn } from "@/lib/utils"
 import type { Profile } from "@/types"
 
@@ -55,6 +57,7 @@ interface DashboardShellProps {
 export function DashboardShell({ user, children }: DashboardShellProps) {
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [aiChatOpen, setAiChatOpen] = useState(false)
   const quickFind = useQuickFind()
   const router = useRouter()
   const isDemoMode = useDemoMode()
@@ -99,6 +102,10 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           isOpen={quickFind.isOpen}
           onClose={quickFind.close}
         />
+
+        {/* AI Chat */}
+        <AIChatButton onClick={() => setAiChatOpen(true)} />
+        <AIChatPanel open={aiChatOpen} onOpenChange={setAiChatOpen} />
       </div>
     </SidebarContext.Provider>
   )

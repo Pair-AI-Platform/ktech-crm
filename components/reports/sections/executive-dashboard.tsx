@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useSyncExternalStore, useRef } from "react"
+import { useSyncExternalStore, useRef } from "react"
 import { motion, useInView } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,7 @@ import {
   Activity,
 } from "lucide-react"
 import type { ExecutiveReportData } from "@/lib/hooks/use-reports"
+import { AnimatedNumber } from "../animated-number"
 import { PipelineFunnelVisual } from "./pipeline-funnel-visual"
 
 interface ExecutiveDashboardProps {
@@ -33,34 +34,13 @@ interface ExecutiveDashboardProps {
 
 const emptySubscribe = () => () => {}
 
-// Enhanced animated number with easing
-function AnimatedNumber({ value, duration = 1000 }: { value: number; duration?: number }) {
-  const [displayValue, setDisplayValue] = useState(0)
-  const ref = useRef<HTMLSpanElement>(null)
-  const isInView = useInView(ref, { once: true })
-
-  useEffect(() => {
-    if (!isInView) return
-
-    let startTime: number
-    let animationFrame: number
-
-    const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp
-      const progress = Math.min((timestamp - startTime) / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 4) // easeOutQuart
-      setDisplayValue(Math.floor(eased * value))
-
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate)
-      }
-    }
-
-    animationFrame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animationFrame)
-  }, [value, duration, isInView])
-
-  return <span ref={ref}>{displayValue.toLocaleString()}</span>
+/** Format change for display — cap at ±200%, handle null (new) */
+function fmtChange(change: number | null): { label: string; isPositive: boolean; isNew: boolean } {
+  if (change === null) return { label: "New", isPositive: true, isNew: true }
+  const capped = Math.max(-200, Math.min(200, change))
+  const prefix = capped > 0 ? "+" : ""
+  const display = Math.abs(change) > 200 ? `${capped > 0 ? ">" : "<"}200` : `${prefix}${capped}`
+  return { label: `${display}%`, isPositive: capped >= 0, isNew: false }
 }
 
 interface TooltipPayload {
@@ -113,6 +93,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
       value: data.targetProgress.current,
       suffix: ` / ${data.targetProgress.target}`,
       percent: data.targetProgress.percent,
+      change: null as number | null,
       icon: Target,
       color: "var(--primary)",
       iconColorClass: "bg-[var(--primary)]",
@@ -126,7 +107,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
       iconColorClass: "bg-[var(--accent)]",
     },
     {
-      title: "Enrollments",
+      title: "Enrollments This Week",
       value: data.weekOverWeek.enrollments.current,
       change: data.weekOverWeek.enrollments.change,
       icon: GraduationCap,
@@ -164,25 +145,33 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                     </div>
 
                     {/* Change indicator or badge */}
-                    {stat.change !== undefined && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={isInView ? { scale: 1 } : {}}
-                        transition={{ delay: index * 0.1 + 0.3, type: "spring" }}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-                          stat.change >= 0
-                            ? "bg-[var(--success)]/10 text-[var(--success)]"
-                            : "bg-[var(--error)]/10 text-[var(--error)]"
-                        }`}
-                      >
-                        {stat.change >= 0 ? (
-                          <ArrowUpRight className="w-3 h-3" />
-                        ) : (
-                          <ArrowDownRight className="w-3 h-3" />
-                        )}
-                        {Math.abs(stat.change)}%
-                      </motion.div>
-                    )}
+                    {stat.change !== undefined && stat.change !== null && (() => {
+                      const info = fmtChange(stat.change)
+                      return (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={isInView ? { scale: 1 } : {}}
+                          transition={{ delay: index * 0.1 + 0.3, type: "spring" }}
+                          className="text-right"
+                        >
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                            info.isNew
+                              ? "bg-[var(--info)]/10 text-[var(--info)]"
+                              : info.isPositive
+                                ? "bg-[var(--success)]/10 text-[var(--success)]"
+                                : "bg-[var(--error)]/10 text-[var(--error)]"
+                          }`}>
+                            {!info.isNew && (info.isPositive ? (
+                              <ArrowUpRight className="w-3 h-3" />
+                            ) : (
+                              <ArrowDownRight className="w-3 h-3" />
+                            ))}
+                            {info.label}
+                          </div>
+                          <p className="text-[9px] text-[var(--text-muted)] mt-0.5 text-center">vs last week</p>
+                        </motion.div>
+                      )
+                    })()}
                     {stat.percent !== undefined && (
                       <motion.div
                         initial={{ scale: 0 }}
@@ -217,7 +206,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                           className="h-full rounded-full"
                           style={{ backgroundColor: stat.color }}
                           initial={{ width: 0 }}
-                          animate={isInView ? { width: `${Math.min(stat.percent, 100)}%` } : {}}
+                          animate={isInView ? { width: `${Math.max(Math.min(stat.percent, 100), 2)}%` } : {}}
                           transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
                         />
                       </div>
@@ -409,7 +398,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
       >
         <Card className="shadow-sm bg-[var(--bg-surface)] overflow-hidden">
           <CardContent className="p-8">
-            <PipelineFunnelVisual data={data.pipelineFunnel} />
+            <PipelineFunnelVisual data={data.pipelineFunnel} totalStageChanges={data.totalStageChanges} />
           </CardContent>
         </Card>
       </motion.div>
@@ -430,12 +419,13 @@ function ComparisonCard({
   label: string
   current: number
   previous: number
-  change: number
+  change: number | null
   color: string
   delay: number
   isInView: boolean
 }) {
-  const isPositive = change >= 0
+  const changeInfo = fmtChange(change)
+  const isPositive = changeInfo.isPositive
 
   return (
     <motion.div
@@ -463,8 +453,8 @@ function ComparisonCard({
                 : "bg-[var(--error)]/15 text-[var(--error)]"
             }`}
           >
-            {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-            {change > 0 ? "+" : ""}{change}%
+            {!changeInfo.isNew && (isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
+            {changeInfo.label}
           </motion.div>
         </div>
 

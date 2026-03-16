@@ -21,10 +21,13 @@ interface PipelineStageData {
   label: string
   count: number
   percent: number
+  movesIn: number
+  movesOut: number
 }
 
 interface PipelineFunnelVisualProps {
   data: PipelineStageData[]
+  totalStageChanges?: number
 }
 
 const STAGE_CONFIG: Record<string, {
@@ -86,7 +89,7 @@ function getStageWidths(count: number): number[] {
   return widths
 }
 
-export function PipelineFunnelVisual({ data }: PipelineFunnelVisualProps) {
+export function PipelineFunnelVisual({ data, totalStageChanges = 0 }: PipelineFunnelVisualProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(containerRef, { once: true, margin: "-50px" })
 
@@ -234,6 +237,13 @@ export function PipelineFunnelVisual({ data }: PipelineFunnelVisualProps) {
                     <span className="text-[10px] text-gray-400 dark:text-gray-500">
                       ({stage.percent}%)
                     </span>
+                    {(stage.movesIn > 0 || stage.movesOut > 0) && (
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 border-l border-gray-200 dark:border-zinc-600 pl-1.5 ml-0.5">
+                        {stage.movesIn > 0 && <span className="text-emerald-500">+{stage.movesIn}</span>}
+                        {stage.movesIn > 0 && stage.movesOut > 0 && ' '}
+                        {stage.movesOut > 0 && <span className="text-red-400">-{stage.movesOut}</span>}
+                      </span>
+                    )}
                   </div>
                   {/* Arrow between labels */}
                   {index < data.length - 1 && index % 2 === 0 && (
@@ -258,7 +268,7 @@ export function PipelineFunnelVisual({ data }: PipelineFunnelVisualProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.8, duration: 0.5 }}
-        className="relative z-10 grid grid-cols-3 gap-4"
+        className="relative z-10 grid grid-cols-4 gap-4"
       >
         <div className="text-center p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)]">
           <p className="text-3xl font-bold text-[var(--text-primary)]">
@@ -271,6 +281,12 @@ export function PipelineFunnelVisual({ data }: PipelineFunnelVisualProps) {
             <AnimatedCounter value={applications} />
           </p>
           <p className="text-sm text-[var(--text-muted)] mt-1">Applications</p>
+        </div>
+        <div className="text-center p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+            <AnimatedCounter value={totalStageChanges} />
+          </p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Stage Changes</p>
         </div>
         <div className="text-center p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)]">
           <p className="text-3xl font-bold text-[var(--text-primary)]">

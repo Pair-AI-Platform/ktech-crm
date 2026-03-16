@@ -58,6 +58,15 @@ export const defaultFilters: ReportFilters = {
 // REPORT DATA TYPES
 // =============================================
 
+export interface FileStageAgentBreakdown {
+  agentId: string
+  agentName: string
+  total: number
+  notPaid: number
+  paid150: number
+  paidFull: number
+}
+
 export interface PaymentReportData {
   totalStudents: number
   pending: number
@@ -67,6 +76,7 @@ export interface PaymentReportData {
   fullTuitionPercent: number
   totalRevenue: number
   byAgent: Array<{ agentId: string; agentName: string; amount: number; count: number }>
+  fileStageByAgent: FileStageAgentBreakdown[]
 }
 
 export interface TestCenterReportData {
@@ -107,24 +117,25 @@ export interface EnrollmentReportData {
 
 export interface ExecutiveReportData {
   targetProgress: { current: number; target: number; percent: number }
-  pipelineFunnel: Array<{ stage: PipelineStage; label: string; count: number; percent: number }>
+  pipelineFunnel: Array<{ stage: PipelineStage; label: string; count: number; percent: number; movesIn: number; movesOut: number }>
   todayNumbers: {
     newLeads: number
     appointments: number
     enrolled: number
   }
   weekOverWeek: {
-    leads: { current: number; previous: number; change: number }
-    appointments: { current: number; previous: number; change: number }
-    enrollments: { current: number; previous: number; change: number }
+    leads: { current: number; previous: number; change: number | null }
+    appointments: { current: number; previous: number; change: number | null }
+    enrollments: { current: number; previous: number; change: number | null }
   }
   weeklyTrend: Array<{ date: string; leads: number; enrolled: number }>
+  totalStageChanges: number
 }
 
 export interface ChannelReportData {
-  bySource: Array<{ source: LeadSource; label: string; count: number; converted: number; conversionRate: number }>
+  bySource: Array<{ source: LeadSource; label: string; count: number; converted: number; conversionRate: number; enrolled: number; enrollmentRate: number }>
   byCategory: Array<{ category: LeadSourceCategory; label: string; count: number; percent: number }>
-  topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
+  topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number; enrolled: number; enrolledPercent: number }>
   bySchool: Array<{ schoolId: string; label: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
 }
 
@@ -140,6 +151,17 @@ export interface LeaderboardData {
   conversionRate: number
   target: number
   progress: number
+  // PUC funnel
+  pucFiles: number
+  pucAppSubmission: number
+  applicant: number
+  // SF funnel
+  sfFiles: number
+  sf150: number
+  sf550: number
+  sfEnrolled: number
+  // Activity
+  statusChanges: number
   // Categorized targets (populated when target mode is 'gender' or 'funding')
   categories?: {
     male?: { target: number; applications: number; progress: number }
@@ -262,6 +284,13 @@ export interface ReportData {
 // =============================================
 // HELPER FUNCTIONS
 // =============================================
+
+/** Calculate week-over-week change %. Returns null when previous=0 and current>0 ("New"), caps at ±999%. */
+function calcChange(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? null : 0
+  const raw = Math.round(((current - previous) / previous) * 100)
+  return Math.max(-999, Math.min(999, raw))
+}
 
 function getDateRange(preset: ReportFilters['dateRange']['preset']): { start: Date; end: Date } {
   const now = new Date()
@@ -406,7 +435,8 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           prevStudents,
           start,
           end,
-          targetMode
+          targetMode,
+          new Map() // No status changes in demo
         )
       }
 
@@ -497,6 +527,14 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         .select("*")
         .eq("month", "overall")
 
+      // Fetch stage change activities for status change count per agent
+      const stageChangesQuery = supabase
+        .from("activities")
+        .select("id, created_by, metadata")
+        .eq("activity_type", "stage_change")
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+
       // Previous week data for comparison
       const weekAgo = getWeekAgo()
       const twoWeeksAgo = getTwoWeeksAgo()
@@ -532,6 +570,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         { data: prevStudents },
         { data: agentTargetsData },
         { data: overallTargetsData },
+        { data: stageChangesData },
       ] = await Promise.all([
         leadsQuery,
         studentsQuery,
@@ -544,6 +583,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         prevStudentsQuery,
         agentTargetsQuery,
         overallTargetsQuery,
+        stageChangesQuery,
       ])
 
       // Get target mode from database or fallback to localStorage
@@ -604,6 +644,16 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         target_sf: agentTargetsMap.get(a.id)?.sf_files || a.target_sf || 0,
       }))
 
+      // Build status changes count per agent
+      const statusChangesMap = new Map<string, number>()
+      if (stageChangesData) {
+        for (const activity of stageChangesData) {
+          if (activity.created_by) {
+            statusChangesMap.set(activity.created_by, (statusChangesMap.get(activity.created_by) || 0) + 1)
+          }
+        }
+      }
+
       // Calculate reports
       return calculateReports(
         leadsData,
@@ -616,7 +666,9 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         (prevStudents || []) as Student[],
         start,
         end,
-        targetMode
+        targetMode,
+        statusChangesMap,
+        (stageChangesData || []) as Array<{ metadata: Record<string, string> | null }>
       )
     },
     staleTime: 60_000,
@@ -642,7 +694,9 @@ function calculateReports(
   prevStudents: Student[],
   _startDate: Date,
   _endDate: Date,
-  targetMode: TargetMode = 'simple'
+  targetMode: TargetMode = 'simple',
+  statusChangesMap: Map<string, number> = new Map(),
+  stageChangesRaw: Array<{ metadata: Record<string, string> | null }> = []
 ): ReportData {
   const today = new Date().toISOString().split('T')[0]
   const weekAgo = getWeekAgo()
@@ -652,29 +706,56 @@ function calculateReports(
   const thisWeekAppointments = appointments.filter(a => new Date(a.scheduled_date) >= weekAgo)
   const thisWeekEnrollments = students.filter(s => s.enrolled_at && new Date(s.enrolled_at) >= weekAgo)
 
-  // Payment Report
+  // Payment Report — only self-funded students have payment tracking
   const activeStudents = students.filter(s => !s.is_withdrawn)
+  const selfFundedStudents = activeStudents.filter(s => s.funding_type === 'self_funded')
   const payment: PaymentReportData = {
-    totalStudents: activeStudents.length,
-    pending: activeStudents.filter(s => s.payment_status === 'pending').length,
-    seatReserved: activeStudents.filter(s => s.payment_status === 'seat_reserved').length,
-    fullTuition: activeStudents.filter(s => s.payment_status === 'full_tuition').length,
-    seatReservedPercent: activeStudents.length > 0
-      ? Math.round((activeStudents.filter(s => s.payment_status === 'seat_reserved' || s.payment_status === 'full_tuition').length / activeStudents.length) * 100)
+    totalStudents: selfFundedStudents.length,
+    pending: selfFundedStudents.filter(s => s.payment_status === 'pending').length,
+    seatReserved: selfFundedStudents.filter(s => s.payment_status === 'seat_reserved').length,
+    fullTuition: selfFundedStudents.filter(s => s.payment_status === 'full_tuition').length,
+    seatReservedPercent: selfFundedStudents.length > 0
+      ? Math.round((selfFundedStudents.filter(s => s.payment_status === 'seat_reserved' || s.payment_status === 'full_tuition').length / selfFundedStudents.length) * 100)
       : 0,
-    fullTuitionPercent: activeStudents.length > 0
-      ? Math.round((activeStudents.filter(s => s.payment_status === 'full_tuition').length / activeStudents.length) * 100)
+    fullTuitionPercent: selfFundedStudents.length > 0
+      ? Math.round((selfFundedStudents.filter(s => s.payment_status === 'full_tuition').length / selfFundedStudents.length) * 100)
       : 0,
-    totalRevenue: activeStudents.reduce((sum, s) => sum + (s.amount_paid || 0), 0),
+    totalRevenue: selfFundedStudents.reduce((sum, s) => sum + (s.amount_paid || 0), 0),
     byAgent: agents.map(agent => {
-      const agentStudents = activeStudents.filter(s => s.assigned_to === agent.id)
+      const agentStudents = selfFundedStudents.filter(s => s.assigned_to === agent.id)
       return {
         agentId: agent.id,
         agentName: agent.full_name,
         amount: agentStudents.reduce((sum, s) => sum + (s.amount_paid || 0), 0),
         count: agentStudents.length
       }
-    }).filter(a => a.count > 0).sort((a, b) => b.amount - a.amount)
+    }).filter(a => a.count > 0).sort((a, b) => b.amount - a.amount),
+    fileStageByAgent: (() => {
+      const fileStageLeads = leads.filter(l => l.pipeline_stage === 'application')
+      const studentByLeadId = new Map(students.filter(s => s.lead_id).map(s => [s.lead_id, s]))
+      return agents.map(agent => {
+        const agentLeads = fileStageLeads.filter(l => l.assigned_to === agent.id)
+        let notPaid = 0, paid150 = 0, paidFull = 0
+        for (const lead of agentLeads) {
+          const student = studentByLeadId.get(lead.id)
+          if (!student || student.payment_status === 'pending') {
+            notPaid++
+          } else if (student.payment_status === 'seat_reserved') {
+            paid150++
+          } else if (student.payment_status === 'full_tuition') {
+            paidFull++
+          }
+        }
+        return {
+          agentId: agent.id,
+          agentName: agent.full_name,
+          total: agentLeads.length,
+          notPaid,
+          paid150,
+          paidFull,
+        }
+      }).filter(a => a.total > 0).sort((a, b) => b.total - a.total)
+    })(),
   }
 
   // Test Center Report
@@ -758,7 +839,7 @@ function calculateReports(
   const totalTarget = agents.reduce((sum, a) => sum + (a.monthly_target || 0), 0)
   const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'test', 'application', 'applicant', 'enrolled', 'withdraw', 'lost']
   const stageLabels: Record<PipelineStage, string> = {
-    new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'File', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost', puc_document_submission: 'Doc Submission', puc_application_submission: 'App Submission'
+    new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'File', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost', puc_document_submission: 'Documents', puc_application_submission: 'Submission'
   }
 
   // Generate weekly trend (last 7 days)
@@ -774,6 +855,16 @@ function calculateReports(
     })
   }
 
+  // Count stage transitions (moves in / moves out per stage)
+  const movesInMap = new Map<string, number>()
+  const movesOutMap = new Map<string, number>()
+  for (const activity of stageChangesRaw) {
+    const newStage = activity.metadata?.new_stage
+    const oldStage = activity.metadata?.old_stage
+    if (newStage) movesInMap.set(newStage, (movesInMap.get(newStage) || 0) + 1)
+    if (oldStage) movesOutMap.set(oldStage, (movesOutMap.get(oldStage) || 0) + 1)
+  }
+
   const executive: ExecutiveReportData = {
     targetProgress: {
       current: activeStudents.length,
@@ -784,7 +875,9 @@ function calculateReports(
       stage,
       label: stageLabels[stage],
       count: leads.filter(l => l.pipeline_stage === stage).length,
-      percent: leads.length > 0 ? Math.round((leads.filter(l => l.pipeline_stage === stage).length / leads.length) * 100) : 0
+      percent: leads.length > 0 ? Math.round((leads.filter(l => l.pipeline_stage === stage).length / leads.length) * 100) : 0,
+      movesIn: movesInMap.get(stage) || 0,
+      movesOut: movesOutMap.get(stage) || 0,
     })),
     todayNumbers: {
       newLeads: leads.filter(l => l.created_at.split('T')[0] === today).length,
@@ -795,34 +888,35 @@ function calculateReports(
       leads: {
         current: thisWeekLeads.length,
         previous: prevLeads.length,
-        change: prevLeads.length > 0 ? Math.round(((thisWeekLeads.length - prevLeads.length) / prevLeads.length) * 100) : 0
+        change: calcChange(thisWeekLeads.length, prevLeads.length)
       },
       appointments: {
         current: thisWeekAppointments.length,
         previous: prevAppointments.length,
-        change: prevAppointments.length > 0 ? Math.round(((thisWeekAppointments.length - prevAppointments.length) / prevAppointments.length) * 100) : 0
+        change: calcChange(thisWeekAppointments.length, prevAppointments.length)
       },
       enrollments: {
         current: thisWeekEnrollments.length,
         previous: prevStudents.length,
-        change: prevStudents.length > 0 ? Math.round(((thisWeekEnrollments.length - prevStudents.length) / prevStudents.length) * 100) : 0
+        change: calcChange(thisWeekEnrollments.length, prevStudents.length)
       }
     },
-    weeklyTrend
+    weeklyTrend,
+    totalStageChanges: stageChangesRaw.length
   }
 
   // Channel Performance
   const sourceLabels: Record<LeadSource, string> = {
     walk_in: 'Walk-in', call_center: 'Call Center', whatsapp: 'WhatsApp', email: 'Email',
     school_visit: 'School Visit', expo: 'Expo', exhibitions: 'Exhibitions',
-    website_form: 'Website Form', facebook: 'Facebook', instagram: 'Instagram',
+    website_form: 'Website Form', facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', email_marketing: 'Email Marketing',
     current_student_referral: 'Student Referral', staff_referral: 'Staff Referral', friend_referral: 'Friend Referral',
     old_contacts: 'Old Contacts', paaet_rejected: 'PAAET Rejected', gpa_lists: 'GPA Lists',
     karnival: 'Karnival',
     whatsapp_ai: 'WhatsApp AI'
   }
   const categoryLabels: Record<LeadSourceCategory, string> = {
-    direct: 'Direct', events: 'Events', digital: 'Digital', referrals: 'Referrals', outreach: 'Outreach'
+    direct: 'Direct', events: 'Events', marketing: 'Marketing', referrals: 'Referrals', outreach: 'Outreach'
   }
   // Group leads by source
   const sourceGroups: Record<string, Lead[]> = {}
@@ -852,16 +946,23 @@ function calculateReports(
   })
 
   const channel: ChannelReportData = {
-    bySource: Object.entries(sourceGroups).map(([source, sourceLeads]) => ({
-      source: source as LeadSource,
-      label: sourceLabels[source as LeadSource] || source,
-      count: sourceLeads.length,
-      converted: sourceLeads.filter(l => l.pipeline_stage === 'application').length,
-      conversionRate: sourceLeads.length > 0
-        ? Math.round((sourceLeads.filter(l => l.pipeline_stage === 'application').length / sourceLeads.length) * 100)
-        : 0
-    })).sort((a, b) => b.count - a.count),
-    byCategory: (['direct', 'events', 'digital', 'referrals', 'outreach'] as LeadSourceCategory[]).map(category => {
+    bySource: Object.entries(sourceGroups).map(([source, sourceLeads]) => {
+      const enrolled = sourceLeads.filter(l => l.pipeline_stage === 'enrolled').length
+      return {
+        source: source as LeadSource,
+        label: sourceLabels[source as LeadSource] || source,
+        count: sourceLeads.length,
+        converted: sourceLeads.filter(l => l.pipeline_stage === 'application').length,
+        conversionRate: sourceLeads.length > 0
+          ? Math.round((sourceLeads.filter(l => l.pipeline_stage === 'application').length / sourceLeads.length) * 100)
+          : 0,
+        enrolled,
+        enrollmentRate: sourceLeads.length > 0
+          ? Math.round((enrolled / sourceLeads.length) * 100)
+          : 0
+      }
+    }).sort((a, b) => b.count - a.count),
+    byCategory: (['direct', 'events', 'marketing', 'referrals', 'outreach'] as LeadSourceCategory[]).map(category => {
       const categoryLeads = leads.filter(l => l.source_category === category)
       return {
         category,
@@ -875,6 +976,7 @@ function calculateReports(
         const totalLeads = data.leads.length
         const applications = data.leads.filter(l => l.pipeline_stage === 'application').length
         const pucCount = data.leads.filter(l => l.funding_type === 'puc').length
+        const enrolled = data.leads.filter(l => l.pipeline_stage === 'enrolled').length
         return {
           schoolId,
           schoolName: data.name,
@@ -883,6 +985,8 @@ function calculateReports(
           applicationPercent: totalLeads > 0 ? Math.round((applications / totalLeads) * 100) : 0,
           pucCount,
           pucPercent: totalLeads > 0 ? Math.round((pucCount / totalLeads) * 100) : 0,
+          enrolled,
+          enrolledPercent: totalLeads > 0 ? Math.round((enrolled / totalLeads) * 100) : 0,
         }
       })
       .sort((a, b) => b.leads - a.leads)
@@ -912,26 +1016,46 @@ function calculateReports(
     const agentApplications = agentLeads.filter(l => ['test', 'application'].includes(l.pipeline_stage))
     const agentEnrolled = students.filter(s => s.assigned_to === agent.id && !s.is_withdrawn)
 
-    // PUC Submission = leads who reached puc_document_submission or puc_application_submission
-    const pucSubmissions = agentLeads.filter(l =>
-      ['puc_document_submission', 'puc_application_submission'].includes(l.pipeline_stage)
+    // PUC funnel
+    const pucFileLeads = agentLeads.filter(l =>
+      l.pipeline_stage === 'puc_document_submission'
     )
+    const pucAppSubmissionLeads = agentLeads.filter(l =>
+      l.pipeline_stage === 'puc_application_submission'
+    )
+    const applicantLeads = agentLeads.filter(l =>
+      l.pipeline_stage === 'applicant'
+    )
+
+    // SF funnel
+    const sfFileLeads = agentLeads.filter(l =>
+      l.funding_type === 'self_funded'
+    )
+    // SF enrolled stages are tracked on students, not leads
+    const agentStudents = students.filter(s => s.assigned_to === agent.id)
+    const sf150Students = agentStudents.filter(s =>
+      s.funding_type === 'self_funded' && s.sf_enrolled_stage === '150'
+    )
+    const sf550Students = agentStudents.filter(s =>
+      s.funding_type === 'self_funded' && s.sf_enrolled_stage === '400'
+    )
+    const sfEnrolledStudents = agentStudents.filter(s =>
+      s.funding_type === 'self_funded' && !s.is_withdrawn
+    )
+
     // SF Application = self-funded leads who reached application stage
     const sfApplications = agentLeads.filter(l =>
       l.funding_type === 'self_funded' && l.pipeline_stage === 'application'
     )
-    // Gender breakdown (across all applications)
-    const maleApplications = agentApplications.filter(l => l.gender === 'male')
-    const femaleApplications = agentApplications.filter(l => l.gender === 'female')
 
     // Always use 3 fixed categories
     const targetPuc = agent.target_puc || 0
     const targetSf = agent.target_sf || 0
     const target = targetPuc + targetSf
 
-    // SF Applicants = self-funded leads who reached applicant stage
-    const sfApplicantLeads = agentLeads.filter(l =>
-      l.funding_type === 'self_funded' && l.pipeline_stage === 'applicant'
+    // PUC Submissions (both stages combined for target progress)
+    const pucSubmissions = agentLeads.filter(l =>
+      ['puc_document_submission', 'puc_application_submission'].includes(l.pipeline_stage)
     )
 
     const categories: LeaderboardData['categories'] = {
@@ -958,8 +1082,18 @@ function calculateReports(
       enrolled: agentEnrolled.length,
       conversionRate: agentLeads.length > 0 ? Math.round((agentEnrolled.length / agentLeads.length) * 100) : 0,
       target,
-      // Progress based on applications vs target (for monthly application target)
       progress: target > 0 ? Math.min(100, Math.round((agentApplications.length / target) * 100)) : 0,
+      // PUC funnel
+      pucFiles: pucFileLeads.length,
+      pucAppSubmission: pucAppSubmissionLeads.length,
+      applicant: applicantLeads.length,
+      // SF funnel
+      sfFiles: sfFileLeads.length,
+      sf150: sf150Students.length,
+      sf550: sf550Students.length,
+      sfEnrolled: sfEnrolledStudents.length,
+      // Status changes
+      statusChanges: statusChangesMap.get(agent.id) || 0,
       categories
     }
   })

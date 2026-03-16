@@ -38,47 +38,27 @@ import {
   Download,
   ChevronLeft,
   ArrowRight,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  useCampaigns,
+  useCreateCampaign,
+  useUpdateCampaign,
+  useDeleteCampaign,
+  useAudienceCounts,
+  type Campaign,
+  type CampaignType,
+  type CampaignStatus,
+} from "@/lib/hooks/use-campaigns"
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type CampaignType = "voice" | "whatsapp" | "sms" | "email"
-type CampaignStatus = "draft" | "scheduled" | "active" | "paused" | "completed"
-type CampaignView = "all" | "voice" | "whatsapp" | "sms" | "email" | "templates"
-type AudienceSource = "filter" | "upload" | "manual"
+type CampaignView = "all" | "voice" | "whatsapp" | "sms" | "email"
+type AudienceSource = "filter" | "upload"
 type ScheduleType = "immediate" | "scheduled" | "optimal"
-
-interface Campaign {
-  id: string
-  name: string
-  type: CampaignType
-  status: CampaignStatus
-  targetLeads: number
-  completedLeads: number
-  scheduledFor?: string
-  results: {
-    enrolled?: number
-    booked?: number
-    callbacks?: number
-    noAnswer?: number
-    replied?: number
-    clicked?: number
-    opened?: number
-  }
-  createdAt: string
-}
-
-interface CampaignTemplate {
-  id: string
-  name: string
-  type: CampaignType
-  description: string
-  targetDescription: string
-  bestFor: string
-}
 
 interface UploadedContact {
   firstName: string
@@ -145,121 +125,13 @@ const CAMPAIGN_TYPE_CONFIG = {
   },
 }
 
-const CAMPAIGN_STATUS_CONFIG = {
+const CAMPAIGN_STATUS_CONFIG: Record<CampaignStatus, { label: string; color: string }> = {
   draft: { label: "Draft", color: "bg-gray-500/10 text-gray-500 border-gray-500/20" },
   scheduled: { label: "Scheduled", color: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
   active: { label: "Active", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
   paused: { label: "Paused", color: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
   completed: { label: "Completed", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
 }
-
-// ============================================================================
-// Mock Data
-// ============================================================================
-
-const MOCK_CAMPAIGNS: Campaign[] = [
-  {
-    id: "c1",
-    name: "Re-enrollment Spring 2026",
-    type: "voice",
-    status: "active",
-    targetLeads: 127,
-    completedLeads: 85,
-    results: {
-      enrolled: 12,
-      booked: 8,
-      callbacks: 15,
-      noAnswer: 50,
-    },
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-  },
-  {
-    id: "c2",
-    name: "Enrollment Promo",
-    type: "whatsapp",
-    status: "active",
-    targetLeads: 300,
-    completedLeads: 267,
-    results: {
-      replied: 45,
-      clicked: 8,
-    },
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-  },
-  {
-    id: "c3",
-    name: "Payment Reminders",
-    type: "sms",
-    status: "scheduled",
-    targetLeads: 45,
-    completedLeads: 0,
-    scheduledFor: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-    results: {},
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-  {
-    id: "c5",
-    name: "Welcome New Leads",
-    type: "whatsapp",
-    status: "completed",
-    targetLeads: 200,
-    completedLeads: 200,
-    results: {
-      replied: 78,
-      clicked: 45,
-    },
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-  },
-]
-
-const MOCK_TEMPLATES: CampaignTemplate[] = [
-  {
-    id: "t1",
-    name: "Re-enrollment Campaign",
-    type: "voice",
-    description: "Kadi calls previous students to discuss re-enrollment",
-    targetDescription: "Previous students who haven't re-enrolled",
-    bestFor: "Semester start",
-  },
-  {
-    id: "t2",
-    name: "Payment Reminder",
-    type: "sms",
-    description: "Friendly reminder about upcoming payment deadlines",
-    targetDescription: "Students with outstanding fees",
-    bestFor: "Weekly",
-  },
-  {
-    id: "t3",
-    name: "Appointment Reminder",
-    type: "whatsapp",
-    description: "Confirm upcoming appointments via WhatsApp",
-    targetDescription: "Leads with upcoming appointments",
-    bestFor: "24h before",
-  },
-  {
-    id: "t4",
-    name: "Welcome Email",
-    type: "email",
-    description: "Professional welcome email with program details",
-    targetDescription: "New leads from last 7 days",
-    bestFor: "New leads",
-  },
-]
-
-// ============================================================================
-// Audience Filter Options
-// ============================================================================
-
-const AUDIENCE_FILTERS = [
-  { id: "previous_students", label: "Previous students who haven't re-enrolled", count: 127 },
-  { id: "new_leads_30", label: "New leads from last 30 days", count: 256 },
-  { id: "new_leads_7", label: "New leads from last 7 days", count: 89 },
-  { id: "upcoming_appointments", label: "Leads with upcoming appointments", count: 34 },
-  { id: "outstanding_payments", label: "Students with outstanding payments", count: 45 },
-  { id: "no_contact", label: "Leads never contacted", count: 178 },
-  { id: "callback_requested", label: "Callback requested", count: 23 },
-]
 
 // ============================================================================
 // CSV Parser Utility
@@ -309,6 +181,7 @@ function parseCSV(csvText: string): UploadedContact[] {
 
 function CampaignTypeBadge({ type }: { type: CampaignType }) {
   const config = CAMPAIGN_TYPE_CONFIG[type]
+  if (!config) return null
   const Icon = config.icon
   return (
     <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border", config.color)}>
@@ -320,6 +193,7 @@ function CampaignTypeBadge({ type }: { type: CampaignType }) {
 
 function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
   const config = CAMPAIGN_STATUS_CONFIG[status]
+  if (!config) return null
   return (
     <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border", config.color)}>
       {status === "active" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
@@ -342,10 +216,17 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   )
 }
 
-function CampaignCard({ campaign, onView }: { campaign: Campaign; onView: () => void }) {
+function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
+  campaign: Campaign
+  onView: () => void
+  onPause: () => void
+  onResume: () => void
+  onDelete: () => void
+}) {
   const typeConfig = CAMPAIGN_TYPE_CONFIG[campaign.type]
+  if (!typeConfig) return null
   const TypeIcon = typeConfig.icon
-  const progress = campaign.targetLeads > 0 ? Math.round((campaign.completedLeads / campaign.targetLeads) * 100) : 0
+  const progress = campaign.total_contacts > 0 ? Math.round((campaign.sent_count / campaign.total_contacts) * 100) : 0
 
   return (
     <motion.div
@@ -377,18 +258,18 @@ function CampaignCard({ campaign, onView }: { campaign: Campaign; onView: () => 
               <span className="text-[var(--text-muted)]">Progress</span>
               <span className="font-medium text-[var(--text-primary)]">{progress}%</span>
             </div>
-            <ProgressBar value={campaign.completedLeads} max={campaign.targetLeads} />
+            <ProgressBar value={campaign.sent_count} max={campaign.total_contacts} />
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              {campaign.completedLeads} of {campaign.targetLeads} {campaign.type === "voice" ? "calls" : "messages"}
+              {campaign.sent_count} of {campaign.total_contacts} {campaign.type === "voice" ? "calls" : "messages"}
             </p>
           </div>
         )}
 
         {/* Scheduled time */}
-        {campaign.status === "scheduled" && campaign.scheduledFor && (
+        {campaign.status === "scheduled" && campaign.scheduled_for && (
           <div className="flex items-center gap-2 mb-4 text-sm text-[var(--text-secondary)]">
             <Clock className="w-4 h-4 text-[var(--text-muted)]" />
-            Starts {new Date(campaign.scheduledFor).toLocaleDateString('en-US', {
+            Starts {new Date(campaign.scheduled_for).toLocaleDateString('en-US', {
               weekday: 'short',
               month: 'short',
               day: 'numeric',
@@ -398,63 +279,52 @@ function CampaignCard({ campaign, onView }: { campaign: Campaign; onView: () => 
           </div>
         )}
 
-        {/* Results */}
-        {(campaign.status === "active" || campaign.status === "completed") && Object.keys(campaign.results).length > 0 && (
-          <div className="flex items-center gap-4 text-sm">
-            {campaign.results.enrolled !== undefined && (
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span className="text-[var(--text-primary)]">{campaign.results.enrolled}</span>
-                <span className="text-[var(--text-muted)]">enrolled</span>
-              </div>
-            )}
-            {campaign.results.booked !== undefined && (
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-blue-500" />
-                <span className="text-[var(--text-primary)]">{campaign.results.booked}</span>
-                <span className="text-[var(--text-muted)]">booked</span>
-              </div>
-            )}
-            {campaign.results.replied !== undefined && (
-              <div className="flex items-center gap-1.5">
-                <MessageSquare className="w-4 h-4 text-emerald-500" />
-                <span className="text-[var(--text-primary)]">{campaign.results.replied}</span>
-                <span className="text-[var(--text-muted)]">replies</span>
-              </div>
-            )}
-            {campaign.results.clicked !== undefined && (
-              <div className="flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-purple-500" />
-                <span className="text-[var(--text-primary)]">{campaign.results.clicked}</span>
-                <span className="text-[var(--text-muted)]">clicked</span>
-              </div>
-            )}
+        {/* Stats summary */}
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-1.5">
+            <Users className="w-4 h-4 text-[var(--text-muted)]" />
+            <span className="text-[var(--text-primary)]">{campaign.total_contacts}</span>
+            <span className="text-[var(--text-muted)]">contacts</span>
           </div>
-        )}
+          {campaign.delivered_count > 0 && (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span className="text-[var(--text-primary)]">{campaign.delivered_count}</span>
+              <span className="text-[var(--text-muted)]">delivered</span>
+            </div>
+          )}
+          {campaign.failed_count > 0 && (
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-red-500" />
+              <span className="text-[var(--text-primary)]">{campaign.failed_count}</span>
+              <span className="text-[var(--text-muted)]">failed</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Actions */}
       <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-surface)]/50">
         <div className="flex items-center gap-2">
           {campaign.status === "active" && (
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={onPause}>
               <Pause className="w-4 h-4" />
               Pause
             </Button>
           )}
           {campaign.status === "paused" && (
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={onResume}>
               <Play className="w-4 h-4" />
               Resume
             </Button>
           )}
           {(campaign.status === "scheduled" || campaign.status === "draft") && (
             <>
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button variant="outline" size="sm" className="gap-2" onClick={onView}>
                 <Edit className="w-4 h-4" />
                 Edit
               </Button>
-              <Button variant="ghost" size="icon-sm" className="text-[var(--text-muted)]">
+              <Button variant="ghost" size="icon-sm" className="text-[var(--text-muted)]" onClick={onDelete}>
                 <Trash2 className="w-4 h-4" />
               </Button>
             </>
@@ -469,49 +339,14 @@ function CampaignCard({ campaign, onView }: { campaign: Campaign; onView: () => 
   )
 }
 
-function TemplateCard({ template, onUse }: { template: CampaignTemplate; onUse: () => void }) {
-  const typeConfig = CAMPAIGN_TYPE_CONFIG[template.type]
-  const TypeIcon = typeConfig.icon
-
-  return (
-    <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-6 hover:border-[var(--primary)]/30 transition-colors">
-      <div className="flex items-start gap-4">
-        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0", typeConfig.color)}>
-          <TypeIcon className="w-6 h-6" />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-medium text-[var(--text-primary)] mb-1">{template.name}</h3>
-          <p className="text-sm text-[var(--text-secondary)] mb-3">{template.description}</p>
-          <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
-            <span className="flex items-center gap-1">
-              <Target className="w-3.5 h-3.5" />
-              {template.targetDescription}
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              Best for: {template.bestFor}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onUse}>
-            Use Template
-          </Button>
-          <Button variant="ghost" size="icon-sm" className="text-[var(--text-muted)]">
-            <Edit className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function NewCampaignModal({ onClose }: { onClose: () => void }) {
+function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [step, setStep] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showArabic, setShowArabic] = useState(false)
+  const createCampaign = useCreateCampaign()
+
+  const { data: audienceFilters, isLoading: filtersLoading } = useAudienceCounts()
 
   const [formData, setFormData] = useState<CampaignFormData>({
     name: "",
@@ -526,7 +361,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
     useTemplate: false,
   })
 
-  const selectedFilter = AUDIENCE_FILTERS.find(f => f.id === formData.audienceFilter)
+  const selectedFilter = audienceFilters?.find(f => f.id === formData.audienceFilter)
   const validContacts = formData.uploadedContacts.filter(c => c.valid)
   const invalidContacts = formData.uploadedContacts.filter(c => !c.valid)
 
@@ -590,7 +425,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   const canProceed = () => {
     switch (step) {
-      case 1: return true // Channel selection always allows proceed
+      case 1: return true
       case 2: return formData.name.trim().length > 0
       case 3:
         if (formData.audienceSource === 'upload') return validContacts.length > 0
@@ -604,48 +439,38 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   }
 
   const handleSubmit = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          type: formData.type,
-          audienceSource: formData.audienceSource,
-          audienceFilter: formData.audienceFilter || undefined,
-          uploadedContacts: formData.audienceSource === 'upload'
-            ? validContacts.map(c => ({
-                firstName: c.firstName,
-                lastName: c.lastName,
-                phone: c.phone,
-                email: c.email,
-              }))
-            : undefined,
-          scheduleType: formData.scheduleType,
-          scheduledDate: formData.scheduledDate,
-          scheduledTime: formData.scheduledTime,
-          messageContent: formData.messageContent || undefined,
-          messageContentAr: formData.messageContentAr || undefined,
-          subject: formData.subject || undefined,
-          voiceWorkflowId: formData.voiceWorkflowId || undefined,
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to create campaign')
+    createCampaign.mutate(
+      {
+        name: formData.name,
+        type: formData.type,
+        audienceSource: formData.audienceSource,
+        audienceFilter: formData.audienceFilter || undefined,
+        uploadedContacts: formData.audienceSource === 'upload'
+          ? validContacts.map(c => ({
+              firstName: c.firstName,
+              lastName: c.lastName,
+              phone: c.phone,
+              email: c.email,
+            }))
+          : undefined,
+        scheduleType: formData.scheduleType,
+        scheduledDate: formData.scheduledDate,
+        scheduledTime: formData.scheduledTime,
+        messageContent: formData.messageContent || undefined,
+        messageContentAr: formData.messageContentAr || undefined,
+        subject: formData.subject || undefined,
+        voiceWorkflowId: formData.voiceWorkflowId || undefined,
+      },
+      {
+        onSuccess: () => {
+          onSuccess()
+          onClose()
+        },
+        onError: (error) => {
+          alert(error instanceof Error ? error.message : 'Failed to create campaign')
+        },
       }
-
-      onClose()
-      // Optionally refresh the page or campaign list
-      window.location.reload()
-    } catch (error) {
-      console.error('Error creating campaign:', error)
-      alert(error instanceof Error ? error.message : 'Failed to create campaign')
-    } finally {
-      setIsLoading(false)
-    }
+    )
   }
 
   return (
@@ -840,26 +665,33 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
               {/* Filter Selection */}
               {formData.audienceSource === "filter" && (
                 <div className="space-y-2">
-                  {AUDIENCE_FILTERS.map((filter) => (
-                    <label key={filter.id} className={cn(
-                      "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors",
-                      formData.audienceFilter === filter.id
-                        ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
-                    )}>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="filter"
-                          checked={formData.audienceFilter === filter.id}
-                          onChange={() => setFormData(prev => ({ ...prev, audienceFilter: filter.id }))}
-                          className="w-4 h-4 text-[var(--primary)]"
-                        />
-                        <span className="text-[var(--text-primary)]">{filter.label}</span>
-                      </div>
-                      <Badge variant="secondary">{filter.count} contacts</Badge>
-                    </label>
-                  ))}
+                  {filtersLoading ? (
+                    <div className="flex items-center justify-center py-8 text-[var(--text-muted)]">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      Loading filters...
+                    </div>
+                  ) : (
+                    audienceFilters?.map((filter) => (
+                      <label key={filter.id} className={cn(
+                        "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors",
+                        formData.audienceFilter === filter.id
+                          ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
+                      )}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="filter"
+                            checked={formData.audienceFilter === filter.id}
+                            onChange={() => setFormData(prev => ({ ...prev, audienceFilter: filter.id }))}
+                            className="w-4 h-4 text-[var(--primary)]"
+                          />
+                          <span className="text-[var(--text-primary)]">{filter.label}</span>
+                        </div>
+                        <Badge variant="secondary">{filter.count} contacts</Badge>
+                      </label>
+                    ))
+                  )}
                 </div>
               )}
 
@@ -1171,15 +1003,15 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-3">
             {step === totalSteps ? (
               <>
-                <Button variant="outline" disabled={isLoading}>
+                <Button variant="outline" disabled={createCampaign.isPending}>
                   Save Draft
                 </Button>
                 <Button
                   className="gap-2"
-                  disabled={!canProceed() || isLoading}
+                  disabled={!canProceed() || createCampaign.isPending}
                   onClick={handleSubmit}
                 >
-                  {isLoading ? (
+                  {createCampaign.isPending ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
                       Creating...
@@ -1219,7 +1051,6 @@ const CAMPAIGN_VIEWS: { id: CampaignView; label: string; icon?: React.ComponentT
   { id: "whatsapp", label: "WhatsApp", icon: MessageSquare },
   { id: "sms", label: "SMS", icon: Smartphone },
   { id: "email", label: "Email", icon: Mail },
-  { id: "templates", label: "Templates", icon: FileText },
 ]
 
 export default function CampaignsPage() {
@@ -1228,14 +1059,32 @@ export default function CampaignsPage() {
   const [showNewCampaign, setShowNewCampaign] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const filteredCampaigns = MOCK_CAMPAIGNS.filter((campaign) => {
-    const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesView = activeView === "all" || campaign.type === activeView
-    return matchesSearch && matchesView
+  const { campaigns, isLoading, invalidate } = useCampaigns({
+    type: activeView !== 'all' ? activeView : undefined,
   })
+  const updateCampaign = useUpdateCampaign()
+  const deleteCampaign = useDeleteCampaign()
 
-  const activeCampaigns = MOCK_CAMPAIGNS.filter(c => c.status === "active").length
-  const scheduledCampaigns = MOCK_CAMPAIGNS.filter(c => c.status === "scheduled").length
+  const filteredCampaigns = campaigns.filter((campaign) =>
+    campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const activeCampaigns = campaigns.filter(c => c.status === "active").length
+  const scheduledCampaigns = campaigns.filter(c => c.status === "scheduled").length
+
+  const handlePause = (id: string) => {
+    updateCampaign.mutate({ id, status: 'paused' })
+  }
+
+  const handleResume = (id: string) => {
+    updateCampaign.mutate({ id, status: 'active' })
+  }
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this campaign?')) {
+      deleteCampaign.mutate(id)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
@@ -1285,125 +1134,107 @@ export default function CampaignsPage() {
             ))}
           </div>
 
-          {activeView !== "templates" && (
-            <div className="relative flex-1 max-w-md ml-auto">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                placeholder="Search campaigns..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 pl-11 pr-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
-              />
-            </div>
-          )}
+          <div className="relative flex-1 max-w-md ml-auto">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder="Search campaigns..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-11 pr-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
+            />
+          </div>
         </div>
       </header>
 
       {/* Content */}
       <main className="px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <AnimatePresence mode="wait">
-          {activeView === "templates" ? (
-            <motion.div
-              key="templates"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-medium text-[var(--text-primary)]">Campaign Templates</h2>
-                <Button variant="outline" className="gap-2">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--text-muted)] mb-4" />
+            <p className="text-[var(--text-muted)]">Loading campaigns...</p>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-[var(--text-muted)]">Total Campaigns</span>
+                  <Layers className="w-5 h-5 text-[var(--text-muted)]" />
+                </div>
+                <div className="text-3xl font-semibold text-[var(--text-primary)]">{campaigns.length}</div>
+              </div>
+              <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-[var(--text-muted)]">Active Now</span>
+                  <Play className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="text-3xl font-semibold text-[var(--text-primary)]">{activeCampaigns}</div>
+              </div>
+              <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-[var(--text-muted)]">Total Contacts</span>
+                  <Users className="w-5 h-5 text-[var(--text-muted)]" />
+                </div>
+                <div className="text-3xl font-semibold text-[var(--text-primary)]">
+                  {campaigns.reduce((sum, c) => sum + c.total_contacts, 0)}
+                </div>
+              </div>
+              <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-[var(--text-muted)]">Delivered</span>
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="text-3xl font-semibold text-[var(--text-primary)]">
+                  {campaigns.reduce((sum, c) => sum + c.delivered_count, 0)}
+                </div>
+              </div>
+            </div>
+
+            {/* Campaign List */}
+            {filteredCampaigns.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mb-4">
+                  <Layers className="w-8 h-8 text-[var(--text-muted)]" />
+                </div>
+                <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">No campaigns found</h3>
+                <p className="text-[var(--text-muted)] mb-6">
+                  {searchQuery ? "Try adjusting your search" : "Create your first campaign to get started"}
+                </p>
+                <Button className="gap-2" onClick={() => setShowNewCampaign(true)}>
                   <Plus className="w-4 h-4" />
-                  New Template
+                  New Campaign
                 </Button>
               </div>
-              {MOCK_TEMPLATES.map((template) => (
-                <TemplateCard
-                  key={template.id}
-                  template={template}
-                  onUse={() => setShowNewCampaign(true)}
-                />
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="campaigns"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-[var(--text-muted)]">Total Campaigns</span>
-                    <Layers className="w-5 h-5 text-[var(--text-muted)]" />
-                  </div>
-                  <div className="text-3xl font-semibold text-[var(--text-primary)]">{MOCK_CAMPAIGNS.length}</div>
-                </div>
-                <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-[var(--text-muted)]">Active Now</span>
-                    <Play className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div className="text-3xl font-semibold text-[var(--text-primary)]">{activeCampaigns}</div>
-                </div>
-                <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-[var(--text-muted)]">Leads Reached</span>
-                    <Users className="w-5 h-5 text-[var(--text-muted)]" />
-                  </div>
-                  <div className="text-3xl font-semibold text-[var(--text-primary)]">
-                    {MOCK_CAMPAIGNS.reduce((sum, c) => sum + c.completedLeads, 0)}
-                  </div>
-                </div>
-                <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-[var(--text-muted)]">Enrolled</span>
-                    <TrendingUp className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div className="text-3xl font-semibold text-[var(--text-primary)]">
-                    {MOCK_CAMPAIGNS.reduce((sum, c) => sum + (c.results.enrolled || 0), 0)}
-                  </div>
-                </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {filteredCampaigns.map((campaign) => (
+                  <CampaignCard
+                    key={campaign.id}
+                    campaign={campaign}
+                    onView={() => router.push(`/campaigns/${campaign.id}`)}
+                    onPause={() => handlePause(campaign.id)}
+                    onResume={() => handleResume(campaign.id)}
+                    onDelete={() => handleDelete(campaign.id)}
+                  />
+                ))}
               </div>
-
-              {/* Campaign List */}
-              {filteredCampaigns.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <div className="w-16 h-16 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mb-4">
-                    <Layers className="w-8 h-8 text-[var(--text-muted)]" />
-                  </div>
-                  <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">No campaigns found</h3>
-                  <p className="text-[var(--text-muted)] mb-6">
-                    {searchQuery ? "Try adjusting your search" : "Create your first campaign to get started"}
-                  </p>
-                  <Button className="gap-2" onClick={() => setShowNewCampaign(true)}>
-                    <Plus className="w-4 h-4" />
-                    New Campaign
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {filteredCampaigns.map((campaign) => (
-                    <CampaignCard
-                      key={campaign.id}
-                      campaign={campaign}
-                      onView={() => router.push(`/campaigns/${campaign.id}`)}
-                    />
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </motion.div>
+        )}
       </main>
 
       {/* New Campaign Modal */}
       <AnimatePresence>
         {showNewCampaign && (
-          <NewCampaignModal onClose={() => setShowNewCampaign(false)} />
+          <NewCampaignModal
+            onClose={() => setShowNewCampaign(false)}
+            onSuccess={invalidate}
+          />
         )}
       </AnimatePresence>
     </div>

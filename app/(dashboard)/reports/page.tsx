@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useSyncExternalStore, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useSyncExternalStore, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,8 +22,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  CheckCircle2,
-  FileCheck,
   Clock,
   TrendingUp,
   AlertCircle,
@@ -38,11 +36,14 @@ import {
   PieChart,
   Target,
   Building2,
+  School,
   CreditCard,
   TestTube,
   UserCheck,
   Megaphone,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileSpreadsheet,
   FileText,
   Printer,
@@ -57,12 +58,15 @@ import {
   Activity,
   Sparkles,
   ClipboardList,
+  AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
 import { useCycles } from "@/lib/hooks/use-cycles"
 import { RoleGuard } from "@/components/auth/role-guard"
+import { AnimatedNumber } from "@/components/reports/animated-number"
+import { exportToCSV } from "@/lib/export-utils"
 import {
   MAJORS,
 } from "@/types"
@@ -81,40 +85,44 @@ import {
   AgentComparison,
   TimeToConversion,
   DetailedAnalytics,
+  SchoolReports,
 } from "@/components/reports"
 
 const emptySubscribe = () => () => {}
 
 // =============================================
-// ANIMATED NUMBER COMPONENT
+// TREND DISPLAY HELPERS
 // =============================================
-function AnimatedNumber({ value, duration = 800, prefix = "", suffix = "" }: {
-  value: number
-  duration?: number
-  prefix?: string
-  suffix?: string
+/** Format a trend change value with capping and edge cases */
+function formatTrend(change: number | null): { label: string; isPositive: boolean; isNew: boolean } {
+  if (change === null) return { label: "New", isPositive: true, isNew: true }
+  const capped = Math.max(-200, Math.min(200, change))
+  const prefix = capped > 0 ? "+" : ""
+  const display = Math.abs(change) > 200 ? `${prefix > "" ? ">" : "<"}200` : `${prefix}${capped}`
+  return { label: `${display}%`, isPositive: capped >= 0, isNew: false }
+}
+
+/** Tiny SVG sparkline from an array of numbers */
+function Sparkline({ data, width = 48, height = 20, color = "var(--primary)" }: {
+  data: number[]
+  width?: number
+  height?: number
+  color?: string
 }) {
-  const [displayValue, setDisplayValue] = useState(0)
-
-  useEffect(() => {
-    let startTime: number
-    let animationFrame: number
-
-    const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp
-      const progress = Math.min((timestamp - startTime) / duration, 1)
-      setDisplayValue(Math.floor(progress * value))
-
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate)
-      }
-    }
-
-    animationFrame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animationFrame)
-  }, [value, duration])
-
-  return <span>{prefix}{displayValue.toLocaleString()}{suffix}</span>
+  if (!data.length) return null
+  const max = Math.max(...data, 1)
+  const min = Math.min(...data, 0)
+  const range = max - min || 1
+  const points = data.map((v, i) => {
+    const x = (i / Math.max(data.length - 1, 1)) * width
+    const y = height - ((v - min) / range) * (height - 2) - 1
+    return `${x},${y}`
+  }).join(" ")
+  return (
+    <svg width={width} height={height} className="inline-block opacity-60">
+      <polyline fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  )
 }
 
 // =============================================
@@ -129,27 +137,35 @@ const DATE_PRESETS = [
   { value: 'all', label: 'All Time', icon: Activity },
 ] as const
 
+const TAB_GROUPS = [
+  { label: "Performance", tabs: ['overview', 'enrollment', 'pipeline', 'agents'] },
+  { label: "Financial", tabs: ['payments', 'puc'] },
+  { label: "Analysis", tabs: ['channels', 'schools', 'demographics', 'test-center'] },
+  { label: "Advanced", tabs: ['conversion', 'agent-compare', 'time-analysis', 'detailed-analytics'] },
+] as const
+
 const REPORT_TABS = [
-  { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Executive summary & KPIs' },
-  { id: 'enrollment', label: 'Enrollment', icon: GraduationCap, description: 'Student enrollment metrics' },
-  { id: 'pipeline', label: 'Pipeline', icon: Target, description: 'Sales funnel analysis' },
-  { id: 'agents', label: 'Agents', icon: Users, description: 'Team performance' },
-  { id: 'payments', label: 'Payments', icon: CreditCard, description: 'Payment status' },
-  { id: 'channels', label: 'Channels', icon: Megaphone, description: 'Lead sources' },
-  { id: 'puc', label: 'PUC', icon: Building2, description: 'PUC funding' },
-  { id: 'demographics', label: 'Demographics', icon: PieChart, description: 'Student breakdown' },
-  { id: 'test-center', label: 'Test Center', icon: TestTube, description: 'Placement tests' },
-  { id: 'conversion', label: 'Conversion', icon: TrendingUp, description: 'Conversion rates by lead source' },
-  { id: 'agent-compare', label: 'Agent Compare', icon: UserCheck, description: 'Multi-metric agent comparison' },
-  { id: 'time-analysis', label: 'Time Analysis', icon: Clock, description: 'Time-to-conversion analytics' },
-  { id: 'detailed-analytics', label: 'Detailed', icon: ClipboardList, description: 'Enrollment, withdrawals, gender, foundation & breakdown analytics' },
+  { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Executive summary & KPIs', group: 'Performance' },
+  { id: 'enrollment', label: 'Enrollment', icon: GraduationCap, description: 'Student enrollment metrics', group: 'Performance' },
+  { id: 'pipeline', label: 'Pipeline', icon: Target, description: 'Sales funnel analysis', group: 'Performance' },
+  { id: 'agents', label: 'Agents', icon: Users, description: 'Team performance', group: 'Performance' },
+  { id: 'payments', label: 'Payments', icon: CreditCard, description: 'Payment status', group: 'Financial' },
+  { id: 'puc', label: 'PUC', icon: Building2, description: 'PUC funding', group: 'Financial' },
+  { id: 'channels', label: 'Sources', icon: Megaphone, description: 'Lead sources', group: 'Analysis' },
+  { id: 'schools', label: 'Schools', icon: School, description: 'School performance', group: 'Analysis' },
+  { id: 'demographics', label: 'Demographics', icon: PieChart, description: 'Student breakdown', group: 'Analysis' },
+  { id: 'test-center', label: 'Test Center', icon: TestTube, description: 'Placement tests', group: 'Analysis' },
+  { id: 'conversion', label: 'Conversion', icon: TrendingUp, description: 'Conversion rates by lead source', group: 'Advanced' },
+  { id: 'agent-compare', label: 'Agent Compare', icon: UserCheck, description: 'Multi-metric agent comparison', group: 'Advanced' },
+  { id: 'time-analysis', label: 'Time Analysis', icon: Clock, description: 'Time-to-conversion analytics', group: 'Advanced' },
+  { id: 'detailed-analytics', label: 'Detailed', icon: ClipboardList, description: 'Enrollment, withdrawals, gender, foundation & breakdown analytics', group: 'Advanced' },
 ] as const
 
 const SOURCE_CATEGORIES = [
   { value: 'all', label: 'All Sources' },
   { value: 'direct', label: 'Direct' },
   { value: 'events', label: 'Events' },
-  { value: 'digital', label: 'Digital' },
+  { value: 'marketing', label: 'Marketing' },
   { value: 'referrals', label: 'Referrals' },
   { value: 'outreach', label: 'Outreach' },
 ]
@@ -166,6 +182,150 @@ const FUNDING_TYPES = [
   { value: 'self_funded', label: 'Self-Funded' },
   { value: 'puc', label: 'PUC' },
 ]
+
+// =============================================
+// TAB NAVIGATION with scroll arrows & group dividers
+// =============================================
+function TabNavigation({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    const el = scrollRef.current
+    if (!el) return
+    el.addEventListener("scroll", checkScroll, { passive: true })
+    window.addEventListener("resize", checkScroll)
+    return () => {
+      el.removeEventListener("scroll", checkScroll)
+      window.removeEventListener("resize", checkScroll)
+    }
+  }, [checkScroll])
+
+  const scroll = (dir: "left" | "right") => {
+    scrollRef.current?.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" })
+  }
+
+  const currentIndex = REPORT_TABS.findIndex(t => t.id === activeTab)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+    >
+      <div className="relative">
+        {/* Scroll left arrow */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll("left")}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-[var(--bg-surface)] border border-[var(--border)] shadow-md flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4 text-[var(--text-secondary)]" />
+          </button>
+        )}
+
+        {/* Scroll right arrow */}
+        {canScrollRight && (
+          <button
+            onClick={() => scroll("right")}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-[var(--bg-surface)] border border-[var(--border)] shadow-md flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <ChevronRight className="w-4 h-4 text-[var(--text-secondary)]" />
+          </button>
+        )}
+
+        {/* Fade edges */}
+        {canScrollLeft && (
+          <div className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-[var(--bg-base)] to-transparent pointer-events-none rounded-l-xl z-[5]" />
+        )}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-[var(--bg-base)] to-transparent pointer-events-none rounded-r-xl z-[5]" />
+        )}
+
+        {/* Tab container */}
+        <div
+          ref={scrollRef}
+          className="flex overflow-x-auto gap-0 p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] scrollbar-hide"
+        >
+          {TAB_GROUPS.map((group, gi) => (
+            <div key={group.label} className="flex items-center shrink-0">
+              {gi > 0 && (
+                <div className="flex items-center mx-1.5">
+                  <div className="w-px h-6 bg-[var(--border-emphasis)]" />
+                </div>
+              )}
+              {group.tabs.map((tabId) => {
+                const tab = REPORT_TABS.find(t => t.id === tabId)
+                if (!tab) return null
+                const Icon = tab.icon
+                const isActive = activeTab === tab.id
+                return (
+                  <motion.button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    title={tab.description}
+                    className={cn(
+                      "relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 mx-0.5",
+                      isActive
+                        ? "text-white"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)]"
+                    )}
+                    whileHover={{ scale: isActive ? 1 : 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTabBg"
+                        className="absolute inset-0 rounded-xl bg-[var(--primary)] shadow-sm"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    <Icon className={cn(
+                      "relative z-10 w-4 h-4 transition-transform duration-300",
+                      isActive && "scale-110"
+                    )} />
+                    <span className="relative z-10">{tab.label}</span>
+                    {isActive && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="relative z-10 w-1.5 h-1.5 rounded-full bg-white/80"
+                      />
+                    )}
+                  </motion.button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Description + position indicator */}
+      <div className="flex items-center justify-between mt-3 ml-1">
+        <motion.p
+          key={activeTab}
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-sm text-[var(--text-muted)]"
+        >
+          {REPORT_TABS.find(t => t.id === activeTab)?.description}
+        </motion.p>
+        <span className="text-[10px] text-[var(--text-muted)] tabular-nums shrink-0 ml-4">
+          {currentIndex + 1} / {REPORT_TABS.length}
+        </span>
+      </div>
+    </motion.div>
+  )
+}
 
 // =============================================
 // MAIN COMPONENT
@@ -231,9 +391,13 @@ export default function ReportsPage() {
       avgConversion,
       todayLeads: data.executive.todayNumbers.newLeads,
       todayEnrollments: data.executive.todayNumbers.enrolled,
+      leadsChange: data.executive.weekOverWeek.leads.change,
       weekChange: data.executive.weekOverWeek.enrollments.change,
       pendingPayments: data.payment.pending,
       targetProgress: data.executive.targetProgress.percent,
+      targetCurrent: data.executive.targetProgress.current,
+      targetTotal: data.executive.targetProgress.target,
+      weeklyTrend: data.executive.weeklyTrend.map(w => w.leads),
     }
   }, [data])
 
@@ -317,18 +481,95 @@ export default function ReportsPage() {
 
   // Export handlers
   const handleExportCSV = () => {
-    // Implementation would go here
-    console.log('Exporting to CSV...')
+    if (!data) return
+    const tabLabel = REPORT_TABS.find(t => t.id === activeTab)?.label ?? activeTab
+
+    switch (activeTab) {
+      case 'overview': {
+        const rows = data.executive.pipelineFunnel.map(s => ({
+          Stage: s.label,
+          Count: s.count,
+          "Percent (%)": s.percent,
+        }))
+        rows.push({ Stage: "Target Progress", Count: data.executive.targetProgress.current, "Percent (%)": data.executive.targetProgress.percent })
+        exportToCSV(rows, `report-overview-${new Date().toISOString().slice(0, 10)}`)
+        break
+      }
+      case 'agents': {
+        const rows = data.leaderboard.map(a => ({
+          Rank: a.rank,
+          Agent: a.agentName,
+          Leads: a.leads,
+          Appointments: a.appointments,
+          Applications: a.applications,
+          Enrolled: a.enrolled,
+          "Conversion (%)": a.conversionRate,
+          "Progress (%)": a.progress,
+        }))
+        exportToCSV(rows, `report-agents-${new Date().toISOString().slice(0, 10)}`)
+        break
+      }
+      case 'enrollment': {
+        const rows = data.enrollment.byAgent.map(a => ({
+          Agent: a.agentName,
+          Enrolled: a.enrolled,
+          Target: a.target,
+          "Progress (%)": a.progress,
+        }))
+        exportToCSV(rows, `report-enrollment-${new Date().toISOString().slice(0, 10)}`)
+        break
+      }
+      case 'payments': {
+        const rows = [{
+          "Total Students": data.payment.totalStudents,
+          Pending: data.payment.pending,
+          "Seat Reserved": data.payment.seatReserved,
+          "Full Tuition": data.payment.fullTuition,
+          "Total Revenue": data.payment.totalRevenue,
+        }]
+        exportToCSV(rows, `report-payments-${new Date().toISOString().slice(0, 10)}`)
+        break
+      }
+      case 'channels': {
+        const rows = data.channel.bySource.map(s => ({
+          Source: s.label,
+          Leads: s.count,
+          Converted: s.converted,
+          "Conversion (%)": s.conversionRate,
+        }))
+        exportToCSV(rows, `report-channels-${new Date().toISOString().slice(0, 10)}`)
+        break
+      }
+      default: {
+        // Generic: export pipeline funnel as fallback
+        const rows = data.executive.pipelineFunnel.map(s => ({
+          Stage: s.label,
+          Count: s.count,
+          "Percent (%)": s.percent,
+        }))
+        exportToCSV(rows, `report-${tabLabel.toLowerCase()}-${new Date().toISOString().slice(0, 10)}`)
+      }
+    }
   }
 
   const handleExportPDF = () => {
-    // Implementation would go here
-    console.log('Exporting to PDF...')
+    window.print()
   }
 
   const handlePrint = () => {
     window.print()
   }
+
+  // Staleness detection — show warning after 5 minutes
+  const [isStale, setIsStale] = useState(false)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const diff = Date.now() - lastUpdated.getTime()
+      setIsStale(diff > 5 * 60 * 1000)
+    }, 30_000)
+    setIsStale(false)
+    return () => clearInterval(timer)
+  }, [lastUpdated])
 
   // Loading state
   if (loading && !data) {
@@ -462,40 +703,58 @@ export default function ReportsPage() {
 
             {/* Quick Stats - Theme Adaptive Cards */}
             {summaryMetrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <QuickStatCard
                   label="Total Leads"
                   value={summaryMetrics.totalLeads}
                   icon={Users}
-                  trend={summaryMetrics.weekChange}
+                  trend={summaryMetrics.leadsChange}
+                  trendLabel="vs last week"
+                  sparklineData={summaryMetrics.weeklyTrend}
                   mounted={mounted}
                   colorScheme="primary"
+                  onClick={() => setActiveTab('pipeline')}
                 />
                 <QuickStatCard
                   label="Enrolled"
                   value={summaryMetrics.totalEnrolled}
                   icon={GraduationCap}
-                  subtext={`${summaryMetrics.avgConversion}% conversion`}
+                  subtext={`${summaryMetrics.avgConversion}% conversion rate`}
                   mounted={mounted}
                   colorScheme="success"
+                  onClick={() => setActiveTab('enrollment')}
                 />
                 <QuickStatCard
                   label="Target Progress"
                   value={summaryMetrics.targetProgress}
                   icon={Target}
                   suffix="%"
+                  subtext={`${summaryMetrics.targetCurrent} / ${summaryMetrics.targetTotal}`}
                   mounted={mounted}
                   colorScheme="accent"
+                  progressPercent={summaryMetrics.targetProgress}
                 />
                 <QuickStatCard
-                  label="Today"
+                  label="Today's Activity"
                   value={summaryMetrics.todayLeads}
                   icon={Zap}
-                  subtext={`${summaryMetrics.todayEnrollments} enrolled`}
+                  subtext={summaryMetrics.todayEnrollments === 0
+                    ? `0 enrolled (${summaryMetrics.totalEnrolled} total)`
+                    : `${summaryMetrics.todayEnrollments} enrolled today`}
                   mounted={mounted}
-                  className="hidden lg:block"
                   colorScheme="warning"
                 />
+              </div>
+            )}
+
+            {/* Staleness warning */}
+            {isStale && (
+              <div className="flex items-center gap-2 mt-3 text-xs text-[var(--warning)]">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Data may be stale — last updated {lastUpdated.toLocaleTimeString()}</span>
+                <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={handleRefresh}>
+                  Refresh
+                </Button>
               </div>
             )}
           </div>
@@ -791,77 +1050,9 @@ export default function ReportsPage() {
         </AnimatePresence>
 
         {/* ============================================= */}
-        {/* REPORT TABS NAVIGATION - Premium Pill Design */}
+        {/* REPORT TABS NAVIGATION - With scroll arrows & group dividers */}
         {/* ============================================= */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="relative">
-            {/* Background container */}
-            <div className="flex overflow-x-auto gap-1.5 p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] scrollbar-hide">
-              {REPORT_TABS.map((tab) => {
-                const isActive = activeTab === tab.id
-                return (
-                  <motion.button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      "relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300",
-                      isActive
-                        ? "text-white"
-                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)]"
-                    )}
-                    whileHover={{ scale: isActive ? 1 : 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {/* Active background with gradient */}
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeTabBg"
-                        className="absolute inset-0 rounded-xl bg-[var(--primary)] shadow-sm"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-
-                    {/* Icon */}
-                    <tab.icon className={cn(
-                      "relative z-10 w-4 h-4 transition-transform duration-300",
-                      isActive && "scale-110"
-                    )} />
-
-                    {/* Label */}
-                    <span className="relative z-10">{tab.label}</span>
-
-                    {/* Active indicator dot */}
-                    {isActive && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="relative z-10 w-1.5 h-1.5 rounded-full bg-white/80"
-                      />
-                    )}
-                  </motion.button>
-                )
-              })}
-            </div>
-
-            {/* Fade edges for scroll indication */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-[var(--bg-surface)] pointer-events-none rounded-l-xl opacity-0 lg:hidden" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-[var(--bg-surface)] pointer-events-none rounded-r-xl opacity-0 lg:hidden" />
-          </div>
-
-          {/* Current tab description */}
-          <motion.p
-            key={activeTab}
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-[var(--text-muted)] mt-3 ml-1"
-          >
-            {REPORT_TABS.find(t => t.id === activeTab)?.description}
-          </motion.p>
-        </motion.div>
+        <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
         {/* ============================================= */}
         {/* REPORT CONTENT */}
@@ -876,11 +1067,8 @@ export default function ReportsPage() {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <>
-              {/* Target Progress */}
-              <TargetProgressCard data={data} />
-
-              {/* KPI Cards */}
-              <KPICardsGrid data={data} mounted={mounted} />
+              {/* KPI Cards - Actionable Pipeline Metrics */}
+              <KPICardsGrid data={data} mounted={mounted} onNavigate={setActiveTab} />
 
               {/* Executive Dashboard Charts */}
               <ExecutiveDashboard data={data.executive} />
@@ -907,9 +1095,14 @@ export default function ReportsPage() {
             <PaymentReports data={data.payment} />
           )}
 
-          {/* Channels Tab */}
+          {/* Sources Tab */}
           {activeTab === 'channels' && (
             <ChannelPerformance data={data.channel} />
+          )}
+
+          {/* Schools Tab */}
+          {activeTab === 'schools' && (
+            <SchoolReports data={data.channel} demographicData={data.demographics} />
           )}
 
           {/* PUC Tab */}
@@ -960,12 +1153,12 @@ export default function ReportsPage() {
 
 // Color scheme mapping for QuickStatCard
 const STAT_COLOR_SCHEMES = {
-  primary: { bg: "bg-[var(--primary-muted)]", text: "text-[var(--primary)]", accent: "bg-[var(--primary)]" },
-  success: { bg: "bg-[var(--success-bg)]", text: "text-[var(--success)]", accent: "bg-[var(--success)]" },
-  accent: { bg: "bg-[var(--accent-muted)]", text: "text-[var(--accent)]", accent: "bg-[var(--accent)]" },
-  warning: { bg: "bg-[var(--warning-bg)]", text: "text-[var(--warning)]", accent: "bg-[var(--warning)]" },
-  error: { bg: "bg-[var(--error-bg)]", text: "text-[var(--error)]", accent: "bg-[var(--error)]" },
-  info: { bg: "bg-[var(--info-bg)]", text: "text-[var(--info)]", accent: "bg-[var(--info)]" },
+  primary: { bg: "bg-[var(--primary-muted)]", text: "text-[var(--primary)]", accent: "bg-[var(--primary)]", color: "var(--primary)" },
+  success: { bg: "bg-[var(--success-bg)]", text: "text-[var(--success)]", accent: "bg-[var(--success)]", color: "var(--success)" },
+  accent: { bg: "bg-[var(--accent-muted)]", text: "text-[var(--accent)]", accent: "bg-[var(--accent)]", color: "var(--accent)" },
+  warning: { bg: "bg-[var(--warning-bg)]", text: "text-[var(--warning)]", accent: "bg-[var(--warning)]", color: "var(--warning)" },
+  error: { bg: "bg-[var(--error-bg)]", text: "text-[var(--error)]", accent: "bg-[var(--error)]", color: "var(--error)" },
+  info: { bg: "bg-[var(--info-bg)]", text: "text-[var(--info)]", accent: "bg-[var(--info)]", color: "var(--info)" },
 } as const
 
 function QuickStatCard({
@@ -973,25 +1166,34 @@ function QuickStatCard({
   value,
   icon: Icon,
   trend,
+  trendLabel,
   subtext,
   prefix = "",
   suffix = "",
   mounted,
   className,
-  colorScheme = "primary"
+  colorScheme = "primary",
+  sparklineData,
+  progressPercent,
+  onClick,
 }: {
   label: string
   value: number
   icon: React.ComponentType<{ className?: string }>
-  trend?: number
+  trend?: number | null
+  trendLabel?: string
   subtext?: string
   prefix?: string
   suffix?: string
   mounted: boolean
   className?: string
   colorScheme?: keyof typeof STAT_COLOR_SCHEMES
+  sparklineData?: number[]
+  progressPercent?: number
+  onClick?: () => void
 }) {
   const colors = STAT_COLOR_SCHEMES[colorScheme]
+  const trendInfo = trend !== undefined ? formatTrend(trend) : null
 
   return (
     <motion.div
@@ -999,8 +1201,10 @@ function QuickStatCard({
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ scale: 1.02, y: -2 }}
       transition={{ duration: 0.3 }}
+      onClick={onClick}
       className={cn(
         "group relative overflow-hidden rounded-xl p-4 transition-all duration-300 bg-[var(--bg-elevated)] border border-[var(--border)]",
+        onClick && "cursor-pointer",
         className
       )}
     >
@@ -1019,21 +1223,28 @@ function QuickStatCard({
             </span>
           </div>
 
-          {/* Trend badge */}
-          {trend !== undefined && (
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className={cn(
-                "flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full",
-                trend >= 0
-                  ? "bg-[var(--success-bg)] text-[var(--success)]"
-                  : "bg-[var(--error-bg)] text-[var(--error)]"
+          {/* Trend badge with label */}
+          {trendInfo && (
+            <div className="text-right">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className={cn(
+                  "inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full",
+                  trendInfo.isNew
+                    ? "bg-[var(--info-bg)] text-[var(--info)]"
+                    : trendInfo.isPositive
+                      ? "bg-[var(--success-bg)] text-[var(--success)]"
+                      : "bg-[var(--error-bg)] text-[var(--error)]"
+                )}
+              >
+                {!trendInfo.isNew && (trendInfo.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />)}
+                {trendInfo.label}
+              </motion.span>
+              {trendLabel && (
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{trendLabel}</p>
               )}
-            >
-              {trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-              {Math.abs(trend)}%
-            </motion.span>
+            </div>
           )}
         </div>
 
@@ -1046,106 +1257,37 @@ function QuickStatCard({
         </p>
 
         {/* Label */}
-        <p className="text-xs text-[var(--text-muted)] mt-1 font-medium">{subtext || label}</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1 font-medium">{label}</p>
+        {subtext && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtext}</p>}
+
+        {/* Mini progress bar for target */}
+        {progressPercent !== undefined && (
+          <div className="mt-2 h-1.5 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+            <motion.div
+              className={cn("h-full rounded-full", colors.accent)}
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.max(Math.min(progressPercent, 100), 2)}%` }}
+              transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+            />
+          </div>
+        )}
+
+        {/* Sparkline below value */}
+        {sparklineData && sparklineData.length > 1 && (
+          <div className="mt-1.5">
+            <Sparkline data={sparklineData} color={colors.color} width={60} height={16} />
+          </div>
+        )}
       </div>
     </motion.div>
   )
 }
 
-function TargetProgressCard({ data }: { data: ReportData }) {
-  const { current, target, percent } = data.executive.targetProgress
-  const isGoalAchieved = percent >= 100
-
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center",
-              isGoalAchieved
-                ? "bg-[var(--success-bg)]"
-                : "bg-[var(--primary-muted)]"
-            )}>
-              <Target className={cn(
-                "w-6 h-6",
-                isGoalAchieved ? "text-[var(--success)]" : "text-[var(--primary)]"
-              )} />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                Enrollment Target
-              </h2>
-              <p className="text-sm text-[var(--text-muted)]">
-                {target.toLocaleString()} completed applications goal
-              </p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className={cn(
-              "text-3xl font-bold",
-              isGoalAchieved ? "text-[var(--success)]" : "text-[var(--primary)]"
-            )}>
-              {percent}%
-            </span>
-            <p className="text-sm text-[var(--text-muted)]">
-              {current.toLocaleString()} / {target.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="relative h-4 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min(percent, 100)}%` }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-            className={cn(
-              "absolute inset-y-0 left-0 rounded-full",
-              isGoalAchieved
-                ? "bg-[var(--success)]"
-                : "bg-[var(--primary)]"
-            )}
-          />
-          {/* Milestone markers */}
-          <div className="absolute inset-0 flex justify-between px-1">
-            {[25, 50, 75].map((milestone) => (
-              <div
-                key={milestone}
-                className="w-0.5 h-full bg-white/20"
-                style={{ marginLeft: `${milestone}%` }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Goal Achievement Alert */}
-        {isGoalAchieved && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 flex items-center gap-3 p-3 bg-[var(--success-bg)] border border-[var(--success)]/20 rounded-xl"
-          >
-            <CheckCircle2 className="w-5 h-5 text-[var(--success)]" />
-            <p className="text-sm text-[var(--success)] font-medium">
-              Congratulations! Target achieved with {current.toLocaleString()} enrollments!
-            </p>
-          </motion.div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean }) {
+// =============================================
+// KPI CARDS - Actionable Pipeline Metrics
+// =============================================
+function KPICardsGrid({ data, mounted, onNavigate }: { data: ReportData; mounted: boolean; onNavigate: (tab: string) => void }) {
   const kpis = [
-    {
-      title: "Complete Applications",
-      value: data.enrollment.totalEnrolled,
-      icon: FileCheck,
-      color: "emerald",
-      gradient: "bg-[var(--success)]",
-    },
     {
       title: "Pending Applications",
       value: data.executive.pipelineFunnel
@@ -1153,32 +1295,34 @@ function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean })
         .reduce((sum, s) => sum + s.count, 0),
       icon: Clock,
       color: "amber",
-      gradient: "bg-[var(--warning)]",
-    },
-    {
-      title: "Today's Conversions",
-      value: data.executive.todayNumbers.enrolled,
-      icon: TrendingUp,
-      color: "blue",
-      gradient: "bg-[var(--primary)]",
+      tab: "pipeline",
     },
     {
       title: "In Pipeline",
       value: data.executive.pipelineFunnel
-        .filter(s => ['new', 'test'].includes(s.stage))
+        .filter(s => ['new', 'contacted', 'visit'].includes(s.stage))
         .reduce((sum, s) => sum + s.count, 0),
       icon: Activity,
+      color: "blue",
+      tab: "pipeline",
+    },
+    {
+      title: "Appointments This Week",
+      value: data.executive.weekOverWeek.appointments.current,
+      icon: Calendar,
       color: "purple",
-      gradient: "bg-[var(--primary)]",
+      tab: "agents",
+    },
+    {
+      title: "Withdrawals",
+      value: data.enrollment.withdrawals.total,
+      icon: AlertTriangle,
+      color: "red",
+      tab: "detailed-analytics",
     },
   ]
 
   const colorClasses: Record<string, { bg: string; icon: string; border: string }> = {
-    emerald: {
-      bg: "bg-[var(--success-bg)]",
-      icon: "text-[var(--success)]",
-      border: "border-l-[var(--success)]",
-    },
     amber: {
       bg: "bg-[var(--warning-bg)]",
       icon: "text-[var(--warning)]",
@@ -1190,9 +1334,14 @@ function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean })
       border: "border-l-[var(--primary)]",
     },
     purple: {
-      bg: "bg-[var(--primary-muted)]",
-      icon: "text-[var(--primary)]",
-      border: "border-l-[var(--primary)]",
+      bg: "bg-[var(--accent-muted)]",
+      icon: "text-[var(--accent)]",
+      border: "border-l-[var(--accent)]",
+    },
+    red: {
+      bg: "bg-[var(--error-bg)]",
+      icon: "text-[var(--error)]",
+      border: "border-l-[var(--error)]",
     },
   }
 
@@ -1205,10 +1354,13 @@ function KPICardsGrid({ data, mounted }: { data: ReportData; mounted: boolean })
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
         >
-          <Card className={cn(
-            "hover:shadow-lg transition-all border-l-4",
-            colorClasses[kpi.color].border
-          )}>
+          <Card
+            className={cn(
+              "hover:shadow-lg transition-all border-l-4 cursor-pointer",
+              colorClasses[kpi.color].border
+            )}
+            onClick={() => onNavigate(kpi.tab)}
+          >
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>

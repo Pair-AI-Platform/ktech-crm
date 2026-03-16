@@ -14,6 +14,7 @@ import {
   TrendingUp,
   ArrowUpDown,
   Crown,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LeaderboardData } from "@/lib/hooks/use-reports"
@@ -22,7 +23,7 @@ interface AgentLeaderboardProps {
   data: LeaderboardData[]
 }
 
-type SortKey = 'rank' | 'leads' | 'appointments' | 'applications' | 'enrolled' | 'conversionRate'
+type SortKey = 'rank' | 'leads' | 'appointments' | 'pucFiles' | 'pucAppSubmission' | 'applicant' | 'enrolled' | 'sfFiles' | 'sf150' | 'sf550' | 'sfEnrolled' | 'statusChanges' | 'conversionRate'
 
 export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortKey>('enrolled')
@@ -102,14 +103,16 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   <Stat label="Enrolled" value={agent.enrolled} />
                   <Stat label="Leads" value={agent.leads} />
-                  <Stat label="Conv. Rate" value={`${agent.conversionRate}%`} />
-                  <Stat label="Progress" value={`${agent.progress}%`} />
+                  <Stat label="Conv %" value={`${agent.conversionRate}%`} />
+                  <Stat label="PUC Files" value={agent.pucFiles} />
+                  <Stat label="SF Files" value={agent.sfFiles} />
+                  <Stat label="Changes" value={agent.statusChanges} />
                 </div>
 
-                {/* Target Progress - always 3 categories */}
+                {/* Target Progress */}
                 <div className="mt-4 space-y-2">
                   {agent.categories?.puc && agent.categories.puc.target > 0 && (
                     <CategoryBar label="PUC Files" color="green" cat={agent.categories.puc} />
@@ -182,19 +185,40 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
+                  {/* Group headers */}
                   <tr className="border-b border-[var(--border)]">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)]">
+                    <th colSpan={3} />
+                    <th colSpan={4} className="text-center py-2 px-1 text-xs font-semibold text-green-600 uppercase tracking-wider border-x border-[var(--border)] bg-green-500/5">
+                      PUC Funnel
+                    </th>
+                    <th colSpan={4} className="text-center py-2 px-1 text-xs font-semibold text-orange-600 uppercase tracking-wider border-x border-[var(--border)] bg-orange-500/5">
+                      SF Funnel
+                    </th>
+                    <th colSpan={3} />
+                  </tr>
+                  {/* Column headers */}
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left py-3 px-3 text-sm font-medium text-[var(--text-muted)]">
                       Rank
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)]">
+                    <th className="text-left py-3 px-3 text-sm font-medium text-[var(--text-muted)]">
                       Agent
                     </th>
                     <SortHeader label="Leads" sortKey="leads" currentSort={sortBy} onSort={handleSort} />
-                    <SortHeader label="Appointments" sortKey="appointments" currentSort={sortBy} onSort={handleSort} />
-                    <SortHeader label="Applications" sortKey="applications" currentSort={sortBy} onSort={handleSort} />
-                    <SortHeader label="Enrolled" sortKey="enrolled" currentSort={sortBy} onSort={handleSort} />
+                    {/* PUC Funnel */}
+                    <SortHeader label="Files" sortKey="pucFiles" currentSort={sortBy} onSort={handleSort} className="border-l border-[var(--border)] bg-green-500/5" />
+                    <SortHeader label="Submission" sortKey="pucAppSubmission" currentSort={sortBy} onSort={handleSort} className="bg-green-500/5" />
+                    <SortHeader label="Applicant" sortKey="applicant" currentSort={sortBy} onSort={handleSort} className="bg-green-500/5" />
+                    <SortHeader label="Enrolled" sortKey="enrolled" currentSort={sortBy} onSort={handleSort} className="border-r border-[var(--border)] bg-green-500/5" />
+                    {/* SF Funnel */}
+                    <SortHeader label="Files" sortKey="sfFiles" currentSort={sortBy} onSort={handleSort} className="border-l border-[var(--border)] bg-orange-500/5" />
+                    <SortHeader label="150 KD" sortKey="sf150" currentSort={sortBy} onSort={handleSort} className="bg-orange-500/5" />
+                    <SortHeader label="550 KD" sortKey="sf550" currentSort={sortBy} onSort={handleSort} className="bg-orange-500/5" />
+                    <SortHeader label="Enrolled" sortKey="sfEnrolled" currentSort={sortBy} onSort={handleSort} className="border-r border-[var(--border)] bg-orange-500/5" />
+                    {/* Other */}
+                    <SortHeader label="Status Chg" sortKey="statusChanges" currentSort={sortBy} onSort={handleSort} />
                     <SortHeader label="Conv %" sortKey="conversionRate" currentSort={sortBy} onSort={handleSort} />
-                    <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)]">
+                    <th className="text-left py-3 px-3 text-sm font-medium text-[var(--text-muted)]">
                       Targets
                     </th>
                   </tr>
@@ -205,27 +229,43 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                       key={agent.agentId}
                       className="border-b border-[var(--border)] hover:bg-[var(--bg-sunken)] transition-colors"
                     >
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3">
                         <RankBadge rank={agent.rank} />
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
                           <Avatar size="sm">
                             {agent.avatarUrl && <AvatarImage src={agent.avatarUrl} />}
                             <AvatarFallback>
                               {agent.agentName.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium text-[var(--text-primary)]">{agent.agentName}</span>
+                          <span className="font-medium text-[var(--text-primary)] whitespace-nowrap">{agent.agentName}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-[var(--text-primary)]">{agent.leads}</td>
-                      <td className="py-3 px-4 text-sm text-[var(--text-primary)]">{agent.appointments}</td>
-                      <td className="py-3 px-4 text-sm text-[var(--text-primary)]">{agent.applications}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)]">{agent.leads}</td>
+                      {/* PUC Funnel */}
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)] border-l border-[var(--border)] bg-green-500/5">{agent.pucFiles}</td>
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)] bg-green-500/5">{agent.pucAppSubmission}</td>
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)] bg-green-500/5">{agent.applicant}</td>
+                      <td className="py-3 px-3 border-r border-[var(--border)] bg-green-500/5">
                         <span className="font-semibold text-[var(--text-primary)]">{agent.enrolled}</span>
                       </td>
-                      <td className="py-3 px-4">
+                      {/* SF Funnel */}
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)] border-l border-[var(--border)] bg-orange-500/5">{agent.sfFiles}</td>
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)] bg-orange-500/5">{agent.sf150}</td>
+                      <td className="py-3 px-3 text-sm text-[var(--text-primary)] bg-orange-500/5">{agent.sf550}</td>
+                      <td className="py-3 px-3 border-r border-[var(--border)] bg-orange-500/5">
+                        <span className="font-semibold text-[var(--text-primary)]">{agent.sfEnrolled}</span>
+                      </td>
+                      {/* Other */}
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3 text-[var(--text-muted)]" />
+                          <span className="text-sm text-[var(--text-primary)]">{agent.statusChanges}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
                         <Badge
                           variant={agent.conversionRate >= 40 ? 'success' : agent.conversionRate >= 20 ? 'warning' : 'secondary'}
                           size="sm"
@@ -233,7 +273,7 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                           {agent.conversionRate}%
                         </Badge>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3">
                         <div className="space-y-1">
                           {agent.categories?.puc && agent.categories.puc.target > 0 && (
                             <div className="flex items-center gap-2">
@@ -336,17 +376,22 @@ function SortHeader({
   sortKey,
   currentSort,
   onSort,
+  className,
 }: {
   label: string
   sortKey: SortKey
   currentSort: SortKey
   onSort: (key: SortKey) => void
+  className?: string
 }) {
   const isActive = currentSort === sortKey
 
   return (
     <th
-      className="text-left py-3 px-4 text-sm font-medium text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] transition-colors"
+      className={cn(
+        "text-left py-3 px-3 text-sm font-medium text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] transition-colors whitespace-nowrap",
+        className
+      )}
       onClick={() => onSort(sortKey)}
     >
       <div className="flex items-center gap-1">

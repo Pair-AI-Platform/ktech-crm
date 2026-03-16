@@ -17,6 +17,7 @@ import {
   TrendingUp,
   CheckCircle2,
   Clock,
+  FolderOpen,
 } from "lucide-react"
 import type { PaymentReportData } from "@/lib/hooks/use-reports"
 
@@ -216,6 +217,91 @@ export function PaymentReports({ data }: PaymentReportsProps) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* File Stage Payment Breakdown by Agent */}
+      {data.fileStageByAgent.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.8 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-[var(--primary)]" />
+                File Stage — Payment per Agent
+              </CardTitle>
+              <CardDescription>Leads in File stage grouped by agent and payment status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Summary row */}
+              {(() => {
+                const totals = data.fileStageByAgent.reduce(
+                  (acc, a) => ({
+                    total: acc.total + a.total,
+                    notPaid: acc.notPaid + a.notPaid,
+                    paid150: acc.paid150 + a.paid150,
+                    paidFull: acc.paidFull + a.paidFull,
+                  }),
+                  { total: 0, notPaid: 0, paid150: 0, paidFull: 0 }
+                )
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    <div className="p-3 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)] text-center">
+                      <p className="text-xs text-[var(--text-muted)]">Total in Files</p>
+                      <p className="text-xl font-bold text-[var(--text-primary)]">{totals.total}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[var(--warning-bg)] border border-[var(--warning)]/20 text-center">
+                      <p className="text-xs text-[var(--warning)]">Not Paid</p>
+                      <p className="text-xl font-bold text-[var(--warning)]">{totals.notPaid}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[var(--info-bg)] border border-[var(--info)]/20 text-center">
+                      <p className="text-xs text-[var(--info)]">Paid 150 KD</p>
+                      <p className="text-xl font-bold text-[var(--info)]">{totals.paid150}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[var(--success-bg)] border border-[var(--success)]/20 text-center">
+                      <p className="text-xs text-[var(--success)]">Full Payment</p>
+                      <p className="text-xl font-bold text-[var(--success)]">{totals.paidFull}</p>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* Agent table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left py-3 px-3 text-[var(--text-secondary)] font-medium">Agent</th>
+                      <th className="text-center py-3 px-3 text-[var(--text-secondary)] font-medium">Total</th>
+                      <th className="text-center py-3 px-3 text-[var(--warning)] font-medium">Not Paid</th>
+                      <th className="text-center py-3 px-3 text-[var(--info)] font-medium">Paid 150</th>
+                      <th className="text-center py-3 px-3 text-[var(--success)] font-medium">Full Payment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.fileStageByAgent.map((agent) => (
+                      <tr key={agent.agentId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                        <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{agent.agentName}</td>
+                        <td className="py-3 px-3 text-center text-[var(--text-primary)] font-semibold">{agent.total}</td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant="warning" size="sm">{agent.notPaid}</Badge>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant="info" size="sm">{agent.paid150}</Badge>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant="success" size="sm">{agent.paidFull}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   )
 }

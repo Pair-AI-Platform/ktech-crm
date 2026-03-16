@@ -497,7 +497,7 @@ export function StageSettings() {
         trackId="puc"
         title="PUC Stages"
         subtitle="Public Universities Council"
-        description="New → Contacted → Visit → Test → File → Doc Submission → App Submission → Applicant → Enrolled → Withdraw"
+        description="New → Contacted → Visit → Test → File → Documents → Submission → Applicant → Enrolled → Withdraw"
         iconLetter="P"
         iconBgClass="bg-cyan-500/20"
         iconTextClass="text-cyan-600 dark:text-cyan-400"

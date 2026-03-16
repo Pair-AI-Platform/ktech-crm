@@ -35,7 +35,16 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push("/dashboard")
+      // Check role for redirect
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .single()
+      if (profile?.role === "marketing") {
+        router.push("/marketing")
+      } else {
+        router.push("/dashboard")
+      }
       router.refresh()
     }
   }
@@ -57,7 +66,15 @@ export default function LoginPage() {
       setError("Demo login failed. Please try again.")
       setDemoLoading(null)
     } else {
-      router.push("/dashboard")
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .single()
+      if (profile?.role === "marketing") {
+        router.push("/marketing")
+      } else {
+        router.push("/dashboard")
+      }
       router.refresh()
     }
   }

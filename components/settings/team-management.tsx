@@ -315,7 +315,7 @@ function InviteMemberModal({
 }) {
   const [email, setEmail] = useState("")
   const [fullName, setFullName] = useState("")
-  const [role, setRole] = useState<"admin" | "agent">("agent")
+  const [role, setRole] = useState<"admin" | "agent" | "marketing">("agent")
   const [monthlyTarget, setMonthlyTarget] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -377,7 +377,7 @@ function InviteMemberModal({
             <label className="text-sm font-medium text-[var(--text-secondary)]">
               Role
             </label>
-            <Select value={role} onValueChange={(v) => setRole(v as "admin" | "agent")}>
+            <Select value={role} onValueChange={(v) => setRole(v as "admin" | "agent" | "marketing")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -392,6 +392,12 @@ function InviteMemberModal({
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4" />
                     Admin
+                  </div>
+                </SelectItem>
+                <SelectItem value="marketing">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Marketing
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -437,7 +443,7 @@ function EditMemberModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [role, setRole] = useState<"admin" | "agent">("agent")
+  const [role, setRole] = useState<"admin" | "agent" | "marketing">("agent")
   const [monthlyTarget, setMonthlyTarget] = useState("20")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const supabase = createClient()
@@ -508,7 +514,7 @@ function EditMemberModal({
             <label className="text-sm font-medium text-[var(--text-secondary)]">
               Role
             </label>
-            <Select value={role} onValueChange={(v) => setRole(v as "admin" | "agent")}>
+            <Select value={role} onValueChange={(v) => setRole(v as "admin" | "agent" | "marketing")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -523,6 +529,12 @@ function EditMemberModal({
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4" />
                     Admin
+                  </div>
+                </SelectItem>
+                <SelectItem value="marketing">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Marketing
                   </div>
                 </SelectItem>
               </SelectContent>

@@ -203,8 +203,8 @@ export function PipelineSection({ sfLeads, pucLeads, loading }: PipelineSectionP
       { key: 'visit', label: 'Visit', color: '#8B5CF6' },
       { key: 'test', label: 'Test', color: '#F59E0B' },
       { key: 'application', label: 'File', color: '#EF4444' },
-      { key: 'puc_document_submission', label: 'Doc Sub', color: '#EC4899' },
-      { key: 'puc_application_submission', label: 'App Sub', color: '#06B6D4' },
+      { key: 'puc_document_submission', label: 'Documents', color: '#EC4899' },
+      { key: 'puc_application_submission', label: 'Submission', color: '#06B6D4' },
       { key: 'applicant', label: 'Applicant', color: '#14B8A6' },
       { key: 'enrolled', label: 'Enrolled', color: '#22C55E' },
     ]

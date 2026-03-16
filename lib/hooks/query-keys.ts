@@ -87,4 +87,21 @@ export const queryKeys = {
     all: ['agent-seasonal-targets'] as const,
     season: (seasonId: string) => ['agent-seasonal-targets', seasonId] as const,
   },
+  marketingLeads: {
+    all: ['marketing-leads'] as const,
+    list: (filters?: Record<string, unknown>) => ['marketing-leads', 'list', filters] as const,
+  },
+  aiChat: {
+    all: ['ai-chat'] as const,
+    conversations: () => [...queryKeys.aiChat.all, 'conversations'] as const,
+    messages: (id: string) => [...queryKeys.aiChat.all, 'messages', id] as const,
+  },
+  campaigns: {
+    all: ['campaigns'] as const,
+    lists: () => [...queryKeys.campaigns.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.campaigns.lists(), filters] as const,
+    details: () => [...queryKeys.campaigns.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.campaigns.details(), id] as const,
+    audienceCounts: () => [...queryKeys.campaigns.all, 'audience-counts'] as const,
+  },
 }

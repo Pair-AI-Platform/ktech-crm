@@ -21,6 +21,7 @@ import {
   Trash2,
   GraduationCap,
   Search,
+  Send,
   Ban,
   UserMinus,
   Wallet,
@@ -52,7 +53,7 @@ type NavItem = {
   description: string
   badge?: string
   children?: NavItem[]
-  roles?: ("admin" | "agent")[]
+  roles?: ("admin" | "agent" | "marketing")[]
 }
 
 interface NavLinkProps {
@@ -250,7 +251,7 @@ const navigation: NavItem[] = [
     { name: "Lost", href: "/leads?stage=lost", icon: Ban, description: "Lost leads" },
   ]},
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
-  // { name: "Voice", href: "/voice", icon: Phone, description: "Kadi AI & calls" },
+  { name: "Campaigns", href: "/campaigns", icon: Send, description: "Outreach campaigns", roles: ["admin"] },
   { name: "Reports", href: "/reports", icon: BarChart3, description: "Analytics & insights", roles: ["admin", "agent"] },
   { name: "Activity", href: "/activity", icon: Activity, description: "Recent activity", roles: ["admin", "agent"] },
 ]

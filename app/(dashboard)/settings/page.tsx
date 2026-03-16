@@ -15,7 +15,6 @@ import { LeadAssignmentRules } from "@/components/settings/lead-assignment-rules
 import { StageSettings } from "@/components/settings/stage-settings"
 import { TargetSettings } from "@/components/settings/targets"
 import { SchoolManagement } from "@/components/settings/school-management"
-import { AutomationRulesManager } from "@/components/settings/automation-rules-manager"
 import { DocumentConfigManagement } from "@/components/settings/document-config-management"
 import { CycleManagement } from "@/components/settings/cycle-management"
 import {
@@ -44,7 +43,6 @@ import {
   Lock,
   ChevronRight,
   Clock,
-  Zap,
   ExternalLink,
   GitBranch,
   Target,
@@ -63,7 +61,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "schools" | "documents" | "automations" | "enrollment"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "schools" | "documents" | "enrollment"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -75,7 +73,6 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
-  { id: "automations", label: "Automations", icon: Zap, adminOnly: true },
   { id: "team", label: "Team", icon: Users, adminOnly: true },
 ]
 
@@ -224,7 +221,7 @@ export default function SettingsPage() {
   const userRole = profile?.role || "agent"
   const visibleTabs = TABS.filter(tab => {
     if (tab.adminOnly && !isAdmin) return false
-    if (tab.roles && !tab.roles.includes(userRole)) return false
+    if (tab.roles && !tab.roles.includes(userRole as "admin" | "agent")) return false
     return true
   })
 
@@ -696,19 +693,6 @@ export default function SettingsPage() {
                     className="space-y-6"
                   >
                     <DocumentConfigManagement />
-                  </motion.div>
-                )}
-
-                {/* Automations Tab */}
-                {activeTab === "automations" && isAdmin && (
-                  <motion.div
-                    key="automations"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="space-y-6"
-                  >
-                    <AutomationRulesManager />
                   </motion.div>
                 )}
 

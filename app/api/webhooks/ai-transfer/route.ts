@@ -133,7 +133,7 @@ export const POST = withApiHandler(
           phone,
           email: body.email?.trim() || null,
           source: 'whatsapp_ai',
-          source_category: 'digital',
+          source_category: 'marketing',
           pipeline_stage: 'new',
           contact_status: 'uncontacted',
           nationality: 'Kuwaiti',

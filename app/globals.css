@@ -1560,22 +1560,36 @@ input[type="time"]::-webkit-calendar-picker-indicator {
    ============================================ */
 @media print {
   body {
-    background: white;
-    color: black;
+    background: white !important;
+    color: black !important;
     font-size: 12pt;
   }
 
   .no-print,
   .mobile-nav,
   .sidebar,
-  button,
-  .btn {
+  nav,
+  header,
+  button:not(.print-keep),
+  .btn:not(.print-keep),
+  [data-sidebar],
+  .print-hide {
     display: none !important;
   }
 
+  .print-break {
+    page-break-before: always;
+  }
+
   .card {
-    box-shadow: none;
-    border: 1px solid #ddd;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+  }
+
+  .print-full-width {
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   a {
@@ -1585,6 +1599,19 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   h1, h2, h3 {
     page-break-after: avoid;
+  }
+
+  /* Clean layout for report printing */
+  .print-compact {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Force light colors for print */
+  * {
+    color: black !important;
+    background: white !important;
+    border-color: #ddd !important;
   }
 }
 

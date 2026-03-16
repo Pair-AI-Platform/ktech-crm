@@ -230,7 +230,7 @@ const firstNamesF = ["فاطمة", "مريم", "سارة", "نورة", "هيا",
 const lastNames = ["الصباح", "الرشيد", "الأحمد", "المطيري", "الشمري", "العنزي", "الحربي", "الكندري", "الفيلكاوي", "القطان", "السعيد", "الهاجري", "الدوسري", "العازمي", "العتيبي"]
 
 const sources = ["instagram", "school_visit", "current_student_referral", "walk_in", "exhibitions", "snapchat", "facebook", "whatsapp", "call_center", "website_form"]
-const sourceCategories = ["digital", "events", "referrals", "direct", "outreach"]
+const sourceCategories = ["marketing", "events", "referrals", "direct", "outreach"]
 const schools = [
   "jaber_mubarak_boys", "ahmad_shihab_aldin", "saad_bin_alrabee",
   "qurtuba_girls", "alasmaa_bint_alharith", "fatima_bint_alwalid",

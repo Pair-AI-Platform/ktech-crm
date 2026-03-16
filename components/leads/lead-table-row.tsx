@@ -448,7 +448,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                     const payment = sfPaymentData[lead.id]
                     const paid = payment?.amount_paid ?? 0
                     const milestone1 = 150
-                    const milestone2 = 600 // 150 + 450
+                    const milestone2 = 550 // 150 + 400
                     const phase1Done = paid >= milestone1
                     const phase2Done = paid >= milestone2
                     return (
@@ -464,7 +464,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                               </div>
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className={phase2Done ? "text-emerald-400" : "text-[var(--text-muted)]"}>
-                                  {phase2Done ? "\u2713" : "\u25CB"} Phase 2: 450 KD
+                                  {phase2Done ? "\u2713" : "\u25CB"} Phase 2: 400 KD
                                 </span>
                               </div>
                             </div>

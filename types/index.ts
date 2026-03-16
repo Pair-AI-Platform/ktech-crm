@@ -2,16 +2,16 @@
 // ENUMS
 // =============================================
 
-export type UserRole = 'admin' | 'agent'
+export type UserRole = 'admin' | 'agent' | 'marketing'
 
 export type LeadStatus = 'no_answer' | 'callback' | 'not_interested' | 'switched_off' | 'busy' | 'confirmed' | 'wrong_number' | 'will_see' | 'postponed' | 'by_mistake' | 'disconnected' | 'hanged_up' | 'cancelled' | 'online' | 'on_campus' | 'on_the_way' | 'cant_reach' | 'contacted' | 'seeking_job' | 'current_student' | 'asking_bachelors' | 'courses_masters' | 'rude' | 'informed' | 'travelling' | 'might_withdraw' | 'pay_later' | 'interested' | 'high_gpa' | 'competitor' | 'applied' | 'blocked_ku' | 'blocked_paaet' | 'blocked_abroad' | 'blocked_aasu' | 'blocked_paci' | 'blocked_puc' | 'blocked_gpa' | 'documents_missing' | 'payment_pending' | 'blocked_other' | 'changed_preferences'
 
-export type LeadSourceCategory = 'direct' | 'events' | 'digital' | 'referrals' | 'outreach'
+export type LeadSourceCategory = 'direct' | 'events' | 'marketing' | 'referrals' | 'outreach'
 
 export type LeadSource =
   | 'walk_in' | 'call_center' | 'whatsapp' | 'email'
   | 'school_visit' | 'expo' | 'exhibitions' | 'karnival'
-  | 'website_form' | 'facebook' | 'instagram'
+  | 'website_form' | 'facebook' | 'instagram' | 'tiktok' | 'email_marketing'
   | 'current_student_referral' | 'staff_referral' | 'friend_referral'
   | 'old_contacts' | 'paaet_rejected' | 'gpa_lists'
   | 'whatsapp_ai'
@@ -108,7 +108,7 @@ export type EducationType = 'GOV' | 'US' | 'UK' | 'KSA' | 'other'
 export type FundingType = 'self_funded' | 'puc'
 
 export type IntendedMajor =
-  | 'cyber_security' | 'cis' | 'marketing' | 'accounting' | 'mis' | 'network_security' | 'other'
+  | 'cyber_security' | 'cis' | 'marketing' | 'accounting' | 'network_security' | 'other'
 
 export type PlacementLevel = 'foundation_1' | 'foundation_2' | 'majors'
 
@@ -395,6 +395,9 @@ export interface Lead {
   submission_blocked_reason_notes?: string
   submission_lost_reason_id?: string
   puc_document_status_override?: PUCDocumentStatus | null
+
+  // Created by (marketing portal tracking)
+  created_by?: string
 
   // Assignment
   assigned_to?: string
@@ -1454,16 +1457,18 @@ export const LEAD_SOURCES: { value: LeadSource; label: string; category: LeadSou
   { value: 'school_visit', label: 'School Visit', category: 'events' },
   { value: 'exhibitions', label: 'Exhibitions', category: 'events' },
   { value: 'karnival', label: 'Karnival', category: 'events' },
-  { value: 'website_form', label: 'Website Form', category: 'digital' },
-  { value: 'facebook', label: 'Facebook', category: 'digital' },
-  { value: 'instagram', label: 'Instagram', category: 'digital' },
+  { value: 'website_form', label: 'Website Form', category: 'marketing' },
+  { value: 'facebook', label: 'Facebook', category: 'marketing' },
+  { value: 'instagram', label: 'Instagram', category: 'marketing' },
+  { value: 'tiktok', label: 'TikTok', category: 'marketing' },
+  { value: 'email_marketing', label: 'Email Marketing', category: 'marketing' },
   { value: 'current_student_referral', label: 'Student Referral', category: 'referrals' },
   { value: 'staff_referral', label: 'Staff Referral', category: 'referrals' },
   { value: 'friend_referral', label: 'Friend Referral', category: 'referrals' },
   { value: 'old_contacts', label: 'Old Contacts', category: 'outreach' },
   { value: 'paaet_rejected', label: 'PAAET Rejected', category: 'outreach' },
   { value: 'gpa_lists', label: 'GPA Lists', category: 'outreach' },
-  { value: 'whatsapp_ai', label: 'WhatsApp AI', category: 'digital' }
+  { value: 'whatsapp_ai', label: 'WhatsApp AI', category: 'marketing' }
 ]
 
 export const EDUCATION_TYPES: { value: EducationType; label: string; description: string }[] = [
@@ -1479,7 +1484,6 @@ export const MAJORS: { value: IntendedMajor; label: string }[] = [
   { value: 'cis', label: 'نظم المعلومات الحاسوبية' },
   { value: 'marketing', label: 'التسويق' },
   { value: 'accounting', label: 'المحاسبة' },
-  { value: 'mis', label: 'نظم المعلومات الإدارية' },
   { value: 'network_security', label: 'أمن الشبكات' },
   { value: 'other', label: 'أخرى' }
 ]

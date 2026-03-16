@@ -305,6 +305,28 @@ export function useLead(id: string) {
         .single()
 
       if (error) throw new Error(error.message)
+
+      // Auto-assign to active cycle's open term if lead has no semester
+      if (!data.semester_id) {
+        const { data: openTerms } = await supabase
+          .from("semesters")
+          .select("id, name, is_active, cycle_id")
+          .eq("is_active", true)
+          .eq("is_open", true)
+          .limit(1)
+          .single()
+
+        if (openTerms) {
+          await supabase
+            .from("leads")
+            .update({ semester_id: openTerms.id })
+            .eq("id", data.id)
+
+          data.semester_id = openTerms.id
+          data.semester = { id: openTerms.id, name: openTerms.name, is_active: openTerms.is_active } as Lead["semester"]
+        }
+      }
+
       return data as Lead
     },
     enabled: !!id,
@@ -411,6 +433,20 @@ export function useLeadMutations() {
       const shouldRouteToPuc = shouldAutoRouteToPucSrj(finalLeadData)
       if (shouldRouteToPuc && finalLeadData.funding_type !== 'puc') {
         finalLeadData.funding_type = 'puc'
+      }
+
+      // Auto-assign to active cycle's open term if no semester selected
+      if (!finalLeadData.semester_id) {
+        const { data: openTerm } = await supabase
+          .from("semesters")
+          .select("id")
+          .eq("is_active", true)
+          .eq("is_open", true)
+          .limit(1)
+          .single()
+        if (openTerm) {
+          finalLeadData.semester_id = openTerm.id
+        }
       }
 
       const { data, error } = await supabase

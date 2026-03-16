@@ -28,7 +28,7 @@ interface ReportsFiltersProps {
 const SOURCE_CATEGORIES = [
   { value: 'direct', label: 'Direct' },
   { value: 'events', label: 'Events' },
-  { value: 'digital', label: 'Digital' },
+  { value: 'marketing', label: 'Marketing' },
   { value: 'referrals', label: 'Referrals' },
   { value: 'outreach', label: 'Outreach' },
 ]

@@ -1,0 +1,117 @@
+"use client"
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { createClient } from "@/lib/supabase/client"
+import { queryKeys } from "./query-keys"
+import type { LeadSource, LeadSourceCategory, PipelineStage, ContactStatus } from "@/types"
+
+export interface MarketingLead {
+  id: string
+  first_name: string
+  last_name: string
+  phone: string
+  pipeline_stage: PipelineStage
+  contact_status: ContactStatus
+  assigned_to: string | null
+  created_at: string
+  source: LeadSource
+  assigned_agent: { full_name: string } | null
+}
+
+interface CreateMarketingLeadData {
+  first_name: string
+  last_name: string
+  phone: string
+  school?: string
+  source: LeadSource
+  source_category: LeadSourceCategory
+  source_detail?: string
+  notes?: string
+  semester_id: string
+  created_by: string
+}
+
+export function useMarketingLeads() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  const leadsQuery = useQuery({
+    queryKey: queryKeys.marketingLeads.all,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id, first_name, last_name, phone, pipeline_stage, contact_status, assigned_to, created_at, source, assigned_agent:profiles!leads_assigned_to_fkey(full_name)")
+        .order("created_at", { ascending: false })
+
+      if (error) throw new Error(error.message)
+      // Supabase returns the join as array; normalize to single object or null
+      return (data ?? []).map((row): MarketingLead => ({
+        id: row.id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        phone: row.phone,
+        pipeline_stage: row.pipeline_stage,
+        contact_status: row.contact_status,
+        assigned_to: row.assigned_to,
+        created_at: row.created_at,
+        source: row.source,
+        assigned_agent: Array.isArray(row.assigned_agent) && row.assigned_agent.length > 0
+          ? (row.assigned_agent[0] as { full_name: string })
+          : !Array.isArray(row.assigned_agent) ? (row.assigned_agent as { full_name: string } | null) : null,
+      }))
+    },
+  })
+
+  const createLead = useMutation({
+    mutationFn: async (data: CreateMarketingLeadData) => {
+      const { error } = await supabase
+        .from("leads")
+        .insert({
+          ...data,
+          pipeline_stage: "new",
+          contact_status: "uncontacted",
+          nationality: "kuwaiti",
+          is_kuwaiti: true,
+          is_transfer_student: false,
+          is_special_needs: false,
+          is_diplomatic: false,
+          is_athlete: false,
+          is_married: false,
+          is_employee: false,
+          funding_type: "puc",
+          has_weyay_account: false,
+          has_bank_account: false,
+        })
+
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.marketingLeads.all })
+    },
+  })
+
+  return {
+    leads: leadsQuery.data ?? [],
+    isLoading: leadsQuery.isLoading,
+    error: leadsQuery.error,
+    createLead,
+  }
+}
+
+export function useActiveSemester() {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: queryKeys.semesters.active(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("semesters")
+        .select("id, name")
+        .eq("is_active", true)
+        .single()
+
+      if (error) throw new Error(error.message)
+      return data as { id: string; name: string }
+    },
+  })
+}

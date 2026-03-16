@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import {
   Percent,
   Check,
+  ChevronDown,
   ClipboardCheck,
   FileText,
   RefreshCw,
@@ -37,6 +38,7 @@ export function LeadFormPipeline({
   isAtTestStage,
 }: LeadFormPipelineProps) {
   const [declarationSent, setDeclarationSent] = useState(false)
+  const [placementOpen, setPlacementOpen] = useState(true)
 
   return (
     <>
@@ -177,7 +179,11 @@ export function LeadFormPipeline({
 
       {/* Section 6: Placement Test */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setPlacementOpen(!placementOpen)}
+          className="flex items-center gap-2 mb-4 w-full text-left cursor-pointer"
+        >
           <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
             <ClipboardCheck className="w-4 h-4 text-[var(--primary)]" />
           </div>
@@ -188,9 +194,13 @@ export function LeadFormPipeline({
               LMS Synced
             </span>
           )}
-        </div>
+          <ChevronDown className={cn(
+            "w-4 h-4 text-[var(--text-muted)] transition-transform ml-auto",
+            placementOpen && "rotate-180"
+          )} />
+        </button>
 
-        <div className="space-y-4 pl-10">
+        {placementOpen && <div className="space-y-4 pl-10">
           {isAtTestStage ? (
             /* Show blank state when at test stage */
             <div className="space-y-4">
@@ -385,7 +395,7 @@ export function LeadFormPipeline({
               </div>
             </>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Section 7: Notes */}

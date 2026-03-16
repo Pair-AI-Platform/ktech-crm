@@ -10,7 +10,7 @@ export interface Profile {
   email: string
   full_name: string
   full_name_ar?: string
-  role: "admin" | "agent"
+  role: "admin" | "agent" | "marketing"
   avatar_url?: string
   phone?: string
   is_active: boolean
@@ -126,6 +126,7 @@ export function useUser() {
     signOut,
     isAdmin: profile?.role === "admin",
     isAgent: profile?.role === "agent",
+    isMarketing: profile?.role === "marketing",
   }
 }
 

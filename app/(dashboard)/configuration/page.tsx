@@ -26,7 +26,7 @@ export default function ConfigurationPage() {
     { id: "brand", label: "Brand" },
     { id: "voice", label: "Voice & Tone" },
     { id: "appearance", label: "Appearance" },
-    { id: "channels", label: "Channels" },
+    { id: "channels", label: "Sources" },
     { id: "security", label: "Security" },
     { id: "advanced", label: "Advanced" },
   ];
@@ -358,14 +358,14 @@ export default function ConfigurationPage() {
               </div>
             )}
 
-            {/* Channels Tab */}
+            {/* Sources Tab */}
             {activeTab === "channels" && (
               <div className="space-y-6">
                 <p className="text-gray-600">
-                  Configure your communication channels and integrations.
+                  Configure your lead sources and integrations.
                 </p>
                 <div className="text-center py-12 text-gray-400">
-                  Channels configuration coming soon...
+                  Sources configuration coming soon...
                 </div>
               </div>
             )}

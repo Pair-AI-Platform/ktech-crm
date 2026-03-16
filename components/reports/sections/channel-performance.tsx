@@ -11,6 +11,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -19,9 +20,8 @@ import {
 import {
   Share2,
   TrendingUp,
-  Building,
-  MapPin,
   Layers,
+  GraduationCap,
 } from "lucide-react"
 import type { ChannelReportData } from "@/lib/hooks/use-reports"
 
@@ -66,10 +66,9 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
   })).filter(d => d.value > 0)
 
   const topSource = data.bySource[0]
-  const topSchool = data.topSchools[0]
-  const topSchoolByLeads = data.bySchool.length > 0
-    ? data.bySchool.reduce((max, school) => school.leads > max.leads ? school : max, data.bySchool[0])
-    : { label: 'N/A', leads: 0, applicationPercent: 0, pucPercent: 0 }
+  const topEnrollmentSource = [...data.bySource].sort((a, b) => b.enrolled - a.enrolled)[0]
+  const totalEnrolled = data.bySource.reduce((sum, s) => sum + s.enrolled, 0)
+  const totalLeads = data.bySource.reduce((sum, s) => sum + s.count, 0)
 
   return (
     <div className="space-y-6">
@@ -88,7 +87,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 </div>
                 <Badge variant="success" size="sm">Top Source</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Performing Source</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Most Leads</p>
               <p className="text-xl font-bold text-[var(--text-primary)]">{topSource?.label || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
                 {topSource?.count || 0} leads, {topSource?.conversionRate || 0}% conversion
@@ -106,18 +105,18 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
           <Card hover glow className="relative overflow-hidden">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-[var(--success)] shadow-sm">
-                  <Building className="w-5 h-5 text-white" />
+                <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
+                  <GraduationCap className="w-5 h-5 text-white" />
                 </div>
-                <Badge variant="success" size="sm">Top School</Badge>
+                <Badge variant="info" size="sm">Top Enrollment</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Performing School</p>
-              <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchool?.schoolName || 'N/A'}</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Enrollment Source</p>
+              <p className="text-xl font-bold text-[var(--text-primary)]">{topEnrollmentSource?.label || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {topSchool?.leads || 0} leads, {topSchool?.applications || 0} applications
+                {topEnrollmentSource?.enrolled || 0} enrolled, {topEnrollmentSource?.enrollmentRate || 0}% rate
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--success)] opacity-50" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--primary)] opacity-30" />
           </Card>
         </motion.div>
 
@@ -129,18 +128,18 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
           <Card hover glow className="relative overflow-hidden">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-[var(--primary)] shadow-sm">
-                  <MapPin className="w-5 h-5 text-white" />
+                <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
+                  <TrendingUp className="w-5 h-5 text-white" />
                 </div>
-                <Badge variant="success" size="sm">Top Area</Badge>
+                <Badge variant="warning" size="sm">Overall</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Top School by Leads</p>
-              <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchoolByLeads?.label || 'N/A'}</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Overall Enrollment Rate</p>
+              <p className="text-xl font-bold text-[var(--text-primary)]">{totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0}%</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {topSchoolByLeads?.leads || 0} leads, {topSchoolByLeads?.applicationPercent || 0}% application
+                {totalEnrolled} enrolled from {totalLeads} leads
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--primary)] opacity-50" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--warning)] opacity-30" />
           </Card>
         </motion.div>
       </div>
@@ -157,18 +156,18 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
-                Leads by Source
+                Leads & Enrollment by Source
               </CardTitle>
-              <CardDescription>Performance by lead source</CardDescription>
+              <CardDescription>Leads vs enrolled per source</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" style={{ minWidth: 0 }}>
+              <div className="h-[350px]" style={{ minWidth: 0 }}>
                 {mounted && data.bySource.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={data.bySource.slice(0, 8)}
                       layout="vertical"
-                      margin={{ left: 80 }}
+                      margin={{ left: 80, right: 10 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={true} vertical={false} />
                       <XAxis
@@ -184,7 +183,9 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                         width={75}
                       />
                       <Tooltip content={<CustomTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Bar dataKey="count" name="Leads" fill="var(--primary)" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="enrolled" name="Enrolled" fill="#22C55E" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -270,7 +271,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
         </motion.div>
       </div>
 
-      {/* School Breakdown */}
+      {/* Source Breakdown Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -279,67 +280,63 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building className="w-5 h-5 text-[var(--success)]" />
-              School Breakdown
+              <GraduationCap className="w-5 h-5 text-[var(--primary)]" />
+              Source Breakdown
             </CardTitle>
-            <CardDescription>Total leads, application stage %, and PUC % per school</CardDescription>
+            <CardDescription>Leads, enrollment count, and enrollment rate per source</CardDescription>
           </CardHeader>
           <CardContent>
-            {data.topSchools.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
-                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">School</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total Leads</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Applications</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Application %</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3">PUC %</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left py-3 px-3 text-[var(--text-muted)] font-medium">Source</th>
+                    <th className="text-center py-3 px-3 text-[var(--text-muted)] font-medium">Leads</th>
+                    <th className="text-center py-3 px-3 text-[var(--text-muted)] font-medium">Applications</th>
+                    <th className="text-center py-3 px-3 text-[var(--text-muted)] font-medium">Enrolled</th>
+                    <th className="text-center py-3 px-3 text-[var(--text-muted)] font-medium">Enrollment Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.bySource.map((source) => (
+                    <tr key={source.source} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                      <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{source.label}</td>
+                      <td className="py-3 px-3 text-center text-[var(--text-secondary)]">{source.count}</td>
+                      <td className="py-3 px-3 text-center text-[var(--text-secondary)]">{source.converted}</td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`font-semibold ${source.enrolled > 0 ? 'text-green-500' : 'text-[var(--text-muted)]'}`}>
+                          {source.enrolled}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-16 h-2 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-green-500 transition-all"
+                              style={{ width: `${Math.min(source.enrollmentRate, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-[var(--text-muted)] w-8">{source.enrollmentRate}%</span>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {data.topSchools.map((school, index) => (
-                      <tr key={school.schoolId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
-                        <td className="py-3 pr-4">
-                          <span className="text-sm font-bold text-[var(--text-muted)]">{index + 1}</span>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span className="text-sm font-medium text-[var(--text-primary)]">{school.schoolName}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.leads}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.applications}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <Badge variant={school.applicationPercent >= 30 ? 'success' : school.applicationPercent >= 15 ? 'warning' : 'secondary'} size="sm">
-                            {school.applicationPercent}%
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.pucCount}</span>
-                        </td>
-                        <td className="py-3 pl-3 text-center">
-                          <Badge variant="info" size="sm">
-                            {school.pucPercent}%
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-[var(--text-muted)]">
-                No school data available
-              </div>
-            )}
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-[var(--border)] font-semibold">
+                    <td className="py-3 px-3 text-[var(--text-primary)]">Total</td>
+                    <td className="py-3 px-3 text-center text-[var(--text-primary)]">{totalLeads}</td>
+                    <td className="py-3 px-3 text-center text-[var(--text-primary)]">{data.bySource.reduce((sum, s) => sum + s.converted, 0)}</td>
+                    <td className="py-3 px-3 text-center text-green-500">{totalEnrolled}</td>
+                    <td className="py-3 px-3 text-center text-[var(--text-muted)]">{totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0}%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </motion.div>
+
     </div>
   )
 }

@@ -92,7 +92,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     school: lead?.school_id || lead?.school || "",
     education_type: lead?.education_type || "",
     education_type_custom: lead?.education_type_custom || "",
-    source_category: "digital",
+    source_category: "marketing",
     source: lead?.source || "website_form",
     funding_type: lead?.funding_type || "self_funded",
     intended_major: lead?.intended_major || "",
@@ -571,7 +571,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     const categoryMap: Record<string, string[]> = {
       direct: ["walk_in", "call_center", "whatsapp", "email"],
       events: ["school_visit", "expo", "exhibitions", "karnival"],
-      digital: ["website_form", "facebook", "instagram"],
+      marketing: ["website_form", "facebook", "instagram", "tiktok", "email_marketing", "whatsapp_ai"],
       referrals: ["current_student_referral", "staff_referral", "friend_referral"],
       outreach: ["old_contacts", "paaet_rejected", "gpa_lists"],
     }

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { resolveFilterAudience } from '@/lib/campaigns/audience-resolver'
 
 // Types
 type CampaignType = 'voice' | 'whatsapp' | 'sms' | 'email'
@@ -28,16 +29,10 @@ interface CreateCampaignRequest {
 }
 
 // GET - List campaigns
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
+export const GET = withApiHandler(
+  { context: 'campaigns', roles: ['admin'] },
+  async ({ req, supabase, logger }) => {
+    const { searchParams } = new URL(req.url)
     const type = searchParams.get('type')
     const status = searchParams.get('status')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
@@ -60,28 +55,19 @@ export async function GET(request: NextRequest) {
     const { data: campaigns, error } = await query
 
     if (error) {
-      console.error('Error fetching campaigns:', error)
+      logger.error('Error fetching campaigns', { error: error.message })
       return NextResponse.json({ error: 'Failed to fetch campaigns' }, { status: 500 })
     }
 
     return NextResponse.json({ campaigns })
-  } catch (error) {
-    console.error('Campaigns GET error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Create a new campaign
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body: CreateCampaignRequest = await request.json()
+export const POST = withApiHandler(
+  { context: 'campaigns-create', roles: ['admin'] },
+  async ({ req, supabase, user, logger }) => {
+    const body: CreateCampaignRequest = await req.json()
 
     // Validate required fields
     if (!body.name || !body.type) {
@@ -145,7 +131,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (campaignError) {
-      console.error('Error creating campaign:', campaignError)
+      logger.error('Error creating campaign', { error: campaignError.message })
       return NextResponse.json(
         { error: 'Failed to create campaign' },
         { status: 500 }
@@ -177,8 +163,7 @@ export async function POST(request: NextRequest) {
         .insert(contacts)
 
       if (contactsError) {
-        console.error('Error adding campaign contacts:', contactsError)
-        // Don't fail the request, just log the error
+        logger.error('Error adding uploaded contacts', { error: contactsError.message })
       }
 
       // Update total contacts count
@@ -188,25 +173,33 @@ export async function POST(request: NextRequest) {
         .eq('id', campaign.id)
     }
 
-    // If using filter, get count of matching leads
+    // If using filter, resolve leads and insert into campaign_contacts
     if (body.audienceSource === 'filter' && body.audienceFilter) {
-      // This would typically query leads based on the filter
-      // For now, we'll set a placeholder count
-      const filterCounts: Record<string, number> = {
-        previous_students: 127,
-        new_leads_30: 256,
-        new_leads_7: 89,
-        upcoming_appointments: 34,
-        outstanding_payments: 45,
-        no_contact: 178,
-        callback_requested: 23,
-      }
+      const audienceContacts = await resolveFilterAudience(supabase, body.audienceFilter)
 
-      const count = filterCounts[body.audienceFilter] || 0
+      if (audienceContacts.length > 0) {
+        const contacts = audienceContacts.map(contact => ({
+          campaign_id: campaign.id,
+          lead_id: contact.lead_id,
+          first_name: contact.first_name,
+          last_name: contact.last_name,
+          phone: contact.phone,
+          email: contact.email || null,
+          status: 'pending',
+        }))
+
+        const { error: contactsError } = await supabase
+          .from('campaign_contacts')
+          .insert(contacts)
+
+        if (contactsError) {
+          logger.error('Error adding filter contacts', { error: contactsError.message })
+        }
+      }
 
       await supabase
         .from('campaigns')
-        .update({ total_contacts: count })
+        .update({ total_contacts: audienceContacts.length })
         .eq('id', campaign.id)
     }
 
@@ -227,8 +220,5 @@ export async function POST(request: NextRequest) {
       success: true,
       campaign,
     })
-  } catch (error) {
-    console.error('Campaigns POST error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

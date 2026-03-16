@@ -34,21 +34,21 @@ export const leadCreateSchema = z.object({
   gpa_grade_11: z.number().min(0).max(100).optional().nullable(),
   gpa_grade_12_expected: z.number().min(0).max(100).optional().nullable(),
   intended_major: z
-    .enum(['cyber_security', 'cis', 'marketing', 'accounting', 'mis', 'network_security', 'other'])
+    .enum(['cyber_security', 'cis', 'marketing', 'accounting', 'network_security', 'other'])
     .optional()
     .nullable(),
   funding_type: z.enum(['self_funded', 'puc']).optional().nullable(),
   has_weyay_account: z.boolean().optional(),
   has_bank_account: z.boolean().optional(),
   source_category: z
-    .enum(['direct', 'events', 'digital', 'referrals', 'outreach'])
+    .enum(['direct', 'events', 'marketing', 'referrals', 'outreach'])
     .optional()
     .nullable(),
   source: z
     .enum([
       'walk_in', 'call_center', 'whatsapp', 'email',
       'school_visit', 'expo', 'exhibitions', 'karnival',
-      'website_form', 'facebook', 'instagram',
+      'website_form', 'facebook', 'instagram', 'tiktok', 'email_marketing',
       'current_student_referral', 'staff_referral', 'friend_referral',
       'old_contacts', 'paaet_rejected', 'gpa_lists',
     ])

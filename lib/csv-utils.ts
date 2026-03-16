@@ -40,7 +40,7 @@ const VALID_SOURCES: LeadSource[] = [
 ]
 
 const VALID_SOURCE_CATEGORIES: LeadSourceCategory[] = [
-  "direct", "events", "digital", "referrals", "outreach"
+  "direct", "events", "marketing", "referrals", "outreach"
 ]
 
 const VALID_FUNDING_TYPES: FundingType[] = ["self_funded", "puc"]
@@ -54,7 +54,7 @@ const VALID_GRADE_LEVELS: GradeLevel[] = ["10th", "11th", "12th"]
 const VALID_ACADEMIC_TRACKS: AcademicTrack[] = ["science", "arts"]
 
 const VALID_MAJORS: IntendedMajor[] = [
-  "cyber_security", "cis", "marketing", "accounting", "mis", "network_security", "other"
+  "cyber_security", "cis", "marketing", "accounting", "network_security", "other"
 ]
 
 // Export leads to CSV string

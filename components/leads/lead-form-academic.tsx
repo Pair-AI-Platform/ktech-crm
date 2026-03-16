@@ -47,7 +47,7 @@ import {
   School as SchoolIcon,
   type LucideIcon,
 } from "lucide-react"
-import { EDUCATION_TYPES, MAJORS, PREFERRED_COLLEGES, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type PipelineStage, type LeadStatus, type SchoolEntity } from "@/types"
+import { EDUCATION_TYPES, MAJORS, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type PipelineStage, type LeadStatus, type SchoolEntity } from "@/types"
 import { cn } from "@/lib/utils"
 import type { LeadFormData } from "./lead-form-types"
 import type { Dispatch, SetStateAction } from "react"
@@ -55,7 +55,7 @@ import type { Dispatch, SetStateAction } from "react"
 const SOURCE_CATEGORIES = [
   { value: "direct", label: "Direct", icon: "📞" },
   { value: "events", label: "Events", icon: "🎪" },
-  { value: "digital", label: "Digital", icon: "💻" },
+  { value: "marketing", label: "Marketing", icon: "📱" },
   { value: "referrals", label: "Referrals", icon: "👥" },
   { value: "outreach", label: "Outreach", icon: "📣" },
 ]
@@ -180,7 +180,7 @@ export function LeadFormAcademic({
                     const categoryMap: Record<string, string> = {
                       direct: "walk_in",
                       events: "school_visit",
-                      digital: "website_form",
+                      marketing: "website_form",
                       referrals: "current_student_referral",
                       outreach: "old_contacts",
                     }
@@ -522,100 +522,18 @@ export function LeadFormAcademic({
                 <SelectValue placeholder="Select term" />
               </SelectTrigger>
               <SelectContent>
-                {/* Open terms first */}
-                {semesters.filter(s => s.is_active && s.is_open).length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Open for Enrollment</div>
-                    {semesters.filter(s => s.is_active && s.is_open).map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id}>
-                        {semester.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-                {/* Other active terms (closed) */}
-                {semesters.filter(s => s.is_active && !s.is_open).length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mt-1">Closed</div>
-                    {semesters.filter(s => s.is_active && !s.is_open).map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id} className="opacity-60">
-                        {semester.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-                {/* Archived terms */}
-                {semesters.filter(s => !s.is_active).length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mt-1">Archived</div>
-                    {semesters.filter(s => !s.is_active).map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id} className="opacity-40">
-                        {semester.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
+                {semesters.filter(s => s.is_active).map((semester) => (
+                  <SelectItem key={semester.id} value={semester.id}>
+                    {semester.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            {semesters.filter(s => s.is_active && s.is_open).length === 0 && semesters.length > 0 && (
-              <p className="text-xs text-amber-600">No terms are currently open for enrollment.</p>
-            )}
             {errors.semester_id && (
               <p className="text-xs text-red-500">{errors.semester_id}</p>
             )}
           </div>
 
-          {/* Ministry Blocked Section */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Ban className="w-4 h-4 text-orange-500" />
-                <Label className="text-sm font-medium">Ministry Blocked</Label>
-              </div>
-              <Switch
-                checked={formData.ministry_blocked}
-                onCheckedChange={(checked) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    ministry_blocked: checked,
-                    ministry_block_reasons: checked ? prev.ministry_block_reasons : []
-                  }))
-                }}
-              />
-            </div>
-            {formData.ministry_blocked && (
-              <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                <p className="text-xs text-[var(--text-muted)] mb-2">Select block reason(s):</p>
-                <div className="flex flex-wrap gap-2">
-                  {MINISTRY_BLOCK_REASONS.map((reason) => {
-                    const isSelected = formData.ministry_block_reasons.includes(reason.value)
-                    return (
-                      <button
-                        key={reason.value}
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({
-                            ...prev,
-                            ministry_block_reasons: isSelected
-                              ? prev.ministry_block_reasons.filter(r => r !== reason.value)
-                              : [...prev.ministry_block_reasons, reason.value]
-                          }))
-                        }}
-                        className={cn(
-                          "px-3 py-1.5 text-sm rounded-lg border transition-all",
-                          isSelected
-                            ? "bg-orange-500 text-white border-orange-500"
-                            : "bg-[var(--bg-elevated)] text-[var(--text-primary)] border-[var(--border)] hover:border-orange-500/50"
-                        )}
-                      >
-                        {reason.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -662,23 +580,6 @@ export function LeadFormAcademic({
                 onChange={(e) => handleChange("preferred_major", e.target.value)}
                 placeholder="Enter preferred major"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="preferred_college">Preferred College</Label>
-              <Select
-                value={formData.preferred_college ?? ""}
-                onValueChange={(value) => handleChange("preferred_college", value === "__clear__" ? "" : value)}
-              >
-                <SelectTrigger id="preferred_college">
-                  <SelectValue placeholder="Select college" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__clear__">— None —</SelectItem>
-                  {PREFERRED_COLLEGES.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
