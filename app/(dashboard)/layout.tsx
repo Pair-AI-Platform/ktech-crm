@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { Suspense } from "react"
 import { getUserProfile } from "@/lib/supabase/server"
 import { DashboardShell } from "@/components/layout/dashboard-shell"

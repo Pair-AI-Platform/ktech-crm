@@ -98,7 +98,7 @@ export function useReRegisterLeads() {
         const data = await res.json()
         throw new Error(data.error || "Failed to re-register leads")
       }
-      return res.json() as Promise<{ count: number }>
+      return res.json() as Promise<{ count: number; skipped?: number; skippedNames?: string[] }>
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })

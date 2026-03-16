@@ -201,12 +201,16 @@ function TransferDialog({
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [selectedSemester, setSelectedSemester] = useState<string>("")
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ count: number; skipped?: number; skippedNames?: string[] } | null>(null)
 
   useEffect(() => {
     if (isOpen) {
       setSelectedAgent(null)
       setSelectedSemester(activeSemesters[0]?.id || "")
       setSuccess(false)
+      setError(null)
+      setResult(null)
       setLoadingAgents(true)
 
       async function fetchAgents() {
@@ -224,15 +228,21 @@ function TransferDialog({
   }, [isOpen, activeSemesters])
 
   const handleTransfer = async () => {
-    await reRegister.mutateAsync({
-      leadIds: selectedLeadIds,
-      targetSemesterId: selectedSemester || undefined,
-      assignedTo: selectedAgent || undefined,
-    })
-    setSuccess(true)
-    setTimeout(() => {
-      onClose()
-    }, 1500)
+    try {
+      setError(null)
+      const res = await reRegister.mutateAsync({
+        leadIds: selectedLeadIds,
+        targetSemesterId: selectedSemester || undefined,
+        assignedTo: selectedAgent || undefined,
+      })
+      setResult(res)
+      setSuccess(true)
+      setTimeout(() => {
+        onClose()
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to transfer leads")
+    }
   }
 
   return (
@@ -260,8 +270,13 @@ function TransferDialog({
                 <CheckCircle2 className="w-8 h-8 text-[var(--success)]" />
               </div>
               <p className="font-medium text-[var(--text-primary)]">
-                {selectedCount} lead{selectedCount !== 1 ? "s" : ""} transferred!
+                {result?.count ?? selectedCount} lead{(result?.count ?? selectedCount) !== 1 ? "s" : ""} transferred!
               </p>
+              {result?.skipped && result.skipped > 0 && (
+                <p className="text-sm text-[var(--text-muted)] text-center">
+                  {result.skipped} skipped (already in active cycle)
+                </p>
+              )}
             </motion.div>
           ) : (
             <>
@@ -350,6 +365,12 @@ function TransferDialog({
                 </p>
               </div>
             </>
+          )}
+
+          {error && (
+            <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
           )}
         </DialogBody>
 

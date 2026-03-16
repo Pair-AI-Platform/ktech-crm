@@ -64,8 +64,31 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'No leads found' }, { status: 404 })
     }
 
+    // Check for existing leads with same civil_id to avoid unique constraint violations
+    const civilIds = sourceLeads.map((l) => l.civil_id).filter(Boolean)
+    let existingCivilIds = new Set<string>()
+    if (civilIds.length > 0) {
+      const { data: existing } = await supabase
+        .from('leads')
+        .select('civil_id')
+        .in('civil_id', civilIds)
+      existingCivilIds = new Set((existing || []).map((e) => e.civil_id))
+    }
+
+    // Split leads into transferable and skipped (already exist)
+    const skippedLeads = sourceLeads.filter((l) => l.civil_id && existingCivilIds.has(l.civil_id))
+    const transferableLeads = sourceLeads.filter((l) => !l.civil_id || !existingCivilIds.has(l.civil_id))
+
+    if (transferableLeads.length === 0) {
+      const names = skippedLeads.map((l) => `${l.first_name} ${l.last_name}`).join(', ')
+      return NextResponse.json(
+        { error: `All selected leads already exist in the active cycle: ${names}` },
+        { status: 409 }
+      )
+    }
+
     // Build new leads with kept fields, reset pipeline fields
-    const newLeads = sourceLeads.map((lead) => ({
+    const newLeads = transferableLeads.map((lead) => ({
       // Kept fields
       first_name: lead.first_name,
       last_name: lead.last_name,
@@ -118,10 +141,15 @@ export const POST = withApiHandler(
 
     logger.info('Re-registered leads', {
       count: created?.length ?? 0,
+      skipped: skippedLeads.length,
       sourceSemester: sourceLeads[0]?.semester_id,
       targetSemester: activeSemester.id,
     })
 
-    return NextResponse.json({ count: created?.length ?? 0 })
+    return NextResponse.json({
+      count: created?.length ?? 0,
+      skipped: skippedLeads.length,
+      skippedNames: skippedLeads.map((l) => `${l.first_name} ${l.last_name}`),
+    })
   }
 )
