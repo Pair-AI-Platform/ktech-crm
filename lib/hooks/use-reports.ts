@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
-import { isDemoMode, getDemoLeads, getDemoStudents, getDemoAppointments, DEMO_AGENTS } from "@/lib/demo-data"
+import { isDemoMode, getDemoLeads, getDemoStudents, getDemoAppointments, DEMO_AGENTS, DEMO_LOST_REASONS } from "@/lib/demo-data"
 import type {
   Lead,
   Student,
@@ -19,8 +19,10 @@ import type {
   IntendedMajor,
   DiscountType,
   Governorate,
+  AppointmentType,
+  AppointmentStatus,
 } from "@/types"
-import { SCHOOLS, GOVERNORATES } from "@/types"
+import { SCHOOLS, GOVERNORATES, APPOINTMENT_TYPES, APPOINTMENT_STATUSES } from "@/types"
 
 // =============================================
 // FILTER TYPES
@@ -79,6 +81,17 @@ export interface PaymentReportData {
   fileStageByAgent: FileStageAgentBreakdown[]
 }
 
+export interface RetestStudentData {
+  studentId: string
+  studentName: string
+  previousLevel: PlacementLevel | null
+  currentLevel: PlacementLevel | null
+  testDate: string | null
+  passed: boolean | null
+  appointmentDate: string | null
+  status: 'improved' | 'same' | 'pending'
+}
+
 export interface TestCenterReportData {
   totalTested: number
   foundation1: number
@@ -86,6 +99,14 @@ export interface TestCenterReportData {
   majors: number
   byLevel: Array<{ level: PlacementLevel; count: number; percent: number }>
   passRate: number
+  retest: {
+    totalRetests: number
+    completed: number
+    improved: number
+    same: number
+    pending: number
+    students: RetestStudentData[]
+  }
 }
 
 export interface PUCReportData {
@@ -94,7 +115,10 @@ export interface PUCReportData {
   rejected: number
   pending: number
   conversionRate: number
-  byStage: Array<{ stage: string; count: number }>
+  filesOpened: number
+  documentsSubmitted: number
+  applicationSubmitted: number
+  feePaid: number
   convertedToSF: number
 }
 
@@ -115,9 +139,13 @@ export interface EnrollmentReportData {
   }
 }
 
+export type PipelineFunnelItem = { stage: PipelineStage; label: string; count: number; percent: number; movesIn: number; movesOut: number }
+
 export interface ExecutiveReportData {
   targetProgress: { current: number; target: number; percent: number }
-  pipelineFunnel: Array<{ stage: PipelineStage; label: string; count: number; percent: number; movesIn: number; movesOut: number }>
+  pipelineFunnel: PipelineFunnelItem[]
+  sfPipelineFunnel: PipelineFunnelItem[]
+  pucPipelineFunnel: PipelineFunnelItem[]
   todayNumbers: {
     newLeads: number
     appointments: number
@@ -128,12 +156,17 @@ export interface ExecutiveReportData {
     appointments: { current: number; previous: number; change: number | null }
     enrollments: { current: number; previous: number; change: number | null }
   }
-  weeklyTrend: Array<{ date: string; leads: number; enrolled: number }>
+  agentPerformance: Array<{ agent: string; leads: number; files: number }>
   totalStageChanges: number
+  weeklyTrend: Array<{ day: string; leads: number; enrolled: number }>
+  byFunding: {
+    puc: { totalLeads: number; enrolled: number; todayLeads: number; todayEnrolled: number; targetCurrent: number; targetTotal: number; targetPercent: number; leadsChange: number | null; weeklyTrend: number[] }
+    sf: { totalLeads: number; enrolled: number; todayLeads: number; todayEnrolled: number; targetCurrent: number; targetTotal: number; targetPercent: number; leadsChange: number | null; weeklyTrend: number[] }
+  }
 }
 
 export interface ChannelReportData {
-  bySource: Array<{ source: LeadSource; label: string; count: number; converted: number; conversionRate: number; enrolled: number; enrollmentRate: number }>
+  bySource: Array<{ source: LeadSource; label: string; count: number; converted: number; conversionRate: number; files: number; enrolled: number; enrollmentRate: number }>
   byCategory: Array<{ category: LeadSourceCategory; label: string; count: number; percent: number }>
   topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number; enrolled: number; enrolledPercent: number }>
   bySchool: Array<{ schoolId: string; label: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
@@ -202,6 +235,46 @@ export interface TimeToConversionData {
   count: number
 }
 
+export interface StageChangeAnalysisData {
+  /** Distribution: how many leads had N unique-day stage changes */
+  distribution: Array<{ changes: number; count: number }>
+  /** Average unique-day stage changes by current pipeline stage */
+  byCurrentStage: Array<{ stage: string; stageLabel: string; avgChanges: number; count: number }>
+  /** Average unique-day stage changes by agent */
+  byAgent: Array<{ agentId: string; agentName: string; avatarUrl: string | null; avgChanges: number; totalChanges: number; leadCount: number }>
+  /** Overall stats */
+  totalLeadsWithChanges: number
+  overallAvgChanges: number
+  maxChanges: number
+}
+
+export interface CalendarReportData {
+  // Summary KPIs
+  totalAppointments: number
+  totalCallbacks: number
+  completedAppointments: number
+  completedCallbacks: number
+  cancelledAppointments: number
+  cancelledCallbacks: number
+  noAnswerAppointments: number
+  noAnswerCallbacks: number
+  // Appointments breakdown
+  appointmentsByType: Array<{ type: string; label: string; total: number; completed: number; cancelled: number; noAnswer: number; pending: number }>
+  appointmentsByStatus: Array<{ status: string; label: string; count: number; percent: number }>
+  appointmentsByAgent: Array<{ agentId: string; agentName: string; avatarUrl: string | null; total: number; completed: number; cancelled: number; completionRate: number }>
+  appointmentsByDay: Array<{ date: string; appointments: number; callbacks: number }>
+  // Callbacks breakdown
+  callbacksByStatus: Array<{ status: string; label: string; count: number; percent: number }>
+  callbacksByAgent: Array<{ agentId: string; agentName: string; avatarUrl: string | null; total: number; completed: number; cancelled: number; completionRate: number }>
+  // Rates
+  appointmentCompletionRate: number
+  callbackCompletionRate: number
+  appointmentAttendanceRate: number
+  callbackAttendanceRate: number
+  // Modality
+  appointmentsByModality: Array<{ modality: string; label: string; count: number; percent: number }>
+}
+
 // =============================================
 // DETAILED ANALYTICS TYPES
 // =============================================
@@ -266,6 +339,29 @@ export interface DetailedAnalyticsData {
   enrolledByBreakdown: EnrolledByBreakdownData
 }
 
+export interface LostReportData {
+  totalLost: number
+  sfLost: number
+  pucLost: number
+  lostRate: number
+  byReason: Array<{ reasonId: string; reason: string; category: string; count: number; percent: number }>
+  byStage: Array<{ stage: string; stageLabel: string; count: number; percent: number; totalInStage: number; lostRatio: number }>
+  byAgent: Array<{
+    agentId: string
+    agentName: string
+    avatarUrl: string | null
+    sfLost: number
+    pucLost: number
+    total: number
+  }>
+  topReason: string | null
+  reasonsByStage: Array<{
+    stage: string
+    stageLabel: string
+    reasons: Array<{ reason: string; count: number; percent: number }>
+  }>
+}
+
 export interface ReportData {
   payment: PaymentReportData
   testCenter: TestCenterReportData
@@ -279,6 +375,9 @@ export interface ReportData {
   agentComparison: AgentComparisonData[]
   timeToConversion: TimeToConversionData[]
   detailedAnalytics: DetailedAnalyticsData
+  stageChangeAnalysis: StageChangeAnalysisData
+  calendar: CalendarReportData
+  lost: LostReportData
 }
 
 // =============================================
@@ -429,7 +528,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           studentsData,
           appointmentsData,
           agentsData,
-          [], // No lost reasons in demo
+          DEMO_LOST_REASONS,
           prevLeads,
           prevAppointments,
           prevStudents,
@@ -530,7 +629,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
       // Fetch stage change activities for status change count per agent
       const stageChangesQuery = supabase
         .from("activities")
-        .select("id, created_by, metadata")
+        .select("id, lead_id, created_by, created_at, metadata")
         .eq("activity_type", "stage_change")
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
@@ -668,7 +767,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         end,
         targetMode,
         statusChangesMap,
-        (stageChangesData || []) as Array<{ metadata: Record<string, string> | null }>
+        (stageChangesData || []) as Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }>
       )
     },
     staleTime: 60_000,
@@ -696,7 +795,7 @@ function calculateReports(
   _endDate: Date,
   targetMode: TargetMode = 'simple',
   statusChangesMap: Map<string, number> = new Map(),
-  stageChangesRaw: Array<{ metadata: Record<string, string> | null }> = []
+  stageChangesRaw: Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }> = []
 ): ReportData {
   const today = new Date().toISOString().split('T')[0]
   const weekAgo = getWeekAgo()
@@ -775,11 +874,72 @@ function calculateReports(
     })),
     passRate: testedStudents.length > 0
       ? Math.round((testedStudents.filter(s => s.placement_test_passed).length / testedStudents.length) * 100)
-      : 0
+      : 0,
+    retest: (() => {
+      // Find all retest appointments
+      const retestAppointments = appointments.filter(a => a.appointment_type.includes('retest'))
+      const completedRetests = retestAppointments.filter(a => a.status === 'completed')
+      const pendingRetests = retestAppointments.filter(a => ['scheduled', 'confirmed', 'on_the_way', 'will_see'].includes(a.status))
+
+      // Build retest student data by matching appointments to students/leads
+      const retestStudents: RetestStudentData[] = retestAppointments.map(appt => {
+        // Find the student linked to this appointment
+        const student = appt.student_id
+          ? students.find(s => s.id === appt.student_id)
+          : appt.lead_id
+            ? students.find(s => s.lead_id === appt.lead_id)
+            : undefined
+
+        // Try to get previous level from placement_test_score JSONB
+        const previousLevel = (student?.placement_test_score as Record<string, unknown> | undefined)?.previous_level as PlacementLevel | undefined
+
+        const isCompleted = appt.status === 'completed'
+        let status: 'improved' | 'same' | 'pending' = 'pending'
+        if (isCompleted && student?.placement_level) {
+          const levelOrder: Record<string, number> = { foundation_1: 1, foundation_2: 2, majors: 3 }
+          const prevRank = previousLevel ? (levelOrder[previousLevel] ?? 0) : 0
+          const currRank = levelOrder[student.placement_level] ?? 0
+          status = currRank > prevRank ? 'improved' : 'same'
+        }
+
+        const studentName = student
+          ? `${student.first_name} ${student.last_name}`
+          : appt.lead
+            ? `${appt.lead.first_name} ${appt.lead.last_name}`
+            : 'Unknown'
+
+        return {
+          studentId: student?.id ?? appt.lead_id ?? appt.id,
+          studentName,
+          previousLevel: previousLevel ?? null,
+          currentLevel: student?.placement_level ?? null,
+          testDate: student?.placement_test_date ?? null,
+          passed: student?.placement_test_passed ?? null,
+          appointmentDate: appt.scheduled_date,
+          status,
+        }
+      })
+
+      const improved = retestStudents.filter(s => s.status === 'improved').length
+      const same = retestStudents.filter(s => s.status === 'same').length
+
+      return {
+        totalRetests: retestAppointments.length,
+        completed: completedRetests.length,
+        improved,
+        same,
+        pending: pendingRetests.length,
+        students: retestStudents,
+      }
+    })()
   }
 
   // PUC Report
   const pucStudents = students.filter(s => s.funding_type === 'puc')
+  const pucLeadsAll = leads.filter(l => l.funding_type === 'puc')
+  const pucFileStages = ['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+  const pucDocStages = ['puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+  const pucAppStages = ['puc_application_submission', 'applicant', 'enrolled']
   const puc: PUCReportData = {
     totalApplied: pucStudents.length,
     accepted: pucStudents.filter(s => s.puc_decision === 'accepted').length,
@@ -788,13 +948,10 @@ function calculateReports(
     conversionRate: pucStudents.length > 0
       ? Math.round((pucStudents.filter(s => s.puc_decision === 'accepted').length / pucStudents.length) * 100)
       : 0,
-    byStage: [
-      { stage: 'Ktech Application', count: pucStudents.filter(s => s.puc_stage === 'ktech_application').length },
-      { stage: 'PACI Verification', count: pucStudents.filter(s => s.puc_stage === 'paci_verification').length },
-      { stage: 'PUC Submission', count: pucStudents.filter(s => s.puc_stage === 'puc_submission').length },
-      { stage: 'PUC Decision', count: pucStudents.filter(s => s.puc_stage === 'puc_decision').length },
-      { stage: 'Enrolled', count: pucStudents.filter(s => s.puc_stage === 'enrolled').length },
-    ],
+    filesOpened: pucLeadsAll.filter(l => pucFileStages.includes(l.pipeline_stage)).length,
+    documentsSubmitted: pucLeadsAll.filter(l => pucDocStages.includes(l.pipeline_stage)).length,
+    applicationSubmitted: pucLeadsAll.filter(l => pucAppStages.includes(l.pipeline_stage)).length,
+    feePaid: pucStudents.filter(s => s.puc_fee_paid).length,
     convertedToSF: pucStudents.filter(s => s.puc_converted_to_sf).length
   }
 
@@ -842,18 +999,13 @@ function calculateReports(
     new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'File', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost', puc_document_submission: 'Documents', puc_application_submission: 'Submission'
   }
 
-  // Generate weekly trend (last 7 days)
-  const weeklyTrend: Array<{ date: string; leads: number; enrolled: number }> = []
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    const dateStr = date.toISOString().split('T')[0]
-    weeklyTrend.push({
-      date: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      leads: leads.filter(l => l.created_at.split('T')[0] === dateStr).length,
-      enrolled: students.filter(s => s.enrolled_at?.split('T')[0] === dateStr).length
-    })
-  }
+  // Generate agent performance (leads & files per agent)
+  const fileStages: PipelineStage[] = ['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+  const agentPerformance = agents.map(a => ({
+    agent: a.full_name.split(' ')[0],
+    leads: leads.filter(l => l.assigned_to === a.id).length,
+    files: leads.filter(l => l.assigned_to === a.id && fileStages.includes(l.pipeline_stage)).length,
+  })).sort((a, b) => b.leads - a.leads)
 
   // Count stage transitions (moves in / moves out per stage)
   const movesInMap = new Map<string, number>()
@@ -871,14 +1023,60 @@ function calculateReports(
       target: totalTarget,
       percent: totalTarget > 0 ? Math.round((activeStudents.length / totalTarget) * 100) : 0
     },
-    pipelineFunnel: pipelineStages.filter(s => s !== 'lost').map(stage => ({
-      stage,
-      label: stageLabels[stage],
-      count: leads.filter(l => l.pipeline_stage === stage).length,
-      percent: leads.length > 0 ? Math.round((leads.filter(l => l.pipeline_stage === stage).length / leads.length) * 100) : 0,
-      movesIn: movesInMap.get(stage) || 0,
-      movesOut: movesOutMap.get(stage) || 0,
-    })),
+    pipelineFunnel: (() => {
+      const funnelStages = pipelineStages.filter(s => s !== 'lost' && s !== 'withdraw')
+      const funnelTotal = leads.filter(l => l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw').length
+      const stageCounts = funnelStages.map(stage => leads.filter(l => l.pipeline_stage === stage).length)
+      return funnelStages.map((stage, index) => {
+        const count = stageCounts[index]
+        // Cumulative: leads at this stage or beyond (sum from this index to end)
+        const cumulativeCount = stageCounts.slice(index).reduce((sum, c) => sum + c, 0)
+        return {
+          stage,
+          label: stageLabels[stage],
+          count,
+          percent: funnelTotal > 0 ? Math.round((cumulativeCount / funnelTotal) * 100) : 0,
+          movesIn: movesInMap.get(stage) || 0,
+          movesOut: movesOutMap.get(stage) || 0,
+        }
+      })
+    })(),
+    sfPipelineFunnel: (() => {
+      const sfStages: PipelineStage[] = ['new', 'contacted', 'test', 'application', 'applicant', 'enrolled']
+      const sfLeads = leads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
+      const sfTotal = sfLeads.length
+      const sfCounts = sfStages.map(stage => sfLeads.filter(l => l.pipeline_stage === stage).length)
+      return sfStages.map((stage, index) => {
+        const count = sfCounts[index]
+        const cumulativeCount = sfCounts.slice(index).reduce((sum, c) => sum + c, 0)
+        return {
+          stage,
+          label: stageLabels[stage],
+          count,
+          percent: sfTotal > 0 ? Math.round((cumulativeCount / sfTotal) * 100) : 0,
+          movesIn: movesInMap.get(stage) || 0,
+          movesOut: movesOutMap.get(stage) || 0,
+        }
+      })
+    })(),
+    pucPipelineFunnel: (() => {
+      const pucStages: PipelineStage[] = ['new', 'contacted', 'visit', 'test', 'application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+      const pucLeads = leads.filter(l => l.funding_type === 'puc' && l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
+      const pucTotal = pucLeads.length
+      const pucCounts = pucStages.map(stage => pucLeads.filter(l => l.pipeline_stage === stage).length)
+      return pucStages.map((stage, index) => {
+        const count = pucCounts[index]
+        const cumulativeCount = pucCounts.slice(index).reduce((sum, c) => sum + c, 0)
+        return {
+          stage,
+          label: stageLabels[stage],
+          count,
+          percent: pucTotal > 0 ? Math.round((cumulativeCount / pucTotal) * 100) : 0,
+          movesIn: movesInMap.get(stage) || 0,
+          movesOut: movesOutMap.get(stage) || 0,
+        }
+      })
+    })(),
     todayNumbers: {
       newLeads: leads.filter(l => l.created_at.split('T')[0] === today).length,
       appointments: appointments.filter(a => a.scheduled_date === today).length,
@@ -901,8 +1099,65 @@ function calculateReports(
         change: calcChange(thisWeekEnrollments.length, prevStudents.length)
       }
     },
-    weeklyTrend,
-    totalStageChanges: stageChangesRaw.length
+    agentPerformance,
+    totalStageChanges: stageChangesRaw.length,
+    weeklyTrend: Array.from({ length: 7 }, (_, i) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (6 - i))
+      const dateStr = date.toISOString().split('T')[0]
+      const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' })
+      return {
+        day: dayLabel,
+        leads: leads.filter(l => l.created_at.split('T')[0] === dateStr).length,
+        enrolled: students.filter(s => s.enrolled_at?.split('T')[0] === dateStr).length,
+      }
+    }),
+    byFunding: (() => {
+      const pucLeads = leads.filter(l => l.funding_type === 'puc')
+      const sfLeads = leads.filter(l => l.funding_type === 'self_funded')
+      const pucStudents = activeStudents.filter(s => s.funding_type === 'puc')
+      const sfStudents = activeStudents.filter(s => s.funding_type === 'self_funded')
+      const totalTargetPuc = agents.reduce((sum, a) => sum + (a.target_puc || 0), 0)
+      const totalTargetSf = agents.reduce((sum, a) => sum + (a.target_sf || 0), 0)
+      const pucThisWeek = thisWeekLeads.filter(l => l.funding_type === 'puc')
+      const sfThisWeek = thisWeekLeads.filter(l => l.funding_type === 'self_funded')
+      const pucPrevWeek = prevLeads.filter(l => l.funding_type === 'puc')
+      const sfPrevWeek = prevLeads.filter(l => l.funding_type === 'self_funded')
+      return {
+        puc: {
+          totalLeads: pucLeads.length,
+          enrolled: pucStudents.length,
+          todayLeads: pucLeads.filter(l => l.created_at.split('T')[0] === today).length,
+          todayEnrolled: students.filter(s => s.funding_type === 'puc' && s.enrolled_at?.split('T')[0] === today).length,
+          targetCurrent: pucStudents.length,
+          targetTotal: totalTargetPuc,
+          targetPercent: totalTargetPuc > 0 ? Math.round((pucStudents.length / totalTargetPuc) * 100) : 0,
+          leadsChange: calcChange(pucThisWeek.length, pucPrevWeek.length),
+          weeklyTrend: Array.from({ length: 7 }, (_, i) => {
+            const date = new Date()
+            date.setDate(date.getDate() - (6 - i))
+            const dateStr = date.toISOString().split('T')[0]
+            return pucLeads.filter(l => l.created_at.split('T')[0] === dateStr).length
+          }),
+        },
+        sf: {
+          totalLeads: sfLeads.length,
+          enrolled: sfStudents.length,
+          todayLeads: sfLeads.filter(l => l.created_at.split('T')[0] === today).length,
+          todayEnrolled: students.filter(s => s.funding_type === 'self_funded' && s.enrolled_at?.split('T')[0] === today).length,
+          targetCurrent: sfStudents.length,
+          targetTotal: totalTargetSf,
+          targetPercent: totalTargetSf > 0 ? Math.round((sfStudents.length / totalTargetSf) * 100) : 0,
+          leadsChange: calcChange(sfThisWeek.length, sfPrevWeek.length),
+          weeklyTrend: Array.from({ length: 7 }, (_, i) => {
+            const date = new Date()
+            date.setDate(date.getDate() - (6 - i))
+            const dateStr = date.toISOString().split('T')[0]
+            return sfLeads.filter(l => l.created_at.split('T')[0] === dateStr).length
+          }),
+        },
+      }
+    })(),
   }
 
   // Channel Performance
@@ -947,6 +1202,8 @@ function calculateReports(
 
   const channel: ChannelReportData = {
     bySource: Object.entries(sourceGroups).map(([source, sourceLeads]) => {
+      const fileStages: PipelineStage[] = ['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+      const files = sourceLeads.filter(l => fileStages.includes(l.pipeline_stage)).length
       const enrolled = sourceLeads.filter(l => l.pipeline_stage === 'enrolled').length
       return {
         source: source as LeadSource,
@@ -956,6 +1213,7 @@ function calculateReports(
         conversionRate: sourceLeads.length > 0
           ? Math.round((sourceLeads.filter(l => l.pipeline_stage === 'application').length / sourceLeads.length) * 100)
           : 0,
+        files,
         enrolled,
         enrollmentRate: sourceLeads.length > 0
           ? Math.round((enrolled / sourceLeads.length) * 100)
@@ -1103,7 +1361,7 @@ function calculateReports(
   // Demographics
   const majorLabels: Record<IntendedMajor, string> = {
     cyber_security: 'Cyber Security', cis: 'CIS', marketing: 'Marketing',
-    accounting: 'Accounting', mis: 'MIS', network_security: 'Network Security', other: 'Other'
+    accounting: 'Accounting', network_security: 'Network Security', other: 'Other'
   }
   const discountLabels: Record<DiscountType, string> = {
     kuwaiti_new_certificate: 'Kuwaiti New Certificate (25%)', kuwaiti_old_certificate: 'Kuwaiti Old Certificate (20%)', non_kuwaiti: 'Non-Kuwaiti (37.5%)',
@@ -1427,6 +1685,333 @@ function calculateReports(
     enrolledByBreakdown,
   }
 
+  // =============================================
+  // STAGE CHANGE ANALYSIS (deduplicated per lead per day)
+  // =============================================
+  const leadChangeDays = new Map<string, Set<string>>() // lead_id -> Set of date strings
+  const leadAgent = new Map<string, string>() // lead_id -> last known created_by (agent)
+  for (const activity of stageChangesRaw) {
+    if (!activity.lead_id) continue
+    const dateStr = activity.created_at.split('T')[0]
+    if (!leadChangeDays.has(activity.lead_id)) {
+      leadChangeDays.set(activity.lead_id, new Set())
+    }
+    leadChangeDays.get(activity.lead_id)!.add(dateStr)
+    if (activity.created_by) {
+      leadAgent.set(activity.lead_id, activity.created_by)
+    }
+  }
+
+  // Distribution: how many leads had N unique-day changes
+  const changeCounts = new Map<number, number>() // N changes -> count of leads
+  let totalChangeDays = 0
+  let maxChanges = 0
+  for (const [, days] of leadChangeDays) {
+    const count = days.size
+    totalChangeDays += count
+    if (count > maxChanges) maxChanges = count
+    changeCounts.set(count, (changeCounts.get(count) || 0) + 1)
+  }
+  const distribution = Array.from(changeCounts.entries())
+    .map(([changes, count]) => ({ changes, count }))
+    .sort((a, b) => a.changes - b.changes)
+
+  // By current pipeline stage
+  const stageChangeCounts = new Map<string, { total: number; leadCount: number }>()
+  for (const [leadId, days] of leadChangeDays) {
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead) continue
+    const stage = lead.pipeline_stage
+    if (!stageChangeCounts.has(stage)) {
+      stageChangeCounts.set(stage, { total: 0, leadCount: 0 })
+    }
+    const entry = stageChangeCounts.get(stage)!
+    entry.total += days.size
+    entry.leadCount++
+  }
+  const byCurrentStage = Array.from(stageChangeCounts.entries())
+    .map(([stage, data]) => ({
+      stage,
+      stageLabel: stageLabels[stage as PipelineStage] || stage,
+      avgChanges: data.leadCount > 0 ? Math.round((data.total / data.leadCount) * 10) / 10 : 0,
+      count: data.leadCount,
+    }))
+    .sort((a, b) => b.avgChanges - a.avgChanges)
+
+  // By agent
+  const agentChangeCounts = new Map<string, { total: number; leadIds: Set<string> }>()
+  for (const [leadId, days] of leadChangeDays) {
+    const agentId = leadAgent.get(leadId)
+    if (!agentId) continue
+    if (!agentChangeCounts.has(agentId)) {
+      agentChangeCounts.set(agentId, { total: 0, leadIds: new Set() })
+    }
+    const entry = agentChangeCounts.get(agentId)!
+    entry.total += days.size
+    entry.leadIds.add(leadId)
+  }
+  const byAgent = agents
+    .map(agent => {
+      const data = agentChangeCounts.get(agent.id)
+      if (!data || data.leadIds.size === 0) return null
+      return {
+        agentId: agent.id,
+        agentName: agent.full_name,
+        avatarUrl: agent.avatar_url || null,
+        avgChanges: Math.round((data.total / data.leadIds.size) * 10) / 10,
+        totalChanges: data.total,
+        leadCount: data.leadIds.size,
+      }
+    })
+    .filter((a): a is NonNullable<typeof a> => a !== null)
+    .sort((a, b) => b.totalChanges - a.totalChanges)
+
+  const stageChangeAnalysis: StageChangeAnalysisData = {
+    distribution,
+    byCurrentStage,
+    byAgent,
+    totalLeadsWithChanges: leadChangeDays.size,
+    overallAvgChanges: leadChangeDays.size > 0 ? Math.round((totalChangeDays / leadChangeDays.size) * 10) / 10 : 0,
+    maxChanges,
+  }
+
+  // Calendar Report — appointments vs callbacks
+  const regularAppointments = appointments.filter(a => !a.is_callback)
+  const callbacks = appointments.filter(a => a.is_callback)
+
+  const countByStatus = (list: Appointment[], status: AppointmentStatus) => list.filter(a => a.status === status).length
+
+  const appointmentsByType: CalendarReportData['appointmentsByType'] = APPOINTMENT_TYPES.map(t => {
+    const ofType = regularAppointments.filter(a => a.appointment_type.includes(t.value))
+    return {
+      type: t.value,
+      label: t.label,
+      total: ofType.length,
+      completed: ofType.filter(a => a.status === 'completed').length,
+      cancelled: ofType.filter(a => a.status === 'cancelled').length,
+      noAnswer: ofType.filter(a => a.status === 'no_answer').length,
+      pending: ofType.filter(a => ['scheduled', 'confirmed', 'on_the_way', 'will_see'].includes(a.status)).length,
+    }
+  }).filter(t => t.total > 0)
+
+  const buildStatusBreakdown = (list: Appointment[]) =>
+    APPOINTMENT_STATUSES.map(s => ({
+      status: s.value,
+      label: s.label,
+      count: list.filter(a => a.status === s.value).length,
+      percent: list.length > 0 ? Math.round((list.filter(a => a.status === s.value).length / list.length) * 100) : 0,
+    })).filter(s => s.count > 0)
+
+  const buildAgentBreakdown = (list: Appointment[]) => {
+    const agentMap = new Map<string, { total: number; completed: number; cancelled: number }>()
+    for (const a of list) {
+      const agentId = a.assigned_agent || 'unassigned'
+      if (!agentMap.has(agentId)) agentMap.set(agentId, { total: 0, completed: 0, cancelled: 0 })
+      const entry = agentMap.get(agentId)!
+      entry.total++
+      if (a.status === 'completed') entry.completed++
+      if (a.status === 'cancelled') entry.cancelled++
+    }
+    return agents
+      .filter(agent => agentMap.has(agent.id))
+      .map(agent => {
+        const d = agentMap.get(agent.id)!
+        return {
+          agentId: agent.id,
+          agentName: agent.full_name,
+          avatarUrl: agent.avatar_url || null,
+          total: d.total,
+          completed: d.completed,
+          cancelled: d.cancelled,
+          completionRate: d.total > 0 ? Math.round((d.completed / d.total) * 100) : 0,
+        }
+      })
+      .sort((a, b) => b.total - a.total)
+  }
+
+  // Daily breakdown
+  const dayMap = new Map<string, { appointments: number; callbacks: number }>()
+  for (const a of appointments) {
+    const date = a.scheduled_date
+    if (!dayMap.has(date)) dayMap.set(date, { appointments: 0, callbacks: 0 })
+    const entry = dayMap.get(date)!
+    if (a.is_callback) entry.callbacks++
+    else entry.appointments++
+  }
+  const appointmentsByDay = Array.from(dayMap.entries())
+    .map(([date, counts]) => ({ date, ...counts }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  // Modality breakdown
+  const modalityMap = new Map<string, number>()
+  for (const a of regularAppointments) {
+    const mod = a.modality || 'campus'
+    modalityMap.set(mod, (modalityMap.get(mod) || 0) + 1)
+  }
+  const modalityLabels: Record<string, string> = { online: 'Online', campus: 'Campus' }
+  const appointmentsByModality = Array.from(modalityMap.entries()).map(([modality, count]) => ({
+    modality,
+    label: modalityLabels[modality] || modality,
+    count,
+    percent: regularAppointments.length > 0 ? Math.round((count / regularAppointments.length) * 100) : 0,
+  }))
+
+  // Attendance = completed / (total - cancelled)
+  const apptNonCancelled = regularAppointments.filter(a => a.status !== 'cancelled').length
+  const cbNonCancelled = callbacks.filter(a => a.status !== 'cancelled').length
+
+  const calendar: CalendarReportData = {
+    totalAppointments: regularAppointments.length,
+    totalCallbacks: callbacks.length,
+    completedAppointments: countByStatus(regularAppointments, 'completed'),
+    completedCallbacks: countByStatus(callbacks, 'completed'),
+    cancelledAppointments: countByStatus(regularAppointments, 'cancelled'),
+    cancelledCallbacks: countByStatus(callbacks, 'cancelled'),
+    noAnswerAppointments: countByStatus(regularAppointments, 'no_answer'),
+    noAnswerCallbacks: countByStatus(callbacks, 'no_answer'),
+    appointmentsByType,
+    appointmentsByStatus: buildStatusBreakdown(regularAppointments),
+    appointmentsByAgent: buildAgentBreakdown(regularAppointments),
+    appointmentsByDay,
+    callbacksByStatus: buildStatusBreakdown(callbacks),
+    callbacksByAgent: buildAgentBreakdown(callbacks),
+    appointmentCompletionRate: regularAppointments.length > 0 ? Math.round((countByStatus(regularAppointments, 'completed') / regularAppointments.length) * 100) : 0,
+    callbackCompletionRate: callbacks.length > 0 ? Math.round((countByStatus(callbacks, 'completed') / callbacks.length) * 100) : 0,
+    appointmentAttendanceRate: apptNonCancelled > 0 ? Math.round((countByStatus(regularAppointments, 'completed') / apptNonCancelled) * 100) : 0,
+    callbackAttendanceRate: cbNonCancelled > 0 ? Math.round((countByStatus(callbacks, 'completed') / cbNonCancelled) * 100) : 0,
+    appointmentsByModality,
+  }
+
+  // =============================================
+  // LOST LEADS ANALYSIS
+  // =============================================
+  const lostLeads = leads.filter(l => l.pipeline_stage === 'lost')
+  const sfLost = lostLeads.filter(l => l.funding_type === 'self_funded').length
+  const pucLost = lostLeads.filter(l => l.funding_type === 'puc').length
+
+  const lostByReason: Record<string, number> = {}
+  lostLeads.forEach(l => {
+    const key = l.lost_reason_id || 'unknown'
+    lostByReason[key] = (lostByReason[key] || 0) + 1
+  })
+
+  const lostByStage: Record<string, number> = {}
+  lostLeads.forEach(l => {
+    const key = l.lost_at_stage || 'unknown'
+    lostByStage[key] = (lostByStage[key] || 0) + 1
+  })
+
+  const lostStageLabels: Record<string, string> = {
+    new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test',
+    application: 'File', applicant: 'Applicant', enrolled: 'Enrolled',
+    unknown: 'Unknown',
+  }
+
+  // Count total leads that reached each stage (for lost ratio: lost / reached)
+  const stageOrderList = ['new', 'contacted', 'visit', 'test', 'application', 'applicant', 'enrolled']
+  const totalReachedStage: Record<string, number> = {}
+  stageOrderList.forEach(stage => {
+    const stageIdx = stageOrderList.indexOf(stage)
+    totalReachedStage[stage] = leads.filter(l => {
+      if (l.completed_stages?.includes(stage as PipelineStage)) return true
+      const currentIdx = stageOrderList.indexOf(l.pipeline_stage)
+      if (currentIdx >= stageIdx) return true
+      if (l.lost_at_stage) {
+        const lostIdx = stageOrderList.indexOf(l.lost_at_stage)
+        if (lostIdx >= stageIdx) return true
+      }
+      return false
+    }).length
+  })
+
+  // Reasons grouped by lost_at_stage
+  const reasonsByStageMap: Record<string, Record<string, number>> = {}
+  lostLeads.forEach(l => {
+    const stage = l.lost_at_stage || 'unknown'
+    if (!reasonsByStageMap[stage]) reasonsByStageMap[stage] = {}
+    const reasonId = l.lost_reason_id || 'unknown'
+    reasonsByStageMap[stage][reasonId] = (reasonsByStageMap[stage][reasonId] || 0) + 1
+  })
+
+  const lostByAgent: Record<string, { sf: number; puc: number }> = {}
+  lostLeads.forEach(l => {
+    const agentId = l.assigned_to || 'unassigned'
+    if (!lostByAgent[agentId]) lostByAgent[agentId] = { sf: 0, puc: 0 }
+    if (l.funding_type === 'puc') lostByAgent[agentId].puc++
+    else lostByAgent[agentId].sf++
+  })
+
+  const lostReasonEntries = Object.entries(lostByReason)
+    .map(([reasonId, count]) => {
+      const reason = lostReasons.find(r => r.id === reasonId)
+      return {
+        reasonId,
+        reason: reason?.reason_en || 'Unknown',
+        category: reason?.category || 'unknown',
+        count,
+        percent: lostLeads.length > 0 ? Math.round((count / lostLeads.length) * 100) : 0,
+      }
+    })
+    .sort((a, b) => b.count - a.count)
+
+  const lost: LostReportData = {
+    totalLost: lostLeads.length,
+    sfLost,
+    pucLost,
+    lostRate: leads.length > 0 ? Math.round((lostLeads.length / leads.length) * 100) : 0,
+    byReason: lostReasonEntries,
+    byStage: Object.entries(lostByStage)
+      .map(([stage, count]) => {
+        const totalInStage = totalReachedStage[stage] || 0
+        return {
+          stage,
+          stageLabel: lostStageLabels[stage] || stage,
+          count,
+          percent: lostLeads.length > 0 ? Math.round((count / lostLeads.length) * 100) : 0,
+          totalInStage,
+          lostRatio: totalInStage > 0 ? Math.round((count / totalInStage) * 100) : 0,
+        }
+      })
+      .sort((a, b) => b.count - a.count),
+    byAgent: Object.entries(lostByAgent)
+      .map(([agentId, counts]) => {
+        const agent = agents.find(a => a.id === agentId)
+        return {
+          agentId,
+          agentName: agent?.full_name || 'Unassigned',
+          avatarUrl: agent?.avatar_url || null,
+          sfLost: counts.sf,
+          pucLost: counts.puc,
+          total: counts.sf + counts.puc,
+        }
+      })
+      .sort((a, b) => b.total - a.total),
+    topReason: lostReasonEntries.length > 0 ? lostReasonEntries[0].reason : null,
+    reasonsByStage: Object.entries(reasonsByStageMap)
+      .map(([stage, reasons]) => {
+        const stageTotal = lostByStage[stage] || 0
+        return {
+          stage,
+          stageLabel: lostStageLabels[stage] || stage,
+          reasons: Object.entries(reasons)
+            .map(([reasonId, count]) => {
+              const reason = lostReasons.find(r => r.id === reasonId)
+              return {
+                reason: reason?.reason_en || 'Unknown',
+                count,
+                percent: stageTotal > 0 ? Math.round((count / stageTotal) * 100) : 0,
+              }
+            })
+            .sort((a, b) => b.count - a.count),
+        }
+      })
+      .sort((a, b) => {
+        const aCount = lostByStage[a.stage] || 0
+        const bCount = lostByStage[b.stage] || 0
+        return bCount - aCount
+      }),
+  }
+
   return {
     payment,
     testCenter,
@@ -1440,6 +2025,9 @@ function calculateReports(
     agentComparison,
     timeToConversion,
     detailedAnalytics,
+    stageChangeAnalysis,
+    calendar,
+    lost,
   }
 }
 

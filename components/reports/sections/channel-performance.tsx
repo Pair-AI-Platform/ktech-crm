@@ -185,6 +185,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                       <Tooltip content={<CustomTooltip />} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Bar dataKey="count" name="Leads" fill="var(--primary)" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="files" name="Files" fill="#F59E0B" radius={[0, 4, 4, 0]} />
                       <Bar dataKey="enrolled" name="Enrolled" fill="#22C55E" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -213,58 +214,91 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
               <CardDescription>Distribution by category</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px]" style={{ minWidth: 0 }}>
-                {mounted && categoryPieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {categoryPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
-                                <p className="text-xs text-[var(--text-muted)]">{payload[0].name}</p>
-                                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                                  {payload[0].value} leads ({payload[0].payload.percent}%)
-                                </p>
-                              </div>
-                            )
-                          }
-                          return null
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
-                    No data available
-                  </div>
-                )}
-              </div>
-              {/* Legend */}
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                {categoryPieData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
-                    <span className="text-xs text-[var(--text-muted)] ml-auto">{item.percent}%</span>
-                  </div>
-                ))}
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                {/* Donut chart with center label */}
+                <div className="relative h-[220px] w-[220px] flex-shrink-0" style={{ minWidth: 0 }}>
+                  {mounted && categoryPieData.length > 0 ? (
+                    <>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryPieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={3}
+                            dataKey="value"
+                            strokeWidth={0}
+                          >
+                            {categoryPieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
+                                    <p className="text-xs text-[var(--text-muted)]">{payload[0].name}</p>
+                                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                                      {payload[0].value} leads ({payload[0].payload.percent}%)
+                                    </p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Center label */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-2xl font-bold text-[var(--text-primary)]">
+                          {categoryPieData.reduce((s, d) => s + d.value, 0)}
+                        </span>
+                        <span className="text-xs text-[var(--text-muted)]">Total Leads</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
+                      No data available
+                    </div>
+                  )}
+                </div>
+
+                {/* Legend with progress bars */}
+                <div className="flex-1 w-full space-y-3">
+                  {categoryPieData.map((item) => {
+                    const maxCount = Math.max(...categoryPieData.map(d => d.value))
+                    return (
+                      <div key={item.name} className="group">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2.5 h-2.5 rounded-sm"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="text-sm font-medium text-[var(--text-primary)]">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{item.value}</span>
+                            <span className="text-xs text-[var(--text-muted)] w-10 text-right">{item.percent}%</span>
+                          </div>
+                        </div>
+                        <div className="w-full h-1.5 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: item.color }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(item.value / maxCount) * 100}%` }}
+                            transition={{ duration: 0.6, delay: 0.6 }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>

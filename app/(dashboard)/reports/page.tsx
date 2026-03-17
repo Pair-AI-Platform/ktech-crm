@@ -59,6 +59,8 @@ import {
   Sparkles,
   ClipboardList,
   AlertTriangle,
+  UserMinus,
+  UserX,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
@@ -86,6 +88,10 @@ import {
   TimeToConversion,
   DetailedAnalytics,
   SchoolReports,
+  StageChangeAnalysis,
+  CalendarReports,
+  WithdrawalReports,
+  LostReports,
 } from "@/components/reports"
 
 const emptySubscribe = () => () => {}
@@ -138,15 +144,17 @@ const DATE_PRESETS = [
 ] as const
 
 const TAB_GROUPS = [
-  { label: "Performance", tabs: ['overview', 'enrollment', 'pipeline', 'agents'] },
+  { label: "Performance", tabs: ['overview', 'enrollment', 'withdraw', 'lost', 'pipeline', 'agents'] },
   { label: "Financial", tabs: ['payments', 'puc'] },
-  { label: "Analysis", tabs: ['channels', 'schools', 'demographics', 'test-center'] },
-  { label: "Advanced", tabs: ['conversion', 'agent-compare', 'time-analysis', 'detailed-analytics'] },
+  { label: "Analysis", tabs: ['channels', 'schools', 'demographics', 'test-center', 'calendar'] },
+  { label: "Advanced", tabs: ['conversion', 'agent-compare', 'time-analysis', 'stage-analysis', 'detailed-analytics'] },
 ] as const
 
 const REPORT_TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Executive summary & KPIs', group: 'Performance' },
   { id: 'enrollment', label: 'Enrollment', icon: GraduationCap, description: 'Student enrollment metrics', group: 'Performance' },
+  { id: 'withdraw', label: 'Withdraw', icon: UserMinus, description: 'Withdrawal analysis, reasons & agent breakdown', group: 'Performance' },
+  { id: 'lost', label: 'Lost', icon: UserX, description: 'Lost leads analysis, reasons & stage breakdown', group: 'Performance' },
   { id: 'pipeline', label: 'Pipeline', icon: Target, description: 'Sales funnel analysis', group: 'Performance' },
   { id: 'agents', label: 'Agents', icon: Users, description: 'Team performance', group: 'Performance' },
   { id: 'payments', label: 'Payments', icon: CreditCard, description: 'Payment status', group: 'Financial' },
@@ -155,9 +163,11 @@ const REPORT_TABS = [
   { id: 'schools', label: 'Schools', icon: School, description: 'School performance', group: 'Analysis' },
   { id: 'demographics', label: 'Demographics', icon: PieChart, description: 'Student breakdown', group: 'Analysis' },
   { id: 'test-center', label: 'Test Center', icon: TestTube, description: 'Placement tests', group: 'Analysis' },
+  { id: 'calendar', label: 'Calendar', icon: CalendarDays, description: 'Appointments & callbacks breakdown with attendance rates', group: 'Analysis' },
   { id: 'conversion', label: 'Conversion', icon: TrendingUp, description: 'Conversion rates by lead source', group: 'Advanced' },
   { id: 'agent-compare', label: 'Agent Compare', icon: UserCheck, description: 'Multi-metric agent comparison', group: 'Advanced' },
   { id: 'time-analysis', label: 'Time Analysis', icon: Clock, description: 'Time-to-conversion analytics', group: 'Advanced' },
+  { id: 'stage-analysis', label: 'Analysis', icon: Activity, description: 'Stage change frequency per lead (deduplicated per day)', group: 'Advanced' },
   { id: 'detailed-analytics', label: 'Detailed', icon: ClipboardList, description: 'Enrollment, withdrawals, gender, foundation & breakdown analytics', group: 'Advanced' },
 ] as const
 
@@ -379,25 +389,33 @@ export default function ReportsPage() {
 
   // Calculate summary metrics
   const summaryMetrics = useMemo(() => {
-    if (!data) return null
+    if (!data?.executive?.pipelineFunnel || !data?.enrollment || !data?.payment) return null
 
     const totalLeads = data.executive.pipelineFunnel.reduce((sum, s) => sum + s.count, 0)
     const totalEnrolled = data.enrollment.totalEnrolled
     const avgConversion = totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0
 
+    const byFunding = data.executive.byFunding
+    const puc = byFunding?.puc ?? { totalLeads: 0, enrolled: 0, todayLeads: 0, todayEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, weeklyTrend: [] }
+    const sf = byFunding?.sf ?? { totalLeads: 0, enrolled: 0, todayLeads: 0, todayEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, weeklyTrend: [] }
+    const pucConversion = puc.totalLeads > 0 ? Math.round((puc.enrolled / puc.totalLeads) * 100) : 0
+    const sfConversion = sf.totalLeads > 0 ? Math.round((sf.enrolled / sf.totalLeads) * 100) : 0
+
     return {
       totalLeads,
       totalEnrolled,
       avgConversion,
-      todayLeads: data.executive.todayNumbers.newLeads,
-      todayEnrollments: data.executive.todayNumbers.enrolled,
-      leadsChange: data.executive.weekOverWeek.leads.change,
-      weekChange: data.executive.weekOverWeek.enrollments.change,
+      todayLeads: data.executive.todayNumbers?.newLeads ?? 0,
+      todayEnrollments: data.executive.todayNumbers?.enrolled ?? 0,
+      leadsChange: data.executive.weekOverWeek?.leads?.change ?? null,
+      weekChange: data.executive.weekOverWeek?.enrollments?.change ?? null,
       pendingPayments: data.payment.pending,
-      targetProgress: data.executive.targetProgress.percent,
-      targetCurrent: data.executive.targetProgress.current,
-      targetTotal: data.executive.targetProgress.target,
-      weeklyTrend: data.executive.weeklyTrend.map(w => w.leads),
+      targetProgress: data.executive.targetProgress?.percent ?? 0,
+      targetCurrent: data.executive.targetProgress?.current ?? 0,
+      targetTotal: data.executive.targetProgress?.target ?? 0,
+      weeklyTrend: (data.executive.agentPerformance ?? []).map(a => a.leads),
+      puc: { ...puc, conversion: pucConversion },
+      sf: { ...sf, conversion: sfConversion },
     }
   }, [data])
 
@@ -700,52 +718,6 @@ export default function ReportsPage() {
                 </Button>
               </div>
             </div>
-
-            {/* Quick Stats - Theme Adaptive Cards */}
-            {summaryMetrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <QuickStatCard
-                  label="Total Leads"
-                  value={summaryMetrics.totalLeads}
-                  icon={Users}
-                  trend={summaryMetrics.leadsChange}
-                  trendLabel="vs last week"
-                  sparklineData={summaryMetrics.weeklyTrend}
-                  mounted={mounted}
-                  colorScheme="primary"
-                  onClick={() => setActiveTab('pipeline')}
-                />
-                <QuickStatCard
-                  label="Enrolled"
-                  value={summaryMetrics.totalEnrolled}
-                  icon={GraduationCap}
-                  subtext={`${summaryMetrics.avgConversion}% conversion rate`}
-                  mounted={mounted}
-                  colorScheme="success"
-                  onClick={() => setActiveTab('enrollment')}
-                />
-                <QuickStatCard
-                  label="Target Progress"
-                  value={summaryMetrics.targetProgress}
-                  icon={Target}
-                  suffix="%"
-                  subtext={`${summaryMetrics.targetCurrent} / ${summaryMetrics.targetTotal}`}
-                  mounted={mounted}
-                  colorScheme="accent"
-                  progressPercent={summaryMetrics.targetProgress}
-                />
-                <QuickStatCard
-                  label="Today's Activity"
-                  value={summaryMetrics.todayLeads}
-                  icon={Zap}
-                  subtext={summaryMetrics.todayEnrollments === 0
-                    ? `0 enrolled (${summaryMetrics.totalEnrolled} total)`
-                    : `${summaryMetrics.todayEnrollments} enrolled today`}
-                  mounted={mounted}
-                  colorScheme="warning"
-                />
-              </div>
-            )}
 
             {/* Staleness warning */}
             {isStale && (
@@ -1067,6 +1039,101 @@ export default function ReportsPage() {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <>
+              {/* Quick Stats - Split by PUC & SF */}
+              {summaryMetrics && (
+                <div className="space-y-3">
+                  {/* PUC Row */}
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">PUC</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <QuickStatCard
+                        label="Total Leads"
+                        value={summaryMetrics.puc.totalLeads}
+                        icon={Users}
+                        trend={summaryMetrics.puc.leadsChange}
+                        trendLabel="vs last week"
+                        sparklineData={summaryMetrics.puc.weeklyTrend}
+                        mounted={mounted}
+                        colorScheme="primary"
+                        onClick={() => setActiveTab('pipeline')}
+                      />
+                      <QuickStatCard
+                        label="Total Files"
+                        value={summaryMetrics.puc.enrolled}
+                        icon={Zap}
+                        subtext={`${summaryMetrics.puc.conversion}% conversion rate`}
+                        mounted={mounted}
+                        colorScheme="warning"
+                      />
+                      <QuickStatCard
+                        label="Target Progress"
+                        value={summaryMetrics.puc.targetPercent}
+                        icon={Target}
+                        suffix="%"
+                        subtext={`${summaryMetrics.puc.targetCurrent} / ${summaryMetrics.puc.targetTotal}`}
+                        mounted={mounted}
+                        colorScheme="accent"
+                        progressPercent={summaryMetrics.puc.targetPercent}
+                      />
+                      <QuickStatCard
+                        label="Enrolled"
+                        value={summaryMetrics.puc.enrolled}
+                        icon={GraduationCap}
+                        subtext={`${summaryMetrics.puc.conversion}% conversion rate`}
+                        mounted={mounted}
+                        colorScheme="success"
+                        onClick={() => setActiveTab('enrollment')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* SF Row */}
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Self-Funded</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <QuickStatCard
+                        label="Total Leads"
+                        value={summaryMetrics.sf.totalLeads}
+                        icon={Users}
+                        trend={summaryMetrics.sf.leadsChange}
+                        trendLabel="vs last week"
+                        sparklineData={summaryMetrics.sf.weeklyTrend}
+                        mounted={mounted}
+                        colorScheme="primary"
+                        onClick={() => setActiveTab('pipeline')}
+                      />
+                      <QuickStatCard
+                        label="Total Files"
+                        value={summaryMetrics.sf.enrolled}
+                        icon={Zap}
+                        subtext={`${summaryMetrics.sf.conversion}% conversion rate`}
+                        mounted={mounted}
+                        colorScheme="warning"
+                      />
+                      <QuickStatCard
+                        label="Target Progress"
+                        value={summaryMetrics.sf.targetPercent}
+                        icon={Target}
+                        suffix="%"
+                        subtext={`${summaryMetrics.sf.targetCurrent} / ${summaryMetrics.sf.targetTotal}`}
+                        mounted={mounted}
+                        colorScheme="accent"
+                        progressPercent={summaryMetrics.sf.targetPercent}
+                      />
+                      <QuickStatCard
+                        label="Enrolled"
+                        value={summaryMetrics.sf.enrolled}
+                        icon={GraduationCap}
+                        subtext={`${summaryMetrics.sf.conversion}% conversion rate`}
+                        mounted={mounted}
+                        colorScheme="success"
+                        onClick={() => setActiveTab('enrollment')}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* KPI Cards - Actionable Pipeline Metrics */}
               <KPICardsGrid data={data} mounted={mounted} onNavigate={setActiveTab} />
 
@@ -1078,6 +1145,19 @@ export default function ReportsPage() {
           {/* Enrollment Tab */}
           {activeTab === 'enrollment' && (
             <EnrollmentReports data={data.enrollment} />
+          )}
+
+          {/* Withdraw Tab */}
+          {activeTab === 'withdraw' && (
+            <WithdrawalReports
+              enrollmentData={data.enrollment}
+              withdrawalsByAgent={data.detailedAnalytics.withdrawalsByAgent}
+            />
+          )}
+
+          {/* Lost Tab */}
+          {activeTab === 'lost' && (
+            <LostReports data={data.lost} />
           )}
 
           {/* Pipeline Tab */}
@@ -1117,7 +1197,12 @@ export default function ReportsPage() {
 
           {/* Test Center Tab */}
           {activeTab === 'test-center' && (
-            <TestCenterReports data={data.testCenter} />
+            <TestCenterReports data={data.testCenter} onSync={async () => { await refetch() }} />
+          )}
+
+          {/* Calendar Tab */}
+          {activeTab === 'calendar' && (
+            <CalendarReports data={data.calendar} />
           )}
 
           {/* Conversion by Source Tab */}
@@ -1133,6 +1218,11 @@ export default function ReportsPage() {
           {/* Time Analysis Tab */}
           {activeTab === 'time-analysis' && (
             <TimeToConversion data={data.timeToConversion} />
+          )}
+
+          {/* Stage Change Analysis Tab */}
+          {activeTab === 'stage-analysis' && (
+            <StageChangeAnalysis data={data.stageChangeAnalysis} />
           )}
 
           {/* Detailed Analytics Tab */}
@@ -1289,24 +1379,6 @@ function QuickStatCard({
 function KPICardsGrid({ data, mounted, onNavigate }: { data: ReportData; mounted: boolean; onNavigate: (tab: string) => void }) {
   const kpis = [
     {
-      title: "Pending Applications",
-      value: data.executive.pipelineFunnel
-        .filter(s => ['test', 'application'].includes(s.stage))
-        .reduce((sum, s) => sum + s.count, 0),
-      icon: Clock,
-      color: "amber",
-      tab: "pipeline",
-    },
-    {
-      title: "In Pipeline",
-      value: data.executive.pipelineFunnel
-        .filter(s => ['new', 'contacted', 'visit'].includes(s.stage))
-        .reduce((sum, s) => sum + s.count, 0),
-      icon: Activity,
-      color: "blue",
-      tab: "pipeline",
-    },
-    {
       title: "Appointments This Week",
       value: data.executive.weekOverWeek.appointments.current,
       icon: Calendar,
@@ -1318,7 +1390,7 @@ function KPICardsGrid({ data, mounted, onNavigate }: { data: ReportData; mounted
       value: data.enrollment.withdrawals.total,
       icon: AlertTriangle,
       color: "red",
-      tab: "detailed-analytics",
+      tab: "withdraw",
     },
   ]
 
@@ -1346,7 +1418,7 @@ function KPICardsGrid({ data, mounted, onNavigate }: { data: ReportData; mounted
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {kpis.map((kpi, index) => (
         <motion.div
           key={kpi.title}

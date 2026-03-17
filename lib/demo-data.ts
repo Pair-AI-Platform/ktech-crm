@@ -1,4 +1,4 @@
-import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType } from "@/types"
+import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType, LostReason } from "@/types"
 import { toDateString } from "@/lib/utils"
 
 // Check if we're in demo mode
@@ -423,6 +423,16 @@ export function generateDemoLeads(count: number = 50): Lead[] {
   return leads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 }
 
+// Demo withdrawal/lost reasons
+export const DEMO_LOST_REASONS: LostReason[] = [
+  { id: 'wr-1', category: 'financial', reason_en: 'Financial difficulties', reason_ar: 'صعوبات مالية', is_active: true },
+  { id: 'wr-2', category: 'personal', reason_en: 'Personal reasons', reason_ar: 'أسباب شخصية', is_active: true },
+  { id: 'wr-3', category: 'academic', reason_en: 'Transferred to another institution', reason_ar: 'انتقل إلى مؤسسة أخرى', is_active: true },
+  { id: 'wr-4', category: 'academic', reason_en: 'Academic performance', reason_ar: 'الأداء الأكاديمي', is_active: true },
+  { id: 'wr-5', category: 'personal', reason_en: 'Family relocation', reason_ar: 'انتقال العائلة', is_active: true },
+  { id: 'wr-6', category: 'competitors', reason_en: 'Joined competitor', reason_ar: 'انضم إلى منافس', is_active: true },
+]
+
 // Generate demo students
 export function generateDemoStudents(count: number = 20): Student[] {
   const students: Student[] = []
@@ -463,7 +473,8 @@ export function generateDemoStudents(count: number = 20): Student[] {
       placement_test_exempted: Math.random() > 0.8,
       placement_test_date: randomDate(30),
       semester_id: "sem-1",
-      is_withdrawn: false,
+      is_withdrawn: i % 5 === 0, // ~20% withdrawn
+      withdrawal_reason_id: i % 5 === 0 ? randomItem(DEMO_LOST_REASONS).id : undefined,
       paci_verified: fundingType === "puc",
       puc_converted_to_sf: false,
       puc_stage: fundingType === "puc" ? randomItem(pucStages) as Student["puc_stage"] : undefined,

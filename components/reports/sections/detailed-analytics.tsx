@@ -21,7 +21,6 @@ import {
 } from "recharts"
 import {
   FileCheck,
-  UserX,
   Users,
   BookOpen,
   MapPin,
@@ -67,7 +66,7 @@ export function DetailedAnalytics({ data }: DetailedAnalyticsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
   const [breakdownTab, setBreakdownTab] = useState<BreakdownTab>('governorate')
 
-  const { enrollmentFromApplications, withdrawalsByAgent, enrolledByGender, foundationLevel, enrolledByBreakdown } = data
+  const { enrollmentFromApplications, enrolledByGender, foundationLevel, enrolledByBreakdown } = data
 
   // Chart data
   const appChartData = [
@@ -192,122 +191,7 @@ export function DetailedAnalytics({ data }: DetailedAnalyticsProps) {
       </section>
 
       {/* ============================================= */}
-      {/* SECTION 2: Withdrawals by Agent */}
-      {/* ============================================= */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <UserX className="w-5 h-5 text-[var(--error)]" />
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Withdrawals by Agent</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card hover glow>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-2.5 rounded-xl bg-[var(--error-bg)] shadow-sm">
-                    <UserX className="w-5 h-5 text-[var(--error)]" />
-                  </div>
-                  <Badge variant="error" size="sm">Total</Badge>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-1">Total Withdrawals</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{withdrawalsByAgent.totalWithdrawnSF + withdrawalsByAgent.totalWithdrawnPUC}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card hover glow>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-2.5 rounded-xl bg-[var(--primary-muted)] shadow-sm">
-                    <Users className="w-5 h-5 text-[var(--primary)]" />
-                  </div>
-                  <Badge variant="secondary" size="sm">SF</Badge>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-1">SF Withdrawals</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{withdrawalsByAgent.totalWithdrawnSF}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card hover glow>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-2.5 rounded-xl bg-[var(--warning-bg)] shadow-sm">
-                    <Users className="w-5 h-5 text-[var(--warning)]" />
-                  </div>
-                  <Badge variant="warning" size="sm">PUC</Badge>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-1">PUC Withdrawals</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{withdrawalsByAgent.totalWithdrawnPUC}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Agent Withdrawal Table */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Withdrawals per Agent</CardTitle>
-              <CardDescription>Breakdown of withdrawals by funding type per agent</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {withdrawalsByAgent.byAgent.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-[var(--border)]">
-                        <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
-                        <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Agent</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">SF</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {withdrawalsByAgent.byAgent.map((agent, index) => (
-                        <tr key={agent.agentId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
-                          <td className="py-3 pr-4">
-                            <span className="text-sm font-bold text-[var(--text-muted)]">{index + 1}</span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <div className="flex items-center gap-2.5">
-                              <Avatar className="w-7 h-7">
-                                <AvatarImage src={agent.avatarUrl || undefined} />
-                                <AvatarFallback className="text-xs">{getInitials(agent.agentName)}</AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm font-medium text-[var(--text-primary)]">{agent.agentName}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="text-sm font-semibold text-[var(--primary)]">{agent.sfWithdrawn}</span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="text-sm font-semibold text-[var(--warning)]">{agent.pucWithdrawn}</span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <Badge variant="error" size="sm">{agent.total}</Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-[var(--text-muted)]">
-                  No withdrawal data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </section>
-
-      {/* ============================================= */}
-      {/* SECTION 3: Enrolled by Gender per Agent */}
+      {/* SECTION 2: Enrolled by Gender per Agent */}
       {/* ============================================= */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">

@@ -187,12 +187,18 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
 ]
 
+function matchesKeyword(msg: string, keyword: string): boolean {
+  // Use word boundary matching to avoid partial matches (e.g. "this" matching "hi")
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`\\b${escaped}\\b`).test(msg)
+}
+
 function generateMockResponse(userMessage: string): string {
   const msg = userMessage.toLowerCase()
 
   // Find the best matching presaved answer
   for (const answer of MOCK_ANSWERS) {
-    if (answer.keywords.some(kw => msg.includes(kw))) {
+    if (answer.keywords.some(kw => matchesKeyword(msg, kw))) {
       return answer.response
     }
   }

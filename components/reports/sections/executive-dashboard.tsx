@@ -5,8 +5,8 @@ import { motion, useInView } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
+  Layers,
 } from "lucide-react"
 import type { ExecutiveReportData } from "@/lib/hooks/use-reports"
 import { AnimatedNumber } from "../animated-number"
@@ -220,10 +221,9 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Weekly Trend Chart - Takes more space */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* Weekly Trend Chart */}
         <motion.div
-          className="xl:col-span-7"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.4 }}
@@ -237,31 +237,21 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                   </div>
                   <div>
                     <CardTitle className="text-lg" style={{ fontFamily: 'var(--font-display)' }}>
-                      Weekly Performance
+                      Agent Performance
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Leads and enrollments over time
+                      Leads and files by agent
                     </CardDescription>
                   </div>
                 </div>
-                <Badge variant="secondary" className="font-medium">Last 7 Days</Badge>
+                <Badge variant="secondary" className="font-medium">Current Period</Badge>
               </div>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="h-[300px]" style={{ minWidth: 0 }}>
                 {mounted ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data.weeklyTrend}>
-                      <defs>
-                        <linearGradient id="colorLeadsNew" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366F1" stopOpacity={0.4}/>
-                          <stop offset="100%" stopColor="#6366F1" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorEnrolledNew" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#22C55E" stopOpacity={0.4}/>
-                          <stop offset="100%" stopColor="#22C55E" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
+                    <BarChart data={data.agentPerformance}>
                       <CartesianGrid
                         strokeDasharray="3 3"
                         stroke="var(--border)"
@@ -269,7 +259,7 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                         opacity={0.5}
                       />
                       <XAxis
-                        dataKey="date"
+                        dataKey="agent"
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: 'var(--text-muted)', fontSize: 11, fontWeight: 500 }}
@@ -282,39 +272,23 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                         dx={-10}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Area
-                        type="monotone"
+                      <Bar
                         dataKey="leads"
                         name="Leads"
-                        stroke="#6366F1"
-                        strokeWidth={2.5}
-                        fillOpacity={1}
-                        fill="url(#colorLeadsNew)"
-                        dot={false}
-                        activeDot={{
-                          r: 6,
-                          fill: "#6366F1",
-                          stroke: "#fff",
-                          strokeWidth: 2,
-                        }}
+                        fill="#6366F1"
+                        stackId="a"
+                        radius={[0, 0, 0, 0]}
+                        maxBarSize={40}
                       />
-                      <Area
-                        type="monotone"
-                        dataKey="enrolled"
-                        name="Enrolled"
-                        stroke="#22C55E"
-                        strokeWidth={2.5}
-                        fillOpacity={1}
-                        fill="url(#colorEnrolledNew)"
-                        dot={false}
-                        activeDot={{
-                          r: 6,
-                          fill: "#22C55E",
-                          stroke: "#fff",
-                          strokeWidth: 2,
-                        }}
+                      <Bar
+                        dataKey="files"
+                        name="Files"
+                        fill="#22C55E"
+                        stackId="a"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={40}
                       />
-                    </AreaChart>
+                    </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full bg-[var(--bg-sunken)] rounded-xl animate-pulse" />
@@ -329,180 +303,54 @@ export function ExecutiveDashboard({ data }: ExecutiveDashboardProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-[#22C55E]" />
-                  <span className="text-sm text-[var(--text-secondary)]">Enrolled</span>
+                  <span className="text-sm text-[var(--text-secondary)]">Files</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Week over Week - Redesigned */}
+      </div>
+
+      {/* Pipeline Funnels - SF & PUC Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
-          className="xl:col-span-5"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
         >
-          <Card className="h-full shadow-sm bg-[var(--bg-surface)]">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-[var(--success)] shadow-sm">
-                  <TrendingUp className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg" style={{ fontFamily: 'var(--font-display)' }}>
-                    Week over Week
-                  </CardTitle>
-                  <CardDescription className="text-xs">Performance comparison</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ComparisonCard
-                label="Leads"
-                current={data.weekOverWeek.leads.current}
-                previous={data.weekOverWeek.leads.previous}
-                change={data.weekOverWeek.leads.change}
-                color="#6366F1"
-                delay={0.6}
-                isInView={isInView}
+          <Card className="shadow-sm bg-[var(--bg-surface)] overflow-hidden">
+            <CardContent className="p-8">
+              <PipelineFunnelVisual
+                data={data.sfPipelineFunnel}
+                totalStageChanges={data.totalStageChanges}
+                title="Self Funded"
+                subtitle="SF lead progression funnel"
+                icon={<Layers className="w-5 h-5 text-white" />}
               />
-              <ComparisonCard
-                label="Appointments"
-                current={data.weekOverWeek.appointments.current}
-                previous={data.weekOverWeek.appointments.previous}
-                change={data.weekOverWeek.appointments.change}
-                color="#F59E0B"
-                delay={0.7}
-                isInView={isInView}
-              />
-              <ComparisonCard
-                label="Enrollments"
-                current={data.weekOverWeek.enrollments.current}
-                previous={data.weekOverWeek.enrollments.previous}
-                change={data.weekOverWeek.enrollments.change}
-                color="#22C55E"
-                delay={0.8}
-                isInView={isInView}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.7 }}
+        >
+          <Card className="shadow-sm bg-[var(--bg-surface)] overflow-hidden">
+            <CardContent className="p-8">
+              <PipelineFunnelVisual
+                data={data.pucPipelineFunnel}
+                totalStageChanges={data.totalStageChanges}
+                title="PUC"
+                subtitle="PUC lead progression funnel"
+                icon={<GraduationCap className="w-5 h-5 text-white" />}
               />
             </CardContent>
           </Card>
         </motion.div>
       </div>
-
-      {/* Pipeline Funnel - Full Width Premium Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={isInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.5, delay: 0.6 }}
-      >
-        <Card className="shadow-sm bg-[var(--bg-surface)] overflow-hidden">
-          <CardContent className="p-8">
-            <PipelineFunnelVisual data={data.pipelineFunnel} totalStageChanges={data.totalStageChanges} />
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   )
 }
 
-// Redesigned comparison card component
-function ComparisonCard({
-  label,
-  current,
-  previous,
-  change,
-  color,
-  delay,
-  isInView,
-}: {
-  label: string
-  current: number
-  previous: number
-  change: number | null
-  color: string
-  delay: number
-  isInView: boolean
-}) {
-  const changeInfo = fmtChange(change)
-  const isPositive = changeInfo.isPositive
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={isInView ? { opacity: 1, x: 0 } : {}}
-      transition={{ duration: 0.4, delay }}
-      className="relative group"
-    >
-      <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] transition-all duration-300 hover:border-[var(--border-hover)] hover:shadow-lg">
-        {/* Accent line */}
-        <div
-          className="absolute left-0 top-4 bottom-4 w-1 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-
-        <div className="flex items-center justify-between mb-3 pl-3">
-          <span className="font-semibold text-[var(--text-primary)]">{label}</span>
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={isInView ? { scale: 1 } : {}}
-            transition={{ delay: delay + 0.2, type: "spring" }}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-              isPositive
-                ? "bg-[var(--success)]/15 text-[var(--success)]"
-                : "bg-[var(--error)]/15 text-[var(--error)]"
-            }`}
-          >
-            {!changeInfo.isNew && (isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
-            {changeInfo.label}
-          </motion.div>
-        </div>
-
-        <div className="flex items-end justify-between pl-3">
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-1">This Week</p>
-            <p className="text-2xl font-bold" style={{ color, fontFamily: 'var(--font-display)' }}>
-              {current}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-muted)] mb-1">Last Week</p>
-            <p className="text-lg font-medium text-[var(--text-secondary)]">{previous}</p>
-          </div>
-        </div>
-
-        {/* Mini comparison bar */}
-        <div className="mt-3 pl-3">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-              <motion.div
-                className="h-full rounded-full"
-                style={{ backgroundColor: color }}
-                initial={{ width: 0 }}
-                animate={isInView ? {
-                  width: `${Math.min((current / Math.max(current, previous)) * 100, 100)}%`
-                } : {}}
-                transition={{ delay: delay + 0.3, duration: 0.6 }}
-              />
-            </div>
-            <span className="text-[10px] text-[var(--text-muted)] font-medium w-8">now</span>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-              <motion.div
-                className="h-full rounded-full opacity-50"
-                style={{ backgroundColor: color }}
-                initial={{ width: 0 }}
-                animate={isInView ? {
-                  width: `${Math.min((previous / Math.max(current, previous)) * 100, 100)}%`
-                } : {}}
-                transition={{ delay: delay + 0.4, duration: 0.6 }}
-              />
-            </div>
-            <span className="text-[10px] text-[var(--text-muted)] font-medium w-8">prev</span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
