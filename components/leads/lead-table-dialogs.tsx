@@ -38,6 +38,8 @@ export interface LeadTableDialogsProps {
   setPspWizardLead: (lead: Lead | null) => void
   setViewingAppointment: (apt: import("@/types").Appointment | null) => void
   handleLostConfirm: (reasonId: string, notes?: string) => Promise<void>
+  handleAssignLostReason?: (reasonId: string, notes?: string) => Promise<void>
+  assignReasonMode?: boolean
   handleContactedConfirm: (status: LeadStatus) => Promise<void>
   handleBlockedConfirm: (reason: SubmissionBlockedReason, notes?: string) => Promise<void>
   handleWithdrawConfirm: (reason: string, notes?: string) => Promise<void>
@@ -75,6 +77,8 @@ export function LeadTableDialogs({
   setPspWizardLead,
   setViewingAppointment,
   handleLostConfirm,
+  handleAssignLostReason,
+  assignReasonMode,
   handleContactedConfirm,
   handleBlockedConfirm,
   handleWithdrawConfirm,
@@ -124,14 +128,15 @@ export function LeadTableDialogs({
         fromStage={callbackFromStage}
       />
 
-      {/* Mark Lost Dialog */}
+      {/* Mark Lost Dialog / Assign Reason Dialog */}
       <MarkLostDialog
         open={!!lostDialogLead}
         onOpenChange={(open) => {
           if (!open) setLostDialogLead(null)
         }}
         leadName={lostDialogLead ? `${lostDialogLead.first_name} ${lostDialogLead.last_name}` : ''}
-        onConfirm={handleLostConfirm}
+        onConfirm={assignReasonMode && handleAssignLostReason ? handleAssignLostReason : handleLostConfirm}
+        assignReasonMode={assignReasonMode}
       />
 
       {/* Contacted Status Required Dialog */}

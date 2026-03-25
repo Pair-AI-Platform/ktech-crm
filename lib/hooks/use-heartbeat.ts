@@ -17,11 +17,11 @@ export type ManualStatus = 'meeting' | 'break' | null
 export function useHeartbeat(userId: string | undefined) {
   const [manualStatus, setManualStatusState] = useState<ManualStatus>(null)
   const queryClient = useQueryClient()
-  const supabase = createClient()
 
   // Fetch initial manual_status on mount
   useEffect(() => {
     if (!userId) return
+    const supabase = createClient()
     supabase
       .from('profiles')
       .select('manual_status')
@@ -32,10 +32,11 @@ export function useHeartbeat(userId: string | undefined) {
           setManualStatusState(data.manual_status as ManualStatus)
         }
       })
-  }, [userId, supabase])
+  }, [userId])
 
   useEffect(() => {
     if (!userId) return
+    const supabase = createClient()
 
     async function ping() {
       await supabase
@@ -47,18 +48,19 @@ export function useHeartbeat(userId: string | undefined) {
     ping()
     const interval = setInterval(ping, HEARTBEAT_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [userId, supabase])
+  }, [userId])
 
   const setManualStatus = useCallback(async (status: ManualStatus) => {
     if (!userId) return
     setManualStatusState(status)
+    const supabase = createClient()
     await supabase
       .from('profiles')
       .update({ manual_status: status })
       .eq('id', userId)
     // Invalidate presence so the dashboard updates
     queryClient.invalidateQueries({ queryKey: queryKeys.agentPresence.all })
-  }, [userId, supabase, queryClient])
+  }, [userId, queryClient])
 
   return { manualStatus, setManualStatus }
 }

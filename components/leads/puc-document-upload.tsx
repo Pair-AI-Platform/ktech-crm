@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
+import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
+import { ScanLine } from "lucide-react"
+import type { Lead } from "@/types"
 
 // The 5 PUC document types that appear on the lead profile
 const PUC_PROFILE_DOCUMENTS = [
@@ -40,6 +43,8 @@ interface StoredDocument {
 
 interface PUCDocumentUploadProps {
   leadId: string
+  lead?: Lead
+  onLeadUpdate?: () => void
   className?: string
 }
 
@@ -61,13 +66,16 @@ function getFileIcon(type: string) {
   return FILE_ICONS[type] || File
 }
 
-export function PUCDocumentUpload({ leadId, className }: PUCDocumentUploadProps) {
+export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUCDocumentUploadProps) {
   const [documents, setDocuments] = useState<Record<string, StoredDocument | null>>({})
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false)
+  const [extracting, setExtracting] = useState(false)
 
   // Load existing documents from the psp_documents table
   useEffect(() => {
@@ -154,6 +162,41 @@ export function PUCDocumentUpload({ leadId, className }: PUCDocumentUploadProps)
         ...prev,
         [docId]: savedDoc,
       }))
+
+      // Trigger civil ID extraction if this is a civil_id document
+      if (docId === "civil_id" && lead && !file.type.includes("pdf")) {
+        setExtracting(true)
+        try {
+          const reader = new FileReader()
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result as string
+              // Extract base64 data after the data URL prefix
+              resolve(result.split(",")[1])
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+
+          const extractRes = await fetch("/api/civil-id-extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
+          })
+
+          if (extractRes.ok) {
+            const { extracted } = await extractRes.json()
+            if (extracted && Object.keys(extracted).some(k => extracted[k])) {
+              setExtractedData(extracted)
+              setShowExtractionDialog(true)
+            }
+          }
+        } catch (err) {
+          console.error("Civil ID extraction failed:", err)
+        } finally {
+          setExtracting(false)
+        }
+      }
     } catch (err) {
       console.error("Upload failed:", err)
       alert("Failed to upload file. Please try again.")
@@ -393,6 +436,35 @@ export function PUCDocumentUpload({ leadId, className }: PUCDocumentUploadProps)
           url={pdfPreview.url}
           fileName={pdfPreview.name}
           onClose={() => setPdfPreview(null)}
+        />
+      )}
+
+      {/* Extracting indicator */}
+      {extracting && (
+        <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <ScanLine className="w-4 h-4" />
+          Extracting information from Civil ID...
+        </div>
+      )}
+
+      {/* Civil ID Extraction Dialog */}
+      {showExtractionDialog && extractedData && lead && (
+        <CivilIdExtractionDialog
+          isOpen={showExtractionDialog}
+          onClose={() => setShowExtractionDialog(false)}
+          extractedData={extractedData}
+          currentLead={lead}
+          onApply={async (fieldsToUpdate) => {
+            const supabase = createClient()
+            const { error } = await supabase
+              .from("leads")
+              .update(fieldsToUpdate)
+              .eq("id", leadId)
+            if (!error) {
+              onLeadUpdate?.()
+            }
+          }}
         />
       )}
     </div>

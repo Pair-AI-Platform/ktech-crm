@@ -28,6 +28,8 @@ interface UseLeadsFilters {
   lostAtFilter?: string
   hasNotes?: string
   lostReasonIds?: string[]
+  priority?: string
+  ministryAssigned?: string
 }
 
 interface UseLeadsOptions {
@@ -38,10 +40,11 @@ interface UseLeadsOptions {
   page?: number
   pageSize?: number
   filters?: UseLeadsFilters
+  enabled?: boolean
 }
 
 export function useLeads(options: UseLeadsOptions = {}) {
-  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25, filters: advancedFilters } = options
+  const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25, filters: advancedFilters, enabled = true } = options
   const usePagination = page !== undefined
   const queryClient = useQueryClient()
 
@@ -81,154 +84,47 @@ export function useLeads(options: UseLeadsOptions = {}) {
         }
       }
 
-      const supabase = createClient()
-
-      // Build count query in parallel with data query for pagination
-      const buildQuery = (forCount: boolean) => {
-        let q = supabase
-          .from("leads")
-          .select(
-            forCount
-              ? "*"
-              : `
-                *,
-                school:schools(id, name_en, name_ar),
-                assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
-                appointments(id, appointment_type, status, scheduled_date),
-                lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category)
-              `,
-            forCount ? { count: "exact", head: true } : undefined
-          )
-
-        if (!forCount) {
-          q = q
-            .order("position_in_stage", { ascending: true })
-            .order("created_at", { ascending: false })
-        }
-
-        if (stage !== "all") {
-          q = q.eq("pipeline_stage", stage)
-        }
-
-        if (fundingType !== "all") {
-          q = q.eq("funding_type", fundingType)
-        }
-
-        if (searchQuery) {
-          q = q.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,civil_id.ilike.%${searchQuery}%`)
-        }
-
-        // Advanced filters (server-side)
-        if (advancedFilters) {
-          if (advancedFilters.statuses && advancedFilters.statuses.length > 0) {
-            q = q.in("status", advancedFilters.statuses)
-          }
-          if (advancedFilters.sources && advancedFilters.sources.length > 0) {
-            q = q.in("source", advancedFilters.sources)
-          }
-          if (advancedFilters.schools && advancedFilters.schools.length > 0) {
-            q = q.in("school_id", advancedFilters.schools)
-          }
-          if (advancedFilters.academicTrack && advancedFilters.academicTrack !== "all") {
-            q = q.eq("academic_track", advancedFilters.academicTrack)
-          }
-          if (advancedFilters.assignedTo) {
-            q = q.eq("assigned_to", advancedFilters.assignedTo)
-          }
-          if (advancedFilters.isKuwaiti !== null && advancedFilters.isKuwaiti !== undefined) {
-            q = q.eq("is_kuwaiti", advancedFilters.isKuwaiti)
-          }
-          if (advancedFilters.gpaMin !== null && advancedFilters.gpaMin !== undefined) {
-            q = q.or(`gpa_grade_12_expected.gte.${advancedFilters.gpaMin},gpa_grade_11.gte.${advancedFilters.gpaMin},gpa_grade_10.gte.${advancedFilters.gpaMin}`)
-          }
-          if (advancedFilters.gpaMax !== null && advancedFilters.gpaMax !== undefined) {
-            q = q.or(`gpa_grade_12_expected.lte.${advancedFilters.gpaMax},gpa_grade_11.lte.${advancedFilters.gpaMax},gpa_grade_10.lte.${advancedFilters.gpaMax}`)
-          }
-          if (advancedFilters.ministryBlocked === "blocked") {
-            q = q.eq("ministry_blocked", true)
-          } else if (advancedFilters.ministryBlocked === "not_blocked") {
-            q = q.eq("ministry_blocked", false)
-          }
-          if (advancedFilters.blockReasons && advancedFilters.blockReasons.length > 0) {
-            q = q.in("submission_blocked_reason", advancedFilters.blockReasons)
-          }
-          if (advancedFilters.submissionSubstages && advancedFilters.submissionSubstages.length > 0) {
-            q = q.in("submission_substage", advancedFilters.submissionSubstages)
-          }
-          if (advancedFilters.submissionStatuses && advancedFilters.submissionStatuses.length > 0) {
-            q = q.in("submission_status", advancedFilters.submissionStatuses)
-          }
-          if (advancedFilters.lostAtStages && advancedFilters.lostAtStages.length > 0) {
-            q = q.in("lost_at_stage", advancedFilters.lostAtStages)
-          }
-          if (advancedFilters.lostAtFilter && advancedFilters.lostAtFilter !== "all") {
-            q = q.eq("lost_at_stage", advancedFilters.lostAtFilter)
-          }
-          if (advancedFilters.lostReasonIds && advancedFilters.lostReasonIds.length > 0) {
-            q = q.in("lost_reason_id", advancedFilters.lostReasonIds)
-          }
-          if (advancedFilters.hasNotes === "with_notes") {
-            q = q.neq("notes", "").not("notes", "is", null)
-          } else if (advancedFilters.hasNotes === "without_notes") {
-            q = q.or("notes.is.null,notes.eq.")
-          }
-          if (advancedFilters.dateRange && advancedFilters.dateRange !== "all") {
-            const now = new Date()
-            let cutoff: Date
-            switch (advancedFilters.dateRange) {
-              case "today":
-                cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-                break
-              case "week":
-                cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-                break
-              case "month":
-                cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-                break
-              case "quarter":
-                cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-                break
-              default:
-                cutoff = new Date(0)
-            }
-            q = q.gte("created_at", cutoff.toISOString())
-          }
-        }
-
-        return q
+      // Fetch via API route (server-side query with proper auth)
+      const params = new URLSearchParams()
+      if (stage !== "all") params.set("stage", stage)
+      if (fundingType !== "all") params.set("fundingType", fundingType)
+      if (searchQuery) params.set("search", searchQuery)
+      params.set("limit", String(limit))
+      if (usePagination) {
+        params.set("page", String(page))
+        params.set("pageSize", String(pageSize))
+      }
+      if (advancedFilters) {
+        params.set("filters", JSON.stringify(advancedFilters))
       }
 
-      if (usePagination) {
-        const offset = (page! - 1) * pageSize
-        const [dataResult, countResult] = await Promise.all([
-          buildQuery(false).range(offset, offset + pageSize - 1),
-          buildQuery(true),
-        ])
+      const res = await fetch(`/api/leads?${params.toString()}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(body.error || `Failed to fetch leads (${res.status})`)
+      }
 
-        if (dataResult.error) throw new Error(dataResult.error.message)
+      const result = await res.json()
 
-        return {
-          leads: (dataResult.data as unknown as Lead[] | null) || [],
-          totalCount: countResult.count ?? 0,
-        }
-      } else {
-        const dataResult = await buildQuery(false).limit(limit)
+      // Map contact_status to status for backward compat
+      const leads = (result.leads || []).map((l: any) => ({
+        ...l,
+        status: l.contact_status ?? l.status,
+      }))
 
-        if (dataResult.error) throw new Error(dataResult.error.message)
-
-        return {
-          leads: (dataResult.data as unknown as Lead[] | null) || [],
-          totalCount: dataResult.data?.length || 0,
-        }
+      return {
+        leads: leads as Lead[],
+        totalCount: result.totalCount ?? leads.length,
       }
     },
     staleTime: 30_000,
+    enabled,
   })
 
   // Subscribe to real-time changes (only in non-demo mode)
   // On realtime event, invalidate the React Query cache instead of fetching directly
   useEffect(() => {
-    if (isDemoMode()) return
+    if (isDemoMode() || !enabled) return
 
     const supabase = createClient()
 
@@ -254,7 +150,7 @@ export function useLeads(options: UseLeadsOptions = {}) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [queryClient, stage, fundingType])
+  }, [queryClient, stage, fundingType, enabled])
 
   const leads = data?.leads ?? []
   const totalCount = data?.totalCount ?? 0
@@ -287,47 +183,16 @@ export function useLead(id: string) {
         const demoLeads = getDemoLeads()
         const demoLead = demoLeads.find(l => l.id === id)
         if (demoLead) return demoLead
-        throw new Error("Lead not found")
+        return null
       }
 
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from("leads")
-        .select(`
-          *,
-          school:schools(id, name_en, name_ar),
-          assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
-          lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category),
-          semester:semesters(id, name, is_active)
-        `)
-        .eq("id", id)
-        .single()
-
-      if (error) throw new Error(error.message)
-
-      // Auto-assign to active cycle's open term if lead has no semester
-      if (!data.semester_id) {
-        const { data: openTerms } = await supabase
-          .from("semesters")
-          .select("id, name, is_active, cycle_id")
-          .eq("is_active", true)
-          .eq("is_open", true)
-          .limit(1)
-          .single()
-
-        if (openTerms) {
-          await supabase
-            .from("leads")
-            .update({ semester_id: openTerms.id })
-            .eq("id", data.id)
-
-          data.semester_id = openTerms.id
-          data.semester = { id: openTerms.id, name: openTerms.name, is_active: openTerms.is_active } as Lead["semester"]
-        }
+      const res = await fetch(`/api/leads/${id}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(body.error || `Failed to fetch lead (${res.status})`)
       }
 
-      return data as Lead
+      return (await res.json()) as Lead
     },
     enabled: !!id,
     staleTime: 30_000,
@@ -453,7 +318,7 @@ export function useLeadMutations() {
         .from("leads")
         .insert({
           ...finalLeadData,
-          status: null,
+          contact_status: null,
           assigned_to: finalLeadData.assigned_to || user?.id,
           assigned_at: new Date().toISOString(),
         })
@@ -515,7 +380,7 @@ export function useLeadMutations() {
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, preferred_college")
+        .select("pipeline_stage, contact_status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college")
         .eq("id", id)
         .single()
 
@@ -637,9 +502,11 @@ export function useLeadMutations() {
       }
 
       // Log activity for status change
-      if (updates.status !== undefined && oldLead && updates.status !== oldLead.status) {
-        const oldStatusLabel = oldLead.status ? (LEAD_STATUSES.find(s => s.value === oldLead.status)?.label || oldLead.status) : 'None'
-        const newStatusLabel = updates.status ? (LEAD_STATUSES.find(s => s.value === updates.status)?.label || updates.status) : 'None'
+      const newStatus = updates.contact_status ?? updates.status
+      const oldStatus = oldLead?.contact_status
+      if (newStatus !== undefined && oldLead && newStatus !== oldStatus) {
+        const oldStatusLabel = oldStatus ? (LEAD_STATUSES.find(s => s.value === oldStatus)?.label || oldStatus) : 'None'
+        const newStatusLabel = newStatus ? (LEAD_STATUSES.find(s => s.value === newStatus)?.label || newStatus) : 'None'
 
         await supabase.from('activities').insert({
           lead_id: id,
@@ -647,8 +514,8 @@ export function useLeadMutations() {
           title: 'Status Changed',
           description: `${oldLead.first_name} ${oldLead.last_name}: ${oldStatusLabel} → ${newStatusLabel}`,
           metadata: {
-            old_status: oldLead.status || null,
-            new_status: updates.status || null,
+            old_status: oldStatus || null,
+            new_status: newStatus || null,
             old_status_label: oldStatusLabel,
             new_status_label: newStatusLabel,
           },
@@ -945,9 +812,9 @@ export function useLeadMutations() {
 
     updates.last_contacted_at = new Date().toISOString()
 
-    // Clear status when moving to enrolled (no longer relevant)
+    // Clear contact_status when moving to enrolled (no longer relevant)
     if (stage === "enrolled") {
-      updates.status = null as unknown as Lead['status']
+      updates.contact_status = null as unknown as Lead['contact_status']
     }
 
     // Get old stage before update to check for test → application transition

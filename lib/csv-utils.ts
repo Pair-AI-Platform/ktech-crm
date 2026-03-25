@@ -20,7 +20,7 @@ export const LEAD_CSV_COLUMNS: { key: string; label: string; required?: boolean 
   { key: "gpa_grade_10", label: "GPA Grade 10", required: false },
   { key: "gpa_grade_11", label: "GPA Grade 11", required: false },
   { key: "gpa_grade_12_expected", label: "GPA Grade 12 (Expected)", required: false },
-  { key: "intended_major", label: "Intended Major", required: false },
+  { key: "intended_major", label: "ktech Intended Major", required: false },
   { key: "funding_type", label: "Funding Type", required: false },
   { key: "has_weyay_account", label: "Has Weyay Account", required: false },
   { key: "has_bank_account", label: "Has Bank Account", required: false },

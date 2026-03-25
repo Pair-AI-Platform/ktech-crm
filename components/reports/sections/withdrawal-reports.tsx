@@ -25,6 +25,7 @@ import type { EnrollmentReportData, WithdrawalsByAgentData } from "@/lib/hooks/u
 export interface WithdrawalReportsProps {
   enrollmentData: EnrollmentReportData
   withdrawalsByAgent: WithdrawalsByAgentData
+  isAgent?: boolean
 }
 
 const emptySubscribe = () => () => {}
@@ -53,16 +54,19 @@ const COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899', '#10B981'
 // Demo data when no real withdrawal data exists
 const DEMO_ENROLLMENT: EnrollmentReportData = {
   totalEnrolled: 156,
+  pucEnrolled: 62,
+  sfEnrolled: 94,
   byAgent: [],
   withdrawals: {
     total: 23,
     rate: 13,
     byReason: [
-      { reasonId: '1', reason: 'Financial Issues', count: 8, percent: 35 },
-      { reasonId: '2', reason: 'Relocated', count: 5, percent: 22 },
-      { reasonId: '3', reason: 'Schedule Conflict', count: 4, percent: 17 },
-      { reasonId: '4', reason: 'Personal Reasons', count: 3, percent: 13 },
-      { reasonId: '5', reason: 'Found Alternative', count: 3, percent: 13 },
+      { reasonId: 'payment_issue', reason: 'Payment Issue', count: 6, percent: 26 },
+      { reasonId: 'far_away', reason: 'Far Away', count: 5, percent: 22 },
+      { reasonId: 'personal_reasons', reason: 'Personal Reasons', count: 4, percent: 17 },
+      { reasonId: 'competitor_gust', reason: 'GUST', count: 3, percent: 13 },
+      { reasonId: 'studying_abroad', reason: 'Studying Abroad', count: 3, percent: 13 },
+      { reasonId: 'language_issues', reason: 'Language Issues', count: 2, percent: 9 },
     ],
   },
 }
@@ -71,14 +75,14 @@ const DEMO_WITHDRAWALS: WithdrawalsByAgentData = {
   totalWithdrawnSF: 14,
   totalWithdrawnPUC: 9,
   byAgent: [
-    { agentId: '1', agentName: 'Ahmed Al-Rashidi', avatarUrl: null, sfWithdrawn: 5, pucWithdrawn: 3, total: 8 },
-    { agentId: '2', agentName: 'Sara Al-Mutairi', avatarUrl: null, sfWithdrawn: 4, pucWithdrawn: 2, total: 6 },
-    { agentId: '3', agentName: 'Fahad Al-Dosari', avatarUrl: null, sfWithdrawn: 3, pucWithdrawn: 2, total: 5 },
-    { agentId: '4', agentName: 'Noura Al-Harbi', avatarUrl: null, sfWithdrawn: 2, pucWithdrawn: 2, total: 4 },
+    { agentId: '1', agentName: 'Ahmed Al-Rashidi', avatarUrl: null, sfWithdrawn: 5, pucWithdrawn: 3, total: 8, applicantCount: 20, ratio: 40 },
+    { agentId: '2', agentName: 'Sara Al-Mutairi', avatarUrl: null, sfWithdrawn: 4, pucWithdrawn: 2, total: 6, applicantCount: 18, ratio: 33 },
+    { agentId: '3', agentName: 'Fahad Al-Dosari', avatarUrl: null, sfWithdrawn: 3, pucWithdrawn: 2, total: 5, applicantCount: 15, ratio: 33 },
+    { agentId: '4', agentName: 'Noura Al-Harbi', avatarUrl: null, sfWithdrawn: 2, pucWithdrawn: 2, total: 4, applicantCount: 12, ratio: 33 },
   ],
 }
 
-export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: WithdrawalReportsProps) {
+export function WithdrawalReports({ enrollmentData, withdrawalsByAgent, isAgent }: WithdrawalReportsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   // Use demo data when no real withdrawal data exists
@@ -108,9 +112,9 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
       )}
 
       {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }}>
-          <Card hover glow className="relative overflow-hidden">
+          <Card hover glow>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--error-bg)] shadow-sm">
@@ -121,12 +125,11 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
               <p className="text-sm text-[var(--text-secondary)] mb-1">Total Withdrawals</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{totalWithdrawals}</p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--error)] opacity-50" />
           </Card>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card hover glow className="relative overflow-hidden">
+          <Card hover glow>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--primary-muted)] shadow-sm">
@@ -137,12 +140,11 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
               <p className="text-sm text-[var(--text-secondary)] mb-1">SF Withdrawals</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{displayWithdrawals.totalWithdrawnSF}</p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--primary)] opacity-50" />
           </Card>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card hover glow className="relative overflow-hidden">
+          <Card hover glow>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--warning-bg)] shadow-sm">
@@ -153,12 +155,11 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
               <p className="text-sm text-[var(--text-secondary)] mb-1">PUC Withdrawals</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{displayWithdrawals.totalWithdrawnPUC}</p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--warning)] opacity-50" />
           </Card>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card hover glow className="relative overflow-hidden">
+          <Card hover glow>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--warning-bg)] shadow-sm">
@@ -168,24 +169,9 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
               <p className="text-sm text-[var(--text-secondary)] mb-1">Withdrawal Rate</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{displayEnrollment.withdrawals.rate}%</p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--warning)] opacity-50" />
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card hover glow className="relative overflow-hidden">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-[var(--success-bg)] shadow-sm">
-                  <UserMinus className="w-5 h-5 text-[var(--success)]" />
-                </div>
-              </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Retention Rate</p>
-              <p className="text-2xl font-bold text-[var(--text-primary)]">{100 - displayEnrollment.withdrawals.rate}%</p>
-            </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--success)] opacity-50" />
-          </Card>
-        </motion.div>
       </div>
 
       {/* Withdrawal Reasons Chart */}
@@ -261,7 +247,8 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
         </motion.div>
       </div>
 
-      {/* Withdrawals per Agent Table */}
+      {/* Withdrawals per Agent Table — admin only */}
+      {!isAgent && (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
         <Card>
           <CardHeader>
@@ -282,6 +269,12 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
                       <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">SF</th>
                       <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
                       <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3" title="Percentage of the agent's total applicants that withdrew">
+                        <span className="inline-flex items-center gap-1">
+                          Ratio
+                          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[var(--text-muted)]/20 text-[9px] font-bold text-[var(--text-muted)] cursor-help" title="Withdrawals ÷ Total Applicants × 100">?</span>
+                        </span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -308,6 +301,11 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
                         <td className="py-3 px-3 text-center">
                           <Badge variant="error" size="sm">{agent.total}</Badge>
                         </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className={`text-sm font-semibold ${agent.ratio >= 50 ? 'text-[var(--error)]' : agent.ratio >= 30 ? 'text-[var(--warning)]' : 'text-[var(--success)]'}`}>
+                            {agent.ratio}%
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -321,6 +319,7 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent }: Withdr
           </CardContent>
         </Card>
       </motion.div>
+      )}
     </div>
   )
 }

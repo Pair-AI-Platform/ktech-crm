@@ -11,7 +11,7 @@ const DEMO_USERS = [
   {
     email: "demo-agent@ktech.edu.kw",
     password: "demo-agent-2026!",
-    full_name: "Demo Agent",
+    full_name: "Khalifa",
     role: "agent" as const,
   },
 ]
@@ -36,7 +36,12 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (existing) {
-      results.push({ email: user.email, status: "already exists" })
+      // Ensure role and name are correct for existing demo users
+      await supabase
+        .from("profiles")
+        .update({ role: user.role, full_name: user.full_name })
+        .eq("id", existing.id)
+      results.push({ email: user.email, status: "updated" })
       continue
     }
 

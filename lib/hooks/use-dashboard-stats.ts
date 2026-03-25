@@ -16,6 +16,8 @@ export interface DashboardLead {
   last_name: string
   phone: string
   pipeline_stage: string
+  contact_status: string | null
+  /** Alias for contact_status — kept for backward compat with page.tsx */
   status: string | null
   funding_type: string | null
   assigned_to: string | null
@@ -29,7 +31,7 @@ export interface DashboardLead {
 }
 
 const DASHBOARD_LEAD_COLUMNS =
-  'id, first_name, last_name, phone, pipeline_stage, status, funding_type, assigned_to, created_at, updated_at, last_contacted_at, callback_date, date_of_birth, priority, source'
+  'id, first_name, last_name, phone, pipeline_stage, contact_status, funding_type, assigned_to, created_at, updated_at, last_contacted_at, callback_date, date_of_birth, priority, source'
 
 /**
  * Single lightweight query that replaces the three useLeads(limit:200) calls
@@ -45,44 +47,54 @@ export function useDashboardStats() {
     const abortController = new AbortController()
 
     async function fetchStats() {
-      if (isDemoMode()) {
-        // Map demo leads to the lightweight shape
-        const demoLeads = getDemoLeads()
-        const mapped: DashboardLead[] = demoLeads.map(l => ({
-          id: l.id,
-          first_name: l.first_name,
-          last_name: l.last_name,
-          phone: l.phone,
-          pipeline_stage: l.pipeline_stage,
-          status: l.status ?? null,
-          funding_type: l.funding_type ?? null,
-          assigned_to: l.assigned_to ?? null,
-          created_at: l.created_at,
-          updated_at: l.updated_at,
-          last_contacted_at: l.last_contacted_at ?? null,
-          callback_date: l.callback_date ?? null,
-          date_of_birth: l.date_of_birth ?? null,
-          priority: null,
-          source: l.source ?? null,
-        }))
-        setAllLeads(mapped)
-        setLoading(false)
-        return
+      try {
+        if (isDemoMode()) {
+          // Map demo leads to the lightweight shape
+          const demoLeads = getDemoLeads()
+          const mapped: DashboardLead[] = demoLeads.map(l => ({
+            id: l.id,
+            first_name: l.first_name,
+            last_name: l.last_name,
+            phone: l.phone,
+            pipeline_stage: l.pipeline_stage,
+            contact_status: l.status ?? null,
+            status: l.status ?? null,
+            funding_type: l.funding_type ?? null,
+            assigned_to: l.assigned_to ?? null,
+            created_at: l.created_at,
+            updated_at: l.updated_at,
+            last_contacted_at: l.last_contacted_at ?? null,
+            callback_date: l.callback_date ?? null,
+            date_of_birth: l.date_of_birth ?? null,
+            priority: null,
+            source: l.source ?? null,
+          }))
+          setAllLeads(mapped)
+          setLoading(false)
+          return
+        }
+
+        const supabase = createClient()
+
+        const { data, error } = await supabase
+          .from('leads')
+          .select(DASHBOARD_LEAD_COLUMNS)
+          .order('created_at', { ascending: false })
+
+        if (abortController.signal.aborted) return
+        if (error) {
+          console.error('[useDashboardStats] Supabase error:', error.message)
+        }
+        if (!error && data) {
+          setAllLeads(data.map((l: any) => ({ ...l, status: l.contact_status })) as DashboardLead[])
+        }
+      } catch (err) {
+        console.error('[useDashboardStats] Failed to fetch leads:', err)
+      } finally {
+        if (!abortController.signal.aborted) {
+          setLoading(false)
+        }
       }
-
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from('leads')
-        .select(DASHBOARD_LEAD_COLUMNS)
-        .order('created_at', { ascending: false })
-
-      if (abortController.signal.aborted) return
-
-      if (!error && data) {
-        setAllLeads(data as DashboardLead[])
-      }
-      setLoading(false)
     }
 
     fetchStats()

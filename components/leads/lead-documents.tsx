@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { SF_DOCUMENTS, type Lead } from "@/types"
+import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
+import { ScanLine } from "lucide-react"
 
 interface LeadDocument {
   id: string
@@ -35,6 +37,7 @@ interface LeadDocumentsProps {
   leadId: string
   lead?: Lead
   onDocumentToggle?: (key: string, value: boolean) => Promise<void>
+  onLeadUpdate?: () => void
   className?: string
 }
 
@@ -56,13 +59,16 @@ function getFileIcon(type: string) {
   return FILE_ICONS[type] || File
 }
 
-export function LeadDocuments({ leadId, lead, onDocumentToggle, className }: LeadDocumentsProps) {
+export function LeadDocuments({ leadId, lead, onDocumentToggle, onLeadUpdate, className }: LeadDocumentsProps) {
   const [documents, setDocuments] = useState<LeadDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [togglingKey, setTogglingKey] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false)
+  const [extracting, setExtracting] = useState(false)
 
   const isSelfFunded = lead?.funding_type === 'self_funded'
 
@@ -141,6 +147,40 @@ export function LeadDocuments({ leadId, lead, onDocumentToggle, className }: Lea
 
       if (newDocs.length > 0) {
         saveDocuments([...documents, ...newDocs])
+
+        // Check if any uploaded file is a civil ID (by name) and trigger extraction
+        const civilIdFile = Array.from(files).find(f => {
+          const name = f.name.toLowerCase()
+          return (name.includes('civil') || name.includes('بطاقة') || name.includes('مدني')) &&
+            f.type.startsWith('image/')
+        })
+        if (civilIdFile && lead) {
+          setExtracting(true)
+          try {
+            const reader = new FileReader()
+            const base64 = await new Promise<string>((resolve, reject) => {
+              reader.onload = () => resolve((reader.result as string).split(",")[1])
+              reader.onerror = reject
+              reader.readAsDataURL(civilIdFile)
+            })
+            const extractRes = await fetch("/api/civil-id-extract", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageBase64: base64, mimeType: civilIdFile.type }),
+            })
+            if (extractRes.ok) {
+              const { extracted } = await extractRes.json()
+              if (extracted && Object.keys(extracted).some(k => extracted[k])) {
+                setExtractedData(extracted)
+                setShowExtractionDialog(true)
+              }
+            }
+          } catch (err) {
+            console.error("Civil ID extraction failed:", err)
+          } finally {
+            setExtracting(false)
+          }
+        }
       }
     } catch (err) {
       console.error('Upload failed:', err)
@@ -367,6 +407,35 @@ export function LeadDocuments({ leadId, lead, onDocumentToggle, className }: Lea
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Extracting indicator */}
+      {extracting && (
+        <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <ScanLine className="w-4 h-4" />
+          Extracting information from Civil ID...
+        </div>
+      )}
+
+      {/* Civil ID Extraction Dialog */}
+      {showExtractionDialog && extractedData && lead && (
+        <CivilIdExtractionDialog
+          isOpen={showExtractionDialog}
+          onClose={() => setShowExtractionDialog(false)}
+          extractedData={extractedData}
+          currentLead={lead}
+          onApply={async (fieldsToUpdate) => {
+            const supabase = createClient()
+            const { error } = await supabase
+              .from("leads")
+              .update(fieldsToUpdate)
+              .eq("id", leadId)
+            if (!error) {
+              onLeadUpdate?.()
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

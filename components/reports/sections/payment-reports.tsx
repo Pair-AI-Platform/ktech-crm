@@ -10,6 +10,11 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "recharts"
 import {
   CreditCard,
@@ -18,11 +23,15 @@ import {
   CheckCircle2,
   Clock,
   FolderOpen,
+  BarChart3,
+  Percent,
 } from "lucide-react"
+import { ProgressBar } from "@/components/ui/progress"
 import type { PaymentReportData } from "@/lib/hooks/use-reports"
 
 interface PaymentReportsProps {
   data: PaymentReportData
+  isAgent?: boolean
 }
 
 const emptySubscribe = () => () => {}
@@ -46,7 +55,20 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   return null
 }
 
-export function PaymentReports({ data }: PaymentReportsProps) {
+function BarTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { agentName: string; amount: number; count: number } }> }) {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload
+    return (
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{d.agentName}</p>
+        <p className="text-xs text-[var(--text-muted)]">{d.amount.toLocaleString()} KD &middot; {d.count} students</p>
+      </div>
+    )
+  }
+  return null
+}
+
+export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   const pieData = [
@@ -55,37 +77,49 @@ export function PaymentReports({ data }: PaymentReportsProps) {
     { name: 'Full Tuition', value: data.fullTuition, color: '#22C55E' },
   ].filter(d => d.value > 0)
 
+  const collectionRate = data.totalStudents > 0
+    ? Math.round(((data.seatReserved + data.fullTuition) / data.totalStudents) * 100)
+    : 0
+
   const stats = [
     {
       title: "Total Students",
       value: data.totalStudents,
       icon: Users,
-      color: "primary",
-      colorClass: "bg-[var(--bg-sunken)]"
+      color: "default" as const,
+      colorClass: "bg-[var(--bg-sunken)]",
+      barColor: "bg-[var(--text-muted)]",
+      percent: 100,
     },
     {
       title: "Pending",
-      value: `${data.pending}`,
-      subtext: `${Math.round((data.pending / data.totalStudents) * 100) || 0}% of total`,
+      value: data.pending,
+      subtext: `${data.totalStudents > 0 ? Math.round((data.pending / data.totalStudents) * 100) : 0}% of total`,
       icon: Clock,
-      color: "warning",
-      colorClass: "bg-[var(--warning)]"
+      color: "warning" as const,
+      colorClass: "bg-[var(--warning)]",
+      barColor: "bg-[var(--warning)]",
+      percent: data.totalStudents > 0 ? Math.round((data.pending / data.totalStudents) * 100) : 0,
     },
     {
       title: "Seat Reserved",
-      value: `${data.seatReservedPercent}%`,
-      subtext: `${data.seatReserved} students`,
+      value: data.seatReserved,
+      subtext: `${data.seatReservedPercent}% of files`,
       icon: CheckCircle2,
-      color: "info",
-      colorClass: "bg-[var(--primary)]"
+      color: "info" as const,
+      colorClass: "bg-[var(--primary)]",
+      barColor: "bg-[var(--primary)]",
+      percent: data.seatReservedPercent,
     },
     {
       title: "Full Payment",
-      value: `${data.fullTuitionPercent}%`,
-      subtext: `${data.fullTuition} students`,
+      value: data.fullTuition,
+      subtext: `${data.fullTuitionPercent}% of files`,
       icon: TrendingUp,
-      color: "success",
-      colorClass: "bg-[var(--success)]"
+      color: "success" as const,
+      colorClass: "bg-[var(--success)]",
+      barColor: "bg-[var(--success)]",
+      percent: data.fullTuitionPercent,
     },
   ]
 
@@ -98,7 +132,7 @@ export function PaymentReports({ data }: PaymentReportsProps) {
             key={stat.title}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
+            transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
           >
             <Card hover glow className="relative overflow-hidden">
               <CardContent className="p-5">
@@ -106,11 +140,23 @@ export function PaymentReports({ data }: PaymentReportsProps) {
                   <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
+                  {stat.title !== "Total Students" && (
+                    <Badge variant={stat.color} size="sm">{stat.percent}%</Badge>
+                  )}
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
                 {stat.subtext && (
                   <p className="text-xs text-[var(--text-muted)] mt-1">{stat.subtext}</p>
+                )}
+                {/* Progress bar */}
+                {stat.title !== "Total Students" && (
+                  <div className="w-full h-1.5 rounded-full bg-[var(--bg-sunken)] mt-3 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${stat.barColor} transition-all duration-700`}
+                      style={{ width: `${stat.percent}%` }}
+                    />
+                  </div>
                 )}
               </CardContent>
               <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
@@ -119,11 +165,11 @@ export function PaymentReports({ data }: PaymentReportsProps) {
         ))}
       </div>
 
-      {/* Payment Status Distribution */}
+      {/* Payment Status Distribution — Donut with center label */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.4 }}
+        transition={{ duration: 0.4, delay: 0.6 }}
       >
         <Card>
           <CardHeader>
@@ -134,92 +180,106 @@ export function PaymentReports({ data }: PaymentReportsProps) {
             <CardDescription>Distribution by payment stage</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[260px]" style={{ minWidth: 0 }}>
+            <div className="h-[280px] relative" style={{ minWidth: 0 }}>
               {mounted && pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={70}
+                        outerRadius={100}
+                        paddingAngle={3}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center label */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <p className="text-3xl font-bold text-[var(--text-primary)]">{data.totalStudents}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Total</p>
+                  </div>
+                </>
               ) : (
-                <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
-                  No data available
+                <div className="flex flex-col items-center justify-center h-full gap-2">
+                  <CreditCard className="w-10 h-10 text-[var(--text-muted)] opacity-30" />
+                  <p className="text-sm text-[var(--text-muted)]">No payment data available</p>
                 </div>
               )}
             </div>
             {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-4">
-              {pieData.map((item) => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
-                </div>
-              ))}
-            </div>
+            {pieData.length > 0 && (
+              <div className="flex items-center justify-center gap-6 mt-4">
+                {pieData.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-sm text-[var(--text-secondary)]">
+                      {item.name} <span className="text-[var(--text-muted)]">({item.value})</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Payment Status Breakdown */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.6 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Status Breakdown</CardTitle>
-            <CardDescription>Detailed view of payment stages</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatusCard
-                icon={Clock}
-                title="Pending"
-                count={data.pending}
-                total={data.totalStudents}
-                color="warning"
-                description="Payment not yet initiated"
-              />
-              <StatusCard
-                icon={CheckCircle2}
-                title="Seat Reserved"
-                count={data.seatReserved}
-                total={data.totalStudents}
-                color="info"
-                description="150+ KD paid"
-              />
-              <StatusCard
-                icon={TrendingUp}
-                title="Full Tuition"
-                count={data.fullTuition}
-                total={data.totalStudents}
-                color="success"
-                description="550 KD paid"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      {/* Revenue by Agent — bar chart (admin only) */}
+      {!isAgent && data.byAgent.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.7 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-[var(--primary)]" />
+                Revenue by Agent
+              </CardTitle>
+              <CardDescription>Total amount collected per agent (KD)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]" style={{ minWidth: 0 }}>
+                {mounted ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={data.byAgent}
+                      layout="vertical"
+                      margin={{ top: 0, right: 20, bottom: 0, left: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
+                      <YAxis
+                        type="category"
+                        dataKey="agentName"
+                        width={100}
+                        tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
+                      />
+                      <Tooltip content={<BarTooltip />} cursor={{ fill: 'var(--bg-sunken)', opacity: 0.5 }} />
+                      <Bar dataKey="amount" fill="var(--primary)" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
-      {/* File Stage Payment Breakdown by Agent */}
-      {data.fileStageByAgent.length > 0 && (
+      {/* File Stage Payment Breakdown by Agent — admin only */}
+      {!isAgent && data.fileStageByAgent.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -302,43 +362,51 @@ export function PaymentReports({ data }: PaymentReportsProps) {
           </Card>
         </motion.div>
       )}
-    </div>
-  )
-}
 
-function StatusCard({
-  icon: Icon,
-  title,
-  count,
-  total,
-  color,
-  description,
-}: {
-  icon: typeof Clock
-  title: string
-  count: number
-  total: number
-  color: 'warning' | 'info' | 'success'
-  description: string
-}) {
-  const percent = total > 0 ? Math.round((count / total) * 100) : 0
-  const colorClasses = {
-    warning: 'bg-[var(--warning-bg)] text-[var(--warning)]',
-    info: 'bg-[var(--info-bg)] text-[var(--info)]',
-    success: 'bg-[var(--success-bg)] text-[var(--success)]',
-  }
-
-  return (
-    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <Badge variant={color} size="sm">{percent}%</Badge>
-      </div>
-      <h4 className="font-semibold text-[var(--text-primary)]">{title}</h4>
-      <p className="text-2xl font-bold text-[var(--text-primary)] my-1">{count}</p>
-      <p className="text-xs text-[var(--text-muted)]">{description}</p>
+      {/* Discount Analysis */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.9 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Percent className="w-5 h-5 text-[var(--warning)]" />
+              Discount Analysis
+            </CardTitle>
+            <CardDescription>Students by discount type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.discountAnalysis.length > 0 ? (
+              <div className="space-y-4">
+                {data.discountAnalysis.map((discount) => (
+                  <div key={discount.discountType} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {discount.label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" size="sm">{discount.count} students</Badge>
+                      </div>
+                    </div>
+                    <ProgressBar
+                      value={discount.count}
+                      max={Math.max(...data.discountAnalysis.map(d => d.count)) || 1}
+                      size="sm"
+                      variant="gradient"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-[var(--text-muted)]">
+                No discount data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   )
 }

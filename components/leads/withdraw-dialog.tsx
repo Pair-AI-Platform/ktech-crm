@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, UserMinus } from "lucide-react"
+import { Loader2, UserMinus, Check } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -14,48 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import type { WithdrawalReasonCategory } from "@/types"
-
-// Withdrawal reasons for enrolled students
-const WITHDRAWAL_REASONS: { id: string; category: WithdrawalReasonCategory; reason_en: string }[] = [
-  // Academic
-  { id: "wr-1", category: "academic", reason_en: "Academic difficulties" },
-  { id: "wr-2", category: "academic", reason_en: "Failed placement test" },
-  { id: "wr-3", category: "academic", reason_en: "Changed major interest" },
-  { id: "wr-4", category: "academic", reason_en: "Academic probation" },
-
-  // Financial
-  { id: "wr-5", category: "financial", reason_en: "Cannot afford tuition" },
-  { id: "wr-6", category: "financial", reason_en: "Lost scholarship/PUC" },
-  { id: "wr-7", category: "financial", reason_en: "Payment issues" },
-  { id: "wr-8", category: "financial", reason_en: "Financial emergency" },
-
-  // Personal
-  { id: "wr-9", category: "personal", reason_en: "Family circumstances" },
-  { id: "wr-10", category: "personal", reason_en: "Health issues" },
-  { id: "wr-11", category: "personal", reason_en: "Relocation" },
-  { id: "wr-12", category: "personal", reason_en: "Military service" },
-  { id: "wr-13", category: "personal", reason_en: "Got married" },
-
-  // Transfer
-  { id: "wr-14", category: "transfer", reason_en: "Transferring to another university" },
-  { id: "wr-15", category: "transfer", reason_en: "Accepted at PAAET" },
-  { id: "wr-16", category: "transfer", reason_en: "Accepted at Kuwait University" },
-  { id: "wr-17", category: "transfer", reason_en: "Studying abroad" },
-
-  // Other
-  { id: "wr-18", category: "other", reason_en: "Changed mind" },
-  { id: "wr-19", category: "other", reason_en: "No longer interested" },
-  { id: "wr-20", category: "other", reason_en: "Other reason" },
-]
-
-const CATEGORY_LABELS: Record<WithdrawalReasonCategory, string> = {
-  academic: "Academic",
-  financial: "Financial",
-  personal: "Personal",
-  transfer: "Transfer",
-  other: "Other",
-}
+import { WITHDRAWAL_REASONS, COMPETITOR_OPTIONS, MILITARY_SECURITY_OPTIONS } from "@/lib/config/withdrawal-reasons"
 
 interface WithdrawDialogProps {
   open: boolean
@@ -74,23 +33,18 @@ export function WithdrawDialog({
   const [notes, setNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
-  // Group reasons by category
-  const groupedReasons = WITHDRAWAL_REASONS.reduce((acc, reason) => {
-    if (!acc[reason.category]) {
-      acc[reason.category] = []
-    }
-    acc[reason.category].push(reason)
-    return acc
-  }, {} as Record<WithdrawalReasonCategory, typeof WITHDRAWAL_REASONS>)
-
-  const selectedReason = WITHDRAWAL_REASONS.find(r => r.id === selectedReasonId)
+  const allOptions = [
+    ...WITHDRAWAL_REASONS.map(r => ({ id: r.id, label: r.label })),
+    ...COMPETITOR_OPTIONS,
+    ...MILITARY_SECURITY_OPTIONS,
+  ]
+  const selectedOption = allOptions.find(r => r.id === selectedReasonId)
 
   const handleConfirm = async () => {
-    if (!selectedReasonId || !selectedReason) return
+    if (!selectedReasonId || !selectedOption) return
     setSubmitting(true)
     try {
-      await onConfirm(selectedReasonId, selectedReason.reason_en, notes.trim() || undefined)
-      // Reset state on success
+      await onConfirm(selectedReasonId, selectedOption.label, notes.trim() || undefined)
       setSelectedReasonId(null)
       setNotes("")
       onOpenChange(false)
@@ -106,6 +60,26 @@ export function WithdrawDialog({
       onOpenChange(false)
     }
   }
+
+  const renderButtons = (options: ReadonlyArray<{ id: string; label: string }>) => (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          onClick={() => setSelectedReasonId(option.id)}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-lg border transition-all inline-flex items-center gap-1.5",
+            selectedReasonId === option.id
+              ? "bg-orange-500 border-orange-500 text-white"
+              : "bg-[var(--bg-sunken)] border-[var(--border)] text-[var(--text-primary)] hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+          )}
+        >
+          {selectedReasonId === option.id && <Check className="w-3.5 h-3.5" />}
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -126,31 +100,28 @@ export function WithdrawDialog({
 
         <DialogBody>
           <div className="space-y-4">
-            {/* Reason Selection */}
-            <div className="space-y-3">
-              {Object.entries(groupedReasons).map(([category, categoryReasons]) => (
-                <div key={category}>
-                  <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">
-                    {CATEGORY_LABELS[category as WithdrawalReasonCategory]}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {categoryReasons.map((reason) => (
-                      <button
-                        key={reason.id}
-                        onClick={() => setSelectedReasonId(reason.id)}
-                        className={cn(
-                          "px-3 py-1.5 text-sm rounded-lg border transition-all",
-                          selectedReasonId === reason.id
-                            ? "bg-orange-500 border-orange-500 text-white"
-                            : "bg-[var(--bg-sunken)] border-[var(--border)] text-[var(--text-primary)] hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30"
-                        )}
-                      >
-                        {reason.reason_en}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            {/* General Reasons */}
+            <div>
+              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                Select Reason
+              </h4>
+              {renderButtons(WITHDRAWAL_REASONS)}
+            </div>
+
+            {/* Competitors */}
+            <div>
+              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                Competitors
+              </h4>
+              {renderButtons(COMPETITOR_OPTIONS)}
+            </div>
+
+            {/* Military / Security */}
+            <div>
+              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                Military / Security
+              </h4>
+              {renderButtons(MILITARY_SECURITY_OPTIONS)}
             </div>
 
             {/* Notes */}

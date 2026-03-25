@@ -21,6 +21,7 @@ import {
   UserX,
   TrendingDown,
   AlertTriangle,
+  AlertCircle,
   Users,
   Target,
 } from "lucide-react"
@@ -28,6 +29,7 @@ import type { LostReportData } from "@/lib/hooks/use-reports"
 
 export interface LostReportsProps {
   data: LostReportData
+  isAgent?: boolean
 }
 
 const emptySubscribe = () => () => {}
@@ -73,7 +75,7 @@ function BarCustomTooltip({ active, payload }: { active?: boolean; payload?: Bar
   return null
 }
 
-export function LostReports({ data }: LostReportsProps) {
+export function LostReports({ data, isAgent }: LostReportsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   const pieData = data.byReason.map((item, index) => ({
@@ -96,8 +98,27 @@ export function LostReports({ data }: LostReportsProps) {
       lostRatio: item.lostRatio,
     }))
 
+  const unknownCount = data.byReason.find(r => r.reason === 'Unknown')?.count || 0
+
   return (
     <div className="space-y-6">
+      {/* Missing Reasons Warning */}
+      {unknownCount > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                {unknownCount} lost lead{unknownCount !== 1 ? 's' : ''} missing a reason
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                Filter by &quot;Lost&quot; stage in the leads table and click &quot;+ Add reason&quot; to assign reasons retroactively.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }}>
@@ -181,9 +202,9 @@ export function LostReports({ data }: LostReportsProps) {
         </motion.div>
       </div>
 
-      {/* Lost per Stage Table + Bar Chart */}
+      {/* Lost per Stage — PUC + SF side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Stage Breakdown Table */}
+        {/* PUC Stage Breakdown */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -193,26 +214,25 @@ export function LostReports({ data }: LostReportsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingDown className="w-5 h-5 text-[var(--warning)]" />
-                Lost per Stage
+                Lost per Stage — PUC
               </CardTitle>
-              <CardDescription>How many leads were lost at each stage and the loss ratio</CardDescription>
+              <CardDescription>PUC leads lost at each stage and the loss ratio</CardDescription>
             </CardHeader>
             <CardContent>
-              {data.byStage.length > 0 ? (
+              {data.byStagePuc.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-[var(--border)]">
                         <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Stage</th>
                         <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Lost</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Reached</th>
                         <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Loss Ratio</th>
                         <th className="text-right text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3" style={{ minWidth: 120 }}></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.byStage.map((stage) => {
-                        const maxCount = Math.max(...data.byStage.map(s => s.count))
+                      {data.byStagePuc.map((stage) => {
+                        const maxCount = Math.max(...data.byStagePuc.map(s => s.count))
                         const barWidth = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
                         return (
                           <tr key={stage.stage} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
@@ -220,10 +240,7 @@ export function LostReports({ data }: LostReportsProps) {
                               <span className="text-sm font-medium text-[var(--text-primary)]">{stage.stageLabel}</span>
                             </td>
                             <td className="py-3 px-3 text-center">
-                              <span className="text-sm font-semibold text-[var(--error)]">{stage.count}</span>
-                            </td>
-                            <td className="py-3 px-3 text-center">
-                              <span className="text-sm text-[var(--text-secondary)]">{stage.totalInStage}</span>
+                              <span className="text-sm font-semibold text-[var(--warning)]">{stage.count}</span>
                             </td>
                             <td className="py-3 px-3 text-center">
                               <Badge
@@ -236,7 +253,7 @@ export function LostReports({ data }: LostReportsProps) {
                             <td className="py-3 pl-3">
                               <div className="w-full h-2 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-[var(--error)] transition-all duration-500"
+                                  className="h-full rounded-full bg-[var(--warning)] transition-all duration-500"
                                   style={{ width: `${barWidth}%` }}
                                 />
                               </div>
@@ -249,18 +266,89 @@ export function LostReports({ data }: LostReportsProps) {
                 </div>
               ) : (
                 <div className="text-center py-8 text-[var(--text-muted)]">
-                  No stage data available
+                  No PUC stage data available
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Loss Ratio Bar Chart */}
+        {/* SF Stage Breakdown */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.6 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingDown className="w-5 h-5 text-[var(--primary)]" />
+                Lost per Stage — SF
+              </CardTitle>
+              <CardDescription>Self-funded leads lost at each stage and the loss ratio</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.byStageSf.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[var(--border)]">
+                        <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Stage</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Lost</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Loss Ratio</th>
+                        <th className="text-right text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3" style={{ minWidth: 120 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.byStageSf.map((stage) => {
+                        const maxCount = Math.max(...data.byStageSf.map(s => s.count))
+                        const barWidth = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
+                        return (
+                          <tr key={stage.stage} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                            <td className="py-3 pr-4">
+                              <span className="text-sm font-medium text-[var(--text-primary)]">{stage.stageLabel}</span>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <span className="text-sm font-semibold text-[var(--primary)]">{stage.count}</span>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <Badge
+                                variant={stage.lostRatio >= 50 ? "error" : stage.lostRatio >= 25 ? "warning" : "secondary"}
+                                size="sm"
+                              >
+                                {stage.lostRatio}%
+                              </Badge>
+                            </td>
+                            <td className="py-3 pl-3">
+                              <div className="w-full h-2 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-[var(--primary)] transition-all duration-500"
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-[var(--text-muted)]">
+                  No SF stage data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Loss Ratio Bar Chart (all stages combined) */}
+      <div className="grid grid-cols-1 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.65 }}
         >
           <Card className="h-full">
             <CardHeader>
@@ -485,7 +573,8 @@ export function LostReports({ data }: LostReportsProps) {
         </motion.div>
       )}
 
-      {/* Lost Leads per Agent Table */}
+      {/* Lost Leads per Agent Table — admin only */}
+      {!isAgent && (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.0 }}>
         <Card>
           <CardHeader>
@@ -545,6 +634,7 @@ export function LostReports({ data }: LostReportsProps) {
           </CardContent>
         </Card>
       </motion.div>
+      )}
     </div>
   )
 }

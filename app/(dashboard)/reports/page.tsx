@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   Clock,
-  TrendingUp,
   AlertCircle,
   Filter,
   X,
@@ -57,7 +56,6 @@ import {
   Zap,
   Activity,
   Sparkles,
-  ClipboardList,
   AlertTriangle,
   UserMinus,
   UserX,
@@ -66,7 +64,6 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
 import { useCycles } from "@/lib/hooks/use-cycles"
-import { RoleGuard } from "@/components/auth/role-guard"
 import { AnimatedNumber } from "@/components/reports/animated-number"
 import { exportToCSV } from "@/lib/export-utils"
 import {
@@ -83,15 +80,17 @@ import {
   ChannelPerformance,
   AgentLeaderboard,
   DemographicReports,
-  ConversionBySource,
   AgentComparison,
-  TimeToConversion,
-  DetailedAnalytics,
   SchoolReports,
-  StageChangeAnalysis,
   CalendarReports,
   WithdrawalReports,
   LostReports,
+  AgentWorkload,
+  AgentActivity,
+  AgentAppointmentRates,
+  AgentSourceBreakdown,
+  AgentTopSources,
+  TargetReports,
 } from "@/components/reports"
 
 const emptySubscribe = () => () => {}
@@ -108,26 +107,80 @@ function formatTrend(change: number | null): { label: string; isPositive: boolea
   return { label: `${display}%`, isPositive: capped >= 0, isNew: false }
 }
 
-/** Tiny SVG sparkline from an array of numbers */
-function Sparkline({ data, width = 48, height = 20, color = "var(--primary)" }: {
+/** Tiny SVG sparkline from an array of numbers — with hover tooltip */
+function Sparkline({ data, width = 80, height = 32, color = "var(--primary)" }: {
   data: number[]
   width?: number
   height?: number
   color?: string
 }) {
+  const [hovered, setHovered] = useState<number | null>(null)
   if (!data.length) return null
   const max = Math.max(...data, 1)
   const min = Math.min(...data, 0)
   const range = max - min || 1
-  const points = data.map((v, i) => {
+  const pad = 2
+  const coords = data.map((v, i) => {
     const x = (i / Math.max(data.length - 1, 1)) * width
-    const y = height - ((v - min) / range) * (height - 2) - 1
-    return `${x},${y}`
-  }).join(" ")
+    const y = height - pad - ((v - min) / range) * (height - pad * 2)
+    return { x, y, value: v }
+  })
+  const points = coords.map(p => `${p.x},${p.y}`).join(" ")
+  const areaPoints = `0,${height} ${points} ${width},${height}`
+  const gradId = `spark-fill-${color.replace(/[^a-z0-9]/gi, '')}`
   return (
-    <svg width={width} height={height} className="inline-block opacity-60">
-      <polyline fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={points} />
-    </svg>
+    <div className="relative inline-block" style={{ width, height: height + 4 }}>
+      <svg
+        width={width}
+        height={height}
+        className="inline-block"
+        onMouseLeave={() => setHovered(null)}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon fill={`url(#${gradId})`} points={areaPoints} />
+        <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+        {/* Invisible wider hit areas for each data point */}
+        {coords.map((p, i) => (
+          <rect
+            key={i}
+            x={i === 0 ? 0 : (coords[i - 1].x + p.x) / 2}
+            y={0}
+            width={i === 0 || i === coords.length - 1
+              ? (width / Math.max(data.length - 1, 1)) / 2 + 4
+              : (coords[Math.min(i + 1, coords.length - 1)].x - coords[Math.max(i - 1, 0)].x) / 2
+            }
+            height={height}
+            fill="transparent"
+            onMouseEnter={() => setHovered(i)}
+          />
+        ))}
+        {/* Highlight dot on hovered point */}
+        {hovered !== null && (
+          <circle cx={coords[hovered].x} cy={coords[hovered].y} r={3} fill={color} stroke="white" strokeWidth={1.5} />
+        )}
+      </svg>
+      {/* Tooltip */}
+      {hovered !== null && (
+        <div
+          className="absolute z-50 pointer-events-none px-2 py-1 rounded-md text-[10px] font-bold shadow-lg whitespace-nowrap"
+          style={{
+            left: coords[hovered].x,
+            bottom: height - coords[hovered].y + 8,
+            transform: "translateX(-50%)",
+            backgroundColor: "var(--bg-surface)",
+            color: color,
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          {coords[hovered].value.toLocaleString()}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -147,8 +200,11 @@ const TAB_GROUPS = [
   { label: "Performance", tabs: ['overview', 'enrollment', 'withdraw', 'lost', 'pipeline', 'agents'] },
   { label: "Financial", tabs: ['payments', 'puc'] },
   { label: "Analysis", tabs: ['channels', 'schools', 'demographics', 'test-center', 'calendar'] },
-  { label: "Advanced", tabs: ['conversion', 'agent-compare', 'time-analysis', 'stage-analysis', 'detailed-analytics'] },
+  { label: "Advanced", tabs: ['detailed-analytics', 'target-report'] },
 ] as const
+
+// Tabs hidden from agent role users (team-wide / comparative data)
+const AGENT_HIDDEN_TABS = ['agents', 'enrollment', 'detailed-analytics', 'target-report']
 
 const REPORT_TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Executive summary & KPIs', group: 'Performance' },
@@ -164,11 +220,7 @@ const REPORT_TABS = [
   { id: 'demographics', label: 'Demographics', icon: PieChart, description: 'Student breakdown', group: 'Analysis' },
   { id: 'test-center', label: 'Test Center', icon: TestTube, description: 'Placement tests', group: 'Analysis' },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, description: 'Appointments & callbacks breakdown with attendance rates', group: 'Analysis' },
-  { id: 'conversion', label: 'Conversion', icon: TrendingUp, description: 'Conversion rates by lead source', group: 'Advanced' },
-  { id: 'agent-compare', label: 'Agent Compare', icon: UserCheck, description: 'Multi-metric agent comparison', group: 'Advanced' },
-  { id: 'time-analysis', label: 'Time Analysis', icon: Clock, description: 'Time-to-conversion analytics', group: 'Advanced' },
-  { id: 'stage-analysis', label: 'Analysis', icon: Activity, description: 'Stage change frequency per lead (deduplicated per day)', group: 'Advanced' },
-  { id: 'detailed-analytics', label: 'Detailed', icon: ClipboardList, description: 'Enrollment, withdrawals, gender, foundation & breakdown analytics', group: 'Advanced' },
+  { id: 'target-report', label: 'Target Report', icon: Target, description: 'Agent target progress & achievement tracking', group: 'Advanced' },
 ] as const
 
 const SOURCE_CATEGORIES = [
@@ -196,7 +248,7 @@ const FUNDING_TYPES = [
 // =============================================
 // TAB NAVIGATION with scroll arrows & group dividers
 // =============================================
-function TabNavigation({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
+function TabNavigation({ activeTab, setActiveTab, isAgent }: { activeTab: string; setActiveTab: (tab: string) => void; isAgent: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -224,7 +276,8 @@ function TabNavigation({ activeTab, setActiveTab }: { activeTab: string; setActi
     scrollRef.current?.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" })
   }
 
-  const currentIndex = REPORT_TABS.findIndex(t => t.id === activeTab)
+  const visibleReportTabs = isAgent ? REPORT_TABS.filter(t => !AGENT_HIDDEN_TABS.includes(t.id)) : REPORT_TABS
+  const currentIndex = visibleReportTabs.findIndex(t => t.id === activeTab)
 
   return (
     <motion.div
@@ -266,14 +319,17 @@ function TabNavigation({ activeTab, setActiveTab }: { activeTab: string; setActi
           ref={scrollRef}
           className="flex overflow-x-auto gap-0 p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] scrollbar-hide"
         >
-          {TAB_GROUPS.map((group, gi) => (
+          {TAB_GROUPS.map((group, gi) => {
+            const visibleTabs = group.tabs.filter(tabId => !(isAgent && AGENT_HIDDEN_TABS.includes(tabId)))
+            if (visibleTabs.length === 0) return null
+            return (
             <div key={group.label} className="flex items-center shrink-0">
               {gi > 0 && (
                 <div className="flex items-center mx-1.5">
                   <div className="w-px h-6 bg-[var(--border-emphasis)]" />
                 </div>
               )}
-              {group.tabs.map((tabId) => {
+              {visibleTabs.map((tabId) => {
                 const tab = REPORT_TABS.find(t => t.id === tabId)
                 if (!tab) return null
                 const Icon = tab.icon
@@ -304,18 +360,11 @@ function TabNavigation({ activeTab, setActiveTab }: { activeTab: string; setActi
                       isActive && "scale-110"
                     )} />
                     <span className="relative z-10">{tab.label}</span>
-                    {isActive && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="relative z-10 w-1.5 h-1.5 rounded-full bg-white/80"
-                      />
-                    )}
                   </motion.button>
                 )
               })}
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
@@ -330,7 +379,7 @@ function TabNavigation({ activeTab, setActiveTab }: { activeTab: string; setActi
           {REPORT_TABS.find(t => t.id === activeTab)?.description}
         </motion.p>
         <span className="text-[10px] text-[var(--text-muted)] tabular-nums shrink-0 ml-4">
-          {currentIndex + 1} / {REPORT_TABS.length}
+          {currentIndex + 1} / {visibleReportTabs.length}
         </span>
       </div>
     </motion.div>
@@ -387,6 +436,13 @@ export default function ReportsPage() {
     }
   }, [isAgent, profile?.id])
 
+  // Redirect agents away from hidden tabs
+  useEffect(() => {
+    if (isAgent && AGENT_HIDDEN_TABS.includes(activeTab)) {
+      setActiveTab('overview')
+    }
+  }, [isAgent, activeTab])
+
   // Calculate summary metrics
   const summaryMetrics = useMemo(() => {
     if (!data?.executive?.pipelineFunnel || !data?.enrollment || !data?.payment) return null
@@ -396,8 +452,8 @@ export default function ReportsPage() {
     const avgConversion = totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0
 
     const byFunding = data.executive.byFunding
-    const puc = byFunding?.puc ?? { totalLeads: 0, enrolled: 0, todayLeads: 0, todayEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, weeklyTrend: [] }
-    const sf = byFunding?.sf ?? { totalLeads: 0, enrolled: 0, todayLeads: 0, todayEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, weeklyTrend: [] }
+    const puc = byFunding?.puc ?? { totalLeads: 0, enrolled: 0, applicants: 0, periodLeads: 0, periodEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, dateTrend: [] }
+    const sf = byFunding?.sf ?? { totalLeads: 0, enrolled: 0, applicants: 0, periodLeads: 0, periodEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, dateTrend: [] }
     const pucConversion = puc.totalLeads > 0 ? Math.round((puc.enrolled / puc.totalLeads) * 100) : 0
     const sfConversion = sf.totalLeads > 0 ? Math.round((sf.enrolled / sf.totalLeads) * 100) : 0
 
@@ -405,15 +461,15 @@ export default function ReportsPage() {
       totalLeads,
       totalEnrolled,
       avgConversion,
-      todayLeads: data.executive.todayNumbers?.newLeads ?? 0,
-      todayEnrollments: data.executive.todayNumbers?.enrolled ?? 0,
-      leadsChange: data.executive.weekOverWeek?.leads?.change ?? null,
-      weekChange: data.executive.weekOverWeek?.enrollments?.change ?? null,
+      periodLeads: data.executive.periodNumbers?.newLeads ?? 0,
+      periodEnrollments: data.executive.periodNumbers?.enrolled ?? 0,
+      leadsChange: data.executive.periodComparison?.leads?.change ?? null,
+      periodChange: data.executive.periodComparison?.enrollments?.change ?? null,
       pendingPayments: data.payment.pending,
       targetProgress: data.executive.targetProgress?.percent ?? 0,
       targetCurrent: data.executive.targetProgress?.current ?? 0,
       targetTotal: data.executive.targetProgress?.target ?? 0,
-      weeklyTrend: (data.executive.agentPerformance ?? []).map(a => a.leads),
+      dateTrend: (data.executive.agentPerformance ?? []).map(a => a.leads),
       puc: { ...puc, conversion: pucConversion },
       sf: { ...sf, conversion: sfConversion },
     }
@@ -558,6 +614,21 @@ export default function ReportsPage() {
         exportToCSV(rows, `report-channels-${new Date().toISOString().slice(0, 10)}`)
         break
       }
+      case 'target-report': {
+        const rows = data.leaderboard.filter(a => a.target > 0).map(a => ({
+          Agent: a.agentName,
+          "PUC Target": a.categories?.puc?.target || 0,
+          "PUC Actual": a.categories?.puc?.applications || 0,
+          "PUC Progress (%)": a.categories?.puc?.progress || 0,
+          "SF Target": a.categories?.sf?.target || 0,
+          "SF Actual": a.categories?.sf?.applications || 0,
+          "SF Progress (%)": a.categories?.sf?.progress || 0,
+          "Total Target": a.target,
+          "Total Actual": (a.categories?.puc?.applications || 0) + (a.categories?.sf?.applications || 0),
+        }))
+        exportToCSV(rows, `report-targets-${new Date().toISOString().slice(0, 10)}`)
+        break
+      }
       default: {
         // Generic: export pipeline funnel as fallback
         const rows = data.executive.pipelineFunnel.map(s => ({
@@ -589,51 +660,11 @@ export default function ReportsPage() {
     return () => clearInterval(timer)
   }, [lastUpdated])
 
-  // Loading state
-  if (loading && !data) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-base)]">
-        <Header user={profile} title="Reports" />
-        <div className="flex items-center justify-center py-32">
-          <div className="text-center">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full border-4 border-[var(--border)] border-t-[var(--primary)] animate-spin mx-auto" />
-              <Sparkles className="w-6 h-6 text-[var(--primary)] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            </div>
-            <p className="text-[var(--text-secondary)] mt-4 font-medium">Loading reports...</p>
-            <p className="text-[var(--text-muted)] text-sm mt-1">Analyzing your data</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-base)]">
-        <Header user={profile} title="Reports" />
-        <div className="flex items-center justify-center py-32">
-          <Card className="max-w-md">
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-[var(--error-bg)] flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-8 h-8 text-[var(--error)]" />
-              </div>
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Failed to Load Reports</h3>
-              <p className="text-[var(--text-muted)] mb-4">{error || 'An unexpected error occurred'}</p>
-              <Button onClick={() => refetch()}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
+  // Determine content state
+  const isContentLoading = loading && !data
+  const isContentError = !loading && (error || !data)
 
   return (
-    <RoleGuard allowedRoles={['admin', 'agent']}>
     <div className={cn(
       "min-h-screen bg-[var(--bg-base)] transition-all",
       isFullscreen && "fixed inset-0 z-50 overflow-auto"
@@ -1024,11 +1055,39 @@ export default function ReportsPage() {
         {/* ============================================= */}
         {/* REPORT TABS NAVIGATION - With scroll arrows & group dividers */}
         {/* ============================================= */}
-        <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} isAgent={isAgent} />
 
         {/* ============================================= */}
         {/* REPORT CONTENT */}
         {/* ============================================= */}
+        {isContentLoading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-center">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-[var(--border)] border-t-[var(--primary)] animate-spin mx-auto" />
+                <Sparkles className="w-6 h-6 text-[var(--primary)] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              </div>
+              <p className="text-[var(--text-secondary)] mt-4 font-medium">Loading reports...</p>
+              <p className="text-[var(--text-muted)] text-sm mt-1">Analyzing your data</p>
+            </div>
+          </div>
+        ) : isContentError || !data ? (
+          <div className="flex items-center justify-center py-24">
+            <Card className="max-w-md">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--error-bg)] flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-[var(--error)]" />
+                </div>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Failed to Load Reports</h3>
+                <p className="text-[var(--text-muted)] mb-4">{error || 'An unexpected error occurred'}</p>
+                <Button onClick={() => refetch()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Try Again
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
         <motion.div
           key={activeTab}
           initial={{ opacity: 0, y: 20 }}
@@ -1044,15 +1103,15 @@ export default function ReportsPage() {
                 <div className="space-y-3">
                   {/* PUC Row */}
                   <div>
-                    <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">PUC</p>
+                    <p className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider mb-2">PUC</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <QuickStatCard
                         label="Total Leads"
                         value={summaryMetrics.puc.totalLeads}
                         icon={Users}
                         trend={summaryMetrics.puc.leadsChange}
-                        trendLabel="vs last week"
-                        sparklineData={summaryMetrics.puc.weeklyTrend}
+                        trendLabel="vs prev period"
+                        sparklineData={summaryMetrics.puc.dateTrend}
                         mounted={mounted}
                         colorScheme="primary"
                         onClick={() => setActiveTab('pipeline')}
@@ -1066,14 +1125,11 @@ export default function ReportsPage() {
                         colorScheme="warning"
                       />
                       <QuickStatCard
-                        label="Target Progress"
-                        value={summaryMetrics.puc.targetPercent}
-                        icon={Target}
-                        suffix="%"
-                        subtext={`${summaryMetrics.puc.targetCurrent} / ${summaryMetrics.puc.targetTotal}`}
+                        label="Applicants"
+                        value={summaryMetrics.puc.applicants ?? 0}
+                        icon={UserCheck}
                         mounted={mounted}
                         colorScheme="accent"
-                        progressPercent={summaryMetrics.puc.targetPercent}
                       />
                       <QuickStatCard
                         label="Enrolled"
@@ -1089,15 +1145,15 @@ export default function ReportsPage() {
 
                   {/* SF Row */}
                   <div>
-                    <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Self-Funded</p>
+                    <p className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider mb-2">SELF-FUNDED</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <QuickStatCard
                         label="Total Leads"
                         value={summaryMetrics.sf.totalLeads}
                         icon={Users}
                         trend={summaryMetrics.sf.leadsChange}
-                        trendLabel="vs last week"
-                        sparklineData={summaryMetrics.sf.weeklyTrend}
+                        trendLabel="vs prev period"
+                        sparklineData={summaryMetrics.sf.dateTrend}
                         mounted={mounted}
                         colorScheme="primary"
                         onClick={() => setActiveTab('pipeline')}
@@ -1111,14 +1167,11 @@ export default function ReportsPage() {
                         colorScheme="warning"
                       />
                       <QuickStatCard
-                        label="Target Progress"
-                        value={summaryMetrics.sf.targetPercent}
-                        icon={Target}
-                        suffix="%"
-                        subtext={`${summaryMetrics.sf.targetCurrent} / ${summaryMetrics.sf.targetTotal}`}
+                        label="Applicants"
+                        value={summaryMetrics.sf.applicants ?? 0}
+                        icon={UserCheck}
                         mounted={mounted}
                         colorScheme="accent"
-                        progressPercent={summaryMetrics.sf.targetPercent}
                       />
                       <QuickStatCard
                         label="Enrolled"
@@ -1138,7 +1191,7 @@ export default function ReportsPage() {
               <KPICardsGrid data={data} mounted={mounted} onNavigate={setActiveTab} />
 
               {/* Executive Dashboard Charts */}
-              <ExecutiveDashboard data={data.executive} />
+              <ExecutiveDashboard data={data.executive} isAgent={isAgent} onNavigateTab={setActiveTab} />
             </>
           )}
 
@@ -1152,32 +1205,44 @@ export default function ReportsPage() {
             <WithdrawalReports
               enrollmentData={data.enrollment}
               withdrawalsByAgent={data.detailedAnalytics.withdrawalsByAgent}
+              isAgent={isAgent}
             />
           )}
 
           {/* Lost Tab */}
           {activeTab === 'lost' && (
-            <LostReports data={data.lost} />
+            <LostReports data={data.lost} isAgent={isAgent} />
           )}
 
           {/* Pipeline Tab */}
           {activeTab === 'pipeline' && (
-            <ExecutiveDashboard data={data.executive} />
+            <ExecutiveDashboard data={data.executive} onNavigateTab={setActiveTab} />
           )}
 
-          {/* Agents Tab */}
-          {activeTab === 'agents' && (
-            <AgentLeaderboard data={data.leaderboard} />
+          {/* Agents Tab (admin only) */}
+          {activeTab === 'agents' && !isAgent && (
+            <div className="space-y-6">
+              <AgentLeaderboard data={data.leaderboard} />
+              <AgentComparison data={data.agentComparison} />
+              <AgentWorkload data={data.agentPerformance} />
+              <AgentActivity data={data.agentPerformance.activity} />
+              <AgentAppointmentRates data={data.agentPerformance.appointmentRates} />
+              <AgentSourceBreakdown data={data.agentPerformance.sourcePerformance} />
+              <AgentTopSources data={data.agentPerformance.sourcePerformance} />
+            </div>
           )}
 
           {/* Payments Tab */}
           {activeTab === 'payments' && (
-            <PaymentReports data={data.payment} />
+            <PaymentReports data={data.payment} isAgent={isAgent} />
           )}
 
           {/* Sources Tab */}
           {activeTab === 'channels' && (
-            <ChannelPerformance data={data.channel} />
+            <>
+              <ChannelPerformance data={data.channel} />
+              <AgentTopSources data={data.agentPerformance.sourcePerformance} />
+            </>
           )}
 
           {/* Schools Tab */}
@@ -1202,38 +1267,19 @@ export default function ReportsPage() {
 
           {/* Calendar Tab */}
           {activeTab === 'calendar' && (
-            <CalendarReports data={data.calendar} />
+            <CalendarReports data={data.calendar} isAgent={isAgent} />
           )}
 
-          {/* Conversion by Source Tab */}
-          {activeTab === 'conversion' && (
-            <ConversionBySource data={data.channel} />
+          {/* Target Report Tab */}
+          {activeTab === 'target-report' && (
+            <TargetReports data={data.leaderboard} />
           )}
 
-          {/* Agent Comparison Tab */}
-          {activeTab === 'agent-compare' && (
-            <AgentComparison data={data.agentComparison} />
-          )}
-
-          {/* Time Analysis Tab */}
-          {activeTab === 'time-analysis' && (
-            <TimeToConversion data={data.timeToConversion} />
-          )}
-
-          {/* Stage Change Analysis Tab */}
-          {activeTab === 'stage-analysis' && (
-            <StageChangeAnalysis data={data.stageChangeAnalysis} />
-          )}
-
-          {/* Detailed Analytics Tab */}
-          {activeTab === 'detailed-analytics' && (
-            <DetailedAnalytics data={data.detailedAnalytics} />
-          )}
         </motion.div>
+        )}
 
       </div>
     </div>
-    </RoleGuard>
   )
 }
 
@@ -1282,90 +1328,107 @@ function QuickStatCard({
   progressPercent?: number
   onClick?: () => void
 }) {
-  const colors = STAT_COLOR_SCHEMES[colorScheme]
+  const colors = STAT_COLOR_SCHEMES[colorScheme ?? 'primary'] ?? STAT_COLOR_SCHEMES.primary
   const trendInfo = trend !== undefined ? formatTrend(trend) : null
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02, y: -2 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3, boxShadow: "0 8px 30px -8px rgba(0,0,0,0.12)" }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
       onClick={onClick}
       className={cn(
-        "group relative overflow-hidden rounded-xl p-4 transition-all duration-300 bg-[var(--bg-elevated)] border border-[var(--border)]",
+        "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300",
+        "bg-[var(--bg-surface)] border border-[var(--border-default)]",
+        "shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
         onClick && "cursor-pointer",
         className
       )}
     >
-      {/* Gradient glow on hover */}
-      <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500", colors.bg)} />
+      {/* Subtle gradient overlay on hover */}
+      <div className={cn(
+        "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
+        "bg-gradient-to-br from-transparent via-transparent to-[var(--bg-hover)]"
+      )} />
 
-      {/* Top accent line */}
-      <div className={cn("absolute top-0 left-4 right-4 h-0.5 rounded-full", colors.accent)} />
+      {/* Left accent bar - removed */}
 
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          {/* Icon */}
-          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", colors.bg)}>
+        {/* Header: Icon + Trend */}
+        <div className="flex items-start justify-between mb-4">
+          <div className={cn(
+            "w-11 h-11 rounded-xl flex items-center justify-center",
+            "shadow-sm",
+            colors.bg
+          )}>
             <span className={colors.text}>
-              <Icon className="w-5 h-5" />
+              <Icon className="w-5.5 h-5.5" />
             </span>
           </div>
 
-          {/* Trend badge with label */}
           {trendInfo && (
             <div className="text-right">
               <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
                 className={cn(
-                  "inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full",
+                  "inline-flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-1 rounded-lg",
                   trendInfo.isNew
-                    ? "bg-[var(--info-bg)] text-[var(--info)]"
+                    ? "bg-[var(--info)]/8 text-[var(--info)]"
                     : trendInfo.isPositive
-                      ? "bg-[var(--success-bg)] text-[var(--success)]"
-                      : "bg-[var(--error-bg)] text-[var(--error)]"
+                      ? "bg-[var(--success)]/8 text-[var(--success)]"
+                      : "bg-[var(--error)]/8 text-[var(--error)]"
                 )}
               >
-                {!trendInfo.isNew && (trendInfo.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />)}
+                {!trendInfo.isNew && (trendInfo.isPositive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />)}
                 {trendInfo.label}
               </motion.span>
               {trendLabel && (
-                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{trendLabel}</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1 tracking-wide uppercase">{trendLabel}</p>
               )}
             </div>
           )}
         </div>
 
-        {/* Value */}
-        <p
-          className="text-2xl font-bold text-[var(--text-primary)] tracking-tight"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          {mounted ? <AnimatedNumber value={value} prefix={prefix} suffix={suffix} /> : `${prefix}${value}${suffix}`}
-        </p>
+        {/* Label first for context */}
+        <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-1">{label}</p>
 
-        {/* Label */}
-        <p className="text-xs text-[var(--text-muted)] mt-1 font-medium">{label}</p>
-        {subtext && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtext}</p>}
+        {/* Value — large and prominent */}
+        <div className="flex items-end justify-between gap-3">
+          <p
+            className="text-[28px] font-extrabold text-[var(--text-primary)] tracking-tight leading-none"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            {mounted ? <AnimatedNumber value={value} prefix={prefix} suffix={suffix} /> : `${prefix}${value}${suffix}`}
+          </p>
 
-        {/* Mini progress bar for target */}
+          {/* Sparkline — right-aligned, bigger */}
+          {sparklineData && sparklineData.length > 1 && (
+            <div className="flex-shrink-0 mb-0.5">
+              <Sparkline data={sparklineData} color={colors.color} width={72} height={28} />
+            </div>
+          )}
+        </div>
+
+        {subtext && <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-medium">{subtext}</p>}
+
+        {/* Progress bar — thicker, with label */}
         {progressPercent !== undefined && (
-          <div className="mt-2 h-1.5 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
-            <motion.div
-              className={cn("h-full rounded-full", colors.accent)}
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.max(Math.min(progressPercent, 100), 2)}%` }}
-              transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
-            />
-          </div>
-        )}
-
-        {/* Sparkline below value */}
-        {sparklineData && sparklineData.length > 1 && (
-          <div className="mt-1.5">
-            <Sparkline data={sparklineData} color={colors.color} width={60} height={16} />
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Progress</span>
+              <span className={cn("text-[11px] font-bold", colors.text)}>{progressPercent}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+              <motion.div
+                className={cn("h-full rounded-full", colors.accent)}
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.max(Math.min(progressPercent, 100), 2)}%` }}
+                transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -1376,82 +1439,127 @@ function QuickStatCard({
 // =============================================
 // KPI CARDS - Actionable Pipeline Metrics
 // =============================================
+const KPI_COLOR_CLASSES = {
+  amber: {
+    bg: "bg-amber-50 dark:bg-amber-950/30",
+    icon: "text-amber-600 dark:text-amber-400",
+    iconBg: "bg-amber-500",
+    glow: "shadow-amber-500/20",
+  },
+  blue: {
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    icon: "text-blue-600 dark:text-blue-400",
+    iconBg: "bg-blue-500",
+    glow: "shadow-blue-500/20",
+  },
+  purple: {
+    bg: "bg-violet-50 dark:bg-violet-950/30",
+    icon: "text-violet-600 dark:text-violet-400",
+    iconBg: "bg-violet-500",
+    glow: "shadow-violet-500/20",
+  },
+  sky: {
+    bg: "bg-sky-50 dark:bg-sky-950/30",
+    icon: "text-sky-600 dark:text-sky-400",
+    iconBg: "bg-sky-500",
+    glow: "shadow-sky-500/20",
+  },
+  red: {
+    bg: "bg-rose-50 dark:bg-rose-950/30",
+    icon: "text-rose-600 dark:text-rose-400",
+    iconBg: "bg-rose-500",
+    glow: "shadow-rose-500/20",
+  },
+} as const
+
 function KPICardsGrid({ data, mounted, onNavigate }: { data: ReportData; mounted: boolean; onNavigate: (tab: string) => void }) {
+  const totalSchedule = data?.executive?.periodNumbers?.appointments ?? 0
+  const callbacksCount = data?.executive?.periodNumbers?.callbacks ?? 0
+  const appointmentsOnly = totalSchedule - callbacksCount
+
   const kpis = [
     {
-      title: "Appointments This Week",
-      value: data.executive.weekOverWeek.appointments.current,
+      title: "Appointments",
+      value: appointmentsOnly,
+      subtext: undefined as string | undefined,
       icon: Calendar,
-      color: "purple",
-      tab: "agents",
+      color: "purple" as keyof typeof KPI_COLOR_CLASSES,
+      tab: "calendar",
+    },
+    {
+      title: "Callbacks",
+      value: callbacksCount,
+      subtext: undefined as string | undefined,
+      icon: Clock,
+      color: "sky" as keyof typeof KPI_COLOR_CLASSES,
+      tab: "calendar",
     },
     {
       title: "Withdrawals",
-      value: data.enrollment.withdrawals.total,
+      value: data?.enrollment?.withdrawals?.total ?? 0,
+      subtext: undefined as string | undefined,
       icon: AlertTriangle,
-      color: "red",
+      color: "red" as keyof typeof KPI_COLOR_CLASSES,
       tab: "withdraw",
+    },
+    {
+      title: "Lost",
+      value: data?.lost?.totalLost ?? 0,
+      subtext: undefined as string | undefined,
+      icon: UserX,
+      color: "amber" as keyof typeof KPI_COLOR_CLASSES,
+      tab: "lost",
     },
   ]
 
-  const colorClasses: Record<string, { bg: string; icon: string; border: string }> = {
-    amber: {
-      bg: "bg-[var(--warning-bg)]",
-      icon: "text-[var(--warning)]",
-      border: "border-l-[var(--warning)]",
-    },
-    blue: {
-      bg: "bg-[var(--primary-muted)]",
-      icon: "text-[var(--primary)]",
-      border: "border-l-[var(--primary)]",
-    },
-    purple: {
-      bg: "bg-[var(--accent-muted)]",
-      icon: "text-[var(--accent)]",
-      border: "border-l-[var(--accent)]",
-    },
-    red: {
-      bg: "bg-[var(--error-bg)]",
-      icon: "text-[var(--error)]",
-      border: "border-l-[var(--error)]",
-    },
-  }
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {kpis.map((kpi, index) => (
-        <motion.div
-          key={kpi.title}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
-        >
-          <Card
-            className={cn(
-              "hover:shadow-lg transition-all border-l-4 cursor-pointer",
-              colorClasses[kpi.color].border
-            )}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      {kpis.map((kpi, index) => {
+        const colors = KPI_COLOR_CLASSES[kpi.color] ?? KPI_COLOR_CLASSES.amber
+        return (
+          <motion.div
+            key={kpi.title}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.08, duration: 0.4, ease: "easeOut" }}
+            whileHover={{ y: -4, boxShadow: "0 12px 40px -12px rgba(0,0,0,0.15)" }}
             onClick={() => onNavigate(kpi.tab)}
+            className="cursor-pointer"
           >
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-[var(--text-muted)] mb-1">{kpi.title}</p>
-                  <p className="text-3xl font-bold text-[var(--text-primary)]">
+            <div className={cn(
+              "relative overflow-hidden rounded-2xl p-6 transition-all duration-300",
+              "bg-[var(--bg-surface)] border border-[var(--border-default)]",
+              "shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
+              "group"
+            )}>
+              {/* Background accent gradient */}
+              <div className={cn(
+                "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
+                colors.bg
+              )} />
+
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">{kpi.title}</p>
+                  <p className="text-4xl font-extrabold text-[var(--text-primary)] tracking-tight leading-none"
+                     style={{ fontFamily: 'var(--font-display)' }}>
                     {mounted ? <AnimatedNumber value={kpi.value} /> : kpi.value}
                   </p>
+                  {kpi.subtext && (
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-medium">{kpi.subtext}</p>
+                  )}
                 </div>
                 <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center",
-                  colorClasses[kpi.color].bg
+                  "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg",
+                  colors.iconBg, colors.glow
                 )}>
-                  <kpi.icon className={cn("w-6 h-6", colorClasses[kpi.color].icon)} />
+                  <kpi.icon className="w-7 h-7 text-white" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
+            </div>
+          </motion.div>
+        )
+      })}
     </div>
   )
 }

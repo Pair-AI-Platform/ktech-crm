@@ -17,6 +17,7 @@ interface SourceData {
 interface AdminSourcePerformanceProps {
   sources: SourceData[]
   loading: boolean
+  mode?: "full" | "files"
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -40,7 +41,8 @@ const SOURCE_LABELS: Record<string, string> = {
   other: "Other",
 }
 
-export function AdminSourcePerformance({ sources, loading }: AdminSourcePerformanceProps) {
+export function AdminSourcePerformance({ sources, loading, mode = "full" }: AdminSourcePerformanceProps) {
+  const filesOnly = mode === "files"
   const maxTotal = Math.max(...sources.map(s => s.total), 1)
 
   return (
@@ -48,14 +50,16 @@ export function AdminSourcePerformance({ sources, loading }: AdminSourcePerforma
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
+      className="h-full"
     >
       <StaticBlock
+        className="h-full flex flex-col"
         title={
           <span className="flex items-center gap-2">
-            Lead Sources
+            {filesOnly ? "My Lead Sources" : "Lead Sources"}
             {!loading && sources.length > 0 && (
               <Badge variant="outline" size="sm">
-                {sources.reduce((sum, s) => sum + s.total, 0)} total
+                {sources.reduce((sum, s) => sum + s.total, 0)} {filesOnly ? "files" : "total"}
               </Badge>
             )}
           </span>
@@ -97,18 +101,20 @@ export function AdminSourcePerformance({ sources, loading }: AdminSourcePerforma
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-[var(--text-tertiary)] tabular-nums">
-                        {source.total} leads
+                        {source.total} {filesOnly ? "files" : "leads"}
                       </span>
-                      <span className={cn(
-                        "text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full",
-                        source.conversionRate >= 20
-                          ? "bg-emerald-100 text-emerald-700"
-                          : source.conversionRate >= 10
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-gray-100 text-gray-600"
-                      )}>
-                        {source.conversionRate}%
-                      </span>
+                      {!filesOnly && (
+                        <span className={cn(
+                          "text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full",
+                          source.conversionRate >= 20
+                            ? "bg-emerald-100 text-emerald-700"
+                            : source.conversionRate >= 10
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-gray-100 text-gray-600"
+                        )}>
+                          {source.conversionRate}%
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="relative h-5 bg-[var(--bg-sunken)] rounded-md overflow-hidden">
@@ -120,14 +126,16 @@ export function AdminSourcePerformance({ sources, loading }: AdminSourcePerforma
                       className="absolute inset-y-0 left-0 bg-blue-200/70 rounded-md"
                     />
                     {/* Enrolled bar overlay */}
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${enrolledWidth}%` }}
-                      transition={{ duration: 0.6, delay: index * 0.04 + 0.1 }}
-                      className="absolute inset-y-0 left-0 bg-emerald-400/70 rounded-md"
-                    />
+                    {!filesOnly && (
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${enrolledWidth}%` }}
+                        transition={{ duration: 0.6, delay: index * 0.04 + 0.1 }}
+                        className="absolute inset-y-0 left-0 bg-emerald-400/70 rounded-md"
+                      />
+                    )}
                     {/* Count label */}
-                    {source.enrolled > 0 && (
+                    {!filesOnly && source.enrolled > 0 && (
                       <span className="absolute inset-y-0 left-2 flex items-center text-[10px] font-medium text-emerald-800">
                         {source.enrolled} enrolled
                       </span>
@@ -137,16 +145,18 @@ export function AdminSourcePerformance({ sources, loading }: AdminSourcePerforma
               )
             })}
             {/* Legend */}
-            <div className="flex items-center gap-4 pt-2 border-t border-[var(--border-subtle)]">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-2 rounded-sm bg-blue-200/70" />
-                <span className="text-[10px] text-[var(--text-tertiary)]">Total Leads</span>
+            {!filesOnly && (
+              <div className="flex items-center gap-4 pt-2 border-t border-[var(--border-subtle)]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-2 rounded-sm bg-blue-200/70" />
+                  <span className="text-[10px] text-[var(--text-tertiary)]">Total Leads</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-2 rounded-sm bg-emerald-400/70" />
+                  <span className="text-[10px] text-[var(--text-tertiary)]">Enrolled</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-2 rounded-sm bg-emerald-400/70" />
-                <span className="text-[10px] text-[var(--text-tertiary)]">Enrolled</span>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </StaticBlock>

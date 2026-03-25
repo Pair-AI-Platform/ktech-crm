@@ -115,7 +115,7 @@ export function NoUpdatedAppointments({
           for (const lid of cbLeadIds) {
             await supabase
               .from("leads")
-              .update({ status: "callback", contact_status: "callback" })
+              .update({ contact_status: "callback" })
               .eq("id", lid)
           }
           break
@@ -141,7 +141,7 @@ export function NoUpdatedAppointments({
       for (const lid of cancelLeadIds) {
         await supabase
           .from("leads")
-          .update({ status: "not_interested", notes: cancelNotes || undefined })
+          .update({ contact_status: "not_interested", notes: cancelNotes || undefined })
           .eq("id", lid)
       }
       onUpdate?.()

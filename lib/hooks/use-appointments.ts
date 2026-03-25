@@ -104,7 +104,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         .from("appointments")
         .select(`
           *,
-          appointment_leads(id, lead_id, created_at, lead:leads(id, first_name, last_name, phone, status, pipeline_stage)),
+          appointment_leads(id, lead_id, created_at, lead:leads(id, first_name, last_name, phone, contact_status, pipeline_stage)),
           student:students(id, first_name, last_name, ktech_id),
           assigned_agent_profile:profiles!assigned_agent(id, full_name, email),
           created_by_profile:profiles!created_by(id, full_name, email)

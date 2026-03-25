@@ -145,7 +145,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       }
     }
 
-    // Intended Major validation
+    // ktech Intended Major validation
     if (!formData.intended_major) {
       newErrors.intended_major = "Intended major is required"
     }
@@ -638,17 +638,17 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         </div>
       </div>
 
-      {/* Intended Major */}
+      {/* ktech Intended Major */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
             <GraduationCap className="w-4 h-4 text-[var(--primary)]" />
           </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Intended Major</h4>
+          <h4 className="font-semibold text-[var(--text-primary)]">ktech Intended Major</h4>
         </div>
         <div className="pl-10">
           <div className="space-y-2">
-            <Label>Intended Major *</Label>
+            <Label>ktech Intended Major *</Label>
             <Select
               value={formData.intended_major}
               onValueChange={(value) => handleChange("intended_major", value)}
@@ -668,6 +668,14 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               <p className="text-xs text-[var(--error)]">{errors.intended_major}</p>
             )}
           </div>
+          {lead.ministry_accepted_major && (
+            <div className="space-y-2">
+              <Label>Ministry Accepted Major</Label>
+              <div className="px-3 py-2.5 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] text-sm text-[var(--text-secondary)]">
+                {lead.ministry_accepted_major}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

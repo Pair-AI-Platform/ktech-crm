@@ -8,6 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   GraduationCap,
   Target,
+  Building2,
+  Wallet,
 } from "lucide-react"
 import type { EnrollmentReportData } from "@/lib/hooks/use-reports"
 
@@ -22,6 +24,18 @@ export function EnrollmentReports({ data }: EnrollmentReportsProps) {
       value: data.totalEnrolled,
       icon: GraduationCap,
       colorClass: "bg-[var(--success)]"
+    },
+    {
+      title: "PUC Enrolled",
+      value: data.pucEnrolled,
+      icon: Building2,
+      colorClass: "bg-[var(--primary)]"
+    },
+    {
+      title: "Self-Funded Enrolled",
+      value: data.sfEnrolled,
+      icon: Wallet,
+      colorClass: "bg-[var(--warning)]"
     },
   ]
 
@@ -121,6 +135,14 @@ function AgentRow({
         <div className="text-right">
           <p className="text-xl font-bold text-[var(--text-primary)]">{agent.enrolled}</p>
           <p className="text-xs text-[var(--text-muted)]">enrolled</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-[var(--primary)]">{agent.pucEnrolled}</p>
+          <p className="text-xs text-[var(--text-muted)]">PUC</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-[var(--warning)]">{agent.sfEnrolled}</p>
+          <p className="text-xs text-[var(--text-muted)]">Self</p>
         </div>
         <div className="w-24">
           <div className="flex items-center justify-between mb-1">

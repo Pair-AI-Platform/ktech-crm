@@ -115,12 +115,18 @@ export function TestCenterReports({ data, onSync }: TestCenterReportsProps) {
       icon: FileCheck,
       colorClass: "bg-[var(--primary)]"
     },
+    {
+      title: "Direct Entry",
+      value: data.majors,
+      icon: GraduationCap,
+      colorClass: "bg-[var(--success)]"
+    },
   ]
 
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.title}

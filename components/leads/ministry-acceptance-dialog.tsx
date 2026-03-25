@@ -21,6 +21,7 @@ import {
   GraduationCap,
   UserCheck,
   UserX,
+  RefreshCw,
   Info,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -52,8 +53,9 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const acceptedCount = records.filter(r => r.is_accepted_ktech).length
-  const rejectedCount = records.filter(r => !r.is_accepted_ktech).length
+  const lowGpaCount = records.filter(r => r.gpa !== undefined && r.gpa < 70).length
+  const acceptedCount = records.filter(r => r.is_accepted_ktech && !(r.gpa !== undefined && r.gpa < 70)).length
+  const rejectedCount = records.filter(r => !r.is_accepted_ktech && !(r.gpa !== undefined && r.gpa < 70)).length
 
   const handleFileSelect = async (selectedFile: File) => {
     setFile(selectedFile)
@@ -207,7 +209,7 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                   Drag & drop or click to select an Excel file (.xlsx)
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  File should contain: Civil ID and College/Institution columns
+                  File should contain: Civil ID, College/Institution, and GPA columns
                 </p>
               </div>
 
@@ -234,9 +236,11 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                   <strong>How it works:</strong> Students are matched by Civil ID.
                 </p>
                 <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
-                  <li>Accepted first choice ktech → moved to <strong>Applicant</strong></li>
-                  <li>Applied for ktech but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
-                  <li>Accepted second choice ktech → moved to <strong>Applicant</strong></li>
+                  <li>GPA below 70% → automatically <strong>converted to Self-Funded</strong></li>
+                  <li>Accepted first choice KTECH → moved to <strong>Applicant</strong></li>
+                  <li>Applied for KTECH but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
+                  <li>Accepted second choice KTECH → moved to <strong>Applicant</strong></li>
+                  <li>Leads in <strong>lost or other stages</strong> accepted for KTECH → moved to <strong>Applicant</strong> (marked as Ministry Assigned)</li>
                 </ul>
               </div>
             </div>
@@ -260,7 +264,7 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
               </div>
 
               {/* Summary Cards */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-5 h-5 text-emerald-600" />
@@ -269,7 +273,7 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                         {acceptedCount}
                       </span>
                       <span className="text-sm text-emerald-600 ml-1.5">
-                        Accepted (ktech)
+                        Accepted
                       </span>
                     </div>
                   </div>
@@ -282,11 +286,26 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                         {rejectedCount}
                       </span>
                       <span className="text-sm text-red-600 ml-1.5">
-                        Other Colleges
+                        Other
                       </span>
                     </div>
                   </div>
                 </div>
+                {lowGpaCount > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-amber-600" />
+                      <div>
+                        <span className="font-medium text-amber-700 text-lg">
+                          {lowGpaCount}
+                        </span>
+                        <span className="text-sm text-amber-600 ml-1.5">
+                          Low GPA → SF
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Preview Table */}
@@ -297,12 +316,15 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                       <tr>
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Civil ID</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Name</th>
+                        <th className="px-3 py-2 text-center font-medium text-[var(--text-secondary)]">GPA</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">College</th>
                         <th className="px-3 py-2 text-center font-medium text-[var(--text-secondary)]">Result</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
-                      {records.slice(0, 15).map((record, i) => (
+                      {records.slice(0, 15).map((record, i) => {
+                        const isLowGpa = record.gpa !== undefined && record.gpa < 70
+                        return (
                         <tr key={i}>
                           <td className="px-3 py-2 font-mono text-xs">
                             {record.civil_id}
@@ -310,11 +332,28 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                           <td className="px-3 py-2">
                             {record.student_name || <span className="text-[var(--text-muted)]">-</span>}
                           </td>
+                          <td className="px-3 py-2 text-center">
+                            {record.gpa !== undefined ? (
+                              <span className={cn(
+                                "text-xs font-medium",
+                                isLowGpa ? "text-amber-600" : "text-[var(--text-secondary)]"
+                              )}>
+                                {record.gpa}%
+                              </span>
+                            ) : (
+                              <span className="text-[var(--text-muted)]">-</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-[var(--text-secondary)]">
                             {record.accepted_college || <span className="text-[var(--text-muted)]">-</span>}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {record.is_accepted_ktech ? (
+                            {isLowGpa ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                <RefreshCw className="w-3 h-3" />
+                                → SF
+                              </span>
+                            ) : record.is_accepted_ktech ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
                                 <CheckCircle2 className="w-3 h-3" />
                                 ktech
@@ -327,7 +366,8 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                             )}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -353,9 +393,11 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                   <strong>What will happen:</strong>
                 </p>
                 <ul className="text-sm text-blue-700 ml-5 list-disc space-y-0.5">
-                  <li>Existing leads accepted first choice ktech → moved to <strong>Applicant</strong></li>
-                  <li>Applied for ktech but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
-                  <li>Accepted second choice ktech → moved to <strong>Applicant</strong></li>
+                  <li>GPA below 70% → automatically <strong>converted to Self-Funded</strong></li>
+                  <li>Existing leads accepted first choice KTECH → moved to <strong>Applicant</strong></li>
+                  <li>Applied for KTECH but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
+                  <li>Accepted second choice KTECH → moved to <strong>Applicant</strong></li>
+                  <li>Leads in <strong>lost or other stages</strong> → moved to <strong>Applicant</strong> (Ministry Assigned)</li>
                 </ul>
               </div>
 
@@ -412,6 +454,18 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                   <p className="text-xs text-red-600 mt-0.5 ml-7">Moved to Lost</p>
                 </div>
 
+                {result.convertedToSelfFunded.length > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-amber-600" />
+                      <span className="font-medium text-amber-700">
+                        {result.convertedToSelfFunded.length} → Self-Funded
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-600 mt-0.5 ml-7">GPA below 70%</p>
+                  </div>
+                )}
+
                 {result.createdFirstChoice.length > 0 && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2">
@@ -433,6 +487,18 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                       </span>
                     </div>
                     <p className="text-xs text-indigo-600 mt-0.5 ml-7">Created as Applicant</p>
+                  </div>
+                )}
+
+                {result.ministryAssigned.length > 0 && (
+                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-5 h-5 text-purple-600" />
+                      <span className="font-medium text-purple-700">
+                        {result.ministryAssigned.length} Ministry Assigned
+                      </span>
+                    </div>
+                    <p className="text-xs text-purple-600 mt-0.5 ml-7">Assigned by ministry (not 1st choice)</p>
                   </div>
                 )}
               </div>
@@ -475,6 +541,25 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                 </div>
               )}
 
+              {/* Converted to Self-Funded List */}
+              {result.convertedToSelfFunded.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-amber-50 border-b border-amber-200">
+                    <span className="text-sm font-medium text-amber-700">
+                      Converted to Self-Funded (GPA &lt; 70%)
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {result.convertedToSelfFunded.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-amber-600 text-xs font-medium">GPA: {item.gpa}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* New Leads - First Choice */}
               {result.createdFirstChoice.length > 0 && (
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
@@ -507,6 +592,25 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                       <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
                         <span className="text-[var(--text-primary)]">{item.name}</span>
                         <span className="text-[var(--text-muted)] font-mono text-xs">{item.civilId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ministry Assigned */}
+              {result.ministryAssigned.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-purple-50 border-b border-purple-200">
+                    <span className="text-sm font-medium text-purple-700">
+                      Ministry Assigned (not 1st choice KTECH)
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {result.ministryAssigned.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-purple-500 text-xs">from {item.previousStage}</span>
                       </div>
                     ))}
                   </div>

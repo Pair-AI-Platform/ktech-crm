@@ -208,7 +208,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     for (const lid of allLeadIds) {
       await supabase
         .from("leads")
-        .update({ status: "not_interested", notes: cancelNotes || undefined })
+        .update({ contact_status: "not_interested", notes: cancelNotes || undefined })
         .eq("id", lid)
     }
     // Also cancel the appointment itself
@@ -228,7 +228,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     for (const lid of allLeadIds) {
       await supabase
         .from("leads")
-        .update({ status: "callback", contact_status: "callback" })
+        .update({ contact_status: "callback" })
         .eq("id", lid)
     }
     setIsLoading(false)
@@ -310,7 +310,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     for (const lid of allLeadIds) {
       await supabase
         .from("leads")
-        .update({ status })
+        .update({ contact_status: status })
         .eq("id", lid)
     }
     setLeadStatusLoading(false)

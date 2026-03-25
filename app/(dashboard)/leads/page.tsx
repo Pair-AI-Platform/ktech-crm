@@ -33,7 +33,6 @@ import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { ErrorState } from "@/components/ui/error-state"
-import { RoleGuard } from "@/components/auth/role-guard"
 
 const defaultFilters: LeadFilters = {
   searchQuery: "",
@@ -61,10 +60,13 @@ const defaultFilters: LeadFilters = {
   paymentAmountMax: 5000,
   academicTrack: "all",
   lostReasonIds: [],
+  priority: "all",
+  ministryAssigned: "all",
 }
 
 export default function LeadsPage() {
   const searchParams = useSearchParams()
+  const searchParamsString = searchParams.toString()
   const router = useRouter()
   const { profile } = useUser()
   const { reasons: lostReasons } = useLostReasons()
@@ -91,6 +93,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const initialCheckDone = useRef(false)
   const pendingScrollRestore = useRef<number | null>(null)
   const viewStateRestored = useRef(false)
+  const lastSyncedParams = useRef<string | null>(null)
   const [studentPaymentMap, setStudentPaymentMap] = useState<Map<string, string>>(new Map())
 
   // Restore view state from sessionStorage on mount (for back navigation)
@@ -122,10 +125,14 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         setTimeout(() => setShowAddForm(true), 0)
       }
     }
-  }, [searchParams])
+  }, [searchParamsString])
 
   // Sync filters from URL params (for sidebar sub-tab navigation like PUC SRJ)
   useEffect(() => {
+    // Skip if searchParams matches what we last synced to URL (prevents infinite loop)
+    if (lastSyncedParams.current !== null && searchParamsString === lastSyncedParams.current) {
+      return
+    }
     // Skip the initial sync if we just restored view state from sessionStorage
     if (viewStateRestored.current) {
       viewStateRestored.current = false
@@ -178,7 +185,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         ...(academicTrackParam ? { academicTrack: academicTrackParam as LeadFilters['academicTrack'] } : {}),
       }))
     }
-  }, [searchParams])
+  }, [searchParamsString])
 
   // Sync filter state to URL search params (for shareability and back-navigation)
   useEffect(() => {
@@ -199,6 +206,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
 
     const newUrl = params.toString() ? `?${params.toString()}` : "/leads"
     // Use replaceState to avoid polluting browser history with every filter change
+    lastSyncedParams.current = params.toString()
     window.history.replaceState(null, "", newUrl)
   }, [stageFilter, lostAtFilter, filters.searchQuery, filters.fundingType, filters.statuses, filters.sources, filters.dateRange, filters.assignedTo, filters.gpaMin, filters.gpaMax, filters.isKuwaiti, filters.academicTrack])
 
@@ -224,6 +232,8 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     lostAtFilter: stageFilter === "lost" ? lostAtFilter : undefined,
     hasNotes: filters.hasNotes,
     lostReasonIds: filters.lostReasonIds,
+    priority: filters.priority,
+    ministryAssigned: filters.ministryAssigned,
   }
 
   // Reset to page 1 when any filter changes
@@ -262,15 +272,16 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   }, [loading])
 
   // Fetch student payment data when payment filter is active
+  const leadIds = leads.map(l => l.id).join(",")
   useEffect(() => {
     if (filters.paymentStatus === "all" && !isPaymentRangeActive) {
-      setStudentPaymentMap(new Map())
+      setStudentPaymentMap(prev => prev.size === 0 ? prev : new Map())
       return
     }
 
     const sfLeadIds = leads.filter(l => l.funding_type === "self_funded").map(l => l.id)
     if (sfLeadIds.length === 0) {
-      setStudentPaymentMap(new Map())
+      setStudentPaymentMap(prev => prev.size === 0 ? prev : new Map())
       return
     }
 
@@ -289,7 +300,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         setStudentPaymentMap(map)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.paymentStatus, isPaymentRangeActive, leads])
+  }, [filters.paymentStatus, isPaymentRangeActive, leadIds])
 
   // Client-side filtering (only for filters that can't be done server-side)
   const filteredLeads = leads.filter((lead) => {
@@ -301,7 +312,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     if (filters.appointmentTypes.length > 0) {
       const leadAppointments = lead.appointments || []
       const hasMatchingAppointment = leadAppointments.some(apt =>
-        apt.appointment_type.some(type => filters.appointmentTypes.includes(type))
+        apt.appointment_type?.some(type => filters.appointmentTypes.includes(type))
       )
       if (!hasMatchingAppointment) return false
     }
@@ -485,7 +496,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   )
 
   return (
-    <RoleGuard allowedRoles={['admin', 'agent']}>
     <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0 min-w-0">
       <Header
         user={profile}
@@ -817,6 +827,5 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       />
 
     </div>
-    </RoleGuard>
   )
 }

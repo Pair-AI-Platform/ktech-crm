@@ -32,6 +32,7 @@ interface MarkLostDialogProps {
   onOpenChange: (open: boolean) => void
   onConfirm: (reasonId: string, notes?: string) => Promise<void>
   leadName: string
+  assignReasonMode?: boolean
 }
 
 export function MarkLostDialog({
@@ -39,6 +40,7 @@ export function MarkLostDialog({
   onOpenChange,
   onConfirm,
   leadName,
+  assignReasonMode,
 }: MarkLostDialogProps) {
   const { reasons, loading: reasonsLoading } = useLostReasons()
   const [selectedReasonId, setSelectedReasonId] = useState<string | null>(null)
@@ -86,9 +88,11 @@ export function MarkLostDialog({
               <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <DialogTitle>Mark Lead as Lost</DialogTitle>
+              <DialogTitle>{assignReasonMode ? 'Assign Lost Reason' : 'Mark Lead as Lost'}</DialogTitle>
               <DialogDescription>
-                Why did {leadName} not convert?
+                {assignReasonMode
+                  ? `Select a reason for why ${leadName} was lost.`
+                  : `Why did ${leadName} not convert?`}
               </DialogDescription>
             </div>
           </div>
@@ -161,10 +165,10 @@ export function MarkLostDialog({
             {submitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Marking Lost...
+                {assignReasonMode ? 'Saving...' : 'Marking Lost...'}
               </>
             ) : (
-              "Mark as Lost"
+              assignReasonMode ? "Save Reason" : "Mark as Lost"
             )}
           </Button>
         </DialogFooter>

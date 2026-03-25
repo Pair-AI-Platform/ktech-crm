@@ -12,6 +12,7 @@ import {
   Trophy,
   Briefcase,
   Users,
+  Megaphone,
 } from "lucide-react"
 import { NATIONALITIES } from "@/types"
 import { cn } from "@/lib/utils"
@@ -171,6 +172,17 @@ export function LeadFormPersonal({
               </>
             )}
           </div>
+        </div>
+
+        {/* Address */}
+        <div className="space-y-2">
+          <Label htmlFor="address">Address (Optional)</Label>
+          <Input
+            id="address"
+            placeholder="Enter address..."
+            value={formData.address}
+            onChange={(e) => handleChange("address", e.target.value)}
+          />
         </div>
 
         {/* Profile Checkboxes */}
@@ -340,6 +352,32 @@ export function LeadFormPersonal({
               <Switch
                 checked={formData.is_employee}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_employee: checked }))}
+              />
+            </div>
+
+            <div
+              onClick={() => setFormData(prev => ({ ...prev, is_marketing_student: !prev.is_marketing_student }))}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                formData.is_marketing_student
+                  ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30"
+                  : "border-[var(--border)] hover:border-teal-300"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                formData.is_marketing_student
+                  ? "bg-teal-500 text-white"
+                  : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+              )}>
+                <Megaphone className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">Marketing Student</p>
+              </div>
+              <Switch
+                checked={formData.is_marketing_student}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_marketing_student: checked }))}
               />
             </div>
           </div>

@@ -380,6 +380,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
       is_athlete: Math.random() > 0.95,
       is_married: Math.random() > 0.95,
       is_employee: Math.random() > 0.9,
+      is_marketing_student: Math.random() > 0.85,
       school: randomItem(schools) as Lead["school"],
       source_category: randomItem(sourceCategories) as Lead["source_category"],
       source: randomItem(sources) as Lead["source"],
@@ -466,8 +467,8 @@ export function generateDemoStudents(count: number = 20): Student[] {
       amount_paid: amountPaid,
       payment_status: paymentStatus,
       is_payment_exempted: false,
-      discount_type: Math.random() > 0.7 ? randomItem(["sibling", "early_bird", "scholarship"]) as Student["discount_type"] : undefined,
-      discount_percentage: Math.random() > 0.7 ? randomItem([5, 10, 15, 20]) : undefined,
+      discount_type: Math.random() > 0.7 ? randomItem(["kuwaiti_new_certificate", "kuwaiti_old_certificate", "non_kuwaiti", "athletes", "marketing", "employee", "employee_full", "athletes_full", "president", "charity", "non_kuwaiti_ministry", "service_civil_commission"]) as Student["discount_type"] : undefined,
+      discount_percentage: undefined as number | undefined,
       placement_level: randomItem(placementLevels) as Student["placement_level"],
       placement_test_passed: Math.random() > 0.3,
       placement_test_exempted: Math.random() > 0.8,
@@ -498,6 +499,18 @@ export function generateDemoStudents(count: number = 20): Student[] {
       created_at: randomDate(45),
       updated_at: randomDate(3),
     })
+
+    // Set discount_percentage based on discount_type
+    const student = students[students.length - 1]
+    if (student.discount_type) {
+      const discountPercentages: Record<string, number> = {
+        kuwaiti_new_certificate: 25, kuwaiti_old_certificate: 20, non_kuwaiti: 37.5,
+        athletes: 60, marketing: 70, employee: 50,
+        employee_full: 100, athletes_full: 100, president: 100,
+        charity: 100, non_kuwaiti_ministry: 100, service_civil_commission: 100,
+      }
+      student.discount_percentage = discountPercentages[student.discount_type]
+    }
   }
 
   return students.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())

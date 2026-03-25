@@ -1,9 +1,10 @@
 "use client"
 
-import { useSyncExternalStore } from "react"
+import { useState, useMemo, useCallback, useSyncExternalStore } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   BarChart,
   Bar,
@@ -21,7 +22,14 @@ import {
   MapPin,
   TrendingUp,
   Award,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Download,
+  List,
 } from "lucide-react"
+import { generateExcelXML } from "@/lib/export/excel-generator"
 import type { ChannelReportData, DemographicReportData } from "@/lib/hooks/use-reports"
 
 interface SchoolReportsProps {
@@ -33,6 +41,8 @@ const SCHOOL_COLORS = [
   '#445eb7', '#22C55E', '#F59E0B', '#8B5CF6', '#3B82F6',
   '#EF4444', '#06B6D4', '#EC4899', '#14B8A6', '#F97316',
 ]
+
+const ITEMS_PER_PAGE = 10
 
 const emptySubscribe = () => () => {}
 
@@ -54,6 +64,8 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [showAll, setShowAll] = useState(false)
 
   const topSchool = data.topSchools[0]
   const topSchoolByLeads = data.bySchool.length > 0
@@ -79,6 +91,68 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
     puc: school.pucCount,
   }))
 
+  // Pagination
+  const allSchools = data.topSchools
+  const totalPages = Math.ceil(allSchools.length / ITEMS_PER_PAGE)
+  const displayedSchools = useMemo(() => {
+    if (showAll) return allSchools
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return allSchools.slice(start, start + ITEMS_PER_PAGE)
+  }, [allSchools, currentPage, showAll])
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }, [totalPages])
+
+  const handleToggleShowAll = useCallback(() => {
+    setShowAll(prev => {
+      if (!prev) setCurrentPage(1)
+      return !prev
+    })
+  }, [])
+
+  const handleExportExcel = useCallback(() => {
+    const exportData = {
+      title: 'School Breakdown',
+      columns: [
+        { key: 'rank', label: '#', width: 40 },
+        { key: 'school', label: 'School', width: 200 },
+        { key: 'totalLeads', label: 'Total Leads', width: 100 },
+        { key: 'applications', label: 'Applications', width: 100 },
+        { key: 'applicationPercent', label: 'Application %', width: 100 },
+        { key: 'enrolled', label: 'Enrolled', width: 100 },
+        { key: 'enrolledPercent', label: 'Enrolled %', width: 100 },
+        { key: 'puc', label: 'PUC', width: 80 },
+        { key: 'pucPercent', label: 'PUC %', width: 80 },
+      ],
+      rows: allSchools.map((school, index) => ({
+        rank: index + 1,
+        school: school.schoolName,
+        totalLeads: school.leads,
+        applications: school.applications,
+        applicationPercent: `${school.applicationPercent}%`,
+        enrolled: school.enrolled,
+        enrolledPercent: `${school.enrolledPercent}%`,
+        puc: school.pucCount,
+        pucPercent: `${school.pucPercent}%`,
+      })),
+    }
+
+    const xml = generateExcelXML(exportData)
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `school-breakdown-${new Date().toISOString().split('T')[0]}.xls`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [allSchools])
+
+  // Calculate offset for row numbering
+  const rowOffset = showAll ? 0 : (currentPage - 1) * ITEMS_PER_PAGE
+
   return (
     <div className="space-y-6">
       {/* Quick Stats */}
@@ -99,7 +173,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
               <p className="text-sm text-[var(--text-secondary)] mb-1">Best Performing School</p>
               <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchool?.schoolName || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {topSchool?.leads || 0} leads, {topSchool?.applications || 0} applications
+                {topSchool?.applications || 0} files opened, {topSchool?.leads || 0} leads
               </p>
             </CardContent>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--success)] opacity-50" />
@@ -167,10 +241,10 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                 <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
                 Leads by School
               </CardTitle>
-              <CardDescription>Top schools by lead count</CardDescription>
+              <CardDescription>Top 10 schools by lead count</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" style={{ minWidth: 0 }}>
+              <div className="h-[450px]" style={{ minWidth: 0 }}>
                 {mounted && schoolBarData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
@@ -286,70 +360,178 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
       >
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="w-5 h-5 text-[var(--success)]" />
-              School Breakdown
-            </CardTitle>
-            <CardDescription>Total leads, application stage %, enrolled %, and PUC % per school</CardDescription>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-[var(--success)]" />
+                  School Breakdown
+                </CardTitle>
+                <CardDescription className="mt-1">Total leads, application stage %, enrolled %, and PUC % per school</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToggleShowAll}
+                  className="gap-1.5"
+                >
+                  <List className="w-4 h-4" />
+                  {showAll ? 'Paginate' : `All Schools (${allSchools.length})`}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  className="gap-1.5"
+                  disabled={allSchools.length === 0}
+                >
+                  <Download className="w-4 h-4" />
+                  Export Excel
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {data.topSchools.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
-                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">School</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total Leads</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Applications</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Application %</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled %</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3">PUC %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.topSchools.map((school, index) => (
-                      <tr key={school.schoolId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
-                        <td className="py-3 pr-4">
-                          <span className="text-sm font-bold text-[var(--text-muted)]">{index + 1}</span>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span className="text-sm font-medium text-[var(--text-primary)]">{school.schoolName}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.leads}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.applications}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <Badge variant={school.applicationPercent >= 30 ? 'success' : school.applicationPercent >= 15 ? 'warning' : 'secondary'} size="sm">
-                            {school.applicationPercent}%
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.enrolled}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <Badge variant={school.enrolledPercent >= 30 ? 'success' : school.enrolledPercent >= 15 ? 'warning' : 'secondary'} size="sm">
-                            {school.enrolledPercent}%
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{school.pucCount}</span>
-                        </td>
-                        <td className="py-3 pl-3 text-center">
-                          <Badge variant="info" size="sm">
-                            {school.pucPercent}%
-                          </Badge>
-                        </td>
+            {allSchools.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[var(--border)]">
+                        <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
+                        <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">School</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total Leads</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Applications</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Application %</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled %</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3">PUC %</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {displayedSchools.map((school, index) => (
+                        <tr key={school.schoolId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                          <td className="py-3 pr-4">
+                            <span className="text-sm font-bold text-[var(--text-muted)]">{rowOffset + index + 1}</span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-sm font-medium text-[var(--text-primary)]">{school.schoolName}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{school.leads}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{school.applications}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <Badge variant={school.applicationPercent >= 30 ? 'success' : school.applicationPercent >= 15 ? 'warning' : 'secondary'} size="sm">
+                              {school.applicationPercent}%
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{school.enrolled}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <Badge variant={school.enrolledPercent >= 30 ? 'success' : school.enrolledPercent >= 15 ? 'warning' : 'secondary'} size="sm">
+                              {school.enrolledPercent}%
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{school.pucCount}</span>
+                          </td>
+                          <td className="py-3 pl-3 text-center">
+                            <Badge variant="info" size="sm">
+                              {school.pucPercent}%
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {!showAll && totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--border)]">
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Showing {rowOffset + 1}-{Math.min(rowOffset + ITEMS_PER_PAGE, allSchools.length)} of {allSchools.length} schools
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePageChange(1)}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronsLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => {
+                          if (totalPages <= 5) return true
+                          if (page === 1 || page === totalPages) return true
+                          return Math.abs(page - currentPage) <= 1
+                        })
+                        .reduce<(number | 'ellipsis')[]>((acc, page, i, arr) => {
+                          if (i > 0 && page - (arr[i - 1] as number) > 1) acc.push('ellipsis')
+                          acc.push(page)
+                          return acc
+                        }, [])
+                        .map((item, i) =>
+                          item === 'ellipsis' ? (
+                            <span key={`ellipsis-${i}`} className="px-1 text-[var(--text-muted)]">...</span>
+                          ) : (
+                            <Button
+                              key={item}
+                              variant={currentPage === item ? 'default' : 'ghost'}
+                              size="sm"
+                              onClick={() => handlePageChange(item)}
+                              className="h-8 w-8 p-0"
+                            >
+                              {item}
+                            </Button>
+                          )
+                        )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePageChange(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronsRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {showAll && (
+                  <div className="flex items-center justify-center mt-4 pt-4 border-t border-[var(--border)]">
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Showing all {allSchools.length} schools
+                    </p>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center py-8 text-[var(--text-muted)]">
                 No school data available

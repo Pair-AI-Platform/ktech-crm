@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
 import { PIPELINE_STAGES } from '@/types'
 import { isDemoMode } from '@/lib/demo-data'
+import { useUser } from './use-user'
 
 /**
  * Fetches leads that were lost and groups them by the stage they were
@@ -12,6 +13,8 @@ import { isDemoMode } from '@/lib/demo-data'
  * accurate org-wide drop-off data.
  */
 export function useStageDropoff() {
+  const { isAdmin } = useUser()
+
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.stageDropoff.all,
     queryFn: async () => {
@@ -36,6 +39,7 @@ export function useStageDropoff() {
         activityRows: Array<{ lead_id: string; metadata: Record<string, string> }>
       }>
     },
+    enabled: isAdmin,
   })
 
   const stageLabels = Object.fromEntries(

@@ -24,7 +24,8 @@ import {
   ShieldAlert,
   MessageSquareText,
   CreditCard,
-  BookOpen
+  BookOpen,
+  Star,
 } from "lucide-react"
 import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack } from "@/types"
 import { cn } from "@/lib/utils"
@@ -56,6 +57,8 @@ export interface LeadFilters {
   paymentAmountMax: number
   academicTrack: "all" | AcademicTrack
   lostReasonIds: string[]
+  priority: "all" | "normal" | "important" | "critical"
+  ministryAssigned: "all" | "assigned" | "not_assigned"
 }
 
 interface LeadFiltersProps {
@@ -91,6 +94,8 @@ const defaultFilters: LeadFilters = {
   paymentAmountMax: 5000,
   academicTrack: "all",
   lostReasonIds: [],
+  priority: "all",
+  ministryAssigned: "all",
 }
 
 // Stages that leads can be lost at (excludes 'lost' and 'enrolled')
@@ -262,7 +267,9 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     (localFilters.hasNotes !== "all" ? 1 : 0) +
     (localFilters.paymentStatus !== "all" ? 1 : 0) +
     (localFilters.paymentAmountMin > 0 || localFilters.paymentAmountMax < 5000 ? 1 : 0) +
-    (localFilters.academicTrack !== "all" ? 1 : 0)
+    (localFilters.academicTrack !== "all" ? 1 : 0) +
+    (localFilters.priority !== "all" ? 1 : 0) +
+    (localFilters.ministryAssigned !== "all" ? 1 : 0)
 
   return (
     <AnimatePresence>
@@ -600,6 +607,37 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
+              {/* Priority */}
+              <FilterSection
+                title="Priority"
+                icon={<Star className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("priority")}
+                onToggle={() => toggleSection("priority")}
+                count={localFilters.priority !== "all" ? 1 : 0}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "important", label: "⭐ Starred" },
+                    { value: "critical", label: "🔥 Critical" },
+                    { value: "normal", label: "Normal" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setLocalFilters(prev => ({ ...prev, priority: option.value as LeadFilters["priority"] }))}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-sm text-center transition-all",
+                        localFilters.priority === option.value
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+
               {/* Funding Type */}
               <FilterSection
                 title="Funding Type"
@@ -672,6 +710,38 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                         localFilters.ministryBlocked === option.value
                           ? option.value === "blocked"
                             ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                            : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+
+              {/* Ministry Assigned Filter */}
+              <FilterSection
+                title="Ministry Assigned"
+                icon={<GraduationCap className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("ministryAssigned")}
+                onToggle={() => toggleSection("ministryAssigned")}
+                count={localFilters.ministryAssigned !== "all" ? 1 : 0}
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "assigned", label: "Assigned" },
+                    { value: "not_assigned", label: "Not Assigned" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setLocalFilters(prev => ({ ...prev, ministryAssigned: option.value as LeadFilters["ministryAssigned"] }))}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-sm text-center transition-all",
+                        localFilters.ministryAssigned === option.value
+                          ? option.value === "assigned"
+                            ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400"
                             : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
                           : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
                       )}

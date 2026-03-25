@@ -36,6 +36,7 @@ import type { CalendarReportData } from "@/lib/hooks/use-reports"
 
 interface CalendarReportsProps {
   data: CalendarReportData
+  isAgent?: boolean
 }
 
 const emptySubscribe = () => () => {}
@@ -82,7 +83,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
   return null
 }
 
-export function CalendarReports({ data }: CalendarReportsProps) {
+export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
   const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false)
   if (!isClient) return null
 
@@ -210,61 +211,6 @@ export function CalendarReports({ data }: CalendarReportsProps) {
             </Card>
           )}
 
-          {/* By Type */}
-          {data.appointmentsByType.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">By Type</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {data.appointmentsByType.map(t => (
-                  <div key={t.type} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-[var(--text-primary)] font-medium">{t.label}</span>
-                      <span className="text-[var(--text-secondary)]">{t.total}</span>
-                    </div>
-                    <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-[var(--bg-secondary)]">
-                      {t.completed > 0 && (
-                        <div
-                          className="h-full bg-emerald-500 transition-all"
-                          style={{ width: `${(t.completed / t.total) * 100}%` }}
-                          title={`Completed: ${t.completed}`}
-                        />
-                      )}
-                      {t.pending > 0 && (
-                        <div
-                          className="h-full bg-indigo-500 transition-all"
-                          style={{ width: `${(t.pending / t.total) * 100}%` }}
-                          title={`Pending: ${t.pending}`}
-                        />
-                      )}
-                      {t.noAnswer > 0 && (
-                        <div
-                          className="h-full bg-amber-500 transition-all"
-                          style={{ width: `${(t.noAnswer / t.total) * 100}%` }}
-                          title={`No Answer: ${t.noAnswer}`}
-                        />
-                      )}
-                      {t.cancelled > 0 && (
-                        <div
-                          className="h-full bg-rose-500 transition-all"
-                          style={{ width: `${(t.cancelled / t.total) * 100}%` }}
-                          title={`Cancelled: ${t.cancelled}`}
-                        />
-                      )}
-                    </div>
-                    <div className="flex gap-3 text-[10px] text-[var(--text-tertiary)]">
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{t.completed} done</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />{t.pending} pending</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{t.noAnswer} NA</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" />{t.cancelled} cancelled</span>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
           {/* Modality */}
           {data.appointmentsByModality.length > 0 && (
             <Card>
@@ -288,17 +234,17 @@ export function CalendarReports({ data }: CalendarReportsProps) {
             </Card>
           )}
 
-          {/* Agent Breakdown - Appointments */}
-          {data.appointmentsByAgent.length > 0 && (
+          {/* Agent Breakdown - New Appointments (admin only) */}
+          {!isAgent && data.newAppointmentsByAgent.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Users className="w-4 h-4 text-[var(--color-primary)]" />
-                  Agent Performance (Appointments)
+                  Agent Performance (New Appointments)
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {data.appointmentsByAgent.map(a => (
+                {data.newAppointmentsByAgent.map(a => (
                   <div key={a.agentId} className="flex items-center gap-3">
                     <Avatar className="w-7 h-7">
                       <AvatarImage src={a.avatarUrl || undefined} />
@@ -413,8 +359,8 @@ export function CalendarReports({ data }: CalendarReportsProps) {
             </CardContent>
           </Card>
 
-          {/* Agent Breakdown - Callbacks */}
-          {data.callbacksByAgent.length > 0 && (
+          {/* Agent Breakdown - Callbacks (admin only) */}
+          {!isAgent && data.callbacksByAgent.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -446,6 +392,88 @@ export function CalendarReports({ data }: CalendarReportsProps) {
           )}
         </div>
       </div>
+
+      {/* Appointment Type Breakdown (full width) */}
+      {data.appointmentsByType.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[var(--color-primary)]" />
+              Appointments by Type
+              <Badge variant="secondary" size="sm">{data.appointmentsByType.reduce((sum, t) => sum + t.total, 0)} total</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data.appointmentsByType.map(t => {
+                const completedPct = t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0
+                return (
+                  <div key={t.type} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-primary)]">{t.label}</span>
+                      <span className="text-lg font-bold text-[var(--text-primary)]">{t.total}</span>
+                    </div>
+                    <div className="flex gap-1 h-2.5 rounded-full overflow-hidden bg-[var(--bg-primary)]">
+                      {t.completed > 0 && (
+                        <div
+                          className="h-full bg-emerald-500 transition-all"
+                          style={{ width: `${(t.completed / t.total) * 100}%` }}
+                          title={`Completed: ${t.completed}`}
+                        />
+                      )}
+                      {t.pending > 0 && (
+                        <div
+                          className="h-full bg-indigo-500 transition-all"
+                          style={{ width: `${(t.pending / t.total) * 100}%` }}
+                          title={`Pending: ${t.pending}`}
+                        />
+                      )}
+                      {t.noAnswer > 0 && (
+                        <div
+                          className="h-full bg-amber-500 transition-all"
+                          style={{ width: `${(t.noAnswer / t.total) * 100}%` }}
+                          title={`No Answer: ${t.noAnswer}`}
+                        />
+                      )}
+                      {t.cancelled > 0 && (
+                        <div
+                          className="h-full bg-rose-500 transition-all"
+                          style={{ width: `${(t.cancelled / t.total) * 100}%` }}
+                          title={`Cancelled: ${t.cancelled}`}
+                        />
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 text-center">
+                      <div>
+                        <p className="text-sm font-bold text-emerald-500">{t.completed}</p>
+                        <p className="text-[9px] text-[var(--text-tertiary)]">Done</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-indigo-500">{t.pending}</p>
+                        <p className="text-[9px] text-[var(--text-tertiary)]">Pending</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-amber-500">{t.noAnswer}</p>
+                        <p className="text-[9px] text-[var(--text-tertiary)]">No Answer</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-rose-500">{t.cancelled}</p>
+                        <p className="text-[9px] text-[var(--text-tertiary)]">Cancelled</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                      <span>Completion</span>
+                      <Badge variant={completedPct >= 70 ? 'success' : completedPct >= 40 ? 'warning' : 'error'} size="sm">
+                        {completedPct}%
+                      </Badge>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Appointment Rates Card (full width) */}
       <Card>

@@ -203,6 +203,7 @@ export function AppointmentBooking({
         is_athlete: false,
         is_married: false,
         is_employee: false,
+        is_marketing_student: false,
       })
       if (createError || !data) {
         setError(typeof createError === "string" ? createError : "Failed to create lead")

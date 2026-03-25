@@ -157,6 +157,7 @@ CREATE TABLE leads (
   intended_major intended_major,
   custom_major VARCHAR(255),
   preferred_major VARCHAR(255),
+  ministry_accepted_major VARCHAR(255),
   preferred_college TEXT,
   graduation_year INTEGER,
 

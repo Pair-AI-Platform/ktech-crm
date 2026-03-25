@@ -285,7 +285,7 @@ export default function LeadDetailJobs() {
                   <DetailItem label="Grade Level" value="12th" />
                   <DetailItem label="Academic Track" value="Science" />
                   <DetailItem label="Graduation Year" value="2026" />
-                  <DetailItem label="Intended Major" value={lead.intendedMajor} />
+                  <DetailItem label="ktech Intended Major" value={lead.intendedMajor} />
                   <DetailItem label="Lead Source" value={lead.source} />
                   <DetailItem label="Assigned To" value={lead.assignedTo} />
                   <DetailItem label="Created" value={lead.created} />

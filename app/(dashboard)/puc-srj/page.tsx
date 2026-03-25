@@ -79,6 +79,8 @@ const defaultFilters: LeadFilters = {
   paymentAmountMax: 5000,
   academicTrack: "all",
   lostReasonIds: [],
+  priority: "all",
+  ministryAssigned: "all",
 }
 
 export default function PUCSRJPage() {
@@ -118,25 +120,28 @@ export default function PUCSRJPage() {
 
   const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
 
-  // PUC leads
+  // PUC leads - only fetch when PUC tab is active
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
     fundingType: "puc",
     searchQuery,
     limit: 200,
+    enabled: topTab === "puc",
   })
 
-  // SF SRJ leads (self-funded, all stages - stage filtering done client-side for correct counts)
+  // SF SRJ leads - only fetch when SF SRJ tab is active
   const { leads: sfSrjLeads, loading: sfSrjLoading, refetch: sfSrjRefetch } = useLeads({
     fundingType: "self_funded",
     searchQuery: sfSrjSearchQuery,
     limit: 200,
+    enabled: topTab === "sf_srj",
   })
 
-  // Self Fund leads (all stages - stage filtering done client-side for correct counts)
+  // Self Fund leads - only fetch when Self Fund tab is active
   const { leads: sfLeads, loading: sfLoading, refetch: sfRefetch } = useLeads({
     fundingType: "self_funded",
     searchQuery: sfSearchQuery,
     limit: 200,
+    enabled: topTab === "self_fund",
   })
 
   // Active leads/loading/refetch based on tab
@@ -593,8 +598,6 @@ export default function PUCSRJPage() {
                 </Button>
                 {Object.entries(PUC_STAGE_CONFIG).map(([key, config]) => {
                   const count = stageCounts[key] || 0
-                  const alwaysShow = ['puc_document_submission', 'puc_application_submission'].includes(key)
-                  if (count === 0 && stageFilter !== key && !alwaysShow) return null
                   return (
                     <Button
                       key={key}
@@ -605,11 +608,9 @@ export default function PUCSRJPage() {
                       data-active={stageFilter === key}
                     >
                       {config.label}
-                      {count > 0 && (
-                        <Badge variant="secondary" size="sm" className="ml-2">
-                          {count}
-                        </Badge>
-                      )}
+                      <Badge variant="secondary" size="sm" className="ml-2">
+                        {count}
+                      </Badge>
                     </Button>
                   )
                 })}

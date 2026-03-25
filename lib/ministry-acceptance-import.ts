@@ -6,14 +6,19 @@ export interface MinistryAcceptanceRecord {
   civil_id: string
   student_name?: string
   accepted_college?: string // The college they were accepted to
+  accepted_major?: string // The major assigned by the ministry
   is_accepted_ktech: boolean // Whether they were accepted for KTECH
+  is_first_choice: boolean // Whether KTECH was their first choice (مختار vs تم القبول في الخطة)
+  gpa?: number // GPA from ministry list
 }
 
 export interface MinistryAcceptanceResult {
   movedToApplicant: { leadId: string; name: string; civilId: string }[]
   movedToLost: { leadId: string; name: string; civilId: string; acceptedCollege: string }[]
+  convertedToSelfFunded: { leadId: string; name: string; civilId: string; gpa: number }[]
   createdFirstChoice: { leadId: string; name: string; civilId: string }[]
   createdSecondChoice: { leadId: string; name: string; civilId: string }[]
+  ministryAssigned: { leadId: string; name: string; civilId: string; previousStage: string }[]
   errors: { civilId: string; name: string; error: string }[]
 }
 
@@ -55,6 +60,37 @@ const ACCEPTANCE_COLUMN_MAPPINGS: Record<string, string> = {
   'مكان القبول': 'accepted_college',
   'accepted': 'accepted_college',
   'placement': 'accepted_college',
+
+  // Accepted major variations
+  'major': 'accepted_major',
+  'accepted_major': 'accepted_major',
+  'accepted major': 'accepted_major',
+  'التخصص': 'accepted_major',
+  'تخصص': 'accepted_major',
+  'التخصص المقبول': 'accepted_major',
+  'تخصص القبول': 'accepted_major',
+  'specialization': 'accepted_major',
+  'programme': 'accepted_major',
+  'program': 'accepted_major',
+  'البرنامج': 'accepted_major',
+
+  // Status/choice variations (الحالة)
+  'الحالة': 'acceptance_status',
+  'حالة': 'acceptance_status',
+  'الحاله': 'acceptance_status',
+  'status': 'acceptance_status',
+  'acceptance_status': 'acceptance_status',
+  'choice': 'acceptance_status',
+
+  // GPA variations
+  'gpa': 'gpa',
+  'المعدل': 'gpa',
+  'معدل': 'gpa',
+  'المعدل التراكمي': 'gpa',
+  'grade': 'gpa',
+  'average': 'gpa',
+  'نسبة': 'gpa',
+  'النسبة': 'gpa',
 }
 
 // KTECH identification patterns in the accepted college field
@@ -120,12 +156,32 @@ export function parseAcceptanceRow(
 
   const studentName = getValue('student_name') || ''
   const acceptedCollege = getValue('accepted_college') || ''
+  const acceptedMajor = getValue('accepted_major')
+
+  // Parse GPA - handle both number and string formats
+  const gpaRaw = getValue('gpa')
+  let gpa: number | undefined
+  if (gpaRaw) {
+    const parsed = parseFloat(gpaRaw)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+      gpa = parsed
+    }
+  }
+
+  // Determine if KTECH was first choice based on الحالة column
+  // "مختار" = first choice, "تم القبول في الخطة" = second choice (placed but didn't choose first)
+  const acceptanceStatus = getValue('acceptance_status') || ''
+  const isSecondChoice = acceptanceStatus.includes('القبول في الخطة') || acceptanceStatus.includes('تم القبول')
+  const isFirstChoice = !isSecondChoice
 
   return {
     civil_id: civilId,
     student_name: studentName,
     accepted_college: acceptedCollege,
+    accepted_major: acceptedMajor,
     is_accepted_ktech: isKtechAccepted(acceptedCollege),
+    is_first_choice: isFirstChoice,
+    gpa,
   }
 }
 

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { CheckSquare, Square, Paperclip, GraduationCap, Check, Send, Upload, FileText, Loader2, X, Download } from "lucide-react"
+import { CheckSquare, Square, Paperclip, GraduationCap, Check, Send, Upload, FileText, Loader2, X, Download, ScanLine } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { type Lead, type EducationType } from "@/types"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { GRADUATE_TYPE_CONFIGS, getDocumentsForGraduateType, type GraduateType, type ConditionalDocumentFlags } from "@/lib/psp/document-rules"
 import { createClient } from "@/lib/supabase/client"
+import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 
 const GRADUATE_TYPE_OPTIONS: { value: GraduateType; label: string; description: string }[] = [
   { value: "GOV", label: "GOV", description: "Kuwait Government School" },
@@ -50,6 +51,9 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
   const [isSpecialNeeds, setIsSpecialNeeds] = useState(false)
   const { updateLead } = useLeadMutations()
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false)
+  const [extracting, setExtracting] = useState(false)
 
   // Load sent-to-registration flag from localStorage
   useEffect(() => {
@@ -214,6 +218,35 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
 
       const updated = { ...uploadedFiles, [docId]: uploadedFile }
       saveUploadedFiles(updated)
+
+      // Trigger extraction for civil_id documents
+      if (docId === "civil_id" && file.type.startsWith("image/")) {
+        setExtracting(true)
+        try {
+          const reader = new FileReader()
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve((reader.result as string).split(",")[1])
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+          const extractRes = await fetch("/api/civil-id-extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
+          })
+          if (extractRes.ok) {
+            const { extracted } = await extractRes.json()
+            if (extracted && Object.keys(extracted).some(k => extracted[k])) {
+              setExtractedData(extracted)
+              setShowExtractionDialog(true)
+            }
+          }
+        } catch (err) {
+          console.error("Civil ID extraction failed:", err)
+        } finally {
+          setExtracting(false)
+        }
+      }
     } catch (err) {
       console.error("Upload failed:", err)
       alert("Failed to upload file. Please try again.")
@@ -525,6 +558,34 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
         )}
       </div>
 
+      {/* Extracting indicator */}
+      {extracting && (
+        <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <ScanLine className="w-4 h-4" />
+          Extracting information from Civil ID...
+        </div>
+      )}
+
+      {/* Civil ID Extraction Dialog */}
+      {showExtractionDialog && extractedData && (
+        <CivilIdExtractionDialog
+          isOpen={showExtractionDialog}
+          onClose={() => setShowExtractionDialog(false)}
+          extractedData={extractedData}
+          currentLead={lead}
+          onApply={async (fieldsToUpdate) => {
+            const supabase = createClient()
+            const { error } = await supabase
+              .from("leads")
+              .update(fieldsToUpdate)
+              .eq("id", lead.id)
+            if (!error) {
+              onUpdate?.()
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -274,6 +274,8 @@ export interface Lead {
   // Personal Information
   first_name: string
   last_name: string
+  first_name_ar?: string
+  last_name_ar?: string
   civil_id?: string
   phone: string
   phone_secondary?: string
@@ -288,6 +290,7 @@ export interface Lead {
   is_athlete: boolean
   is_married: boolean
   is_employee: boolean
+  is_marketing_student: boolean
 
   // Academic Information
   school_id?: string
@@ -314,10 +317,16 @@ export interface Lead {
   intended_major?: IntendedMajor
   custom_major?: string
   preferred_major?: string
+  ministry_accepted_major?: string
+  ministry_assigned?: boolean
   preferred_college?: string
   graduation_year?: number
   expected_gpa?: number
   actual_lead?: boolean
+
+  // Address & Civil ID
+  address?: string
+  civil_id_expiry?: string
 
   // MOE GPA Fetch
   seat_number?: string
@@ -449,6 +458,7 @@ export interface LeadFormData {
   is_athlete?: boolean
   is_married?: boolean
   is_employee?: boolean
+  is_marketing_student?: boolean
   school_id?: string
   school_name_custom?: string
   school?: School
@@ -468,11 +478,15 @@ export interface LeadFormData {
   intended_major?: IntendedMajor
   custom_major?: string
   preferred_major?: string
+  ministry_accepted_major?: string
+  ministry_assigned?: boolean
   preferred_college?: string
   graduation_year?: number
   expected_gpa?: number
   actual_gpa?: number
   actual_lead?: boolean
+  address?: string
+  civil_id_expiry?: string
   seat_number?: string
   // Placement Test
   placement_level?: PlacementLevel

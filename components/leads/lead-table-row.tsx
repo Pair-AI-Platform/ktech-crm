@@ -22,6 +22,7 @@ import {
   Wand2,
   Flame,
   Star,
+  GraduationCap,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import {
@@ -109,6 +110,7 @@ export interface LeadTableRowProps {
   setCallbackLead: (lead: Lead) => void
   setCallbackFromStage: (stage: PipelineStage | undefined) => void
   setLostDialogLead: (lead: Lead) => void
+  openAssignReasonDialog?: (lead: Lead) => void
   setPspWizardLead: (lead: Lead) => void
   setViewingAppointment: (apt: import("@/types").Appointment | null) => void
   getEffectiveValue: <K extends keyof Lead>(leadId: string, field: K, originalValue: Lead[K]) => Lead[K]
@@ -167,6 +169,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   setCallbackLead,
   setCallbackFromStage,
   setLostDialogLead,
+  openAssignReasonDialog,
   setPspWizardLead,
   setViewingAppointment,
   getEffectiveValue,
@@ -366,8 +369,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   const uploaded = docInfo?.uploaded ?? 0
                   const required = docInfo?.required ?? 0
                   const showDocBadge = !(required > 0 && uploaded >= required)
-                  const showChoiceBadge = !!lead.puc_choice
-                  if (!showDocBadge && !showChoiceBadge) return null
+                  if (!showDocBadge) return null
                   return (
                     <div className="flex items-center gap-1 mb-0.5">
                       {showDocBadge && (
@@ -393,16 +395,6 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                           </span>
                         </SimpleTooltip>
                       )}
-                      {showChoiceBadge && (
-                        <span className={cn(
-                          "inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-md",
-                          lead.puc_choice === "1"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                        )}>
-                          {lead.puc_choice === "1" ? "1st" : lead.puc_choice === "2" ? "2nd" : lead.puc_choice === "3" ? "3rd" : "4th"}
-                        </span>
-                      )}
                     </div>
                   )
                 })()}
@@ -415,6 +407,14 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   {lead.priority === 'important' && (
                     <SimpleTooltip content="Important priority">
                       <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    </SimpleTooltip>
+                  )}
+                  {lead.ministry_assigned && (
+                    <SimpleTooltip content="Ministry assigned (not 1st choice KTECH)">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 ring-1 ring-purple-500/20 shrink-0">
+                        <GraduationCap className="w-3 h-3" />
+                        MA
+                      </span>
                     </SimpleTooltip>
                   )}
                   <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate">
@@ -780,7 +780,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               })()}
             </td>
           )}
-          {/* PUC Contacted: Intended Major + GPA columns */}
+          {/* PUC Contacted: ktech Intended Major + GPA columns */}
           {isPucContactedView && (
             <>
               <td className="px-3 py-3">
@@ -896,11 +896,20 @@ export const LeadTableRow = React.memo(function LeadTableRow({
             })()}
           </td>
           {/* Lost Reason */}
-          <td className="px-3 py-3 overflow-hidden">
+          <td className="px-3 py-3 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-[var(--text-primary)] truncate">
-                {lead.lost_reason?.reason_en || <span className="text-[var(--text-muted)]">&mdash;</span>}
-              </span>
+              {lead.lost_reason?.reason_en ? (
+                <span className="text-xs font-medium text-[var(--text-primary)] truncate">
+                  {lead.lost_reason.reason_en}
+                </span>
+              ) : (
+                <button
+                  onClick={() => openAssignReasonDialog?.(lead)}
+                  className="text-xs font-medium text-[var(--error)] hover:underline cursor-pointer inline-flex items-center gap-1"
+                >
+                  + Add reason
+                </button>
+              )}
               {lead.lost_reason_notes && (
                 <span className="text-[10px] text-[var(--text-muted)] italic truncate max-w-[160px]" title={lead.lost_reason_notes}>
                   {lead.lost_reason_notes}
@@ -1069,7 +1078,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
                 puc_application_submission: ['applied', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
               }
-              const stageConfig = effectiveStage ? STAGE_STATUSES[effectiveStage as PipelineStage] : 'all'
+              const stageConfig = effectiveStage ? (STAGE_STATUSES[effectiveStage as PipelineStage] ?? 'all') : 'all'
               const isStatusDisabled = stageConfig === 'none'
               const isSelfFunded = lead.funding_type === 'self_funded'
               const leadStatus = getEffectiveValue(lead.id, 'status', lead.status)
@@ -1226,7 +1235,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 content={
                   <div className="text-xs space-y-1">
                     <div className="font-medium">Lost Reason</div>
-                    <div>{lead.lost_reason?.reason_en || 'No reason specified'}</div>
+                    <div>{lead.lost_reason?.reason_en || 'No reason — click to assign'}</div>
                     {lead.lost_reason_notes && (
                       <div className="text-[var(--text-muted)] italic">{lead.lost_reason_notes}</div>
                     )}
@@ -1237,7 +1246,12 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   variant="ghost"
                   size="icon-sm"
                   className="group/btn hover:bg-[var(--error-bg)]"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!lead.lost_reason?.reason_en) {
+                      openAssignReasonDialog?.(lead)
+                    }
+                  }}
                 >
                   <XCircle className="w-4 h-4 text-red-400 group-hover/btn:!text-red-600" />
                 </Button>

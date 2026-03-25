@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { MinistryAcceptanceRecord, MinistryAcceptanceResult } from "@/lib/ministry-acceptance-import"
+import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Fetch ALL leads with matching civil IDs (any stage, any funding type)
     const { data: existingLeads, error: leadsError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, civil_id, pipeline_stage, status, funding_type, position_in_stage")
+      .select("id, first_name, last_name, civil_id, pipeline_stage, status, funding_type, position_in_stage, ministry_assigned")
       .in("civil_id", civilIds)
 
     if (leadsError) {
@@ -95,8 +96,10 @@ export async function POST(request: NextRequest) {
     const result: MinistryAcceptanceResult = {
       movedToApplicant: [],
       movedToLost: [],
+      convertedToSelfFunded: [],
       createdFirstChoice: [],
       createdSecondChoice: [],
+      ministryAssigned: [],
       errors: [],
     }
 
@@ -122,21 +125,79 @@ export async function POST(request: NextRequest) {
             continue
           }
 
-          // Skip if already lost
-          if (lead.pipeline_stage === "lost") {
+          // ── GPA CHECK: Auto-convert to self-funded if GPA < threshold ──
+          if (record.gpa !== undefined && record.gpa < GPA_SELF_FUNDED_THRESHOLD && lead.funding_type === "puc") {
+            const { error: updateError } = await supabase
+              .from("leads")
+              .update({
+                funding_type: "self_funded",
+                actual_gpa: record.gpa,
+              })
+              .eq("id", lead.id)
+
+            if (updateError) {
+              result.errors.push({ civilId: record.civil_id, name: leadName, error: "Failed to convert to self-funded" })
+              continue
+            }
+
+            activities.push({
+              lead_id: lead.id,
+              activity_type: "funding_change",
+              title: "Converted to Self-Funded",
+              description: `Automatically converted from PUC to Self-Funded due to GPA ${record.gpa}% (below ${GPA_SELF_FUNDED_THRESHOLD}%). Source: Ministry acceptance import.`,
+              metadata: {
+                old_funding_type: "puc",
+                new_funding_type: "self_funded",
+                gpa: record.gpa,
+                source: "ministry_acceptance_import",
+              },
+              created_by: user.id,
+            })
+
+            result.convertedToSelfFunded.push({
+              leadId: lead.id,
+              name: leadName,
+              civilId: record.civil_id,
+              gpa: record.gpa,
+            })
             continue
+          }
+
+          // Update actual_gpa from ministry list if provided
+          if (record.gpa !== undefined) {
+            await supabase
+              .from("leads")
+              .update({ actual_gpa: record.gpa })
+              .eq("id", lead.id)
           }
 
           if (record.is_accepted_ktech) {
             // Accepted for ktech → move to "applicant"
+            // Second choice = الحالة is "تم القبول في الخطة" (didn't choose KTECH first)
+            const isSecondChoice = !record.is_first_choice
+
             const { error: updateError } = await supabase
               .from("leads")
               .update({
                 pipeline_stage: "applicant",
                 position_in_stage: nextApplicantPosition,
                 status: null,
-                puc_choice: "1",
-                puc_first_choice_college: null,
+                puc_choice: isSecondChoice ? "2" : "1",
+                puc_first_choice_college: isSecondChoice ? (record.accepted_college || null) : null,
+                ministry_assigned: isSecondChoice,
+                // Clear lost fields if moving from lost
+                ...(lead.pipeline_stage === "lost" ? {
+                  lost_reason_id: null,
+                  lost_reason_notes: null,
+                  lost_at_stage: null,
+                } : {}),
+                ...(record.accepted_major ? { ministry_accepted_major: record.accepted_major } : {}),
+                // Highlight second-choice leads with star (important priority)
+                ...(isSecondChoice ? {
+                  priority: "important",
+                  priority_set_by: user.id,
+                  priority_set_at: new Date().toISOString(),
+                } : {}),
               })
               .eq("id", lead.id)
 
@@ -147,23 +208,42 @@ export async function POST(request: NextRequest) {
 
             nextApplicantPosition++
 
+            const description = isSecondChoice
+              ? `Ministry-assigned to KTECH. Moved from ${lead.pipeline_stage} to Applicant.`
+              : `Accepted by ministry for KTECH. Moved from ${lead.pipeline_stage} to Applicant.`
+
             activities.push({
               lead_id: lead.id,
               activity_type: "stage_change",
-              title: "Moved to Applicant",
-              description: `Accepted by ministry for ktech. Moved from ${lead.pipeline_stage} to Applicant.`,
+              title: isSecondChoice ? "Ministry Assigned to Applicant" : "Moved to Applicant",
+              description,
               metadata: {
                 old_stage: lead.pipeline_stage,
                 new_stage: "applicant",
                 source: "ministry_acceptance_import",
+                ministry_assigned: isSecondChoice,
                 accepted_college: record.accepted_college,
               },
               created_by: user.id,
             })
 
             result.movedToApplicant.push({ leadId: lead.id, name: leadName, civilId: record.civil_id })
+
+            if (isSecondChoice) {
+              result.ministryAssigned.push({
+                leadId: lead.id,
+                name: leadName,
+                civilId: record.civil_id,
+                previousStage: lead.pipeline_stage,
+              })
+            }
           } else {
             // Not accepted for ktech → move to "lost" with PUC Rejected reason
+            // Skip if already in lost (no need to re-lose them)
+            if (lead.pipeline_stage === "lost") {
+              continue
+            }
+
             const { error: updateError } = await supabase
               .from("leads")
               .update({
@@ -175,6 +255,7 @@ export async function POST(request: NextRequest) {
                   : "Not accepted for ktech",
                 lost_at_stage: lead.pipeline_stage,
                 status: null,
+                ...(record.accepted_major ? { ministry_accepted_major: record.accepted_major } : {}),
               })
               .eq("id", lead.id)
 
@@ -212,7 +293,7 @@ export async function POST(request: NextRequest) {
         } else {
           // ── NEW STUDENT (not in system) ──
           // Both first choice and second choice ktech students get created as applicants
-          const isFirstChoice = record.is_accepted_ktech
+          const isFirstChoice = record.is_first_choice
           const nameParts = (record.student_name || "").split(/\s+/)
           const firstName = nameParts[0] || "Unknown"
           const lastName = nameParts.slice(1).join(" ") || ""
@@ -231,6 +312,14 @@ export async function POST(request: NextRequest) {
               source_category: "outreach",
               puc_choice: isFirstChoice ? "1" : "2",
               puc_first_choice_college: isFirstChoice ? null : (record.accepted_college || null),
+              ministry_assigned: !isFirstChoice,
+              ...(record.accepted_major ? { ministry_accepted_major: record.accepted_major } : {}),
+              // Highlight second-choice leads with star (important priority)
+              ...(!isFirstChoice ? {
+                priority: "important",
+                priority_set_by: user.id,
+                priority_set_at: new Date().toISOString(),
+              } : {}),
             })
             .select("id")
             .single()
@@ -274,6 +363,14 @@ export async function POST(request: NextRequest) {
               civilId: record.civil_id,
             })
           }
+
+          // All newly created leads are ministry-assigned (not in system before)
+          result.ministryAssigned.push({
+            leadId: newLead.id,
+            name: record.student_name || "Unknown",
+            civilId: record.civil_id,
+            previousStage: "new (not in system)",
+          })
         }
       } catch (error) {
         result.errors.push({
@@ -300,8 +397,10 @@ export async function POST(request: NextRequest) {
         total: records.length,
         movedToApplicant: result.movedToApplicant.length,
         movedToLost: result.movedToLost.length,
+        convertedToSelfFunded: result.convertedToSelfFunded.length,
         createdFirstChoice: result.createdFirstChoice.length,
         createdSecondChoice: result.createdSecondChoice.length,
+        ministryAssigned: result.ministryAssigned.length,
         errors: result.errors.length,
       },
     })

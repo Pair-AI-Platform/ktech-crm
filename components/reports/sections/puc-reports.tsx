@@ -8,7 +8,6 @@ import {
   Users,
   CheckCircle2,
   XCircle,
-  Clock,
   FolderOpen,
   FileText,
   Send,
@@ -16,6 +15,9 @@ import {
   RefreshCw,
   TrendingDown,
   ArrowDown,
+  Shield,
+  Accessibility,
+  Star,
 } from "lucide-react"
 import type { PUCReportData } from "@/lib/hooks/use-reports"
 
@@ -29,7 +31,7 @@ export function PUCReports({ data }: PUCReportsProps) {
       title: "Total Applied",
       value: data.totalApplied,
       icon: Users,
-      colorClass: "bg-[var(--bg-sunken)]"
+      colorClass: "bg-[var(--primary)]"
     },
     {
       title: "Accepted",
@@ -44,17 +46,29 @@ export function PUCReports({ data }: PUCReportsProps) {
       colorClass: "bg-[var(--error)]"
     },
     {
-      title: "Pending",
-      value: data.pending,
-      icon: Clock,
-      colorClass: "bg-[var(--warning)]"
+      title: "Second Choice",
+      value: data.accepted2ndChoice,
+      icon: Star,
+      colorClass: "bg-amber-500"
+    },
+    {
+      title: "Diplomatics",
+      value: data.diplomaticCount,
+      icon: Shield,
+      colorClass: "bg-[var(--accent)]"
+    },
+    {
+      title: "Special Needs",
+      value: data.specialNeedsCount,
+      icon: Accessibility,
+      colorClass: "bg-[var(--info)]"
     },
   ]
 
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.title}
@@ -62,7 +76,7 @@ export function PUCReports({ data }: PUCReportsProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: index * 0.1 }}
           >
-            <Card hover glow className="relative overflow-hidden">
+            <Card hover glow className="h-full">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
@@ -72,7 +86,6 @@ export function PUCReports({ data }: PUCReportsProps) {
                 <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
               </CardContent>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
             </Card>
           </motion.div>
         ))}
@@ -110,13 +123,13 @@ export function PUCReports({ data }: PUCReportsProps) {
                   <p className="text-2xl font-bold text-[var(--success)]">{data.accepted}</p>
                   <p className="text-xs text-[var(--text-muted)]">Accepted</p>
                 </div>
+                <div className="text-center p-3 rounded-lg bg-[var(--warning-bg)]">
+                  <p className="text-2xl font-bold text-[var(--warning)]">{data.accepted2ndChoice}</p>
+                  <p className="text-xs text-[var(--text-muted)]">Accepted 2nd Choice</p>
+                </div>
                 <div className="text-center p-3 rounded-lg bg-[var(--error-bg)]">
                   <p className="text-2xl font-bold text-[var(--error)]">{data.rejected}</p>
                   <p className="text-xs text-[var(--text-muted)]">Rejected</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-[var(--warning-bg)]">
-                  <p className="text-2xl font-bold text-[var(--warning)]">{data.pending}</p>
-                  <p className="text-xs text-[var(--text-muted)]">Pending</p>
                 </div>
               </div>
             </CardContent>
@@ -141,8 +154,8 @@ export function PUCReports({ data }: PUCReportsProps) {
               {[
                 { label: 'Files Opened', labelAr: 'فتح ملف', value: data.filesOpened, icon: FolderOpen, color: 'var(--primary)' },
                 { label: 'Documents Submitted', labelAr: 'تسليم مستندات', value: data.documentsSubmitted, icon: FileText, color: 'var(--info)' },
-                { label: 'Application Submitted', labelAr: 'قدم طلب', value: data.applicationSubmitted, icon: Send, color: 'var(--accent)' },
                 { label: 'Fee Paid (10 KD)', labelAr: 'دفع رسوم البعثات', value: data.feePaid, icon: CreditCard, color: 'var(--success)' },
+                { label: 'Application Submitted', labelAr: 'قدم طلب', value: data.applicationSubmitted, icon: Send, color: 'var(--accent)' },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-sunken)]">
                   <div className="flex items-center gap-3">
@@ -181,8 +194,8 @@ export function PUCReports({ data }: PUCReportsProps) {
               const stages = [
                 { label: 'Files Opened', value: data.filesOpened },
                 { label: 'Documents Submitted', value: data.documentsSubmitted },
-                { label: 'Application Submitted', value: data.applicationSubmitted },
                 { label: 'Fee Paid', value: data.feePaid },
+                { label: 'Application Submitted', value: data.applicationSubmitted },
               ]
               const dropoffs = stages.slice(0, -1).map((stage, i) => {
                 const next = stages[i + 1]
@@ -238,10 +251,10 @@ export function PUCReports({ data }: PUCReportsProps) {
                       <span className="text-sm font-medium text-[var(--text-secondary)]">Total pipeline loss</span>
                       <div className="text-right">
                         <span className="text-lg font-bold text-[var(--error)]">
-                          {data.filesOpened - data.feePaid}
+                          {data.filesOpened - data.applicationSubmitted}
                         </span>
                         <span className="text-sm text-[var(--text-muted)] ml-2">
-                          ({data.filesOpened > 0 ? Math.round(((data.filesOpened - data.feePaid) / data.filesOpened) * 100) : 0}% of {data.filesOpened})
+                          ({data.filesOpened > 0 ? Math.round(((data.filesOpened - data.applicationSubmitted) / data.filesOpened) * 100) : 0}% of {data.filesOpened})
                         </span>
                       </div>
                     </div>
@@ -271,14 +284,14 @@ export function PUCReports({ data }: PUCReportsProps) {
                     Converted to Self-Funded
                   </h3>
                   <p className="text-sm text-[var(--text-muted)]">
-                    PUC rejected students who converted to self-funded enrollment
+                    Leads auto-converted to self-funded due to GPA below 70%
                   </p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-bold text-[var(--text-primary)]">{data.convertedToSF}</p>
                 <p className="text-sm text-[var(--text-muted)]">
-                  {data.rejected > 0 ? Math.round((data.convertedToSF / data.rejected) * 100) : 0}% of rejected
+                  {data.totalApplied > 0 ? Math.round((data.convertedToSF / data.totalApplied) * 100) : 0}% of total
                 </p>
               </div>
             </div>

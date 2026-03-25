@@ -10,6 +10,7 @@ export interface LeadFormData {
   date_of_birth: string
   email: string
   nationality: string
+  address: string
   school: string
   education_type: string
   education_type_custom: string
@@ -18,6 +19,7 @@ export interface LeadFormData {
   funding_type: string
   intended_major: string
   preferred_major: string
+  ministry_accepted_major: string
   preferred_college: string
   pipeline_stage: string
   status: string
@@ -36,6 +38,7 @@ export interface LeadFormData {
   is_athlete: boolean
   is_married: boolean
   is_employee: boolean
+  is_marketing_student: boolean
   // Placement Test fields
   placement_level: string
   placement_english_score: string

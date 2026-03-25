@@ -64,32 +64,82 @@ const topTopics = [
   },
 ];
 
-// Sparkline component
+// Sparkline component — with hover tooltip
 const Sparkline = ({ data }: { data: number[] }) => {
+  const [hovered, setHovered] = React.useState<number | null>(null);
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
   const width = 60;
   const height = 20;
 
-  const points = data
-    .map((value, index) => {
-      const x = (index / (data.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${x},${y}`;
-    })
-    .join(" ");
+  const coords = data.map((value, index) => {
+    const x = (index / (data.length - 1)) * width;
+    const y = height - ((value - min) / range) * height;
+    return { x, y, value };
+  });
+  const points = coords.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <svg width={width} height={height} className="inline-block">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        className="text-[var(--text-muted)]"
-      />
-    </svg>
+    <div className="relative inline-block" style={{ width, height: height + 4 }}>
+      <svg
+        width={width}
+        height={height}
+        className="inline-block"
+        onMouseLeave={() => setHovered(null)}
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className="text-[var(--text-muted)]"
+        />
+        {coords.map((p, i) => (
+          <rect
+            key={i}
+            x={i === 0 ? 0 : (coords[i - 1].x + p.x) / 2}
+            y={0}
+            width={
+              i === 0 || i === coords.length - 1
+                ? width / Math.max(data.length - 1, 1) / 2 + 4
+                : (coords[Math.min(i + 1, coords.length - 1)].x -
+                    coords[Math.max(i - 1, 0)].x) /
+                  2
+            }
+            height={height}
+            fill="transparent"
+            onMouseEnter={() => setHovered(i)}
+          />
+        ))}
+        {hovered !== null && (
+          <circle
+            cx={coords[hovered].x}
+            cy={coords[hovered].y}
+            r={2.5}
+            fill="currentColor"
+            stroke="white"
+            strokeWidth={1.5}
+            className="text-[var(--text-muted)]"
+          />
+        )}
+      </svg>
+      {hovered !== null && (
+        <div
+          className="absolute z-50 pointer-events-none px-1.5 py-0.5 rounded text-[9px] font-bold shadow-lg whitespace-nowrap"
+          style={{
+            left: coords[hovered].x,
+            bottom: height - coords[hovered].y + 6,
+            transform: "translateX(-50%)",
+            backgroundColor: "var(--bg-surface)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          {coords[hovered].value.toLocaleString()}
+        </div>
+      )}
+    </div>
   );
 };
 

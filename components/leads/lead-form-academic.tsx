@@ -537,7 +537,7 @@ export function LeadFormAcademic({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Intended Major</Label>
+              <Label>ktech Intended Major</Label>
               <Select
                 value={formData.intended_major}
                 onValueChange={(value) => handleChange("intended_major", value)}
@@ -579,6 +579,15 @@ export function LeadFormAcademic({
                 value={formData.preferred_major}
                 onChange={(e) => handleChange("preferred_major", e.target.value)}
                 placeholder="Enter preferred major"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ministry_accepted_major">Ktech Actual Major</Label>
+              <Input
+                id="ministry_accepted_major"
+                value={formData.ministry_accepted_major}
+                onChange={(e) => handleChange("ministry_accepted_major", e.target.value)}
+                placeholder="From ministry file"
               />
             </div>
           </div>

@@ -18,13 +18,13 @@ import {
   CartesianGrid,
 } from "recharts"
 import {
-  Users,
   Globe,
   CreditCard,
   BookOpen,
   Percent,
   UserCircle,
   MapPin,
+  Shield,
 } from "lucide-react"
 import type { DemographicReportData } from "@/lib/hooks/use-reports"
 
@@ -84,7 +84,6 @@ export function DemographicReports({ data }: DemographicReportsProps) {
     color: FUNDING_COLORS[index % FUNDING_COLORS.length],
   }))
 
-  const totalLeads = data.byGender.reduce((sum, g) => sum + g.count, 0)
 
   return (
     <div className="space-y-6">
@@ -118,24 +117,6 @@ export function DemographicReports({ data }: DemographicReportsProps) {
             </Card>
           </motion.div>
         ))}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-        >
-          <Card hover glow className="relative overflow-hidden">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-              </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Total Leads</p>
-              <p className="text-2xl font-bold text-[var(--text-primary)]">{totalLeads}</p>
-            </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--bg-sunken)] opacity-50" />
-          </Card>
-        </motion.div>
       </div>
 
       {/* Pie Charts Row */}
@@ -200,6 +181,47 @@ export function DemographicReports({ data }: DemographicReportsProps) {
           </Card>
         </motion.div>
       </div>
+
+      {/* Lead Types */}
+      {data.byLeadType.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.55 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-[var(--warning)]" />
+                Lead Types
+              </CardTitle>
+              <CardDescription>Breakdown by student category</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {data.byLeadType.map((item, index) => {
+                  const typeColors = ['#F59E0B', '#22C55E', '#8B5CF6', '#3B82F6', '#EC4899', '#0EA5E9']
+                  const color = typeColors[index % typeColors.length]
+                  return (
+                    <div
+                      key={item.type}
+                      className="relative rounded-xl border border-[var(--border)] p-4 text-center overflow-hidden"
+                    >
+                      <div
+                        className="absolute top-0 left-0 right-0 h-1"
+                        style={{ backgroundColor: color }}
+                      />
+                      <p className="text-2xl font-bold text-[var(--text-primary)]">{item.count}</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">{item.label}</p>
+                      <Badge variant="secondary" size="sm" className="mt-2">{item.percent}%</Badge>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Major Demand */}
       <motion.div

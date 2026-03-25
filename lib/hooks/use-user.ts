@@ -32,9 +32,9 @@ const DEMO_ADMIN_PROFILE: Profile = {
 }
 
 const DEMO_AGENT_PROFILE: Profile = {
-  id: "demo-agent-id",
-  email: "sarah@ktech.edu.kw",
-  full_name: "Sarah Jones",
+  id: "agent-1",
+  email: "demo-agent@ktech.edu.kw",
+  full_name: "Khalifa",
   role: "agent",
   is_active: true,
   monthly_target: 40,
@@ -70,6 +70,16 @@ export function useUser() {
             .eq("id", user.id)
             .single()
 
+          // Override profile for demo accounts to ensure correct role
+          const email = user.email || profile?.email
+          if (profile && email === "demo-agent@ktech.edu.kw") {
+            profile.role = "agent"
+            profile.full_name = "Khalifa"
+          } else if (profile && email === "demo-admin@ktech.edu.kw") {
+            profile.role = "admin"
+            profile.full_name = "Demo Admin"
+          }
+
           setProfile(profile)
         }
       } catch (error) {
@@ -94,6 +104,17 @@ export function useUser() {
             .select("*")
             .eq("id", session.user.id)
             .single()
+
+          // Override profile for demo accounts to ensure correct role
+          const email = session.user.email || profile?.email
+          if (profile && email === "demo-agent@ktech.edu.kw") {
+            profile.role = "agent"
+            profile.full_name = "Khalifa"
+          } else if (profile && email === "demo-admin@ktech.edu.kw") {
+            profile.role = "admin"
+            profile.full_name = "Demo Admin"
+          }
+
           setProfile(profile)
         } else {
           setProfile(null)

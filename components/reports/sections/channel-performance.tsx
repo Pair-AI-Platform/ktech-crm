@@ -1,6 +1,6 @@
 "use client"
 
-import { useSyncExternalStore } from "react"
+import { useSyncExternalStore, useState } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,10 +24,25 @@ import {
   GraduationCap,
 } from "lucide-react"
 import type { ChannelReportData } from "@/lib/hooks/use-reports"
+import { LEAD_SOURCES } from "@/types"
+import type { LeadSourceCategory } from "@/types"
 
 interface ChannelPerformanceProps {
   data: ChannelReportData
 }
+
+const SOURCE_CATEGORY_TABS: { value: LeadSourceCategory | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'direct', label: 'Direct' },
+  { value: 'outreach', label: 'Outreach' },
+  { value: 'events', label: 'Events' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'referrals', label: 'Referrals' },
+]
+
+const SOURCE_TO_CATEGORY: Record<string, LeadSourceCategory> = Object.fromEntries(
+  LEAD_SOURCES.map(s => [s.value, s.category])
+) as Record<string, LeadSourceCategory>
 
 const CATEGORY_COLORS: Record<string, string> = {
   direct: '#445eb7',
@@ -58,6 +73,12 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 export function ChannelPerformance({ data }: ChannelPerformanceProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
+  const [selectedCategory, setSelectedCategory] = useState<LeadSourceCategory | 'all'>('all')
+
+  const filteredSources = selectedCategory === 'all'
+    ? data.bySource
+    : data.bySource.filter(s => SOURCE_TO_CATEGORY[s.source] === selectedCategory)
+
   const categoryPieData = data.byCategory.map(cat => ({
     name: cat.label,
     value: cat.count,
@@ -69,6 +90,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
   const topEnrollmentSource = [...data.bySource].sort((a, b) => b.enrolled - a.enrolled)[0]
   const totalEnrolled = data.bySource.reduce((sum, s) => sum + s.enrolled, 0)
   const totalLeads = data.bySource.reduce((sum, s) => sum + s.count, 0)
+  const totalApplications = data.bySource.reduce((sum, s) => sum + s.files, 0)
 
   return (
     <div className="space-y-6">
@@ -83,7 +105,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
-                  <Share2 className="w-5 h-5 text-white" />
+                  <Share2 className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <Badge variant="success" size="sm">Top Source</Badge>
               </div>
@@ -93,7 +115,6 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 {topSource?.count || 0} leads, {topSource?.conversionRate || 0}% conversion
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--bg-sunken)] opacity-50" />
           </Card>
         </motion.div>
 
@@ -106,7 +127,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
-                  <GraduationCap className="w-5 h-5 text-white" />
+                  <GraduationCap className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <Badge variant="info" size="sm">Top Enrollment</Badge>
               </div>
@@ -116,7 +137,6 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                 {topEnrollmentSource?.enrolled || 0} enrolled, {topEnrollmentSource?.enrollmentRate || 0}% rate
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--primary)] opacity-30" />
           </Card>
         </motion.div>
 
@@ -129,17 +149,16 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-[var(--bg-sunken)] shadow-sm">
-                  <TrendingUp className="w-5 h-5 text-white" />
+                  <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <Badge variant="warning" size="sm">Overall</Badge>
               </div>
               <p className="text-sm text-[var(--text-secondary)] mb-1">Overall Enrollment Rate</p>
-              <p className="text-xl font-bold text-[var(--text-primary)]">{totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0}%</p>
+              <p className="text-xl font-bold text-[var(--text-primary)]">{totalApplications > 0 ? Math.round((totalEnrolled / totalApplications) * 100) : 0}%</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {totalEnrolled} enrolled from {totalLeads} leads
+                {totalEnrolled} enrolled from {totalApplications} applications
               </p>
             </CardContent>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--warning)] opacity-30" />
           </Card>
         </motion.div>
       </div>
@@ -320,6 +339,21 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
             <CardDescription>Leads, enrollment count, and enrollment rate per source</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {SOURCE_CATEGORY_TABS.map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setSelectedCategory(tab.value)}
+                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    selectedCategory === tab.value
+                      ? 'bg-[var(--primary)] text-white shadow-sm'
+                      : 'bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -332,7 +366,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.bySource.map((source) => (
+                  {filteredSources.map((source) => (
                     <tr key={source.source} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
                       <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{source.label}</td>
                       <td className="py-3 px-3 text-center text-[var(--text-secondary)]">{source.count}</td>
@@ -357,13 +391,21 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t-2 border-[var(--border)] font-semibold">
-                    <td className="py-3 px-3 text-[var(--text-primary)]">Total</td>
-                    <td className="py-3 px-3 text-center text-[var(--text-primary)]">{totalLeads}</td>
-                    <td className="py-3 px-3 text-center text-[var(--text-primary)]">{data.bySource.reduce((sum, s) => sum + s.converted, 0)}</td>
-                    <td className="py-3 px-3 text-center text-green-500">{totalEnrolled}</td>
-                    <td className="py-3 px-3 text-center text-[var(--text-muted)]">{totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0}%</td>
-                  </tr>
+                  {(() => {
+                    const fLeads = filteredSources.reduce((sum, s) => sum + s.count, 0)
+                    const fApps = filteredSources.reduce((sum, s) => sum + s.converted, 0)
+                    const fEnrolled = filteredSources.reduce((sum, s) => sum + s.enrolled, 0)
+                    const fFiles = filteredSources.reduce((sum, s) => sum + s.files, 0)
+                    return (
+                      <tr className="border-t-2 border-[var(--border)] font-semibold">
+                        <td className="py-3 px-3 text-[var(--text-primary)]">Total</td>
+                        <td className="py-3 px-3 text-center text-[var(--text-primary)]">{fLeads}</td>
+                        <td className="py-3 px-3 text-center text-[var(--text-primary)]">{fApps}</td>
+                        <td className="py-3 px-3 text-center text-green-500">{fEnrolled}</td>
+                        <td className="py-3 px-3 text-center text-[var(--text-muted)]">{fFiles > 0 ? Math.round((fEnrolled / fFiles) * 100) : 0}%</td>
+                      </tr>
+                    )
+                  })()}
                 </tfoot>
               </table>
             </div>

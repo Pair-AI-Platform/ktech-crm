@@ -253,9 +253,9 @@ export function StaticBlock({
           opacity: isCollapsed ? 0 : 1,
         }}
         transition={{ duration: 0.2 }}
-        className="overflow-hidden"
+        className="overflow-hidden flex-1"
       >
-        <div className="p-4">{children}</div>
+        <div className="p-4 h-full">{children}</div>
       </motion.div>
     </div>
   )

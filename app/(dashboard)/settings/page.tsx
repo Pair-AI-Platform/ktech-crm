@@ -65,11 +65,11 @@ type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "te
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "notifications", label: "Notifications", icon: Bell, adminOnly: true },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "security", label: "Security", icon: Shield },
   { id: "pipeline", label: "Stages", icon: GitBranch, adminOnly: true },
-  { id: "targets", label: "Targets", icon: Target },
+  { id: "targets", label: "Targets", icon: Target, adminOnly: true },
   { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },

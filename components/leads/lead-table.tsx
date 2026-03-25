@@ -88,6 +88,7 @@ export function LeadTable({
   const [registrationSentLeads, setRegistrationSentLeads] = useState<Set<string>>(new Set())
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
   const [lostDialogLead, setLostDialogLead] = useState<Lead | null>(null)
+  const [assignReasonMode, setAssignReasonMode] = useState(false)
   const [contactedDialogLead, setContactedDialogLead] = useState<Lead | null>(null)
   const [blockedDialogLead, setBlockedDialogLead] = useState<Lead | null>(null)
   const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
@@ -506,6 +507,7 @@ export function LeadTable({
 
     setEditingStage(null)
     setLostDialogLead(null)
+    setAssignReasonMode(false)
     if (result.error) {
       setPendingUpdates(prev => {
         const updated = { ...prev }
@@ -520,6 +522,19 @@ export function LeadTable({
       })
     }
   }
+
+  const handleAssignLostReason = async (reasonId: string, notes?: string) => {
+    if (!lostDialogLead) return
+    const leadId = lostDialogLead.id
+    setLostDialogLead(null)
+    setAssignReasonMode(false)
+    await updateLead(leadId, { lost_reason_id: reasonId, lost_reason_notes: notes || null } as Partial<Lead>)
+  }
+
+  const openAssignReasonDialog = useCallback((lead: Lead) => {
+    setAssignReasonMode(true)
+    setLostDialogLead(lead)
+  }, [])
 
   const handleContactedConfirm = async (status: LeadStatus) => {
     if (!contactedDialogLead) return
@@ -1037,6 +1052,7 @@ export function LeadTable({
                 setCallbackLead={setCallbackLead}
                 setCallbackFromStage={setCallbackFromStage}
                 setLostDialogLead={setLostDialogLead}
+                openAssignReasonDialog={openAssignReasonDialog}
                 setPspWizardLead={setPspWizardLead}
                 setViewingAppointment={setViewingAppointment}
                 getEffectiveValue={getEffectiveValue}
@@ -1113,6 +1129,8 @@ export function LeadTable({
       setPspWizardLead={setPspWizardLead}
       setViewingAppointment={setViewingAppointment}
       handleLostConfirm={handleLostConfirm}
+      handleAssignLostReason={handleAssignLostReason}
+      assignReasonMode={assignReasonMode}
       handleContactedConfirm={handleContactedConfirm}
       handleBlockedConfirm={handleBlockedConfirm}
       handleWithdrawConfirm={handleWithdrawConfirm}

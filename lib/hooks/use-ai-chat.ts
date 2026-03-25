@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { queryKeys } from '@/lib/hooks/query-keys'
 
@@ -32,22 +32,29 @@ export function useAiChat() {
   conversationIdRef.current = conversationId
 
   // Custom fetch to capture conversation ID from response headers
-  const customFetch: typeof globalThis.fetch = async (input, init) => {
+  const customFetch: typeof globalThis.fetch = useCallback(async (input, init) => {
     const response = await globalThis.fetch(input, init)
     const newConvId = response.headers.get('X-Conversation-Id')
     if (newConvId && !conversationIdRef.current) {
       setConversationId(newConvId)
     }
     return response
-  }
+  }, [])
+
+  // Stable transport instance — must not be recreated every render
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        body: () => ({ conversationId: conversationIdRef.current }),
+        fetch: customFetch,
+      }),
+    [customFetch]
+  )
 
   // Vercel AI SDK v3 chat hook
   const chat = useChat({
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-      body: () => ({ conversationId: conversationIdRef.current }),
-      fetch: customFetch,
-    }),
+    transport,
     onFinish: () => {
       // Refresh conversations list after each exchange
       queryClient.invalidateQueries({ queryKey: queryKeys.aiChat.conversations() })
