@@ -361,13 +361,14 @@ export default function DashboardPage() {
     })
   }, [agentPresence, allLeads, todayChangesMap, agentApptsMap, lastMonthMap])
 
-  // Lead source performance data
+  // Lead source performance data (admin: all leads, agent: own leads)
   const sourcePerformanceData = useMemo(() => {
-    if (!isAdmin || allLeads.length === 0) return []
+    const leads = isAdmin ? allLeads : myLeads
+    if (leads.length === 0) return []
 
     const sourceMap = new Map<string, { total: number; enrolled: number }>()
 
-    allLeads.forEach(l => {
+    leads.forEach(l => {
       const src = l.source || 'other'
       const current = sourceMap.get(src) || { total: 0, enrolled: 0 }
       current.total++
@@ -384,7 +385,7 @@ export default function DashboardPage() {
         conversionRate: data.total > 0 ? Math.round((data.enrolled / data.total) * 100) : 0,
       }))
       .sort((a, b) => b.total - a.total)
-  }, [allLeads, isAdmin])
+  }, [allLeads, myLeads, isAdmin])
 
   // Agent workload data
   const workloadData = useMemo(() => {
@@ -488,6 +489,28 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Agent: Sources + Birthdays & Needs Attention */}
+        {!isAdmin && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AdminSourcePerformance sources={sourcePerformanceData} loading={leadsLoading} mode="files" />
+            <div className="flex flex-col gap-6">
+              <BirthdaySection birthdayLeads={birthdayLeads} loading={leadsLoading} />
+              <AttentionSection
+                priorityLeads={priorityLeads}
+                loading={leadsLoading}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Agent: Appointments (full width) */}
+        {!isAdmin && (
+          <AppointmentsSection
+            todayAppointments={todayAppointments}
+            loading={appointmentsLoading}
+          />
+        )}
+
         {/* Admin Drop-off Chart */}
         {isAdmin && (
           <AdminDropoffSection dropoffData={dropoffData} loading={dropoffLoading} />
@@ -500,34 +523,29 @@ export default function DashboardPage() {
           loading={leadsLoading}
         />
 
-        {/* Three Column Row: Appointments | Needs Attention | Birthdays */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {isAdmin ? (
+        {/* Admin: Appointments | Needs Attention | Birthdays */}
+        {isAdmin && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <AdminAppointmentsSection
               todayAppointments={todayAppointments}
               loading={appointmentsLoading}
             />
-          ) : (
-            <AppointmentsSection
-              todayAppointments={todayAppointments}
-              loading={appointmentsLoading}
+
+            <AttentionSection
+              priorityLeads={priorityLeads}
+              loading={leadsLoading}
             />
-          )}
 
-          <AttentionSection
-            priorityLeads={priorityLeads}
-            loading={leadsLoading}
-          />
-
-          <BirthdaySection
-            birthdayLeads={birthdayLeads}
-            loading={leadsLoading}
-          />
-        </div>
+            <BirthdaySection
+              birthdayLeads={birthdayLeads}
+              loading={leadsLoading}
+            />
+          </div>
+        )}
 
         {/* Agent-only sections */}
         {!isAdmin && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <>
             <TargetSection
               myTargetProgress={myTargetProgress}
               allAgentsProgress={allAgentsProgress}
@@ -540,7 +558,7 @@ export default function DashboardPage() {
               agentHistory={agentHistory}
               loading={historyLoading}
             />
-          </div>
+          </>
         )}
       </div>
     </div>
