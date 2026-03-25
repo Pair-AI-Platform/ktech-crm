@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useState, useSyncExternalStore } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
@@ -55,6 +57,10 @@ export default function LoginPage() {
     setDemoLoading(role)
     setError("")
 
+    // Clear any stale localStorage demo mode
+    localStorage.removeItem("ktech-demo-mode")
+    localStorage.removeItem("ktech-demo-role")
+
     const demoCredentials = {
       admin: { email: "demo-admin@ktech.edu.kw", password: "demo-admin-2026!" },
       agent: { email: "demo-agent@ktech.edu.kw", password: "demo-agent-2026!" },
@@ -66,16 +72,19 @@ export default function LoginPage() {
       setError("Demo login failed. Please try again.")
       setDemoLoading(null)
     } else {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .single()
-      if (profile?.role === "marketing") {
-        router.push("/marketing")
-      } else {
-        router.push("/dashboard")
+      // Force correct role and name for demo users via service role
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const res = await fetch("/api/demo-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id, role }),
+        })
+        if (!res.ok) {
+          console.error("Demo profile update failed:", await res.text())
+        }
       }
-      router.refresh()
+      window.location.href = "/dashboard"
     }
   }
 
