@@ -18,8 +18,6 @@ import {
   CreditCard,
   Search,
   Building2,
-  ClipboardCheck,
-  FileText,
   Lock,
   Ban,
   Phone,
@@ -51,6 +49,8 @@ import { EDUCATION_TYPES, MAJORS, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, 
 import { cn } from "@/lib/utils"
 import type { LeadFormData } from "./lead-form-types"
 import type { Dispatch, SetStateAction } from "react"
+import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
+import type { Campaign } from "@/lib/hooks/use-campaigns"
 
 const SOURCE_CATEGORIES = [
   { value: "direct", label: "Direct", icon: "📞" },
@@ -133,6 +133,7 @@ interface LeadFormAcademicProps {
   isAtTestStage: boolean
   agents: { id: string; full_name: string; email: string; avatar_url: string | null }[]
   semesters: { id: string; name: string; is_active: boolean; is_open: boolean; cycle_id?: string }[]
+  campaigns: Campaign[]
 }
 
 export function LeadFormAcademic({
@@ -152,9 +153,9 @@ export function LeadFormAcademic({
   availablePipelineStages,
   agents,
   semesters,
+  campaigns,
 }: LeadFormAcademicProps) {
-  // Check if source is walk-in
-  const isWalkIn = formData.source === 'walk_in'
+  const { exhibitions: activeExhibitions } = useActiveExhibitions()
 
   return (
     <>
@@ -184,7 +185,15 @@ export function LeadFormAcademic({
                       referrals: "current_student_referral",
                       outreach: "old_contacts",
                     }
-                    handleChange("source", categoryMap[cat.value] || "")
+                    const source = categoryMap[cat.value] || ""
+                    handleChange("source", source)
+                    if (source === "walk_in") {
+                      handleChange("pipeline_stage", "visit")
+                    }
+                    // Clear campaign when switching away from outreach
+                    if (cat.value !== "outreach") {
+                      handleChange("campaign_id", "")
+                    }
                   }}
                   className={cn(
                     "flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all",
@@ -200,104 +209,96 @@ export function LeadFormAcademic({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Source</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {filteredSources.map((source) => (
-                <button
-                  key={source.value}
-                  type="button"
-                  onClick={() => handleChange("source", source.value)}
-                  className={cn(
-                    "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
-                    formData.source === source.value
-                      ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                      : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
-                  )}
-                >
-                  <div className={cn(
-                    "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                    formData.source === source.value
-                      ? "border-[var(--primary)] bg-[var(--primary)]"
-                      : "border-[var(--border)]"
-                  )}>
-                    {formData.source === source.value && (
-                      <Check className="w-2.5 h-2.5 text-white" />
+          {formData.source_category === "outreach" ? (
+            <div className="space-y-2">
+              <Label>Campaign</Label>
+              <Select
+                value={formData.campaign_id || ""}
+                onValueChange={(value) => {
+                  handleChange("campaign_id", value)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select campaign" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaigns.map((campaign) => (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.campaign_id && (
+                <p className="text-xs text-[var(--text-muted)]">
+                  📣 {campaigns.find(c => c.id === formData.campaign_id)?.name}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Source</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {filteredSources.map((source) => (
+                  <button
+                    key={source.value}
+                    type="button"
+                    onClick={() => {
+                      handleChange("source", source.value)
+                      if (source.value === "walk_in") {
+                        handleChange("pipeline_stage", "visit")
+                      }
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
+                      formData.source === source.value
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
                     )}
-                  </div>
-                  {source.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Exhibition Notes - Only shown when exhibitions source is selected */}
-          {formData.source === "exhibitions" && (
-            <div className="space-y-2">
-              <Label>Exhibition Name</Label>
-              <Input
-                placeholder="Which exhibition? e.g. Kuwait Education Fair 2025"
-                value={formData.source_detail}
-                onChange={(e) => handleChange("source_detail", e.target.value)}
-              />
-            </div>
-          )}
-
-          {/* Walk-in Stage Selector - Only shown when walk_in source is selected */}
-          {isWalkIn && (
-            <div className="space-y-2">
-              <Label>Walk-in Stage</Label>
-              <p className="text-xs text-[var(--text-muted)] mb-2">Select where this walk-in lead should start</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleChange("pipeline_stage", "test")}
-                  className={cn(
-                    "flex items-center gap-3 p-4 rounded-xl border transition-all",
-                    formData.pipeline_stage === "test"
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-2 ring-blue-500/20"
-                      : "border-[var(--border)] hover:border-blue-300"
-                  )}
-                >
-                  <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                    formData.pipeline_stage === "test"
-                      ? "bg-blue-500 text-white"
-                      : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                  )}>
-                    <ClipboardCheck className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-[var(--text-primary)]">Test</p>
-                    <p className="text-xs text-[var(--text-muted)]">For placement test</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChange("pipeline_stage", "application")}
-                  className={cn(
-                    "flex items-center gap-3 p-4 rounded-xl border transition-all",
-                    formData.pipeline_stage === "application"
-                      ? "border-green-500 bg-green-50 dark:bg-green-950/30 ring-2 ring-green-500/20"
-                      : "border-[var(--border)] hover:border-green-300"
-                  )}
-                >
-                  <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                    formData.pipeline_stage === "application"
-                      ? "bg-green-500 text-white"
-                      : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                  )}>
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-[var(--text-primary)]">File</p>
-                    <p className="text-xs text-[var(--text-muted)]">Direct to file</p>
-                  </div>
-                </button>
+                  >
+                    <div className={cn(
+                      "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                      formData.source === source.value
+                        ? "border-[var(--primary)] bg-[var(--primary)]"
+                        : "border-[var(--border)]"
+                    )}>
+                      {formData.source === source.value && (
+                        <Check className="w-2.5 h-2.5 text-white" />
+                      )}
+                    </div>
+                    {source.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
+
+          {formData.source === "walk_in" && (
+            <p className="text-xs text-[var(--text-muted)] italic">This lead will automatically start at the Visit stage</p>
+          )}
+
+          {/* Exhibition Name - Only shown when exhibitions source is selected */}
+          {formData.source === "exhibitions" && (
+            <div className="space-y-2">
+              <Label>Exhibition Name</Label>
+              <Select
+                value={formData.source_detail || ""}
+                onValueChange={(value) => handleChange("source_detail", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select exhibition" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeExhibitions.map((exhibition) => (
+                    <SelectItem key={exhibition.id} value={exhibition.name}>
+                      {exhibition.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -582,7 +583,7 @@ export function LeadFormAcademic({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ministry_accepted_major">Ktech Actual Major</Label>
+              <Label htmlFor="ministry_accepted_major">ktech Actual Major</Label>
               <Input
                 id="ministry_accepted_major"
                 value={formData.ministry_accepted_major}

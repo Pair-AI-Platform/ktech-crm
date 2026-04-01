@@ -41,6 +41,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { RoleGuard } from "@/components/auth/role-guard"
 import {
   useCampaigns,
   useCreateCampaign,
@@ -877,7 +878,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                     type="text"
                     value={formData.subject || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-                    placeholder="e.g., Your Journey to KTECH Starts Here"
+                    placeholder="e.g., Your Journey to ktech Starts Here"
                     className="w-full h-12 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
                   />
                 </div>
@@ -1087,6 +1088,7 @@ export default function CampaignsPage() {
   }
 
   return (
+    <RoleGuard allowedRoles={['admin']}>
     <div className="min-h-screen bg-[var(--bg-base)]">
       {/* Header */}
       <header className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-[var(--border)] bg-[var(--bg-surface)]">
@@ -1238,5 +1240,6 @@ export default function CampaignsPage() {
         )}
       </AnimatePresence>
     </div>
+    </RoleGuard>
   )
 }

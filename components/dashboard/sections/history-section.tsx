@@ -34,7 +34,7 @@ export function HistorySection({ agentHistory, loading }: HistorySectionProps) {
       transition={{ delay: 0.3 }}
     >
       <StaticBlock
-        title="My History at KTECH"
+        title="My History at ktech"
         icon={<History className="w-4 h-4 text-[var(--accent)]" />}
       >
         {loading ? (

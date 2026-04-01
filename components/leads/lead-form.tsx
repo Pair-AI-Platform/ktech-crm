@@ -11,9 +11,12 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { SCHOOLS, LEAD_SOURCES, PIPELINE_STAGES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, NATIONALITIES, type Lead, type School, type SchoolEntity, type IntendedMajor, type LeadSourceCategory, type LeadSource, type FundingType, type PipelineStage, type PlacementLevel, type LeadStatus, type MinistryBlockReason, type EducationType, type AcademicTrack, type DiscountType, type GradeLevel } from "@/types"
+import { useActiveSources } from "@/lib/hooks/use-sources"
+import { useCampaigns } from "@/lib/hooks/use-campaigns"
 import { createClient } from "@/lib/supabase/client"
 import { isValidKuwaitPhone, isValidKuwaitCivilId } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { useUser } from "@/lib/hooks/use-user"
 import { useDuplicateCheck } from "@/lib/hooks/use-duplicate-check"
 import { DuplicateWarningDialog } from "./duplicate-warning-dialog"
 import { LeadFormPersonal } from "./lead-form-personal"
@@ -30,7 +33,10 @@ interface LeadFormProps {
 
 export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const { createLead, updateLead, loading } = useLeadMutations()
+  const { profile, isAgent } = useUser()
   const { duplicates, checking: duplicateChecking, checkDuplicates, clearDuplicates } = useDuplicateCheck()
+  const { sources: dbSources } = useActiveSources()
+  const { campaigns } = useCampaigns()
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [schoolSearch, setSchoolSearch] = useState("")
@@ -140,6 +146,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     discount_notes: lead?.discount_notes || "",
     semester_id: lead?.semester_id || "",
     assigned_to: lead?.assigned_to || "",
+    campaign_id: "",
   })
 
   // Use database schools if available, fallback to hardcoded SCHOOLS
@@ -379,6 +386,19 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     if (result.error) {
       setErrors({ submit: result.error })
     } else {
+      // Link lead to campaign if outreach + campaign selected
+      if (formData.source_category === "outreach" && formData.campaign_id && result.data?.id) {
+        const supabase = createClient()
+        await supabase.from("campaign_contacts").insert({
+          campaign_id: formData.campaign_id,
+          lead_id: result.data.id,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: formData.phone.replace(/\D/g, ""),
+          email: formData.email || null,
+          status: "pending",
+        })
+      }
       onSuccess?.()
       onClose()
     }
@@ -572,17 +592,11 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     }
   }
 
-  // Filter sources based on selected category
-  const filteredSources = LEAD_SOURCES.filter(source => {
-    const categoryMap: Record<string, string[]> = {
-      direct: ["walk_in", "call_center", "whatsapp", "email"],
-      events: ["school_visit", "expo", "exhibitions", "karnival"],
-      marketing: ["website_form", "facebook", "instagram", "tiktok", "email_marketing", "whatsapp_ai"],
-      referrals: ["current_student_referral", "staff_referral", "friend_referral"],
-      outreach: ["old_contacts", "paaet_rejected", "gpa_lists"],
-    }
-    return categoryMap[formData.source_category]?.includes(source.value)
-  })
+  // Filter sources based on selected category — prefer DB sources, fallback to constant
+  const activeSources = dbSources.length > 0
+    ? dbSources.map(s => ({ value: s.value as LeadSource, label: s.label, category: s.category as LeadSourceCategory }))
+    : LEAD_SOURCES
+  const filteredSources = activeSources.filter(source => source.category === formData.source_category)
 
   return (
     <>
@@ -657,8 +671,9 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
             availableStatuses={availableStatuses}
             availablePipelineStages={availablePipelineStages}
             isAtTestStage={isAtTestStage}
-            agents={agents}
+            agents={isAgent && profile ? agents.filter(a => a.id === profile.id) : agents}
             semesters={semesters}
+            campaigns={campaigns}
           />
 
           {/* Section 4: Discount + Placement Test + Notes */}

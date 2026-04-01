@@ -104,12 +104,12 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
   const conversionRate = totalLeads > 0 ? ((applications / totalLeads) * 100).toFixed(1) : '0'
 
   const stageWidths = getFunnelWidths(data)
-  const targetFunnelHeight = 420
+  const targetFunnelHeight = 340
   const gap = 3
-  const segmentHeight = Math.max(36, Math.min(52, (targetFunnelHeight - (data.length - 1) * gap - 20) / data.length))
+  const segmentHeight = Math.max(28, Math.min(48, (targetFunnelHeight - (data.length - 1) * gap - 20) / data.length))
   const totalHeight = data.length * segmentHeight + (data.length - 1) * gap + 20
   const svgWidth = 700
-  const maxHalfWidth = 280
+  const maxHalfWidth = 260
 
   // Reserve space for left labels and right info
   const centerX = svgWidth / 2
@@ -176,7 +176,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
       </div>
 
       {/* Funnel */}
-      <div className="relative z-10">
+      <div className="relative z-10 overflow-hidden">
         <div className="relative mx-auto" style={{ maxWidth: `${svgWidth}px` }}>
           <svg
             viewBox={`0 0 ${svgWidth} ${totalHeight}`}
@@ -394,6 +394,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
               const edgeX = centerX + (bottomWidth / 100) * maxHalfWidth
 
               const drop = getDropoff(index)
+              const labelX = Math.min(edgeX + 14, svgWidth - 50)
 
               return (
                 <motion.g
@@ -404,9 +405,9 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
                 >
                   {drop !== null && drop !== 0 && (
                     <text
-                      x={edgeX + 14}
+                      x={labelX}
                       y={midY + 4}
-                      fontSize="11"
+                      fontSize="10"
                       fontWeight="600"
                       fill={drop > 0 ? "#EF4444" : "#10B981"}
                       textAnchor="start"
@@ -427,7 +428,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
         initial={{ opacity: 0, y: 20 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.8, duration: 0.5 }}
-        className="relative z-10 grid grid-cols-4 gap-3 mt-4"
+        className="relative z-10 grid grid-cols-4 gap-2 mt-4"
       >
         {[
           {
@@ -469,15 +470,15 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
             initial={{ opacity: 0, y: 15 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.8 + i * 0.08, duration: 0.4 }}
-            className={`relative overflow-hidden text-center p-3 rounded-2xl bg-gradient-to-br ${stat.gradient} border ${stat.border} group hover:shadow-md transition-shadow duration-300`}
+            className={`relative overflow-hidden text-center px-2 py-3 rounded-2xl bg-gradient-to-br ${stat.gradient} border ${stat.border} group hover:shadow-md transition-shadow duration-300`}
           >
-            <div className="flex items-center justify-center gap-1.5 mb-2">
+            <div className="flex items-center justify-center gap-1 mb-2">
               {stat.icon}
-              <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider truncate">
                 {stat.label}
               </p>
             </div>
-            <p className={`text-2xl font-bold ${stat.textColor} tabular-nums`}>
+            <p className={`text-xl font-bold ${stat.textColor} tabular-nums`}>
               {stat.value !== null && stat.value !== undefined ? (
                 <AnimatedCounter value={stat.value} />
               ) : (

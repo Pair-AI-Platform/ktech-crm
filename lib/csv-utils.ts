@@ -1,4 +1,5 @@
 import type { Lead, LeadFormData, LeadSource, LeadSourceCategory, FundingType, School, GradeLevel, AcademicTrack, IntendedMajor } from "@/types"
+import { LEAD_SOURCES } from "@/types"
 
 // CSV column definitions for leads
 export const LEAD_CSV_COLUMNS: { key: string; label: string; required?: boolean }[] = [
@@ -33,10 +34,11 @@ export const LEAD_CSV_COLUMNS: { key: string; label: string; required?: boolean 
 // Valid values for enum fields
 const VALID_SOURCES: LeadSource[] = [
   "walk_in", "call_center", "whatsapp", "email",
-  "school_visit", "expo", "exhibitions", "karnival",
-  "website_form", "facebook", "instagram",
+  "school_visit", "exhibitions", "karnival",
+  "website_form", "facebook", "instagram", "tiktok", "email_marketing",
   "current_student_referral", "staff_referral", "friend_referral",
-  "old_contacts", "paaet_rejected", "gpa_lists"
+  "old_contacts", "paaet_rejected", "gpa_lists",
+  "whatsapp_ai"
 ]
 
 const VALID_SOURCE_CATEGORIES: LeadSourceCategory[] = [
@@ -199,7 +201,9 @@ export function parseLeadFromCSV(row: string[], headerMap: Map<string, number>):
     errors.push(`Invalid source, defaulting to 'walk_in'`)
   }
   if (!sourceCategory || !VALID_SOURCE_CATEGORIES.includes(sourceCategory)) {
-    sourceCategory = "direct"
+    // Derive category from source if not provided
+    const derived = LEAD_SOURCES.find(s => s.value === source)
+    sourceCategory = derived?.category || "direct"
   }
 
   // Funding type validation

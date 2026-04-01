@@ -46,13 +46,14 @@ const defaultFilters: LeadFilters = {
   submissionStatuses: [],
   fundingType: "all",
   dateRange: "all",
+  dateFrom: "",
+  dateTo: "",
   assignedTo: "",
   hasEmail: null,
   hasPhone: null,
   gpaMin: null,
   gpaMax: null,
   isKuwaiti: null,
-  ministryBlocked: "all",
   blockReasons: [],
   hasNotes: "all",
   paymentStatus: "all",
@@ -60,8 +61,14 @@ const defaultFilters: LeadFilters = {
   paymentAmountMax: 5000,
   academicTrack: "all",
   lostReasonIds: [],
+  withdrawalReasons: [],
+  genders: [],
+  governorates: [],
   priority: "all",
   ministryAssigned: "all",
+  docStatuses: [],
+  placementLevels: [],
+  campaignIds: [],
 }
 
 export default function LeadsPage() {
@@ -220,11 +227,12 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     schools: filters.schools,
     academicTrack: filters.academicTrack,
     dateRange: filters.dateRange,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
     assignedTo: filters.assignedTo,
     gpaMin: filters.gpaMin,
     gpaMax: filters.gpaMax,
     isKuwaiti: filters.isKuwaiti,
-    ministryBlocked: filters.ministryBlocked,
     blockReasons: filters.blockReasons,
     submissionSubstages: filters.submissionSubstages,
     submissionStatuses: filters.submissionStatuses,
@@ -232,15 +240,20 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     lostAtFilter: stageFilter === "lost" ? lostAtFilter : undefined,
     hasNotes: filters.hasNotes,
     lostReasonIds: filters.lostReasonIds,
-    priority: filters.priority,
+    withdrawalReasons: filters.withdrawalReasons,
+    genders: filters.genders,
+    governorates: filters.governorates,
     ministryAssigned: filters.ministryAssigned,
+    docStatuses: filters.docStatuses,
+    placementLevels: filters.placementLevels,
+    campaignIds: filters.campaignIds,
   }
 
   // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageFilter, filters.searchQuery, filters.fundingType, filters.statuses, filters.sources, filters.schools, filters.academicTrack, filters.dateRange, filters.assignedTo, filters.gpaMin, filters.gpaMax, filters.isKuwaiti, filters.ministryBlocked, filters.blockReasons, filters.submissionSubstages, filters.submissionStatuses, filters.lostAtStages, filters.hasNotes, filters.lostReasonIds, filters.paymentStatus, filters.paymentAmountMin, filters.paymentAmountMax, filters.appointmentTypes, lostAtFilter])
+  }, [stageFilter, filters.searchQuery, filters.fundingType, filters.statuses, filters.sources, filters.schools, filters.academicTrack, filters.dateRange, filters.assignedTo, filters.gpaMin, filters.gpaMax, filters.isKuwaiti, filters.blockReasons, filters.submissionSubstages, filters.submissionStatuses, filters.lostAtStages, filters.hasNotes, filters.lostReasonIds, filters.withdrawalReasons, filters.genders, filters.governorates, filters.paymentStatus, filters.paymentAmountMin, filters.paymentAmountMax, filters.appointmentTypes, lostAtFilter])
 
   const { leads, loading, error, totalCount, totalPages, refetch } = useLeads({
     stage: stageFilter,

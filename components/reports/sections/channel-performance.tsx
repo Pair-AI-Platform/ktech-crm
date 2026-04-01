@@ -47,7 +47,7 @@ const SOURCE_TO_CATEGORY: Record<string, LeadSourceCategory> = Object.fromEntrie
 const CATEGORY_COLORS: Record<string, string> = {
   direct: '#445eb7',
   events: '#22C55E',
-  digital: '#3B82F6',
+  marketing: '#3B82F6',
   referrals: '#8B5CF6',
   outreach: '#F59E0B',
 }

@@ -20,8 +20,6 @@ import {
   XCircle,
   CheckCircle2,
   Wand2,
-  Flame,
-  Star,
   GraduationCap,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
@@ -52,9 +50,6 @@ import { LeadAppointmentsPopover } from "@/components/leads/lead-appointments-po
 import {
   getLeadTemperature,
   temperatureConfig,
-  PROGRESS_MAX,
-  CIRCLE_RADIUS,
-  CIRCLE_CIRCUMFERENCE,
   PUC_PIPELINE_STAGES,
 } from "./lead-table-utils"
 
@@ -265,63 +260,6 @@ export const LeadTableRow = React.memo(function LeadTableRow({
           const tempLabel = temperature === "hot" ? "Hot" : temperature === "warm" ? "Warm" : "Cold"
           return (
             <Link href={`/leads/${lead.id}${currentStageFilter && currentStageFilter !== "all" ? `?stage=${currentStageFilter}` : ""}`} className="flex items-center gap-2 group" onClick={isSubmissionView ? (e: React.MouseEvent) => e.preventDefault() : undefined}>
-              <SimpleTooltip
-                content={
-                  <div className="max-w-[250px]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon className={cn("w-4 h-4 flex-shrink-0", config.color)} />
-                      <span className="font-semibold">{tempLabel} Lead</span>
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)] whitespace-normal break-words">{description}</p>
-                  </div>
-                }
-                side="right"
-              >
-                {(() => {
-                  const effectiveCount = getEffectiveValue(lead.id, 'contact_count', lead.contact_count) || 0
-                  const progress = Math.min(effectiveCount / PROGRESS_MAX, 1)
-                  const dashOffset = CIRCLE_CIRCUMFERENCE * (1 - progress)
-                  const isFull = effectiveCount >= PROGRESS_MAX
-                  return (
-                    <div className="relative cursor-help flex items-center justify-center w-9 h-9">
-                      <svg width="36" height="36" className="absolute inset-0 -rotate-90">
-                        {/* Background track */}
-                        <circle
-                          cx="18" cy="18" r={CIRCLE_RADIUS}
-                          fill="none"
-                          stroke="var(--border)"
-                          strokeWidth="3"
-                          strokeDasharray={effectiveCount === 0 ? "3 4" : undefined}
-                          opacity={0.5}
-                        />
-                        {/* Progress arc */}
-                        {effectiveCount > 0 && (
-                          <circle
-                            cx="18" cy="18" r={CIRCLE_RADIUS}
-                            fill="none"
-                            stroke={config.stroke}
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeDasharray={CIRCLE_CIRCUMFERENCE}
-                            strokeDashoffset={dashOffset}
-                            className="transition-all duration-500 ease-out"
-                          />
-                        )}
-                      </svg>
-                      <span className={cn(
-                        "relative z-10 font-bold text-xs transition-colors",
-                        isFull
-                          ? config.color
-                          : effectiveCount > 0
-                            ? "text-[var(--text-primary)]"
-                            : "text-[var(--text-muted)]"
-                      )}>
-                        {effectiveCount}
-                      </span>
-                    </div>
-                  )
-                })()}
-              </SimpleTooltip>
               <div className="min-w-0">
                 {/* SF Document completion indicator */}
                 {lead.funding_type === "self_funded" && (() => {
@@ -399,18 +337,8 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   )
                 })()}
                 <div className="flex items-center gap-1.5">
-                  {lead.priority === 'critical' && (
-                    <SimpleTooltip content="Critical priority">
-                      <Flame className="w-3.5 h-3.5 text-red-500 shrink-0 animate-pulse" />
-                    </SimpleTooltip>
-                  )}
-                  {lead.priority === 'important' && (
-                    <SimpleTooltip content="Important priority">
-                      <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    </SimpleTooltip>
-                  )}
                   {lead.ministry_assigned && (
-                    <SimpleTooltip content="Ministry assigned (not 1st choice KTECH)">
+                    <SimpleTooltip content="Ministry assigned (not 1st choice ktech)">
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 ring-1 ring-purple-500/20 shrink-0">
                         <GraduationCap className="w-3 h-3" />
                         MA

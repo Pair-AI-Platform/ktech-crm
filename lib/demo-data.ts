@@ -352,7 +352,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
 
     // Ministry block reasons for submission stage leads
     // Submission substages for even distribution of colors
-    const submissionSubstages: Lead["submission_substage"][] = ['documents', 'submissions', 'applicant']
+    const submissionSubstages: Lead["submission_substage"][] = ['documents', 'submissions']
 
     // For submission stage leads, assign substage in round-robin for even distribution
     let submissionSubstage: Lead["submission_substage"] | undefined = undefined

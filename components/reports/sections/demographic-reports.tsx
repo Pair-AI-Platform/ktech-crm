@@ -33,7 +33,7 @@ interface DemographicReportsProps {
 }
 
 const GENDER_COLORS = ['#3B82F6', '#EC4899']
-const NATIONALITY_COLORS = ['#22C55E', '#F59E0B']
+const NATIONALITY_COLORS = ['#22C55E', '#F59E0B', '#3B82F6', '#EC4899', '#8B5CF6', '#0EA5E9', '#F97316', '#14B8A6', '#EF4444', '#6366F1', '#84CC16', '#D946EF']
 const FUNDING_COLORS = ['#445eb7', '#8B5CF6']
 const MAJOR_COLORS = ['#212e7f', '#445eb7', '#5a71c4', '#7084d1', '#8992c8', '#a3aad6', '#c5c9db']
 const GOVERNORATE_COLORS = ['#0EA5E9', '#8B5CF6', '#F59E0B', '#22C55E', '#EC4899', '#F97316']
@@ -70,6 +70,13 @@ export function DemographicReports({ data }: DemographicReportsProps) {
     color: GENDER_COLORS[index % GENDER_COLORS.length],
   }))
 
+  const genderEnrolledPieData = data.byGenderEnrolled.map((item, index) => ({
+    name: item.gender,
+    value: item.count,
+    percent: item.percent,
+    color: GENDER_COLORS[index % GENDER_COLORS.length],
+  }))
+
   const nationalityPieData = data.byNationality.map((item, index) => ({
     name: item.label,
     value: item.count,
@@ -87,41 +94,9 @@ export function DemographicReports({ data }: DemographicReportsProps) {
 
   return (
     <div className="space-y-6">
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {genderPieData.map((item, index) => (
-          <motion.div
-            key={item.name}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-          >
-            <Card hover glow className="relative overflow-hidden">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div
-                    className="p-2.5 rounded-xl shadow-lg"
-                    style={{ backgroundColor: item.color }}
-                  >
-                    <UserCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <Badge variant="secondary" size="sm">{item.percent}%</Badge>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-1">{item.name}</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{item.value}</p>
-              </CardContent>
-              <div
-                className="absolute bottom-0 left-0 right-0 h-1 opacity-50"
-                style={{ backgroundColor: item.color }}
-              />
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
       {/* Pie Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Gender Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gender Distribution - All Files */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -131,9 +106,9 @@ export function DemographicReports({ data }: DemographicReportsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserCircle className="w-5 h-5 text-[var(--primary)]" />
-                Gender Split
+                Gender Split — All Files
               </CardTitle>
-              <CardDescription>Male vs Female distribution</CardDescription>
+              <CardDescription>Male vs Female across all leads</CardDescription>
             </CardHeader>
             <CardContent>
               <PieChartSection data={genderPieData} mounted={mounted} />
@@ -141,6 +116,29 @@ export function DemographicReports({ data }: DemographicReportsProps) {
           </Card>
         </motion.div>
 
+        {/* Gender Distribution - Enrolled */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCircle className="w-5 h-5 text-[var(--success)]" />
+                Gender Split — Enrolled
+              </CardTitle>
+              <CardDescription>Male vs Female among enrolled students</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PieChartSection data={genderEnrolledPieData} mounted={mounted} />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Nationality + Funding Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Nationality Distribution */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -153,7 +151,7 @@ export function DemographicReports({ data }: DemographicReportsProps) {
                 <Globe className="w-5 h-5 text-[var(--success)]" />
                 Nationality Split
               </CardTitle>
-              <CardDescription>Kuwaiti vs Non-Kuwaiti</CardDescription>
+              <CardDescription>Distribution by nationality</CardDescription>
             </CardHeader>
             <CardContent>
               <PieChartSection data={nationalityPieData} mounted={mounted} />

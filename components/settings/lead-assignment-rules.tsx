@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { SCHOOLS, LEAD_SOURCES, MAJORS } from "@/types"
+import { useActiveSources } from "@/lib/hooks/use-sources"
 import type { Profile } from "@/types"
 
 interface AssignmentRule {
@@ -527,6 +528,7 @@ function RuleModal({
   agents: Profile[]
   saving: boolean
 }) {
+  const { sources: dbSources } = useActiveSources()
   const [name, setName] = useState(() => getInitialFormValues(rule).name)
   const [description, setDescription] = useState(() => getInitialFormValues(rule).description)
   const [ruleType, setRuleType] = useState<AssignmentRule["rule_type"]>(() => getInitialFormValues(rule).ruleType)
@@ -603,7 +605,7 @@ function RuleModal({
   const getConditionOptions = () => {
     switch (ruleType) {
       case "source_based":
-        return LEAD_SOURCES.map((s) => ({ value: s.value, label: s.label }))
+        return (dbSources.length > 0 ? dbSources : LEAD_SOURCES).map((s) => ({ value: s.value, label: s.label }))
       case "school_based":
         return SCHOOLS.map((s) => ({ value: s.value, label: s.label }))
       case "major_based":

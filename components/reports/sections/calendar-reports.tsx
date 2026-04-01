@@ -127,12 +127,15 @@ export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
           color="#10b981"
         />
         <KPICard
-          title="CB Attendance"
-          value={`${data.callbackAttendanceRate}%`}
-          icon={<TrendingUp className="w-4 h-4" />}
-          color="#06b6d4"
+          title="No Answer"
+          value={data.noAnswerAppointments + data.noAnswerCallbacks}
+          icon={<PhoneMissed className="w-4 h-4" />}
+          color="#f59e0b"
         />
       </div>
+
+      {/* Agent role: only show KPI boxes */}
+      {isAgent ? null : <>
 
       {/* Daily Volume Chart */}
       {data.appointmentsByDay.length > 0 && (
@@ -276,88 +279,142 @@ export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
           </h3>
 
           {/* Callback Status Pie */}
-          {data.callbacksByStatus.length > 0 ? (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Status Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {data.callbacksByStatus.some(s => s.count > 0) ? (
+                <>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={data.callbacksByStatus.filter(s => s.count > 0)}
+                          dataKey="count"
+                          nameKey="label"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={2}
+                        >
+                          {data.callbacksByStatus.filter(s => s.count > 0).map((entry, index) => (
+                            <Cell key={entry.status} fill={STATUS_COLORS[entry.status] || PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<PieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex flex-wrap gap-2 justify-center mt-2">
+                    {data.callbacksByStatus.map((s, i) => (
+                      <div key={s.status} className="flex items-center gap-1.5 text-xs">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[s.status] || PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className={`${s.count > 0 ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>{s.label} ({s.count})</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-center">
+                  <Phone className="w-8 h-8 text-[var(--text-tertiary)] mx-auto mb-2" />
+                  <p className="text-sm text-[var(--text-tertiary)]">No callbacks in this period</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Callback Summary Stats */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Callback Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-[var(--bg-secondary)] text-center">
+                  <p className="text-lg font-bold text-emerald-500">{data.completedCallbacks}</p>
+                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Completed</p>
+                </div>
+                <div className="p-3 rounded-lg bg-[var(--bg-secondary)] text-center">
+                  <p className="text-lg font-bold text-rose-500">{data.cancelledCallbacks}</p>
+                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Cancelled</p>
+                </div>
+                <div className="p-3 rounded-lg bg-[var(--bg-secondary)] text-center">
+                  <p className="text-lg font-bold text-amber-500">{data.noAnswerCallbacks}</p>
+                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">No Answer</p>
+                </div>
+                <div className="p-3 rounded-lg bg-[var(--bg-secondary)] text-center">
+                  <p className="text-lg font-bold text-[var(--text-primary)]">{data.callbackCompletionRate}%</p>
+                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Completion Rate</p>
+                </div>
+              </div>
+              {data.totalCallbacks > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1.5">
+                    <span>Completion Progress</span>
+                    <span>{data.completedCallbacks}/{data.totalCallbacks}</span>
+                  </div>
+                  <ProgressBar
+                    value={data.callbackCompletionRate}
+                    size="sm"
+                    color={data.callbackCompletionRate >= 70 ? 'success' : data.callbackCompletionRate >= 40 ? 'warning' : 'error'}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Callback Attendance Rate */}
+          {data.totalCallbacks > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Status Breakdown</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-amber-500" />
+                  Attendance Rate
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={data.callbacksByStatus}
-                        dataKey="count"
-                        nameKey="label"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                      >
-                        {data.callbacksByStatus.map((entry, index) => (
-                          <Cell key={entry.status} fill={STATUS_COLORS[entry.status] || PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<PieTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-center mt-2">
-                  {data.callbacksByStatus.map((s, i) => (
-                    <div key={s.status} className="flex items-center gap-1.5 text-xs">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[s.status] || PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span className="text-[var(--text-secondary)]">{s.label} ({s.count})</span>
+                <div className="flex items-center gap-4">
+                  <div className="relative w-20 h-20">
+                    <svg className="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="var(--border)"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke={data.callbackAttendanceRate >= 70 ? '#10b981' : data.callbackAttendanceRate >= 40 ? '#f59e0b' : '#ef4444'}
+                        strokeWidth="3"
+                        strokeDasharray={`${data.callbackAttendanceRate}, 100`}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-bold text-[var(--text-primary)]">{data.callbackAttendanceRate}%</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-secondary)]">Answered</span>
+                      <span className="font-medium text-[var(--text-primary)]">{data.totalCallbacks - data.noAnswerCallbacks}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-secondary)]">No Answer</span>
+                      <span className="font-medium text-amber-500">{data.noAnswerCallbacks}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-secondary)]">Total</span>
+                      <span className="font-medium text-[var(--text-primary)]">{data.totalCallbacks}</span>
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Phone className="w-8 h-8 text-[var(--text-tertiary)] mx-auto mb-2" />
-                <p className="text-sm text-[var(--text-tertiary)]">No callbacks in this period</p>
               </CardContent>
             </Card>
           )}
-
-          {/* Callback Rates */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Callback Rates</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-[var(--text-secondary)]">Completion Rate</span>
-                  <span className="font-medium text-[var(--text-primary)]">{data.callbackCompletionRate}%</span>
-                </div>
-                <ProgressBar value={data.callbackCompletionRate} size="sm" color={data.callbackCompletionRate >= 70 ? 'success' : data.callbackCompletionRate >= 40 ? 'warning' : 'error'} />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-[var(--text-secondary)]">Attendance Rate</span>
-                  <span className="font-medium text-[var(--text-primary)]">{data.callbackAttendanceRate}%</span>
-                </div>
-                <ProgressBar value={data.callbackAttendanceRate} size="sm" color={data.callbackAttendanceRate >= 70 ? 'success' : data.callbackAttendanceRate >= 40 ? 'warning' : 'error'} />
-              </div>
-              <div className="grid grid-cols-3 gap-2 pt-2">
-                <div className="text-center p-2 rounded-lg bg-[var(--bg-secondary)]">
-                  <p className="text-lg font-bold text-emerald-500">{data.completedCallbacks}</p>
-                  <p className="text-[10px] text-[var(--text-tertiary)]">Completed</p>
-                </div>
-                <div className="text-center p-2 rounded-lg bg-[var(--bg-secondary)]">
-                  <p className="text-lg font-bold text-amber-500">{data.noAnswerCallbacks}</p>
-                  <p className="text-[10px] text-[var(--text-tertiary)]">No Answer</p>
-                </div>
-                <div className="text-center p-2 rounded-lg bg-[var(--bg-secondary)]">
-                  <p className="text-lg font-bold text-rose-500">{data.cancelledCallbacks}</p>
-                  <p className="text-[10px] text-[var(--text-tertiary)]">Cancelled</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Agent Breakdown - Callbacks (admin only) */}
           {!isAgent && data.callbacksByAgent.length > 0 && (
@@ -428,6 +485,13 @@ export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
                           title={`Pending: ${t.pending}`}
                         />
                       )}
+                      {t.postponed > 0 && (
+                        <div
+                          className="h-full bg-violet-500 transition-all"
+                          style={{ width: `${(t.postponed / t.total) * 100}%` }}
+                          title={`Postponed: ${t.postponed}`}
+                        />
+                      )}
                       {t.noAnswer > 0 && (
                         <div
                           className="h-full bg-amber-500 transition-all"
@@ -443,7 +507,7 @@ export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
                         />
                       )}
                     </div>
-                    <div className="grid grid-cols-4 gap-1 text-center">
+                    <div className="grid grid-cols-5 gap-1 text-center">
                       <div>
                         <p className="text-sm font-bold text-emerald-500">{t.completed}</p>
                         <p className="text-[9px] text-[var(--text-tertiary)]">Done</p>
@@ -451,6 +515,10 @@ export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
                       <div>
                         <p className="text-sm font-bold text-indigo-500">{t.pending}</p>
                         <p className="text-[9px] text-[var(--text-tertiary)]">Pending</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-violet-500">{t.postponed}</p>
+                        <p className="text-[9px] text-[var(--text-tertiary)]">Postponed</p>
                       </div>
                       <div>
                         <p className="text-sm font-bold text-amber-500">{t.noAnswer}</p>
@@ -475,44 +543,7 @@ export function CalendarReports({ data, isAgent }: CalendarReportsProps) {
         </Card>
       )}
 
-      {/* Appointment Rates Card (full width) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Appointment Rates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-[var(--text-secondary)]">Appt. Completion</span>
-                <span className="font-medium text-[var(--text-primary)]">{data.appointmentCompletionRate}%</span>
-              </div>
-              <ProgressBar value={data.appointmentCompletionRate} size="sm" color={data.appointmentCompletionRate >= 70 ? 'success' : data.appointmentCompletionRate >= 40 ? 'warning' : 'error'} />
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-[var(--text-secondary)]">Appt. Attendance</span>
-                <span className="font-medium text-[var(--text-primary)]">{data.appointmentAttendanceRate}%</span>
-              </div>
-              <ProgressBar value={data.appointmentAttendanceRate} size="sm" color={data.appointmentAttendanceRate >= 70 ? 'success' : data.appointmentAttendanceRate >= 40 ? 'warning' : 'error'} />
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-[var(--text-secondary)]">CB Completion</span>
-                <span className="font-medium text-[var(--text-primary)]">{data.callbackCompletionRate}%</span>
-              </div>
-              <ProgressBar value={data.callbackCompletionRate} size="sm" color={data.callbackCompletionRate >= 70 ? 'success' : data.callbackCompletionRate >= 40 ? 'warning' : 'error'} />
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-[var(--text-secondary)]">CB Attendance</span>
-                <span className="font-medium text-[var(--text-primary)]">{data.callbackAttendanceRate}%</span>
-              </div>
-              <ProgressBar value={data.callbackAttendanceRate} size="sm" color={data.callbackAttendanceRate >= 70 ? 'success' : data.callbackAttendanceRate >= 40 ? 'warning' : 'error'} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      </>}
     </div>
   )
 }

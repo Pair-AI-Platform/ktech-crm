@@ -91,6 +91,8 @@ import {
   AgentSourceBreakdown,
   AgentTopSources,
   TargetReports,
+  AgentDateRangePerformance,
+  AgentProgressGraph,
 } from "@/components/reports"
 
 const emptySubscribe = () => () => {}
@@ -192,8 +194,7 @@ const DATE_PRESETS = [
   { value: 'week', label: 'This Week', icon: CalendarDays },
   { value: 'month', label: 'This Month', icon: CalendarRange },
   { value: 'quarter', label: 'This Quarter', icon: BarChart3 },
-  { value: 'year', label: 'This Year', icon: Target },
-  { value: 'all', label: 'All Time', icon: Activity },
+  { value: 'all', label: 'This Cycle', icon: Activity },
 ] as const
 
 const TAB_GROUPS = [
@@ -204,7 +205,7 @@ const TAB_GROUPS = [
 ] as const
 
 // Tabs hidden from agent role users (team-wide / comparative data)
-const AGENT_HIDDEN_TABS = ['agents', 'enrollment', 'detailed-analytics', 'target-report']
+const AGENT_HIDDEN_TABS = ['agents', 'pipeline', 'detailed-analytics', 'target-report']
 
 const REPORT_TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Executive summary & KPIs', group: 'Performance' },
@@ -390,7 +391,7 @@ function TabNavigation({ activeTab, setActiveTab, isAgent }: { activeTab: string
 // MAIN COMPONENT
 // =============================================
 export default function ReportsPage() {
-  const { profile, isAdmin } = useUser()
+  const { profile, isAdmin, loading: profileLoading } = useUser()
   const { agents } = useAgents()
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
@@ -426,7 +427,7 @@ export default function ReportsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const { data, loading, error, refetch } = useReports(filters)
+  const { data, loading, error, refetch } = useReports(filters, { enabled: !profileLoading })
 
   // Lock agent filter when profile loads
   useEffect(() => {
@@ -442,6 +443,49 @@ export default function ReportsPage() {
       setActiveTab('overview')
     }
   }, [isAgent, activeTab])
+
+  // Compute active date range for target reports
+  // Compute active date range (full period end) for target reports time remaining
+  const activeDateRange = useMemo(() => {
+    if (filters.dateRange.start && filters.dateRange.end) {
+      return { start: new Date(filters.dateRange.start), end: new Date(filters.dateRange.end) }
+    }
+    const now = new Date()
+    switch (filters.dateRange.preset) {
+      case 'today':
+        return {
+          start: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+          end: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59),
+        }
+      case 'week': {
+        const ws = new Date(now); ws.setDate(now.getDate() - now.getDay()); ws.setHours(0, 0, 0, 0)
+        const we = new Date(ws); we.setDate(ws.getDate() + 6); we.setHours(23, 59, 59)
+        return { start: ws, end: we }
+      }
+      case 'month':
+        return {
+          start: new Date(now.getFullYear(), now.getMonth(), 1),
+          end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+        }
+      case 'quarter': {
+        const qStart = Math.floor(now.getMonth() / 3) * 3
+        return {
+          start: new Date(now.getFullYear(), qStart, 1),
+          end: new Date(now.getFullYear(), qStart + 3, 0, 23, 59, 59),
+        }
+      }
+      case 'year':
+        return {
+          start: new Date(now.getFullYear(), 0, 1),
+          end: new Date(now.getFullYear(), 11, 31, 23, 59, 59),
+        }
+      default:
+        return {
+          start: new Date(now.getFullYear(), now.getMonth(), 1),
+          end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+        }
+    }
+  }, [filters.dateRange])
 
   // Calculate summary metrics
   const summaryMetrics = useMemo(() => {
@@ -1216,7 +1260,25 @@ export default function ReportsPage() {
 
           {/* Pipeline Tab */}
           {activeTab === 'pipeline' && (
-            <ExecutiveDashboard data={data.executive} onNavigateTab={setActiveTab} />
+            <div className="space-y-6">
+              <ExecutiveDashboard data={data.executive} isAgent={isAgent} onNavigateTab={setActiveTab} />
+              {!isAgent && (
+                <>
+                  <AgentProgressGraph
+                    data={data.agentProgressGraph}
+                    dateLabel={dateFrom || dateTo
+                      ? `${dateFrom || '...'} — ${dateTo || '...'}`
+                      : DATE_PRESETS.find(p => p.value === datePreset)?.label ?? 'Current Period'}
+                  />
+                  <AgentDateRangePerformance
+                    data={data.leaderboard}
+                    dateLabel={dateFrom || dateTo
+                      ? `${dateFrom || '...'} — ${dateTo || '...'}`
+                      : DATE_PRESETS.find(p => p.value === datePreset)?.label ?? 'Current Period'}
+                  />
+                </>
+              )}
+            </div>
           )}
 
           {/* Agents Tab (admin only) */}
@@ -1272,7 +1334,7 @@ export default function ReportsPage() {
 
           {/* Target Report Tab */}
           {activeTab === 'target-report' && (
-            <TargetReports data={data.leaderboard} />
+            <TargetReports data={data.leaderboard} dateRange={activeDateRange} />
           )}
 
         </motion.div>

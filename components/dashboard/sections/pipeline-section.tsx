@@ -83,9 +83,9 @@ export function PipelineSection({ sfLeads, pucLeads, loading }: PipelineSectionP
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       {/* Self Funded Pipeline */}
-      <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-default)] shadow-sm hover:shadow-md transition-shadow p-6">
+      <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-default)] shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden">
         <PipelineFunnelVisual
           data={sfFunnelData}
           title="Self Funded"
@@ -96,7 +96,7 @@ export function PipelineSection({ sfLeads, pucLeads, loading }: PipelineSectionP
       </div>
 
       {/* PUC Pipeline */}
-      <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-default)] shadow-sm hover:shadow-md transition-shadow p-6">
+      <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-default)] shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden">
         <PipelineFunnelVisual
           data={pucFunnelData}
           title="PUC"

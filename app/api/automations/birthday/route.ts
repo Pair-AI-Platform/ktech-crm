@@ -13,8 +13,8 @@ function getServiceClient() {
 
 // Fallback templates if no template exists in DB
 const BIRTHDAY_TEMPLATES = {
-  en: 'Happy Birthday {{first_name}}! 🎂🎉 Wishing you a wonderful year ahead. From your friends at KTECH.',
-  ar: 'عيد ميلاد سعيد {{first_name}}! 🎂🎉 نتمنى لك سنة سعيدة. من أصدقائك في KTECH.',
+  en: 'Happy Birthday {{first_name}}! 🎂🎉 Wishing you a wonderful year ahead. From your friends at ktech.',
+  ar: 'عيد ميلاد سعيد {{first_name}}! 🎂🎉 نتمنى لك سنة سعيدة. من أصدقائك في ktech.',
 }
 
 interface BirthdayLead {

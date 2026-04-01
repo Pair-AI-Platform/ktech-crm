@@ -29,9 +29,6 @@ export function computePUCDocumentStatus(
     case "submissions":
       return "applied"
 
-    case "applicant":
-      return null
-
     default:
       return null
   }

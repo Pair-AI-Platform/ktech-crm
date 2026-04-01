@@ -224,7 +224,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          SF Applicants
+                          SF Enrolled
                           <span className="text-[10px] font-normal bg-[var(--bg-sunken)] px-1.5 py-0.5 rounded">
                             {selectedSeason?.name ?? 'Season'}
                           </span>
@@ -248,7 +248,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full bg-purple-500" />
-                          PUC App
+                          PUC Enrolled
                           <span className="text-[10px] font-normal bg-[var(--bg-sunken)] px-1.5 py-0.5 rounded">
                             {selectedSeason?.name ?? 'Season'}
                           </span>

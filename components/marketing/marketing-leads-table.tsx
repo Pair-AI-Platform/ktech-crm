@@ -28,7 +28,7 @@ const STAGE_LABELS: Record<string, string> = {
   lost: "Lost",
   withdraw: "Withdraw",
   puc_document_submission: "PUC Docs",
-  puc_application_submission: "PUC App",
+  puc_application_submission: "PUC Enrolled",
 }
 
 export function MarketingLeadsTable() {

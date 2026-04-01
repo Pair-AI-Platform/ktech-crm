@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +17,8 @@ import { TargetSettings } from "@/components/settings/targets"
 import { SchoolManagement } from "@/components/settings/school-management"
 import { DocumentConfigManagement } from "@/components/settings/document-config-management"
 import { CycleManagement } from "@/components/settings/cycle-management"
+import { SourceManagement } from "@/components/settings/source-management"
+import { ExhibitionsManagement } from "@/components/settings/exhibitions-management"
 import {
   Select,
   SelectContent,
@@ -51,17 +53,20 @@ import {
   MessageSquare,
   Smartphone,
   CalendarClock,
+  Radio,
+  Landmark,
   AlertTriangle,
   BellRing,
   Volume2,
-  VolumeX
+  VolumeX,
+  LogOut
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "schools" | "documents" | "enrollment"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "sources" | "exhibitions" | "schools" | "documents" | "enrollment"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -70,6 +75,8 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "security", label: "Security", icon: Shield },
   { id: "pipeline", label: "Stages", icon: GitBranch, adminOnly: true },
   { id: "targets", label: "Targets", icon: Target, adminOnly: true },
+  { id: "sources", label: "Sources", icon: Radio, adminOnly: true },
+  { id: "exhibitions", label: "Exhibitions", icon: Landmark, adminOnly: true },
   { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
@@ -77,6 +84,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
 ]
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { profile, isAdmin } = useUser()
   const { preferences, loading: prefsLoading, updatePreferences, saving: prefsSaving } = usePreferences()
   const searchParams = useSearchParams()
@@ -617,6 +625,31 @@ export default function SettingsPage() {
                       </CardContent>
                     </Card>
 
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <LogOut className="w-5 h-5 text-[var(--primary)]" />
+                          Sign Out
+                        </CardTitle>
+                        <CardDescription>
+                          Sign out of your account on this device
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            await supabase.auth.signOut()
+                            router.push("/login")
+                            router.refresh()
+                          }}
+                        >
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Sign Out
+                        </Button>
+                      </CardContent>
+                    </Card>
+
                     <Card className="border-rose-500/30 bg-rose-500/5">
                       <CardHeader>
                         <CardTitle className="text-rose-500">Danger Zone</CardTitle>
@@ -654,6 +687,32 @@ export default function SettingsPage() {
                     className="space-y-6"
                   >
                     <TargetSettings />
+                  </motion.div>
+                )}
+
+                {/* Sources Tab */}
+                {activeTab === "sources" && isAdmin && (
+                  <motion.div
+                    key="sources"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <SourceManagement />
+                  </motion.div>
+                )}
+
+                {/* Exhibitions Tab */}
+                {activeTab === "exhibitions" && isAdmin && (
+                  <motion.div
+                    key="exhibitions"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <ExhibitionsManagement />
                   </motion.div>
                 )}
 

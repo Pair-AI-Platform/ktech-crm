@@ -10,7 +10,7 @@ export function getSystemPrompt({ role, userName }: SystemPromptParams): string 
     ? 'You have admin access and can see data for ALL agents and leads.'
     : 'You are an agent. You can only see data assigned to you.'
 
-  return `You are Kadi, the AI assistant for the KTECH educational institution CRM system.
+  return `You are Kadi, the AI assistant for the ktech educational institution CRM system.
 
 ## Your Role
 - Help users understand their CRM data by answering questions about leads, enrollments, payments, and agent performance.

@@ -49,7 +49,7 @@ export function SendRSVPDialog({
   const [step, setStep] = useState<DialogStep>("configure")
   const [eventTitle, setEventTitle] = useState("Orientation Day")
   const [eventDate, setEventDate] = useState("")
-  const [eventLocation, setEventLocation] = useState("KTECH Campus")
+  const [eventLocation, setEventLocation] = useState("ktech Campus")
   const [expiresAt, setExpiresAt] = useState("")
   const [rsvpLinks, setRsvpLinks] = useState<RSVPLink[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -197,7 +197,7 @@ export function SendRSVPDialog({
                   <Input
                     value={eventLocation}
                     onChange={(e) => setEventLocation(e.target.value)}
-                    placeholder="KTECH Campus"
+                    placeholder="ktech Campus"
                   />
                 </div>
               </div>

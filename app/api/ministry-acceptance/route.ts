@@ -209,8 +209,8 @@ export async function POST(request: NextRequest) {
             nextApplicantPosition++
 
             const description = isSecondChoice
-              ? `Ministry-assigned to KTECH. Moved from ${lead.pipeline_stage} to Applicant.`
-              : `Accepted by ministry for KTECH. Moved from ${lead.pipeline_stage} to Applicant.`
+              ? `Ministry-assigned to ktech. Moved from ${lead.pipeline_stage} to Applicant.`
+              : `Accepted by ministry for ktech. Moved from ${lead.pipeline_stage} to Applicant.`
 
             activities.push({
               lead_id: lead.id,

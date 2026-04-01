@@ -24,7 +24,16 @@ import type {
   AppointmentType,
   AppointmentStatus,
 } from "@/types"
-import { SCHOOLS, GOVERNORATES, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, DISCOUNT_TYPES } from "@/types"
+import { SCHOOLS, GOVERNORATES, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, DISCOUNT_TYPES, LEAD_SOURCES } from "@/types"
+
+// Source-to-category lookup derived from LEAD_SOURCES (authoritative mapping)
+const SOURCE_TO_CATEGORY_MAP: Record<string, LeadSourceCategory> = Object.fromEntries(
+  LEAD_SOURCES.map(s => [s.value, s.category])
+) as Record<string, LeadSourceCategory>
+
+function getCategoryForSource(source: string, fallback?: LeadSourceCategory): LeadSourceCategory {
+  return SOURCE_TO_CATEGORY_MAP[source] || fallback || 'direct'
+}
 
 // =============================================
 // FILTER TYPES
@@ -95,6 +104,15 @@ export interface RetestStudentData {
   status: 'improved' | 'same' | 'pending'
 }
 
+export interface LevelStatsData {
+  total: number
+  foundation1: number
+  foundation2: number
+  majors: number
+  byLevel: Array<{ level: PlacementLevel; count: number; percent: number }>
+  passRate: number
+}
+
 export interface TestCenterReportData {
   totalTested: number
   foundation1: number
@@ -102,6 +120,8 @@ export interface TestCenterReportData {
   majors: number
   byLevel: Array<{ level: PlacementLevel; count: number; percent: number }>
   passRate: number
+  enrolled: LevelStatsData
+  files: LevelStatsData
   retest: {
     totalRetests: number
     completed: number
@@ -180,7 +200,7 @@ export interface ExecutiveReportData {
 export interface ChannelReportData {
   bySource: Array<{ source: LeadSource; label: string; count: number; converted: number; conversionRate: number; files: number; enrolled: number; enrollmentRate: number }>
   byCategory: Array<{ category: LeadSourceCategory; label: string; count: number; percent: number }>
-  topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number; enrolled: number; enrolledPercent: number }>
+  topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number; sfCount: number; sfPercent: number; enrolled: number; enrolledPercent: number; enrolledPuc: number; enrolledSf: number }>
   bySchool: Array<{ schoolId: string; label: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
 }
 
@@ -218,7 +238,8 @@ export interface LeaderboardData {
 
 export interface DemographicReportData {
   byGender: Array<{ gender: string; count: number; percent: number }>
-  byNationality: Array<{ label: string; isKuwaiti: boolean; count: number; percent: number }>
+  byGenderEnrolled: Array<{ gender: string; count: number; percent: number }>
+  byNationality: Array<{ nationality: string; label: string; count: number; percent: number }>
   byFunding: Array<{ funding: FundingType; label: string; count: number; percent: number }>
   byMajor: Array<{ major: IntendedMajor; label: string; count: number; percent: number }>
   byGovernorate: Array<{ governorate: Governorate; label: string; count: number; percent: number }>
@@ -272,7 +293,7 @@ export interface CalendarReportData {
   noAnswerAppointments: number
   noAnswerCallbacks: number
   // Appointments breakdown
-  appointmentsByType: Array<{ type: string; label: string; total: number; completed: number; cancelled: number; noAnswer: number; pending: number }>
+  appointmentsByType: Array<{ type: string; label: string; total: number; completed: number; cancelled: number; noAnswer: number; pending: number; postponed: number }>
   appointmentsByStatus: Array<{ status: string; label: string; count: number; percent: number }>
   appointmentsByAgent: Array<{ agentId: string; agentName: string; avatarUrl: string | null; total: number; completed: number; cancelled: number; completionRate: number }>
   newAppointmentsByAgent: Array<{ agentId: string; agentName: string; avatarUrl: string | null; total: number; completed: number; cancelled: number; completionRate: number }>
@@ -423,6 +444,31 @@ export interface AgentPerformanceData {
   avgLeadsPerAgent: number
 }
 
+export interface AgentDailyDataPoint {
+  date: string
+  label: string
+  [agentKey: string]: number | string // agentId_leads, agentId_files, agentId_enrolled
+}
+
+export interface AgentProgressGraphData {
+  dailyData: AgentDailyDataPoint[]
+  agents: Array<{ id: string; name: string; color: string }>
+  peakTime: {
+    agentId: string
+    agentName: string
+    date: string
+    metric: 'leads' | 'files' | 'enrolled'
+    value: number
+  } | null
+  totals: Array<{
+    agentId: string
+    agentName: string
+    leads: number
+    files: number
+    enrolled: number
+  }>
+}
+
 export interface ReportData {
   payment: PaymentReportData
   testCenter: TestCenterReportData
@@ -440,6 +486,7 @@ export interface ReportData {
   calendar: CalendarReportData
   lost: LostReportData
   agentPerformance: AgentPerformanceData
+  agentProgressGraph: AgentProgressGraphData
 }
 
 // =============================================
@@ -514,9 +561,10 @@ function formatTrendLabel(dateStr: string, totalDays: number): string {
 // MAIN HOOK
 // =============================================
 
-export function useReports(filters: ReportFilters = defaultFilters) {
+export function useReports(filters: ReportFilters = defaultFilters, options?: { enabled?: boolean }) {
   const { data = null, isLoading: loading, error: queryError, refetch, status, fetchStatus } = useQuery<ReportData | null>({
     queryKey: ['reports', filters],
+    enabled: options?.enabled !== false,
     queryFn: async () => {
       const { start, end } = filters.dateRange.start && filters.dateRange.end
         ? { start: new Date(filters.dateRange.start), end: new Date(filters.dateRange.end) }
@@ -570,7 +618,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           leadsData = leadsData.filter(l => l.source === filters.source)
         }
         if (filters.sourceCategory !== 'all') {
-          leadsData = leadsData.filter(l => l.source_category === filters.sourceCategory)
+          leadsData = leadsData.filter(l => getCategoryForSource(l.source, l.source_category) === filters.sourceCategory)
         }
 
         // Get previous period data for comparison (same duration before start)
@@ -606,7 +654,9 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           start,
           end,
           targetMode,
-          new Map() // No status changes in demo
+          new Map(), // No status changes in demo
+          [],
+          filters.dateRange.preset
         )
       }
 
@@ -680,12 +730,18 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         .from("lost_reasons")
         .select("*")
 
-      // Fetch agent targets for current month + overall SF applicant targets
-      const currentMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
+      // Fetch agent targets for all months in the date range
+      const rangeMonths: string[] = []
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+      const endMonth = new Date(end.getFullYear(), end.getMonth(), 1)
+      while (cursor <= endMonth) {
+        rangeMonths.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`)
+        cursor.setMonth(cursor.getMonth() + 1)
+      }
       const agentTargetsQuery = supabase
         .from("agent_targets")
         .select("*")
-        .eq("month", currentMonth)
+        .in("month", rangeMonths)
 
       const overallTargetsQuery = supabase
         .from("agent_targets")
@@ -770,7 +826,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
       const lostReasonsData = (lostReasons || []) as LostReason[]
 
       // Build agent targets map from agent_targets table
-      // SF applicants targets come from the 'overall' row, not the monthly row
+      // SF enrolled targets come from the 'overall' row, not the monthly row
       const overallSfApplicantsMap = new Map<string, number>()
       if (overallTargetsData) {
         for (const t of overallTargetsData) {
@@ -780,11 +836,17 @@ export function useReports(filters: ReportFilters = defaultFilters) {
       const agentTargetsMap = new Map<string, { puc_files: number; sf_files: number; sf_applicants: number }>()
       if (agentTargetsData) {
         for (const t of agentTargetsData) {
-          agentTargetsMap.set(t.agent_id, {
-            puc_files: t.puc_files || 0,
-            sf_files: t.sf_files || 0,
-            sf_applicants: overallSfApplicantsMap.get(t.agent_id) || 0,
-          })
+          const existing = agentTargetsMap.get(t.agent_id)
+          if (existing) {
+            existing.puc_files += t.puc_files || 0
+            existing.sf_files += t.sf_files || 0
+          } else {
+            agentTargetsMap.set(t.agent_id, {
+              puc_files: t.puc_files || 0,
+              sf_files: t.sf_files || 0,
+              sf_applicants: overallSfApplicantsMap.get(t.agent_id) || 0,
+            })
+          }
         }
       }
       // Also add agents that only have overall targets but no monthly targets
@@ -827,7 +889,8 @@ export function useReports(filters: ReportFilters = defaultFilters) {
         end,
         targetMode,
         statusChangesMap,
-        (stageChangesData || []) as Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }>
+        (stageChangesData || []) as Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }>,
+        filters.dateRange.preset
       )
 
       // If DB returned zero leads, fall back to demo data so reports aren't empty
@@ -877,7 +940,7 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           leadsData = leadsData.filter(l => l.source === filters.source)
         }
         if (filters.sourceCategory !== 'all') {
-          leadsData = leadsData.filter(l => l.source_category === filters.sourceCategory)
+          leadsData = leadsData.filter(l => getCategoryForSource(l.source, l.source_category) === filters.sourceCategory)
         }
 
         const periodMs = end.getTime() - start.getTime()
@@ -912,6 +975,9 @@ export function useReports(filters: ReportFilters = defaultFilters) {
           start,
           end,
           targetMode,
+          new Map(),
+          [],
+          filters.dateRange.preset
         )
       }
     },
@@ -943,7 +1009,8 @@ function calculateReports(
   endDate: Date,
   targetMode: TargetMode = 'simple',
   statusChangesMap: Map<string, number> = new Map(),
-  stageChangesRaw: Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }> = []
+  stageChangesRaw: Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }> = [],
+  datePreset: ReportFilters['dateRange']['preset'] = 'month'
 ): ReportData {
   // Date range for trend generation
   const trendDates = getDatesBetween(startDate, endDate)
@@ -1027,12 +1094,43 @@ function calculateReports(
           count: ds.length,
           totalDiscount: ds.reduce((sum, s) => sum + (s.discount_percentage || 0), 0)
         }
-      }).filter(d => d.count > 0).sort((a, b) => b.count - a.count)
+      }).sort((a, b) => b.count - a.count)
     })(),
   }
 
   // Test Center Report
   const testedStudents = students.filter(s => s.placement_test_passed !== null)
+
+  // Helper to compute level stats for a subset of students
+  function computeLevelStats(subset: typeof students): LevelStatsData {
+    const tested = subset.filter(s => s.placement_test_passed !== null)
+    const f1 = subset.filter(s => s.placement_level === 'foundation_1').length
+    const f2 = subset.filter(s => s.placement_level === 'foundation_2').length
+    const maj = subset.filter(s => s.placement_level === 'majors').length
+    const total = tested.length
+    return {
+      total,
+      foundation1: f1,
+      foundation2: f2,
+      majors: maj,
+      byLevel: [
+        { level: 'foundation_1' as PlacementLevel, count: f1, percent: total > 0 ? Math.round((f1 / total) * 100) : 0 },
+        { level: 'foundation_2' as PlacementLevel, count: f2, percent: total > 0 ? Math.round((f2 / total) * 100) : 0 },
+        { level: 'majors' as PlacementLevel, count: maj, percent: total > 0 ? Math.round((maj / total) * 100) : 0 },
+      ],
+      passRate: total > 0 ? Math.round((tested.filter(s => s.placement_test_passed).length / total) * 100) : 0,
+    }
+  }
+
+  // Enrolled: students whose linked lead is at 'enrolled' stage
+  const enrolledLeadIds = new Set(leads.filter(l => l.pipeline_stage === 'enrolled').map(l => l.id))
+  const enrolledStudentsList = students.filter(s => (s.lead_id && enrolledLeadIds.has(s.lead_id)) || s.enrolled_at)
+
+  // Files: students whose linked lead is at file stages (application+)
+  const fileStageSet = new Set(['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled'])
+  const fileLeadIds = new Set(leads.filter(l => fileStageSet.has(l.pipeline_stage)).map(l => l.id))
+  const fileStudentsList = students.filter(s => s.lead_id && fileLeadIds.has(s.lead_id))
+
   const testCenter: TestCenterReportData = {
     totalTested: testedStudents.length,
     foundation1: students.filter(s => s.placement_level === 'foundation_1').length,
@@ -1049,6 +1147,8 @@ function calculateReports(
     passRate: testedStudents.length > 0
       ? Math.round((testedStudents.filter(s => s.placement_test_passed).length / testedStudents.length) * 100)
       : 0,
+    enrolled: computeLevelStats(enrolledStudentsList),
+    files: computeLevelStats(fileStudentsList),
     retest: (() => {
       // Find all retest appointments
       const retestAppointments = appointments.filter(a => a.appointment_type.includes('retest'))
@@ -1216,8 +1316,22 @@ function calculateReports(
     }
   }
 
+  // Scale monthly targets based on the selected date period
+  const targetDivisor = (() => {
+    switch (datePreset) {
+      case 'today': return 30
+      case 'week': return 4
+      case 'month': return 1
+      case 'quarter': return 1 / 3
+      case 'year': return 1 / 12
+      case 'all': return 1
+      default: return 1
+    }
+  })()
+  const scaleTarget = (monthly: number) => Math.round(monthly / targetDivisor)
+
   // Executive Dashboard
-  const totalTarget = agents.reduce((sum, a) => sum + (a.monthly_target || 0), 0)
+  const totalTarget = scaleTarget(agents.reduce((sum, a) => sum + (a.monthly_target || 0), 0))
   const pipelineStages: PipelineStage[] = ['new', 'contacted', 'visit', 'test', 'application', 'applicant', 'enrolled', 'withdraw', 'lost']
   const stageLabels: Record<PipelineStage, string> = {
     new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', application: 'File', applicant: 'Applicant', enrolled: 'Enrolled', withdraw: 'Withdraw', lost: 'Lost', puc_document_submission: 'Documents', puc_application_submission: 'Submission'
@@ -1356,8 +1470,8 @@ function calculateReports(
       const sfLeads = leads.filter(l => l.funding_type === 'self_funded')
       const pucStudents = activeStudents.filter(s => s.funding_type === 'puc')
       const sfStudents = activeStudents.filter(s => s.funding_type === 'self_funded')
-      const totalTargetPuc = agents.reduce((sum, a) => sum + (a.target_puc || 0), 0)
-      const totalTargetSf = agents.reduce((sum, a) => sum + (a.target_sf || 0), 0)
+      const totalTargetPuc = scaleTarget(agents.reduce((sum, a) => sum + (a.target_puc || 0), 0))
+      const totalTargetSf = scaleTarget(agents.reduce((sum, a) => sum + (a.target_sf || 0), 0))
       const pucPrev = prevLeads.filter(l => l.funding_type === 'puc')
       const sfPrev = prevLeads.filter(l => l.funding_type === 'self_funded')
       const pucApplicants = pucLeads.filter(l => l.pipeline_stage === 'applicant').length
@@ -1398,7 +1512,7 @@ function calculateReports(
   // Channel Performance
   const sourceLabels: Record<LeadSource, string> = {
     walk_in: 'Walk-in', call_center: 'Call Center', whatsapp: 'WhatsApp', email: 'Email',
-    school_visit: 'School Visit', expo: 'Expo', exhibitions: 'Exhibitions',
+    school_visit: 'School Visit', exhibitions: 'Exhibitions',
     website_form: 'Website Form', facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', email_marketing: 'Email Marketing',
     current_student_referral: 'Student Referral', staff_referral: 'Staff Referral', friend_referral: 'Friend Referral',
     old_contacts: 'Old Contacts', paaet_rejected: 'PAAET Rejected', gpa_lists: 'GPA Lists',
@@ -1456,7 +1570,7 @@ function calculateReports(
       }
     }).sort((a, b) => b.count - a.count),
     byCategory: (['direct', 'events', 'marketing', 'referrals', 'outreach'] as LeadSourceCategory[]).map(category => {
-      const categoryLeads = leads.filter(l => l.source_category === category)
+      const categoryLeads = leads.filter(l => getCategoryForSource(l.source, l.source_category) === category)
       return {
         category,
         label: categoryLabels[category],
@@ -1469,7 +1583,10 @@ function calculateReports(
         const totalLeads = data.leads.length
         const applications = data.leads.filter(l => ['application', 'applicant', 'enrolled', 'puc_document_submission', 'puc_application_submission'].includes(l.pipeline_stage)).length
         const pucCount = data.leads.filter(l => l.funding_type === 'puc').length
+        const sfCount = data.leads.filter(l => l.funding_type === 'self_funded').length
         const enrolled = data.leads.filter(l => l.pipeline_stage === 'enrolled').length
+        const enrolledPuc = data.leads.filter(l => l.pipeline_stage === 'enrolled' && l.funding_type === 'puc').length
+        const enrolledSf = data.leads.filter(l => l.pipeline_stage === 'enrolled' && l.funding_type === 'self_funded').length
         return {
           schoolId,
           schoolName: data.name,
@@ -1478,8 +1595,12 @@ function calculateReports(
           applicationPercent: totalLeads > 0 ? Math.round((applications / totalLeads) * 100) : 0,
           pucCount,
           pucPercent: totalLeads > 0 ? Math.round((pucCount / totalLeads) * 100) : 0,
+          sfCount,
+          sfPercent: totalLeads > 0 ? Math.round((sfCount / totalLeads) * 100) : 0,
           enrolled,
           enrolledPercent: totalLeads > 0 ? Math.round((enrolled / totalLeads) * 100) : 0,
+          enrolledPuc,
+          enrolledSf,
         }
       })
       .sort((a, b) => b.applications - a.applications),
@@ -1540,9 +1661,9 @@ function calculateReports(
       l.funding_type === 'self_funded' && l.pipeline_stage === 'application'
     )
 
-    // Always use 3 fixed categories
-    const targetPuc = agent.target_puc || 0
-    const targetSf = agent.target_sf || 0
+    // Always use 3 fixed categories — scale targets by date period
+    const targetPuc = scaleTarget(agent.target_puc || 0)
+    const targetSf = scaleTarget(agent.target_sf || 0)
     const target = targetPuc + targetSf
 
     // PUC Submissions (both stages combined for target progress)
@@ -1611,6 +1732,21 @@ function calculateReports(
     else genderCounts.other++
   })
 
+  const enrolledLeads = leads.filter(l => l.pipeline_stage === 'enrolled')
+  const enrolledGenderCounts = { male: 0, female: 0, other: 0 }
+  enrolledLeads.forEach(l => {
+    if (l.gender === 'male') enrolledGenderCounts.male++
+    else if (l.gender === 'female') enrolledGenderCounts.female++
+    else enrolledGenderCounts.other++
+  })
+
+  // Group by actual nationality
+  const nationalityCounts: Record<string, number> = {}
+  leads.forEach(l => {
+    const nat = l.nationality?.trim() || 'Unknown'
+    nationalityCounts[nat] = (nationalityCounts[nat] || 0) + 1
+  })
+
   const discountGroups: Record<string, Student[]> = {}
   activeStudents.forEach(s => {
     if (s.discount_type) {
@@ -1624,10 +1760,18 @@ function calculateReports(
       { gender: 'Male', count: genderCounts.male, percent: leads.length > 0 ? Math.round((genderCounts.male / leads.length) * 100) : 0 },
       { gender: 'Female', count: genderCounts.female, percent: leads.length > 0 ? Math.round((genderCounts.female / leads.length) * 100) : 0 },
     ].filter(g => g.count > 0),
-    byNationality: [
-      { label: 'Kuwaiti', isKuwaiti: true, count: leads.filter(l => l.is_kuwaiti).length, percent: leads.length > 0 ? Math.round((leads.filter(l => l.is_kuwaiti).length / leads.length) * 100) : 0 },
-      { label: 'Non-Kuwaiti', isKuwaiti: false, count: leads.filter(l => !l.is_kuwaiti).length, percent: leads.length > 0 ? Math.round((leads.filter(l => !l.is_kuwaiti).length / leads.length) * 100) : 0 },
-    ],
+    byGenderEnrolled: [
+      { gender: 'Male', count: enrolledGenderCounts.male, percent: enrolledLeads.length > 0 ? Math.round((enrolledGenderCounts.male / enrolledLeads.length) * 100) : 0 },
+      { gender: 'Female', count: enrolledGenderCounts.female, percent: enrolledLeads.length > 0 ? Math.round((enrolledGenderCounts.female / enrolledLeads.length) * 100) : 0 },
+    ].filter(g => g.count > 0),
+    byNationality: Object.entries(nationalityCounts)
+      .map(([nat, count]) => ({
+        nationality: nat,
+        label: nat,
+        count,
+        percent: leads.length > 0 ? Math.round((count / leads.length) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count),
     byFunding: [
       { funding: 'self_funded' as FundingType, label: 'Self-Funded', count: leads.filter(l => l.funding_type === 'self_funded').length, percent: leads.length > 0 ? Math.round((leads.filter(l => l.funding_type === 'self_funded').length / leads.length) * 100) : 0 },
       { funding: 'puc' as FundingType, label: 'PUC', count: leads.filter(l => l.funding_type === 'puc').length, percent: leads.length > 0 ? Math.round((leads.filter(l => l.funding_type === 'puc').length / leads.length) * 100) : 0 },
@@ -1771,7 +1915,6 @@ function calculateReports(
   const applicationStageLeads = leads.filter(l =>
     ['application', 'applicant', 'enrolled'].includes(l.pipeline_stage)
   )
-  const enrolledLeads = leads.filter(l => l.pipeline_stage === 'enrolled')
   const sfAppLeads = applicationStageLeads.filter(l => l.funding_type === 'self_funded')
   const pucAppLeads = applicationStageLeads.filter(l => l.funding_type === 'puc')
   const sfEnrolledLeads = enrolledLeads.filter(l => l.funding_type === 'self_funded')
@@ -2048,16 +2191,17 @@ function calculateReports(
       cancelled: ofType.filter(a => a.status === 'cancelled').length,
       noAnswer: ofType.filter(a => a.status === 'no_answer').length,
       pending: ofType.filter(a => ['scheduled', 'confirmed', 'on_the_way', 'will_see'].includes(a.status)).length,
+      postponed: ofType.filter(a => a.status === 'postponed').length,
     }
   }).filter(t => t.total > 0)
 
-  const buildStatusBreakdown = (list: Appointment[]) =>
+  const buildStatusBreakdown = (list: Appointment[], includeAll = false) =>
     APPOINTMENT_STATUSES.map(s => ({
       status: s.value,
       label: s.label,
       count: list.filter(a => a.status === s.value).length,
       percent: list.length > 0 ? Math.round((list.filter(a => a.status === s.value).length / list.length) * 100) : 0,
-    })).filter(s => s.count > 0)
+    })).filter(s => includeAll || s.count > 0)
 
   const buildAgentBreakdown = (list: Appointment[]) => {
     const agentMap = new Map<string, { total: number; completed: number; cancelled: number }>()
@@ -2131,7 +2275,7 @@ function calculateReports(
     appointmentsByAgent: buildAgentBreakdown(regularAppointments),
     newAppointmentsByAgent: buildAgentBreakdown(regularAppointments.filter(a => a.appointment_type.includes('new_appointment'))),
     appointmentsByDay,
-    callbacksByStatus: buildStatusBreakdown(callbacks),
+    callbacksByStatus: buildStatusBreakdown(callbacks, true),
     callbacksByAgent: buildAgentBreakdown(callbacks),
     appointmentCompletionRate: regularAppointments.length > 0 ? Math.round((countByStatus(regularAppointments, 'completed') / regularAppointments.length) * 100) : 0,
     callbackCompletionRate: callbacks.length > 0 ? Math.round((countByStatus(callbacks, 'completed') / callbacks.length) * 100) : 0,
@@ -2169,7 +2313,7 @@ function calculateReports(
   const lostStageLabels: Record<string, string> = {
     new: 'New', contacted: 'Contacted', visit: 'Visit', test: 'Test', tested: 'Tested',
     application: 'File', applicant: 'Applicant', enrolled: 'Enrolled',
-    puc_document_submission: 'PUC Documents', puc_application_submission: 'PUC Submission',
+    puc_document_submission: 'PUC Documents', puc_application_submission: 'PUC Enrolled',
     unknown: 'Unknown',
   }
 
@@ -2384,6 +2528,96 @@ function calculateReports(
     avgLeadsPerAgent,
   }
 
+  // Agent Progress Graph — daily breakdown per agent
+  const AGENT_COLORS = [
+    '#6366F1', '#06B6D4', '#F59E0B', '#10B981', '#EF4444',
+    '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#3B82F6',
+  ]
+  const graphAgents = agents.map((agent, i) => ({
+    id: agent.id,
+    name: agent.full_name,
+    color: AGENT_COLORS[i % AGENT_COLORS.length],
+  }))
+
+  const FILE_STAGES = new Set([
+    'application', 'puc_document_submission', 'puc_application_submission',
+  ])
+
+  const dailyData: AgentDailyDataPoint[] = trendDates.map(dateStr => {
+    const point: AgentDailyDataPoint = {
+      date: dateStr,
+      label: formatTrendLabel(dateStr, totalDays),
+    }
+    agents.forEach(agent => {
+      const dayLeads = leads.filter(l =>
+        l.assigned_to === agent.id && l.created_at.startsWith(dateStr)
+      )
+      const dayFiles = leads.filter(l =>
+        l.assigned_to === agent.id &&
+        l.created_at.startsWith(dateStr) &&
+        FILE_STAGES.has(l.pipeline_stage)
+      )
+      const dayEnrolled = students.filter(s =>
+        s.assigned_to === agent.id &&
+        (s.enrolled_at || s.created_at).startsWith(dateStr) &&
+        !s.is_withdrawn
+      )
+      point[`${agent.id}_leads`] = dayLeads.length
+      point[`${agent.id}_files`] = dayFiles.length
+      point[`${agent.id}_enrolled`] = dayEnrolled.length
+    })
+    return point
+  })
+
+  // Find peak performance moment
+  let peakTime: AgentProgressGraphData['peakTime'] = null
+  let peakValue = 0
+  dailyData.forEach(point => {
+    agents.forEach(agent => {
+      const leadsVal = (point[`${agent.id}_leads`] as number) || 0
+      const filesVal = (point[`${agent.id}_files`] as number) || 0
+      const enrolledVal = (point[`${agent.id}_enrolled`] as number) || 0
+      // Enrolled weighted highest, then files, then leads
+      const candidates: Array<{ metric: 'leads' | 'files' | 'enrolled'; value: number; weight: number }> = [
+        { metric: 'enrolled', value: enrolledVal, weight: enrolledVal * 3 },
+        { metric: 'files', value: filesVal, weight: filesVal * 2 },
+        { metric: 'leads', value: leadsVal, weight: leadsVal },
+      ]
+      candidates.forEach(c => {
+        if (c.weight > peakValue && c.value > 0) {
+          peakValue = c.weight
+          peakTime = {
+            agentId: agent.id,
+            agentName: agent.full_name,
+            date: point.date,
+            metric: c.metric,
+            value: c.value,
+          }
+        }
+      })
+    })
+  })
+
+  const progressTotals = agents.map(agent => {
+    const agentLeads = leads.filter(l => l.assigned_to === agent.id)
+    const agentFiles = agentLeads.filter(l => FILE_STAGES.has(l.pipeline_stage))
+    const agentEnrolled = students.filter(s => s.assigned_to === agent.id && !s.is_withdrawn)
+    return {
+      agentId: agent.id,
+      agentName: agent.full_name,
+      leads: agentLeads.length,
+      files: agentFiles.length,
+      enrolled: agentEnrolled.length,
+    }
+  })
+
+  const agentProgressGraph: AgentProgressGraphData = {
+    dailyData,
+    agents: graphAgents,
+    peakTime,
+    totals: progressTotals,
+  }
+
   return {
     payment,
     testCenter,
@@ -2401,6 +2635,7 @@ function calculateReports(
     calendar,
     lost,
     agentPerformance,
+    agentProgressGraph,
   }
 }
 
@@ -2567,7 +2802,7 @@ export function useAgentTargetProgress(agentId?: string) {
           const pucLeads = agentLeads.filter(l => l.funding_type === 'puc' && l.pipeline_stage === 'application')
           // SF Files
           const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'application')
-          // SF Applicants
+          // SF Enrolled
           const sfApplicantLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'applicant')
 
           const targetPuc = agent.target_puc || 0
@@ -2593,7 +2828,7 @@ export function useAgentTargetProgress(agentId?: string) {
 
       const supabase = createClient()
 
-      // Fetch targets from agent_targets table + overall SF applicant targets
+      // Fetch targets from agent_targets table + overall SF enrolled targets
       const [
         { data: targets },
         { data: overallTargets },
@@ -2613,7 +2848,7 @@ export function useAgentTargetProgress(agentId?: string) {
       if (agentsError) throw new Error(agentsError.message)
       if (leadsError) throw new Error(leadsError.message)
 
-      // SF applicant targets come from the 'overall' row
+      // SF enrolled targets come from the 'overall' row
       const overallSfAppMap = new Map((overallTargets || []).map(t => [t.agent_id, t.sf_applicants || 0]))
       const targetsMap = new Map((targets || []).map(t => [t.agent_id, {
         ...t,
@@ -2628,7 +2863,7 @@ export function useAgentTargetProgress(agentId?: string) {
         const pucLeads = agentLeads.filter(l => l.funding_type === 'puc' && l.pipeline_stage === 'application')
         // SF Files: funding_type=self_funded AND pipeline_stage=application
         const sfLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'application')
-        // SF Applicants: funding_type=self_funded AND pipeline_stage=applicant
+        // SF Enrolled: funding_type=self_funded AND pipeline_stage=applicant
         const sfApplicantLeads = agentLeads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage === 'applicant')
 
         const targetPuc = agentTarget?.puc_files || 0
@@ -2776,7 +3011,7 @@ export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) 
           return ld >= monthStart && ld <= monthEnd
         })
 
-        // Use overall sf_applicants target (monthly row sf_applicants is 0 for new data)
+        // Use overall sf_enrolled target (monthly row sf_applicants is 0 for new data)
         const sfAppTarget = (t.sf_applicants || 0) > 0 ? t.sf_applicants : overallSfApplicants
         const monthlyTarget = (t.puc_files || 0) + (t.sf_files || 0) + sfAppTarget
 

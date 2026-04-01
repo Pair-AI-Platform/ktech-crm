@@ -877,13 +877,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       {lead.intended_major && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 ring-1 ring-rose-300/30">
                           <GraduationCap className="w-3 h-3" />
-                          Ktech intended major: {MAJORS.find(m => m.value === lead.intended_major)?.label || lead.intended_major}
+                          ktech intended major: {MAJORS.find(m => m.value === lead.intended_major)?.label || lead.intended_major}
                         </span>
                       )}
                       {lead.ministry_accepted_major && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 ring-1 ring-emerald-300/30">
                           <GraduationCap className="w-3 h-3" />
-                          Ktech actual major: {lead.ministry_accepted_major}
+                          ktech actual major: {lead.ministry_accepted_major}
                         </span>
                       )}
                       {/* Cycle selector */}

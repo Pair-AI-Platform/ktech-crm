@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -36,7 +36,7 @@ import {
 } from "lucide-react"
 import { cn, getRelativeTime } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
-import type { AuditLog } from "@/types"
+import { useAuditLogs } from "@/lib/hooks/use-audit-logs"
 
 // Action icons
 const ACTION_CONFIG = {
@@ -55,122 +55,50 @@ const TABLE_CONFIG: Record<string, { label: string; icon: typeof Users }> = {
   profiles: { label: "User", icon: User },
 }
 
-// Demo data for activity log
-const generateDemoLogs = (): AuditLog[] => {
-  const actions: AuditLog["action"][] = ["INSERT", "UPDATE", "DELETE"]
-  const tables = ["leads", "students", "appointments", "sms_messages", "payments"]
-  const users = [
-    { id: "1", email: "admin@ktech.edu.kw", name: "Ahmad Al-Sabah" },
-    { id: "2", email: "agent1@ktech.edu.kw", name: "Sara Al-Mutawa" },
-    { id: "3", email: "agent2@ktech.edu.kw", name: "Mohammed Al-Rashid" },
-  ]
-
-  const logs: AuditLog[] = []
-
-  for (let i = 0; i < 50; i++) {
-    const action = actions[Math.floor(Math.random() * actions.length)]
-    const table = tables[Math.floor(Math.random() * tables.length)]
-    const user = users[Math.floor(Math.random() * users.length)]
-    const date = new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
-
-    const log: AuditLog = {
-      id: `log-${i}`,
-      table_name: table,
-      record_id: `record-${Math.floor(Math.random() * 1000)}`,
-      action,
-      user_id: user.id,
-      user_email: user.email,
-      created_at: date.toISOString(),
-    }
-
-    if (action === "UPDATE") {
-      log.changed_fields = ["pipeline_stage", "notes", "assigned_to"].slice(0, Math.floor(Math.random() * 3) + 1)
-      log.old_values = { pipeline_stage: "new", notes: "Initial contact" }
-      log.new_values = { pipeline_stage: "contacted", notes: "Initial contact completed" }
-    } else if (action === "INSERT") {
-      log.new_values = {
-        first_name: "New",
-        last_name: "Lead",
-        phone: "99999999",
-        pipeline_stage: "new",
-      }
-    }
-
-    logs.push(log)
-  }
-
-  return logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-}
-
 export default function ActivityPage() {
-  const { profile } = useUser()
-  const [logs, setLogs] = useState<AuditLog[]>(() => generateDemoLogs())
-  const [loading, setLoading] = useState(false)
+  const { profile, isAdmin } = useUser()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterTable, setFilterTable] = useState<string>("all")
   const [filterAction, setFilterAction] = useState<string>("all")
   const [page, setPage] = useState(1)
   const pageSize = 20
 
-  const refreshLogs = useCallback(async () => {
-    setLoading(true)
-    // Simulated API call - replace with real endpoint
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    setLogs(generateDemoLogs())
-    setLoading(false)
-  }, [])
-
-  // Filter logs
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      log.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.record_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.table_name.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesTable = filterTable === "all" || log.table_name === filterTable
-    const matchesAction = filterAction === "all" || log.action === filterAction
-
-    return matchesSearch && matchesTable && matchesAction
+  const { logs, total, loading, refetch } = useAuditLogs({
+    isAdmin,
+    userId: profile?.id,
+    page,
+    pageSize,
+    search: searchQuery || undefined,
+    filterTable,
+    filterAction,
   })
 
-  // Paginate
-  const totalPages = Math.ceil(filteredLogs.length / pageSize)
-  const paginatedLogs = filteredLogs.slice((page - 1) * pageSize, page * pageSize)
+  const totalPages = Math.ceil(total / pageSize)
 
   // Group logs by date
-  const groupedLogs = paginatedLogs.reduce((acc, log) => {
+  const groupedLogs = logs.reduce((acc, log) => {
     const date = new Date(log.created_at).toLocaleDateString()
     if (!acc[date]) acc[date] = []
     acc[date].push(log)
     return acc
-  }, {} as Record<string, AuditLog[]>)
-
-  // Stats
-  const stats = {
-    total: logs.length,
-    today: logs.filter((l) => new Date(l.created_at).toDateString() === new Date().toDateString()).length,
-    creates: logs.filter((l) => l.action === "INSERT").length,
-    updates: logs.filter((l) => l.action === "UPDATE").length,
-    deletes: logs.filter((l) => l.action === "DELETE").length,
-  }
+  }, {} as Record<string, typeof logs>)
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
       <Header
         user={profile}
         title="Activity Log"
-        subtitle="Track all changes and actions in the system"
+        subtitle={isAdmin ? "Track all changes and actions in the system" : "Track changes on your assigned leads"}
         action={{
           label: "Refresh",
-          onClick: refreshLogs,
+          onClick: () => refetch(),
           icon: <RefreshCw className="w-4 h-4" />,
         }}
       />
 
       <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -183,7 +111,7 @@ export default function ActivityPage() {
                     <Activity className="w-5 h-5 text-[var(--primary)]" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.total}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{total}</p>
                     <p className="text-xs text-[var(--text-muted)]">Total Activities</p>
                   </div>
                 </div>
@@ -203,7 +131,9 @@ export default function ActivityPage() {
                     <Clock className="w-5 h-5 text-[var(--accent)]" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.today}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">
+                      {logs.filter((l) => new Date(l.created_at).toDateString() === new Date().toDateString()).length}
+                    </p>
                     <p className="text-xs text-[var(--text-muted)]">Today</p>
                   </div>
                 </div>
@@ -220,51 +150,11 @@ export default function ActivityPage() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[var(--success)]/10 flex items-center justify-center">
-                    <Plus className="w-5 h-5 text-[var(--success)]" />
+                    <FileEdit className="w-5 h-5 text-[var(--success)]" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.creates}</p>
-                    <p className="text-xs text-[var(--text-muted)]">Creates</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-          >
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--warning)]/10 flex items-center justify-center">
-                    <FileEdit className="w-5 h-5 text-[var(--warning)]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.updates}</p>
-                    <p className="text-xs text-[var(--text-muted)]">Updates</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--error-bg)] flex items-center justify-center">
-                    <Trash2 className="w-5 h-5 text-[var(--error)]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.deletes}</p>
-                    <p className="text-xs text-[var(--text-muted)]">Deletes</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{logs.length}</p>
+                    <p className="text-xs text-[var(--text-muted)]">This Page</p>
                   </div>
                 </div>
               </CardContent>
@@ -281,11 +171,14 @@ export default function ActivityPage() {
                 <Input
                   placeholder="Search activities..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setPage(1)
+                  }}
                   className="pl-10"
                 />
               </div>
-              <Select value={filterTable} onValueChange={setFilterTable}>
+              <Select value={filterTable} onValueChange={(v) => { setFilterTable(v); setPage(1) }}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <Filter className="w-4 h-4 mr-2 text-[var(--text-muted)]" />
                   <SelectValue placeholder="All Tables" />
@@ -302,7 +195,7 @@ export default function ActivityPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={filterAction} onValueChange={setFilterAction}>
+              <Select value={filterAction} onValueChange={(v) => { setFilterAction(v); setPage(1) }}>
                 <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="All Actions" />
                 </SelectTrigger>
@@ -330,7 +223,7 @@ export default function ActivityPage() {
               Activity Timeline
             </CardTitle>
             <CardDescription>
-              Showing {paginatedLogs.length} of {filteredLogs.length} activities
+              Showing {logs.length} of {total} activities
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -338,14 +231,16 @@ export default function ActivityPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
               </div>
-            ) : filteredLogs.length === 0 ? (
+            ) : logs.length === 0 ? (
               <div className="text-center py-12">
                 <Activity className="w-12 h-12 mx-auto text-[var(--text-muted)] mb-4" />
                 <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">
                   No activities found
                 </h3>
                 <p className="text-[var(--text-muted)]">
-                  Try adjusting your filters
+                  {searchQuery || filterTable !== "all" || filterAction !== "all"
+                    ? "Try adjusting your filters"
+                    : "No activity has been recorded yet"}
                 </p>
               </div>
             ) : (

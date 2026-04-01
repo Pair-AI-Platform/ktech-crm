@@ -16,11 +16,12 @@ interface UseLeadsFilters {
   schools?: string[]
   academicTrack?: string
   dateRange?: string
+  dateFrom?: string
+  dateTo?: string
   assignedTo?: string
   gpaMin?: number | null
   gpaMax?: number | null
   isKuwaiti?: boolean | null
-  ministryBlocked?: string
   blockReasons?: string[]
   submissionSubstages?: string[]
   submissionStatuses?: string[]
@@ -28,7 +29,9 @@ interface UseLeadsFilters {
   lostAtFilter?: string
   hasNotes?: string
   lostReasonIds?: string[]
-  priority?: string
+  withdrawalReasons?: string[]
+  genders?: string[]
+  governorates?: string[]
   ministryAssigned?: string
 }
 

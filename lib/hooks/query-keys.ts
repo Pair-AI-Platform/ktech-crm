@@ -96,6 +96,12 @@ export const queryKeys = {
     conversations: () => [...queryKeys.aiChat.all, 'conversations'] as const,
     messages: (id: string) => [...queryKeys.aiChat.all, 'messages', id] as const,
   },
+  leadSources: {
+    all: ['lead-sources'] as const,
+  },
+  exhibitions: {
+    all: ['exhibitions'] as const,
+  },
   campaigns: {
     all: ['campaigns'] as const,
     lists: () => [...queryKeys.campaigns.all, 'list'] as const,

@@ -63,4 +63,6 @@ export interface LeadFormData {
   semester_id: string
   // Assignment
   assigned_to: string
+  // Campaign (outreach)
+  campaign_id: string
 }

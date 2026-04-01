@@ -26,8 +26,9 @@ import {
   Clock,
   RotateCcw,
   CheckCircle2,
+  FolderOpen,
 } from "lucide-react"
-import type { TestCenterReportData } from "@/lib/hooks/use-reports"
+import type { TestCenterReportData, LevelStatsData } from "@/lib/hooks/use-reports"
 
 interface TestCenterReportsProps {
   data: TestCenterReportData
@@ -83,177 +84,27 @@ export function TestCenterReports({ data, onSync }: TestCenterReportsProps) {
     }
   }
 
-  const pieData = data.byLevel.map(level => ({
-    name: LEVEL_LABELS[level.level],
-    value: level.count,
-    percent: level.percent,
-    color: LEVEL_COLORS[level.level],
-  })).filter(d => d.value > 0)
-
-  const stats = [
-    {
-      title: "Total Tested",
-      value: data.totalTested,
-      icon: Users,
-      colorClass: "bg-[var(--bg-sunken)]"
-    },
-    {
-      title: "Pass Rate",
-      value: `${data.passRate}%`,
-      icon: TrendingUp,
-      colorClass: "bg-[var(--success)]"
-    },
-    {
-      title: "Foundation 1",
-      value: data.foundation1,
-      icon: BookOpen,
-      colorClass: "bg-[var(--warning)]"
-    },
-    {
-      title: "Foundation 2",
-      value: data.foundation2,
-      icon: FileCheck,
-      colorClass: "bg-[var(--primary)]"
-    },
-    {
-      title: "Direct Entry",
-      value: data.majors,
-      icon: GraduationCap,
-      colorClass: "bg-[var(--success)]"
-    },
-  ]
-
   return (
     <div className="space-y-6">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-          >
-            <Card hover glow className="relative overflow-hidden">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
-                    <stat.icon className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
-              </CardContent>
-              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+      {/* Enrolled Section */}
+      <LevelSection
+        title="Enrolled"
+        subtitle="Enrolled students"
+        icon={<GraduationCap className="w-5 h-5" />}
+        stats={data.enrolled}
+        mounted={mounted}
+        delayOffset={0}
+      />
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Level Distribution Pie Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-[var(--primary)]" />
-                Level Distribution
-              </CardTitle>
-              <CardDescription>Placement test results breakdown</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[280px]" style={{ minWidth: 0 }}>
-                {mounted && pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
-                    No test data available
-                  </div>
-                )}
-              </div>
-              {/* Legend */}
-              <div className="flex items-center justify-center gap-6 mt-4">
-                {pieData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Level Breakdown Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-[var(--accent)]" />
-                Level Breakdown
-              </CardTitle>
-              <CardDescription>Students by placement level</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {data.byLevel.map((level) => (
-                <LevelCard
-                  key={level.level}
-                  level={level.level}
-                  count={level.count}
-                  percent={level.percent}
-                  total={data.totalTested}
-                />
-              ))}
-
-              {/* Pass Rate Ring */}
-              <div className="mt-6 p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--text-secondary)]">Overall Pass Rate</p>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">{data.passRate}%</p>
-                  </div>
-                  <ProgressRing
-                    value={data.passRate}
-                    max={100}
-                    size={80}
-                    strokeWidth={8}
-                    showValue
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+      {/* Files Section */}
+      <LevelSection
+        title="Files"
+        subtitle="Students with open files"
+        icon={<FolderOpen className="w-5 h-5" />}
+        stats={data.files}
+        mounted={mounted}
+        delayOffset={0.3}
+      />
 
       {/* Retest Report */}
       <motion.div
@@ -404,38 +255,209 @@ export function TestCenterReports({ data, onSync }: TestCenterReportsProps) {
       </motion.div>
 
       {/* Additional Info */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.7 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Placement Level Details</CardTitle>
-            <CardDescription>What each level means</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <InfoCard
-                title="Foundation 1"
-                color="#F59E0B"
-                description="Students requiring comprehensive English foundation courses before starting major courses."
-              />
-              <InfoCard
-                title="Foundation 2"
-                color="#3B82F6"
-                description="Students with intermediate English proficiency, requiring one semester of foundation courses."
-              />
-              <InfoCard
-                title="Majors"
-                color="#22C55E"
-                description="Students ready to start their major courses directly without foundation requirements."
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
+  )
+}
+
+function LevelSection({
+  title,
+  subtitle,
+  icon,
+  stats,
+  mounted,
+  delayOffset,
+}: {
+  title: string
+  subtitle: string
+  icon: React.ReactNode
+  stats: LevelStatsData
+  mounted: boolean
+  delayOffset: number
+}) {
+  const pieData = stats.byLevel.map(level => ({
+    name: LEVEL_LABELS[level.level],
+    value: level.count,
+    percent: level.percent,
+    color: LEVEL_COLORS[level.level],
+  })).filter(d => d.value > 0)
+
+  const statCards = [
+    {
+      title: `Total ${title}`,
+      value: stats.total,
+      icon: Users,
+      colorClass: "bg-[var(--bg-sunken)]"
+    },
+    {
+      title: "Pass Rate",
+      value: `${stats.passRate}%`,
+      icon: TrendingUp,
+      colorClass: "bg-[var(--success)]"
+    },
+    {
+      title: "Foundation 1",
+      value: stats.foundation1,
+      icon: BookOpen,
+      colorClass: "bg-[var(--warning)]"
+    },
+    {
+      title: "Foundation 2",
+      value: stats.foundation2,
+      icon: FileCheck,
+      colorClass: "bg-[var(--primary)]"
+    },
+    {
+      title: "Direct Entry",
+      value: stats.majors,
+      icon: GraduationCap,
+      colorClass: "bg-[var(--success)]"
+    },
+  ]
+
+  return (
+    <>
+      {/* Section Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: delayOffset }}
+        className="flex items-center gap-2 text-[var(--text-secondary)]"
+      >
+        {icon}
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
+        <span className="text-sm">— {subtitle}</span>
+      </motion.div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {statCards.map((stat, index) => (
+          <motion.div
+            key={stat.title}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: delayOffset + index * 0.1 }}
+          >
+            <Card hover glow className="relative overflow-hidden">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-2.5 rounded-xl ${stat.colorClass} shadow-sm`}>
+                    <stat.icon className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)] mb-1">{stat.title}</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
+              </CardContent>
+              <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.colorClass} opacity-50`} />
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Level Distribution Pie Chart */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: delayOffset + 0.4 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-[var(--primary)]" />
+                Level Distribution
+              </CardTitle>
+              <CardDescription>{title} — placement test results breakdown</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]" style={{ minWidth: 0 }}>
+                {mounted && pieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
+                    No test data available
+                  </div>
+                )}
+              </div>
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-6 mt-4">
+                {pieData.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Level Breakdown Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: delayOffset + 0.5 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-[var(--accent)]" />
+                Level Breakdown
+              </CardTitle>
+              <CardDescription>{title} students by placement level</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {stats.byLevel.map((level) => (
+                <LevelCard
+                  key={level.level}
+                  level={level.level}
+                  count={level.count}
+                  percent={level.percent}
+                  total={stats.total}
+                />
+              ))}
+
+              {/* Pass Rate Ring */}
+              <div className="mt-6 p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-[var(--text-secondary)]">Overall Pass Rate</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.passRate}%</p>
+                  </div>
+                  <ProgressRing
+                    value={stats.passRate}
+                    max={100}
+                    size={80}
+                    strokeWidth={8}
+                    showValue
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </>
   )
 }
 
@@ -518,25 +540,3 @@ function RetestStatusBadge({ status }: { status: 'improved' | 'same' | 'pending'
   )
 }
 
-function InfoCard({
-  title,
-  color,
-  description,
-}: {
-  title: string
-  color: string
-  description: string
-}) {
-  return (
-    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]">
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-        <h4 className="font-semibold text-[var(--text-primary)]">{title}</h4>
-      </div>
-      <p className="text-sm text-[var(--text-muted)]">{description}</p>
-    </div>
-  )
-}

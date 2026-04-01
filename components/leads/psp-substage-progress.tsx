@@ -5,7 +5,6 @@ import {
   FileText,
   CheckCircle,
   Send,
-  UserCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { SubmissionSubstage } from "@/types"
@@ -19,22 +18,18 @@ interface PSPSubstageProgressProps {
 }
 
 // Main substages in order
-const MAIN_SUBSTAGES: SubmissionSubstage[] = ['documents', 'submissions', 'applicant']
+const MAIN_SUBSTAGES: SubmissionSubstage[] = ['documents', 'submissions']
 
 // Map substages to their icons
 const SUBSTAGE_ICONS: Record<SubmissionSubstage, typeof FileText> = {
   documents: FileText,
   submissions: Send,
-  sf_srj: FileText,
-  applicant: UserCheck,
 }
 
 // Map substages to colors
 const SUBSTAGE_COLORS: Record<SubmissionSubstage, { from: string; to: string; bg: string }> = {
   documents: { from: '#F59E0B', to: '#D97706', bg: 'bg-amber-100' },
   submissions: { from: '#3B82F6', to: '#2563EB', bg: 'bg-blue-100' },
-  sf_srj: { from: '#6366F1', to: '#4F46E5', bg: 'bg-indigo-100' },
-  applicant: { from: '#10B981', to: '#059669', bg: 'bg-emerald-100' },
 }
 
 function getSubstageIndex(substage: SubmissionSubstage): number {

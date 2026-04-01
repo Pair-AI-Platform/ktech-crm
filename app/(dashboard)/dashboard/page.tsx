@@ -154,6 +154,15 @@ export default function DashboardPage() {
     staleTime: 300_000,
   })
 
+  // Admin today's callbacks count
+  const adminTodayCallbacks = useMemo(() => {
+    if (!isAdmin) return 0
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    return allLeads.filter(l => l.status === 'callback' && l.callback_date === todayStr).length
+  }, [allLeads, isAdmin])
+
+  // Only block on essential data — let admin sections load independently
   const isLoading = leadsLoading || appointmentsLoading || statsLoading
 
   // Priority leads computation
@@ -279,12 +288,12 @@ export default function DashboardPage() {
         diff = Math.floor((nextYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
       }
 
-      if (diff <= 2) {
+      if (diff <= 30) {
         results.push({ lead, daysUntil: diff, isToday: diff === 0 })
       }
     })
 
-    return results.sort((a, b) => a.daysUntil - b.daysUntil)
+    return results.sort((a, b) => a.daysUntil - b.daysUntil).slice(0, 10)
   }, [attentionPool])
 
   // Prepare agent heatmap data (merge presence with lead counts + new metrics)
@@ -454,19 +463,38 @@ export default function DashboardPage() {
       <GreetingHeader profile={profile} />
 
       <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
-        {/* Admin KPIs */}
+        {/* Admin KPIs (includes today's appts & callbacks) */}
         {isAdmin && (
-          <AdminKpiSection allLeads={allLeads} loading={leadsLoading} />
+          <AdminKpiSection
+            allLeads={allLeads}
+            loading={leadsLoading}
+            todayAppointments={appointmentStats.today}
+            todayCallbacks={adminTodayCallbacks}
+            appointmentsLoading={appointmentsLoading}
+          />
         )}
 
-        {/* Quick Stats */}
-        <QuickStatsSection
-          appointmentsLoading={appointmentsLoading}
-          leadsLoading={leadsLoading}
-          appointmentStats={appointmentStats}
-          myLeads={myLeads}
-          isLoading={isLoading}
-        />
+        {/* Quick Stats (agent only) */}
+        {!isAdmin && (
+          <QuickStatsSection
+            appointmentsLoading={appointmentsLoading}
+            leadsLoading={leadsLoading}
+            appointmentStats={appointmentStats}
+            myLeads={myLeads}
+            isLoading={isLoading}
+          />
+        )}
+
+        {/* Agent: Monthly Target (PUC & SF) */}
+        {!isAdmin && (
+          <TargetSection
+            myTargetProgress={myTargetProgress}
+            allAgentsProgress={[]}
+            targetHistory={targetHistory}
+            targetHistoryLoading={targetHistoryLoading}
+            profileId={profile?.id}
+          />
+        )}
 
         {/* Admin Agent Heatmap */}
         {isAdmin && (
@@ -516,12 +544,14 @@ export default function DashboardPage() {
           <AdminDropoffSection dropoffData={dropoffData} loading={dropoffLoading} />
         )}
 
-        {/* Pipeline Progress */}
-        <PipelineSection
-          sfLeads={mySfLeads}
-          pucLeads={myPucLeads}
-          loading={leadsLoading}
-        />
+        {/* Pipeline Progress (admin only) */}
+        {isAdmin && (
+          <PipelineSection
+            sfLeads={mySfLeads}
+            pucLeads={myPucLeads}
+            loading={leadsLoading}
+          />
+        )}
 
         {/* Admin: Appointments | Needs Attention | Birthdays */}
         {isAdmin && (
@@ -543,22 +573,12 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Agent-only sections */}
+        {/* Agent: History */}
         {!isAdmin && (
-          <>
-            <TargetSection
-              myTargetProgress={myTargetProgress}
-              allAgentsProgress={allAgentsProgress}
-              targetHistory={targetHistory}
-              targetHistoryLoading={targetHistoryLoading}
-              profileId={profile?.id}
-            />
-
-            <HistorySection
-              agentHistory={agentHistory}
-              loading={historyLoading}
-            />
-          </>
+          <HistorySection
+            agentHistory={agentHistory}
+            loading={historyLoading}
+          />
         )}
       </div>
     </div>

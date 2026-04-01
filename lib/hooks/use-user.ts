@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoRole, DEMO_AGENTS } from "@/lib/demo-data"
 import type { User } from "@supabase/supabase-js"
@@ -42,91 +43,66 @@ const DEMO_AGENT_PROFILE: Profile = {
   updated_at: new Date().toISOString(),
 }
 
-export function useUser() {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+const USER_QUERY_KEY = ['current-user'] as const
 
-  useEffect(() => {
-    async function getUser() {
-      // Check for demo mode
+export function useUser() {
+  const queryClient = useQueryClient()
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey: USER_QUERY_KEY,
+    queryFn: async (): Promise<{ user: User | null; profile: Profile | null }> => {
       if (isDemoMode()) {
         const demoRole = getDemoRole()
-        setProfile(demoRole === "agent" ? DEMO_AGENT_PROFILE : DEMO_ADMIN_PROFILE)
-        setLoading(false)
-        return
+        return {
+          user: null,
+          profile: demoRole === "agent" ? DEMO_AGENT_PROFILE : DEMO_ADMIN_PROFILE,
+        }
       }
 
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
+      if (!user) return { user: null, profile: null }
 
-        if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .single()
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single()
 
-          // Override profile for demo accounts to ensure correct role
-          const email = user.email || profile?.email
-          if (profile && email === "demo-agent@ktech.edu.kw") {
-            profile.role = "agent"
-            profile.full_name = "Khalifa"
-          } else if (profile && email === "demo-admin@ktech.edu.kw") {
-            profile.role = "admin"
-            profile.full_name = "Demo Admin"
-          }
-
-          setProfile(profile)
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error)
-      } finally {
-        setLoading(false)
+      // Override profile for demo accounts to ensure correct role
+      const email = user.email || profile?.email
+      if (profile && email === "demo-agent@ktech.edu.kw") {
+        profile.role = "agent"
+        profile.full_name = "Khalifa"
+      } else if (profile && email === "demo-admin@ktech.edu.kw") {
+        profile.role = "admin"
+        profile.full_name = "Demo Admin"
       }
-    }
 
-    getUser()
+      return { user, profile }
+    },
+    staleTime: 5 * 60_000, // User data rarely changes, cache for 5 minutes
+    gcTime: 10 * 60_000,
+    retry: 2,
+  })
 
-    // Skip auth state listener in demo mode
+  // Listen for auth state changes and invalidate the query
+  useEffect(() => {
     if (isDemoMode()) return
 
     const supabase = createClient()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .single()
-
-          // Override profile for demo accounts to ensure correct role
-          const email = session.user.email || profile?.email
-          if (profile && email === "demo-agent@ktech.edu.kw") {
-            profile.role = "agent"
-            profile.full_name = "Khalifa"
-          } else if (profile && email === "demo-admin@ktech.edu.kw") {
-            profile.role = "admin"
-            profile.full_name = "Demo Admin"
-          }
-
-          setProfile(profile)
-        } else {
-          setProfile(null)
-        }
-      }
-    )
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY })
+    })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [queryClient])
 
-  const signOut = async () => {
-    // Clear demo mode
+  const user = data?.user ?? null
+  const profile = data?.profile ?? null
+
+  const signOut = useCallback(async () => {
     if (isDemoMode()) {
       localStorage.removeItem("ktech-demo-mode")
       localStorage.removeItem("ktech-demo-role")
@@ -138,7 +114,7 @@ export function useUser() {
     const supabase = createClient()
     await supabase.auth.signOut()
     window.location.href = "/login"
-  }
+  }, [])
 
   return {
     user,
@@ -153,38 +129,26 @@ export function useUser() {
 
 // Hook to get all team members/agents
 export function useAgents() {
-  const [agents, setAgents] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchAgents() {
-      // Check for demo mode
+  const { data: agents = [], isLoading: loading } = useQuery({
+    queryKey: ['agents-list'],
+    queryFn: async (): Promise<Profile[]> => {
       if (isDemoMode()) {
-        setAgents(DEMO_AGENTS as Profile[])
-        setLoading(false)
-        return
+        return DEMO_AGENTS as Profile[]
       }
 
       const supabase = createClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("is_active", true)
+        .order("full_name")
 
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("is_active", true)
-          .order("full_name")
-
-        if (error) throw new Error(error.message)
-        setAgents(data || [])
-      } catch (error) {
-        console.error("Error fetching agents:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchAgents()
-  }, [])
+      if (error) throw new Error(error.message)
+      return data || []
+    },
+    staleTime: 2 * 60_000, // Agents list rarely changes
+    gcTime: 5 * 60_000,
+  })
 
   return { agents, loading }
 }

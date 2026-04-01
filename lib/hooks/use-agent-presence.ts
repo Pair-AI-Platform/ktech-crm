@@ -66,7 +66,8 @@ export function useAgentPresence() {
 
       return data
     },
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000, // Poll less frequently to reduce load
   })
 
   const agents: AgentPresenceInfo[] = (data ?? []).map((p) => ({

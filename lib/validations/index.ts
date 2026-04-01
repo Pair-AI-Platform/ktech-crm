@@ -47,7 +47,7 @@ export const leadCreateSchema = z.object({
   source: z
     .enum([
       'walk_in', 'call_center', 'whatsapp', 'email',
-      'school_visit', 'expo', 'exhibitions', 'karnival',
+      'school_visit', 'exhibitions', 'karnival',
       'website_form', 'facebook', 'instagram', 'tiktok', 'email_marketing',
       'current_student_referral', 'staff_referral', 'friend_referral',
       'old_contacts', 'paaet_rejected', 'gpa_lists',

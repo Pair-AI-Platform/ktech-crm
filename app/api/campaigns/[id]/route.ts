@@ -9,7 +9,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id } = await params
   const handler = withApiHandler(
-    { context: 'campaign-detail' },
+    { context: 'campaign-detail', roles: ['admin'] },
     async ({ supabase, logger }) => {
       const { data: campaign, error } = await supabase
         .from('campaigns')

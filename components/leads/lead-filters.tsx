@@ -25,9 +25,14 @@ import {
   MessageSquareText,
   CreditCard,
   BookOpen,
-  Star,
+  XCircle,
 } from "lucide-react"
-import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack } from "@/types"
+import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, GOVERNORATES, PUC_DOCUMENT_STATUSES, PLACEMENT_LEVELS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack, type Governorate, type PUCDocumentStatus, type PlacementLevel } from "@/types"
+import { WITHDRAWAL_REASONS, COMPETITOR_OPTIONS, MILITARY_SECURITY_OPTIONS } from "@/lib/config/withdrawal-reasons"
+import { useActiveSources } from "@/lib/hooks/use-sources"
+import { useLostReasons } from "@/lib/hooks/use-leads"
+import { useCampaigns, type Campaign } from "@/lib/hooks/use-campaigns"
+import { useUser, useAgents } from "@/lib/hooks/use-user"
 import { cn } from "@/lib/utils"
 import { useStageSettings } from "@/lib/hooks/use-stage-settings"
 
@@ -42,14 +47,15 @@ export interface LeadFilters {
   submissionSubstages: SubmissionSubstage[]
   submissionStatuses: SubmissionStatus[]
   fundingType: "all" | "self_funded" | "puc"
-  dateRange: "all" | "today" | "week" | "month" | "quarter"
+  dateRange: "all" | "today" | "week" | "month" | "quarter" | "custom"
+  dateFrom: string
+  dateTo: string
   assignedTo: string
   hasEmail: boolean | null
   hasPhone: boolean | null
   gpaMin: number | null
   gpaMax: number | null
   isKuwaiti: boolean | null
-  ministryBlocked: "all" | "blocked" | "not_blocked"
   blockReasons: SubmissionBlockedReason[]
   hasNotes: "all" | "with_notes" | "without_notes"
   paymentStatus: "all" | "pending" | "seat_reserved" | "full_tuition"
@@ -57,8 +63,14 @@ export interface LeadFilters {
   paymentAmountMax: number
   academicTrack: "all" | AcademicTrack
   lostReasonIds: string[]
+  withdrawalReasons: string[]
+  genders: string[]
+  governorates: Governorate[]
   priority: "all" | "normal" | "important" | "critical"
   ministryAssigned: "all" | "assigned" | "not_assigned"
+  docStatuses: PUCDocumentStatus[]
+  placementLevels: PlacementLevel[]
+  campaignIds: string[]
 }
 
 interface LeadFiltersProps {
@@ -80,13 +92,14 @@ const defaultFilters: LeadFilters = {
   submissionStatuses: [],
   fundingType: "all",
   dateRange: "all",
+  dateFrom: "",
+  dateTo: "",
   assignedTo: "",
   hasEmail: null,
   hasPhone: null,
   gpaMin: null,
   gpaMax: null,
   isKuwaiti: null,
-  ministryBlocked: "all",
   blockReasons: [],
   hasNotes: "all",
   paymentStatus: "all",
@@ -94,8 +107,14 @@ const defaultFilters: LeadFilters = {
   paymentAmountMax: 5000,
   academicTrack: "all",
   lostReasonIds: [],
+  withdrawalReasons: [],
+  genders: [],
+  governorates: [],
   priority: "all",
   ministryAssigned: "all",
+  docStatuses: [],
+  placementLevels: [],
+  campaignIds: [],
 }
 
 // Stages that leads can be lost at (excludes 'lost' and 'enrolled')
@@ -148,6 +167,14 @@ function getStatusesForStages(stages: PipelineStage[]) {
 export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFiltersProps) {
   const [localFilters, setLocalFilters] = useState<LeadFilters>(filters)
   const [expandedSections, setExpandedSections] = useState<string[]>(["stage", "source"])
+  const { sources: dbSources } = useActiveSources()
+  const { reasons: lostReasons } = useLostReasons()
+  const { isAdmin } = useUser()
+  const { agents } = useAgents()
+  const { campaigns = [] } = useCampaigns()
+  const leadSources = dbSources.length > 0
+    ? dbSources.map(s => ({ value: s.value as LeadSource, label: s.label, category: s.category }))
+    : LEAD_SOURCES
 
   useEffect(() => {
     setLocalFilters(filters)
@@ -194,6 +221,42 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     }))
   }
 
+  const toggleLostReason = (reasonId: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      lostReasonIds: prev.lostReasonIds.includes(reasonId)
+        ? prev.lostReasonIds.filter(id => id !== reasonId)
+        : [...prev.lostReasonIds, reasonId]
+    }))
+  }
+
+  const lostReasonsByCategory = lostReasons.reduce<Record<string, typeof lostReasons>>((acc, reason) => {
+    if (!acc[reason.category]) acc[reason.category] = []
+    acc[reason.category].push(reason)
+    return acc
+  }, {})
+
+  const categoryLabels: Record<string, string> = {
+    competitors: "Competitors",
+    military_security: "Military / Security",
+    academic: "Academic",
+    administrative: "Administrative",
+    financial: "Financial",
+    personal: "Personal",
+  }
+
+  const [schoolSearch, setSchoolSearch] = useState("")
+
+  const filteredSchools = SCHOOLS.filter((school) => {
+    if (!schoolSearch.trim()) return true
+    const q = schoolSearch.trim().toLowerCase()
+    return (
+      school.label.includes(q) ||
+      school.labelEn.toLowerCase().includes(q) ||
+      school.labelAr.includes(q)
+    )
+  })
+
   const toggleSchool = (school: School) => {
     setLocalFilters(prev => ({
       ...prev,
@@ -239,6 +302,15 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     }))
   }
 
+  const toggleDocStatus = (status: PUCDocumentStatus) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      docStatuses: prev.docStatuses.includes(status)
+        ? prev.docStatuses.filter(s => s !== status)
+        : [...prev.docStatuses, status]
+    }))
+  }
+
   const handleApply = () => {
     onChange(localFilters)
     onClose()
@@ -268,8 +340,10 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     (localFilters.paymentStatus !== "all" ? 1 : 0) +
     (localFilters.paymentAmountMin > 0 || localFilters.paymentAmountMax < 5000 ? 1 : 0) +
     (localFilters.academicTrack !== "all" ? 1 : 0) +
-    (localFilters.priority !== "all" ? 1 : 0) +
-    (localFilters.ministryAssigned !== "all" ? 1 : 0)
+    (localFilters.ministryAssigned !== "all" ? 1 : 0) +
+    localFilters.docStatuses.length +
+    localFilters.placementLevels.length +
+    localFilters.campaignIds.length
 
   return (
     <AnimatePresence>
@@ -355,6 +429,88 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </p>
               </FilterSection>
 
+              {/* Lost Reason Filter */}
+              {lostReasons.length > 0 && (
+              <FilterSection
+                title="Lost Reason"
+                icon={<XCircle className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("lostReason")}
+                onToggle={() => toggleSection("lostReason")}
+                count={localFilters.lostReasonIds.length}
+              >
+                <div className="space-y-3">
+                  {Object.entries(lostReasonsByCategory).map(([category, reasons]) => (
+                    <div key={category}>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                        {categoryLabels[category] || category}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {reasons.map((reason) => {
+                          const isSelected = localFilters.lostReasonIds.includes(reason.id)
+                          return (
+                            <button
+                              key={reason.id}
+                              onClick={() => toggleLostReason(reason.id)}
+                              className={cn(
+                                "px-2.5 py-1.5 rounded-lg border text-xs transition-all",
+                                isSelected
+                                  ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400"
+                                  : "border-[var(--border)] hover:border-red-500/50 text-[var(--text-secondary)]"
+                              )}
+                            >
+                              {reason.reason_en}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </FilterSection>
+              )}
+
+              {/* Agent Filter - Admin Only */}
+              {isAdmin && (
+                <FilterSection
+                  title="Agent"
+                  icon={<User className="w-4 h-4" />}
+                  isExpanded={expandedSections.includes("agent")}
+                  onToggle={() => toggleSection("agent")}
+                  count={localFilters.assignedTo ? 1 : 0}
+                >
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setLocalFilters(prev => ({ ...prev, assignedTo: "" }))}
+                      className={cn(
+                        "w-full flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                        !localFilters.assignedTo
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      All Agents
+                    </button>
+                    {agents.map((agent) => (
+                      <button
+                        key={agent.id}
+                        onClick={() => setLocalFilters(prev => ({ ...prev, assignedTo: prev.assignedTo === agent.id ? "" : agent.id }))}
+                        className={cn(
+                          "w-full flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                          localFilters.assignedTo === agent.id
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-[var(--primary-muted)] flex items-center justify-center text-xs font-medium text-[var(--primary)]">
+                          {agent.full_name?.charAt(0) || "?"}
+                        </div>
+                        {agent.full_name}
+                      </button>
+                    ))}
+                  </div>
+                </FilterSection>
+              )}
+
               {/* Lead Status */}
               <FilterSection
                 title="Status"
@@ -406,7 +562,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 count={localFilters.sources.length}
               >
                 <div className="grid grid-cols-2 gap-2">
-                  {LEAD_SOURCES.map((source) => (
+                  {leadSources.map((source) => (
                     <button
                       key={source.value}
                       onClick={() => toggleSource(source.value)}
@@ -441,8 +597,17 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 onToggle={() => toggleSection("school")}
                 count={localFilters.schools.length}
               >
+                <div className="px-3 pb-2">
+                  <SearchInput
+                    value={schoolSearch}
+                    onChange={(e) => setSchoolSearch(e.target.value)}
+                    onClear={() => setSchoolSearch("")}
+                    placeholder="ابحث عن مدرسة..."
+                    searchSize="sm"
+                  />
+                </div>
                 <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
-                  {SCHOOLS.map((school) => (
+                  {filteredSchools.map((school) => (
                     <button
                       key={school.value}
                       onClick={() => toggleSchool(school.value)}
@@ -541,9 +706,9 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
-              {/* Submission Status */}
+              {/* Orientation Status (was Submission Status) */}
               <FilterSection
-                title="Submission Status"
+                title="Orientation Status"
                 icon={<SlidersHorizontal className="w-4 h-4" />}
                 isExpanded={expandedSections.includes("submissionStatus")}
                 onToggle={() => toggleSection("submissionStatus")}
@@ -577,6 +742,42 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
+              {/* Doc Status */}
+              <FilterSection
+                title="Doc Status"
+                icon={<SlidersHorizontal className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("docStatus")}
+                onToggle={() => toggleSection("docStatus")}
+                count={localFilters.docStatuses.length}
+              >
+                <div className="grid grid-cols-1 gap-2">
+                  {PUC_DOCUMENT_STATUSES.map((status) => (
+                    <button
+                      key={status.value}
+                      onClick={() => toggleDocStatus(status.value)}
+                      className={cn(
+                        "flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                        localFilters.docStatuses.includes(status.value)
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                        localFilters.docStatuses.includes(status.value)
+                          ? "border-[var(--primary)] bg-[var(--primary)]"
+                          : "border-[var(--border)]"
+                      )}>
+                        {localFilters.docStatuses.includes(status.value) && (
+                          <Check className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                      <span className="truncate">{status.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+
               {/* Academic Track (Type) */}
               <FilterSection
                 title="Type"
@@ -597,37 +798,6 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                       className={cn(
                         "p-2.5 rounded-lg border text-sm text-center transition-all",
                         localFilters.academicTrack === option.value
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </FilterSection>
-
-              {/* Priority */}
-              <FilterSection
-                title="Priority"
-                icon={<Star className="w-4 h-4" />}
-                isExpanded={expandedSections.includes("priority")}
-                onToggle={() => toggleSection("priority")}
-                count={localFilters.priority !== "all" ? 1 : 0}
-              >
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: "all", label: "All" },
-                    { value: "important", label: "⭐ Starred" },
-                    { value: "critical", label: "🔥 Critical" },
-                    { value: "normal", label: "Normal" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setLocalFilters(prev => ({ ...prev, priority: option.value as LeadFilters["priority"] }))}
-                      className={cn(
-                        "p-2.5 rounded-lg border text-sm text-center transition-all",
-                        localFilters.priority === option.value
                           ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
                           : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
                       )}
@@ -688,35 +858,64 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 />
               </FilterSection>
 
-              {/* Ministry Blocked Filter */}
+
+              {/* Block Reason Filter */}
               <FilterSection
-                title="Ministry Blocked"
-                icon={<Ban className="w-4 h-4" />}
-                isExpanded={expandedSections.includes("ministryBlocked")}
-                onToggle={() => toggleSection("ministryBlocked")}
-                count={localFilters.ministryBlocked !== "all" ? 1 : 0}
+                title="Block Reason"
+                icon={<ShieldAlert className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("blockReasons")}
+                onToggle={() => toggleSection("blockReasons")}
+                count={localFilters.blockReasons.length}
               >
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: "all", label: "All" },
-                    { value: "blocked", label: "Blocked" },
-                    { value: "not_blocked", label: "Not Blocked" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setLocalFilters(prev => ({ ...prev, ministryBlocked: option.value as LeadFilters["ministryBlocked"] }))}
-                      className={cn(
-                        "p-2.5 rounded-lg border text-sm text-center transition-all",
-                        localFilters.ministryBlocked === option.value
-                          ? option.value === "blocked"
-                            ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                            : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                          : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setLocalFilters(prev => ({
+                      ...prev,
+                      blockReasons: prev.blockReasons.length === SUBMISSION_BLOCKED_REASONS.length
+                        ? []
+                        : SUBMISSION_BLOCKED_REASONS.map(r => r.value)
+                    }))}
+                    className={cn(
+                      "w-full p-2 rounded-lg border text-sm text-center transition-all",
+                      localFilters.blockReasons.length === SUBMISSION_BLOCKED_REASONS.length
+                        ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                        : "border-[var(--border)] hover:border-orange-500/50 text-[var(--text-secondary)]"
+                    )}
+                  >
+                    {localFilters.blockReasons.length === SUBMISSION_BLOCKED_REASONS.length ? "Deselect All" : "Select All"}
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SUBMISSION_BLOCKED_REASONS.map((reason) => {
+                      const isSelected = localFilters.blockReasons.includes(reason.value)
+                      return (
+                        <button
+                          key={reason.value}
+                          onClick={() => setLocalFilters(prev => ({
+                            ...prev,
+                            blockReasons: isSelected
+                              ? prev.blockReasons.filter(r => r !== reason.value)
+                              : [...prev.blockReasons, reason.value]
+                          }))}
+                          className={cn(
+                            "flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-all",
+                            isSelected
+                              ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                              : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                            isSelected
+                              ? "bg-orange-500 border-orange-500"
+                              : "border-[var(--border)]"
+                          )}>
+                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          {reason.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </FilterSection>
 
@@ -752,47 +951,274 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
-              {/* Block Reason Filter */}
+              {/* Withdraw Reason Filter */}
               <FilterSection
-                title="Block Reason"
-                icon={<ShieldAlert className="w-4 h-4" />}
-                isExpanded={expandedSections.includes("blockReasons")}
-                onToggle={() => toggleSection("blockReasons")}
-                count={localFilters.blockReasons.length}
+                title="Withdraw Reason"
+                icon={<Ban className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("withdrawalReasons")}
+                onToggle={() => toggleSection("withdrawalReasons")}
+                count={localFilters.withdrawalReasons.length}
+              >
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">General</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {WITHDRAWAL_REASONS.map((reason) => {
+                        const isSelected = localFilters.withdrawalReasons.includes(reason.id)
+                        return (
+                          <button
+                            key={reason.id}
+                            onClick={() => setLocalFilters(prev => ({
+                              ...prev,
+                              withdrawalReasons: isSelected
+                                ? prev.withdrawalReasons.filter(r => r !== reason.id)
+                                : [...prev.withdrawalReasons, reason.id]
+                            }))}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-lg border text-xs transition-all",
+                              isSelected
+                                ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                : "border-[var(--border)] hover:border-amber-500/50 text-[var(--text-secondary)]"
+                            )}
+                          >
+                            {reason.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Competitors</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {COMPETITOR_OPTIONS.map((reason) => {
+                        const isSelected = localFilters.withdrawalReasons.includes(reason.id)
+                        return (
+                          <button
+                            key={reason.id}
+                            onClick={() => setLocalFilters(prev => ({
+                              ...prev,
+                              withdrawalReasons: isSelected
+                                ? prev.withdrawalReasons.filter(r => r !== reason.id)
+                                : [...prev.withdrawalReasons, reason.id]
+                            }))}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-lg border text-xs transition-all",
+                              isSelected
+                                ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                : "border-[var(--border)] hover:border-amber-500/50 text-[var(--text-secondary)]"
+                            )}
+                          >
+                            {reason.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Military / Security</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {MILITARY_SECURITY_OPTIONS.map((reason) => {
+                        const isSelected = localFilters.withdrawalReasons.includes(reason.id)
+                        return (
+                          <button
+                            key={reason.id}
+                            onClick={() => setLocalFilters(prev => ({
+                              ...prev,
+                              withdrawalReasons: isSelected
+                                ? prev.withdrawalReasons.filter(r => r !== reason.id)
+                                : [...prev.withdrawalReasons, reason.id]
+                            }))}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-lg border text-xs transition-all",
+                              isSelected
+                                ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                : "border-[var(--border)] hover:border-amber-500/50 text-[var(--text-secondary)]"
+                            )}
+                          >
+                            {reason.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </FilterSection>
+
+              {/* Gender Filter */}
+              <FilterSection
+                title="Gender"
+                icon={<User className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("gender")}
+                onToggle={() => toggleSection("gender")}
+                count={localFilters.genders.length}
               >
                 <div className="grid grid-cols-2 gap-2">
-                  {SUBMISSION_BLOCKED_REASONS.map((reason) => {
-                    const isSelected = localFilters.blockReasons.includes(reason.value)
+                  {[
+                    { value: "male", label: "Male" },
+                    { value: "female", label: "Female" },
+                  ].map((option) => {
+                    const isSelected = localFilters.genders.includes(option.value)
                     return (
                       <button
-                        key={reason.value}
+                        key={option.value}
                         onClick={() => setLocalFilters(prev => ({
                           ...prev,
-                          blockReasons: isSelected
-                            ? prev.blockReasons.filter(r => r !== reason.value)
-                            : [...prev.blockReasons, reason.value]
+                          genders: isSelected
+                            ? prev.genders.filter(g => g !== option.value)
+                            : [...prev.genders, option.value]
                         }))}
                         className={cn(
                           "flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-all",
                           isSelected
-                            ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
                             : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
                         )}
                       >
                         <div className={cn(
                           "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
                           isSelected
-                            ? "bg-orange-500 border-orange-500"
+                            ? "bg-[var(--primary)] border-[var(--primary)]"
                             : "border-[var(--border)]"
                         )}>
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
-                        {reason.label}
+                        {option.label}
                       </button>
                     )
                   })}
                 </div>
               </FilterSection>
+
+              {/* Governorate Filter */}
+              <FilterSection
+                title="Governorate"
+                icon={<MapPin className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("governorate")}
+                onToggle={() => toggleSection("governorate")}
+                count={localFilters.governorates.length}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {GOVERNORATES.map((gov) => {
+                    const isSelected = localFilters.governorates.includes(gov.value)
+                    return (
+                      <button
+                        key={gov.value}
+                        onClick={() => setLocalFilters(prev => ({
+                          ...prev,
+                          governorates: isSelected
+                            ? prev.governorates.filter(g => g !== gov.value)
+                            : [...prev.governorates, gov.value]
+                        }))}
+                        className={cn(
+                          "flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-all",
+                          isSelected
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                          isSelected
+                            ? "bg-[var(--primary)] border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        )}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        {gov.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+
+              {/* Test Level (Placement Level) Filter */}
+              <FilterSection
+                title="Test Level"
+                icon={<GraduationCap className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("placementLevel")}
+                onToggle={() => toggleSection("placementLevel")}
+                count={localFilters.placementLevels.length}
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  {PLACEMENT_LEVELS.map((level) => {
+                    const isSelected = localFilters.placementLevels.includes(level.value)
+                    return (
+                      <button
+                        key={level.value}
+                        onClick={() => setLocalFilters(prev => ({
+                          ...prev,
+                          placementLevels: isSelected
+                            ? prev.placementLevels.filter(l => l !== level.value)
+                            : [...prev.placementLevels, level.value]
+                        }))}
+                        className={cn(
+                          "flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-all",
+                          isSelected
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                          isSelected
+                            ? "bg-[var(--primary)] border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        )}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        {level.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+
+              {/* Campaign Filter */}
+              {campaigns.length > 0 && (
+              <FilterSection
+                title="Campaign"
+                icon={<Sparkles className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("campaign")}
+                onToggle={() => toggleSection("campaign")}
+                count={localFilters.campaignIds.length}
+              >
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {campaigns.map((campaign) => {
+                    const isSelected = localFilters.campaignIds.includes(campaign.id)
+                    return (
+                      <button
+                        key={campaign.id}
+                        onClick={() => setLocalFilters(prev => ({
+                          ...prev,
+                          campaignIds: isSelected
+                            ? prev.campaignIds.filter(id => id !== campaign.id)
+                            : [...prev.campaignIds, campaign.id]
+                        }))}
+                        className={cn(
+                          "w-full flex items-center gap-2 p-2.5 rounded-lg border text-sm text-left transition-all",
+                          isSelected
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                          isSelected
+                            ? "bg-[var(--primary)] border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        )}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="truncate block">{campaign.name}</span>
+                          <span className="text-xs text-[var(--text-muted)]">{campaign.type} &middot; {campaign.total_contacts} contacts</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+              )}
 
               {/* Has Notes Filter */}
               <FilterSection
@@ -881,19 +1307,34 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 onToggle={() => toggleSection("date")}
                 count={localFilters.dateRange !== "all" ? 1 : 0}
               >
-                <div className="grid grid-cols-5 gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {[
                     { value: "all", label: "All" },
                     { value: "today", label: "Today" },
                     { value: "week", label: "Week" },
                     { value: "month", label: "Month" },
                     { value: "quarter", label: "Quarter" },
+                    { value: "custom", label: "Custom" },
                   ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => setLocalFilters(prev => ({ ...prev, dateRange: option.value as LeadFilters["dateRange"] }))}
+                      onClick={() => {
+                        if (option.value === "custom") {
+                          setLocalFilters(prev => ({
+                            ...prev,
+                            dateRange: "custom",
+                          }))
+                        } else {
+                          setLocalFilters(prev => ({
+                            ...prev,
+                            dateRange: option.value as LeadFilters["dateRange"],
+                            dateFrom: "",
+                            dateTo: "",
+                          }))
+                        }
+                      }}
                       className={cn(
-                        "p-2 rounded-lg border text-xs text-center transition-all",
+                        "px-3 py-1.5 rounded-full border text-xs text-center transition-all",
                         localFilters.dateRange === option.value
                           ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
                           : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
@@ -903,6 +1344,38 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                     </button>
                   ))}
                 </div>
+                {localFilters.dateRange === "custom" && (
+                  <div className="mt-3 pt-3 border-t border-[var(--border)]/50">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-[var(--text-muted)] mb-1 block">From</label>
+                        <input
+                          type="date"
+                          value={localFilters.dateFrom}
+                          onChange={(e) => setLocalFilters(prev => ({
+                            ...prev,
+                            dateRange: "custom",
+                            dateFrom: e.target.value,
+                          }))}
+                          className="w-full p-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] text-xs text-[var(--text-primary)]"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[10px] text-[var(--text-muted)] mb-1 block">To</label>
+                        <input
+                          type="date"
+                          value={localFilters.dateTo}
+                          onChange={(e) => setLocalFilters(prev => ({
+                            ...prev,
+                            dateRange: "custom",
+                            dateTo: e.target.value,
+                          }))}
+                          className="w-full p-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] text-xs text-[var(--text-primary)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </FilterSection>
 
               {/* Pipeline Stages */}

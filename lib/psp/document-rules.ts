@@ -128,7 +128,7 @@ const ACCEPTANCE_LETTER: DocumentRule = {
   acceptedFileTypes: DOCUMENT_FILE_TYPES,
   maxSizeMB: 10,
   hasExpiration: false,
-  description: 'Ktech acceptance letter'
+  description: 'ktech acceptance letter'
 }
 
 const DECLARATION: DocumentRule = {

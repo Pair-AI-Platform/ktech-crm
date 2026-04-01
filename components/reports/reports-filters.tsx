@@ -17,6 +17,7 @@ import {
   SCHOOLS,
   LEAD_SOURCES,
 } from "@/types"
+import { useActiveSources } from "@/lib/hooks/use-sources"
 
 interface ReportsFiltersProps {
   open: boolean
@@ -35,6 +36,10 @@ const SOURCE_CATEGORIES = [
 
 export function ReportsFilters({ open, onClose, filters, onFiltersChange }: ReportsFiltersProps) {
   const { agents } = useAgents()
+  const { sources: dbSources } = useActiveSources()
+  const leadSources = dbSources.length > 0
+    ? dbSources.map(s => ({ value: s.value, label: s.label, category: s.category }))
+    : LEAD_SOURCES
   const [localFilters, setLocalFilters] = useState<ReportFilters>(filters)
   const prevOpen = useRef(open)
 
@@ -193,7 +198,7 @@ export function ReportsFilters({ open, onClose, filters, onFiltersChange }: Repo
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Sources</SelectItem>
-                    {LEAD_SOURCES
+                    {leadSources
                       .filter(s => localFilters.sourceCategory === 'all' || s.category === localFilters.sourceCategory)
                       .map((source) => (
                         <SelectItem key={source.value} value={source.value}>

@@ -1,8 +1,23 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Verify cron secret
+    const cronSecret = process.env.CRON_SECRET
+    if (!cronSecret) {
+      console.error('[Priority Reminders] CRON_SECRET is not configured')
+      return NextResponse.json(
+        { error: 'Server misconfiguration: CRON_SECRET is not set' },
+        { status: 500 }
+      )
+    }
+
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = createServiceRoleClient()
 
     // Find all recurring, non-completed reminders that are due

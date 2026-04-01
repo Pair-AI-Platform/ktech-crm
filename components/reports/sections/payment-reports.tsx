@@ -68,6 +68,19 @@ function BarTooltip({ active, payload }: { active?: boolean; payload?: Array<{ p
   return null
 }
 
+function EnrolledTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { agentName: string; count: number } }> }) {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload
+    return (
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{d.agentName}</p>
+        <p className="text-xs text-[var(--text-muted)]">{d.count} students</p>
+      </div>
+    )
+  }
+  return null
+}
+
 export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
@@ -235,7 +248,7 @@ export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
         </Card>
       </motion.div>
 
-      {/* Revenue by Agent — bar chart (admin only) */}
+      {/* Enrolled Students by Agent — bar chart (admin only) */}
       {!isAgent && data.byAgent.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -246,9 +259,9 @@ export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-[var(--primary)]" />
-                Revenue by Agent
+                Enrolled Students by Agent
               </CardTitle>
-              <CardDescription>Total amount collected per agent (KD)</CardDescription>
+              <CardDescription>Total enrolled students per agent</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]" style={{ minWidth: 0 }}>
@@ -260,15 +273,15 @@ export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
                       margin={{ top: 0, right: 20, bottom: 0, left: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
                       <YAxis
                         type="category"
                         dataKey="agentName"
                         width={100}
                         tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                       />
-                      <Tooltip content={<BarTooltip />} cursor={{ fill: 'var(--bg-sunken)', opacity: 0.5 }} />
-                      <Bar dataKey="amount" fill="var(--primary)" radius={[0, 6, 6, 0]} />
+                      <Tooltip content={<EnrolledTooltip />} cursor={{ fill: 'var(--bg-sunken)', opacity: 0.5 }} />
+                      <Bar dataKey="count" fill="var(--primary)" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : null}

@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef, useEffect } from "react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -42,6 +43,20 @@ export function LeadFormPersonal({
   setIsNationalityDropdownOpen,
   filteredNationalities,
 }: LeadFormPersonalProps) {
+  const nationalityRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isNationalityDropdownOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (nationalityRef.current && !nationalityRef.current.contains(e.target as Node)) {
+        setIsNationalityDropdownOpen(false)
+        setNationalitySearch("")
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [isNationalityDropdownOpen, setIsNationalityDropdownOpen, setNationalitySearch])
+
   return (
     <div className={cn("mb-8 relative", isNationalityDropdownOpen && "z-50")}>
       <div className="flex items-center gap-2 mb-4">
@@ -108,7 +123,7 @@ export function LeadFormPersonal({
         </div>
 
         {/* Nationality */}
-        <div className={cn("relative space-y-2", isNationalityDropdownOpen && "z-50")}>
+        <div ref={nationalityRef} className={cn("relative space-y-2", isNationalityDropdownOpen && "z-50")}>
           <Label>Nationality</Label>
           <div className="relative">
             <div
@@ -127,8 +142,6 @@ export function LeadFormPersonal({
             </div>
 
             {isNationalityDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => { setIsNationalityDropdownOpen(false); setNationalitySearch("") }} />
                 <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
                   <div className="p-2 border-b border-[var(--border)]">
                     <div className="relative">
@@ -169,7 +182,6 @@ export function LeadFormPersonal({
                     )}
                   </div>
                 </div>
-              </>
             )}
           </div>
         </div>

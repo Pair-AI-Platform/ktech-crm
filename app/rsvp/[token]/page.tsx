@@ -85,7 +85,7 @@ export default function RsvpPage() {
       <div className="w-full max-w-md">
         {/* Logo / Header */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">KTECH</h1>
+          <h1 className="text-2xl font-bold text-slate-900">ktech</h1>
           <p className="text-sm text-slate-500">Kuwait Technical College</p>
         </div>
 

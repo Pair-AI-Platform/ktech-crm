@@ -621,22 +621,24 @@ export function useAppointmentStats() {
       const endOfWeek = new Date(startOfWeek)
       endOfWeek.setDate(endOfWeek.getDate() + 6)
 
-      // Fetch this week's appointments
-      const { data: appointments, error } = await supabase
-        .from("appointments")
-        .select("scheduled_date, scheduled_time, status")
-        .gte("scheduled_date", toDateString(startOfWeek))
-        .lte("scheduled_date", toDateString(endOfWeek))
+      // Fetch both queries in parallel to reduce waterfall
+      const [appointmentsRes, needsAttentionRes] = await Promise.all([
+        supabase
+          .from("appointments")
+          .select("scheduled_date, scheduled_time, status")
+          .gte("scheduled_date", toDateString(startOfWeek))
+          .lte("scheduled_date", toDateString(endOfWeek)),
+        supabase
+          .from("appointments")
+          .select("scheduled_date, scheduled_time, status")
+          .eq("status", "scheduled")
+          .lte("scheduled_date", today),
+      ])
 
+      const { data: appointments, error } = appointmentsRes
       if (error) throw new Error(error.message)
 
-      // Fetch all past appointments that are still "scheduled" (needs attention)
-      const { data: needsAttentionData, error: needsAttentionError } = await supabase
-        .from("appointments")
-        .select("scheduled_date, scheduled_time, status")
-        .eq("status", "scheduled")
-        .lte("scheduled_date", today)
-
+      const { data: needsAttentionData, error: needsAttentionError } = needsAttentionRes
       if (needsAttentionError) throw new Error(needsAttentionError.message)
 
       // Filter needs attention by checking if the time has also passed

@@ -10,7 +10,7 @@ export type LeadSourceCategory = 'direct' | 'events' | 'marketing' | 'referrals'
 
 export type LeadSource =
   | 'walk_in' | 'call_center' | 'whatsapp' | 'email'
-  | 'school_visit' | 'expo' | 'exhibitions' | 'karnival'
+  | 'school_visit' | 'exhibitions' | 'karnival'
   | 'website_form' | 'facebook' | 'instagram' | 'tiktok' | 'email_marketing'
   | 'current_student_referral' | 'staff_referral' | 'friend_referral'
   | 'old_contacts' | 'paaet_rejected' | 'gpa_lists'
@@ -1673,13 +1673,11 @@ export const APPOINTMENT_STATUSES: {
 
 
 // Submission Substage
-export type SubmissionSubstage = 'documents' | 'submissions' | 'sf_srj' | 'applicant'
+export type SubmissionSubstage = 'documents' | 'submissions'
 
 export const SUBMISSION_SUBSTAGES: { value: SubmissionSubstage; label: string; labelAr: string; color: string }[] = [
   { value: 'documents', label: 'Documents', labelAr: 'المستندات', color: 'warning' },
   { value: 'submissions', label: 'Submissions', labelAr: 'تم التقديم', color: 'primary' },
-  { value: 'sf_srj', label: 'SF SRJ', labelAr: 'SF SRJ', color: 'info' },
-  { value: 'applicant', label: 'Applicant', labelAr: 'متقدم', color: 'success' },
 ]
 
 // Submission Status

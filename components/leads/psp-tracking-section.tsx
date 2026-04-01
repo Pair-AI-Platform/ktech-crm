@@ -114,7 +114,6 @@ export function PSPTrackingSection({
           <Badge
             variant={
               substage === 'submissions' ? 'success' :
-              substage === 'applicant' ? 'info' :
               'secondary'
             }
             className="gap-1"

@@ -176,7 +176,7 @@ export function AgentTargetRow({
                     )}
                     {activeCategories.has('sf_applicants') && (
                       <CategoryInput
-                        label="SF Applicants"
+                        label="SF Enrolled"
                         sublabel={selectedSeason?.name ?? "Season"}
                         color="bg-blue-500"
                         value={sfApplicants}
@@ -185,7 +185,7 @@ export function AgentTargetRow({
                     )}
                     {activeCategories.has('puc_app_submission') && (
                       <CategoryInput
-                        label="PUC App"
+                        label="PUC Enrolled"
                         sublabel={selectedSeason?.name ?? "Season"}
                         color="bg-purple-500"
                         value={pucAppSubmission}
@@ -220,7 +220,7 @@ export function AgentTargetRow({
                   {activeCategories.has('puc_app_submission') && pucAppSubmission > 0 && (
                     <WeeklyBreakdown
                       category="puc_app_submission"
-                      label="PUC App"
+                      label="PUC Enrolled"
                       total={pucAppSubmission}
                       weekly={weeklyPucAppSubmission}
                       onWeeklyChange={(v) => updateWeekly(agent.id, 'weekly_puc_app_submission', v)}

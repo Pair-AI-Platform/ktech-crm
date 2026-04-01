@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/modal"
 import {
   Archive,
-  Search,
   Users,
   ChevronDown,
   ChevronRight,
@@ -33,13 +32,53 @@ import {
   CheckCircle2,
   X,
   RotateCw,
+  Download,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReRegisterLeads, useActiveSemesters } from "@/lib/hooks/use-semesters"
 import { createClient } from "@/lib/supabase/client"
-import type { Lead, Semester, EducationCycle, Profile } from "@/types"
+import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
+import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
+import type { Lead, Semester, EducationCycle, Profile, PipelineStage } from "@/types"
+
+const defaultFilters: LeadFilters = {
+  searchQuery: "",
+  stages: [],
+  lostAtStages: [],
+  statuses: [],
+  sources: [],
+  schools: [],
+  appointmentTypes: [],
+  submissionSubstages: [],
+  submissionStatuses: [],
+  fundingType: "all",
+  dateRange: "all",
+  dateFrom: "",
+  dateTo: "",
+  assignedTo: "",
+  hasEmail: null,
+  hasPhone: null,
+  gpaMin: null,
+  gpaMax: null,
+  isKuwaiti: null,
+  blockReasons: [],
+  hasNotes: "all",
+  paymentStatus: "all",
+  paymentAmountMin: 0,
+  paymentAmountMax: 5000,
+  academicTrack: "all",
+  lostReasonIds: [],
+  withdrawalReasons: [],
+  genders: [],
+  governorates: [],
+  priority: "all",
+  ministryAssigned: "all",
+  docStatuses: [],
+  placementLevels: [],
+  campaignIds: [],
+}
 
 interface AcademicYear {
   id: string
@@ -412,6 +451,9 @@ export default function ArchivePage() {
   const [showTransferDialog, setShowTransferDialog] = useState(false)
   const [isDemo, setIsDemo] = useState(false)
   const [reRegisteredIds, setReRegisteredIds] = useState<Set<string>>(new Set())
+  const [filters, setFilters] = useState<LeadFilters>(defaultFilters)
+  const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false)
 
   useEffect(() => {
     async function fetchArchive() {
@@ -471,11 +513,28 @@ export default function ArchivePage() {
           civil_id,
           nationality,
           pipeline_stage,
+          status,
           funding_type,
           source,
+          school,
           semester_id,
           created_at,
-          assigned_agent:profiles!leads_assigned_to_fkey(full_name)
+          assigned_to,
+          assigned_agent:profiles!leads_assigned_to_fkey(full_name),
+          is_kuwaiti,
+          expected_gpa,
+          gpa_grade_12_expected,
+          gpa_grade_11,
+          gender,
+          academic_track,
+          priority,
+          lost_at_stage,
+          lost_reason_id,
+          notes,
+          ministry_blocked,
+          ministry_block_reasons,
+          ministry_assigned,
+          school
         `)
         .in("semester_id", semesterIds)
         .order("created_at", { ascending: false })
@@ -580,24 +639,125 @@ export default function ArchivePage() {
     setSelectedLeads(new Set())
   }, [])
 
-  // Filter leads by search
-  const filteredBySemester = useMemo(() => {
-    if (!searchQuery.trim()) return leadsBySemester
+  // All leads flat (for stats)
+  const allLeadsFlat = useMemo(() => {
+    return Object.values(leadsBySemester).flat()
+  }, [leadsBySemester])
 
-    const q = searchQuery.toLowerCase()
+  // Stage stats for QuickFilters
+  const stageStats = useMemo(() => {
+    const stats: Record<PipelineStage, number> = {} as Record<PipelineStage, number>
+    for (const lead of allLeadsFlat) {
+      const stage = lead.pipeline_stage as PipelineStage
+      stats[stage] = (stats[stage] || 0) + 1
+    }
+    return stats
+  }, [allLeadsFlat])
+
+  // Apply all filters
+  const filteredBySemester = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const now = new Date()
+
     const filtered: Record<string, Lead[]> = {}
     for (const [semId, leads] of Object.entries(leadsBySemester)) {
-      filtered[semId] = leads.filter(
-        (lead) =>
+      filtered[semId] = leads.filter((lead) => {
+        // Search query
+        if (q && !(
           lead.first_name?.toLowerCase().includes(q) ||
           lead.last_name?.toLowerCase().includes(q) ||
           lead.phone?.includes(q) ||
           lead.email?.toLowerCase().includes(q) ||
           lead.civil_id?.includes(q)
-      )
+        )) return false
+
+        // Quick stage filter (from stage pills)
+        if (stageFilter !== "all" && lead.pipeline_stage !== stageFilter) return false
+
+        // Advanced filters
+        if (filters.stages.length > 0 && !filters.stages.includes(lead.pipeline_stage)) return false
+        if (filters.lostAtStages.length > 0 && (!lead.lost_at_stage || !filters.lostAtStages.includes(lead.lost_at_stage))) return false
+        if (filters.statuses.length > 0 && (!lead.status || !filters.statuses.includes(lead.status))) return false
+        if (filters.sources.length > 0 && !filters.sources.includes(lead.source)) return false
+        if (filters.schools.length > 0 && (!lead.school || !filters.schools.includes(lead.school))) return false
+        if (filters.fundingType !== "all" && lead.funding_type !== filters.fundingType) return false
+
+        // Assigned agent
+        if (filters.assignedTo && lead.assigned_to !== filters.assignedTo) return false
+
+        // Contact info
+        if (filters.hasEmail === true && !lead.email) return false
+        if (filters.hasEmail === false && lead.email) return false
+        if (filters.hasPhone === true && !lead.phone) return false
+        if (filters.hasPhone === false && lead.phone) return false
+
+        // Nationality
+        if (filters.isKuwaiti === true && !lead.is_kuwaiti) return false
+        if (filters.isKuwaiti === false && lead.is_kuwaiti) return false
+
+        // GPA (use expected GPA as the primary GPA field)
+        const gpa = lead.expected_gpa ?? lead.gpa_grade_12_expected ?? lead.gpa_grade_11
+        if (filters.gpaMin !== null && (gpa == null || gpa < filters.gpaMin)) return false
+        if (filters.gpaMax !== null && (gpa == null || gpa > filters.gpaMax)) return false
+
+        // Gender
+        if (filters.genders.length > 0 && (!lead.gender || !filters.genders.includes(lead.gender))) return false
+
+        // Academic track
+        if (filters.academicTrack !== "all" && lead.academic_track !== filters.academicTrack) return false
+
+        // Block reasons
+        if (filters.blockReasons.length > 0) {
+          const leadReasons = (lead.ministry_block_reasons || []) as string[]
+          if (!filters.blockReasons.some(r => leadReasons.includes(r as string))) return false
+        }
+
+        // Ministry assigned
+        if (filters.ministryAssigned === "assigned" && !lead.ministry_assigned) return false
+        if (filters.ministryAssigned === "not_assigned" && lead.ministry_assigned) return false
+
+        // Notes
+        if (filters.hasNotes === "with_notes" && !lead.notes) return false
+        if (filters.hasNotes === "without_notes" && lead.notes) return false
+
+        // Lost reason
+        if (filters.lostReasonIds.length > 0 && (!lead.lost_reason_id || !filters.lostReasonIds.includes(lead.lost_reason_id))) return false
+
+        // Placement level (test level)
+        if (filters.placementLevels.length > 0 && (!lead.placement_level || !filters.placementLevels.includes(lead.placement_level))) return false
+
+        // Date range
+        if (filters.dateRange !== "all" && filters.dateRange !== "custom") {
+          const created = new Date(lead.created_at)
+          const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          if (filters.dateRange === "today" && created < startOfDay) return false
+          if (filters.dateRange === "week") {
+            const weekAgo = new Date(startOfDay)
+            weekAgo.setDate(weekAgo.getDate() - 7)
+            if (created < weekAgo) return false
+          }
+          if (filters.dateRange === "month") {
+            const monthAgo = new Date(startOfDay)
+            monthAgo.setMonth(monthAgo.getMonth() - 1)
+            if (created < monthAgo) return false
+          }
+          if (filters.dateRange === "quarter") {
+            const quarterAgo = new Date(startOfDay)
+            quarterAgo.setMonth(quarterAgo.getMonth() - 3)
+            if (created < quarterAgo) return false
+          }
+        }
+        if (filters.dateRange === "custom") {
+          const created = new Date(lead.created_at)
+          if (filters.dateFrom && created < new Date(filters.dateFrom)) return false
+          if (filters.dateTo && created > new Date(filters.dateTo + "T23:59:59")) return false
+        }
+
+        return true
+      })
     }
     return filtered
-  }, [leadsBySemester, searchQuery])
+  }, [leadsBySemester, searchQuery, stageFilter, filters])
 
   // Helper to get all leads for a cycle (across its semesters)
   const getLeadsForCycle = (year: AcademicYear) => {
@@ -627,29 +787,27 @@ export default function ArchivePage() {
       />
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-        {/* Search & Stats */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[var(--bg-muted)]">
-              <Archive className="w-5 h-5 text-[var(--text-secondary)]" />
-            </div>
-            <div>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {totalArchivedLeads} lead{totalArchivedLeads !== 1 ? "s" : ""} across{" "}
-                {academicYears.length} cycle{academicYears.length !== 1 ? "s" : ""}
-              </p>
-            </div>
+        {/* Stats summary */}
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-[var(--bg-muted)]">
+            <Archive className="w-5 h-5 text-[var(--text-secondary)]" />
           </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-            <Input
-              placeholder="Search archived leads..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+          <p className="text-sm text-[var(--text-secondary)]">
+            {totalArchivedLeads} lead{totalArchivedLeads !== 1 ? "s" : ""} across{" "}
+            {academicYears.length} cycle{academicYears.length !== 1 ? "s" : ""}
+          </p>
         </div>
+
+        {/* Quick Filters + Search */}
+        <QuickFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeStage={stageFilter}
+          onStageChange={setStageFilter}
+          onOpenAdvanced={() => setShowFiltersPanel(true)}
+          stats={stageStats}
+          total={allLeadsFlat.length}
+        />
 
         {/* Selection action bar */}
         <AnimatePresence>
@@ -674,14 +832,28 @@ export default function ArchivePage() {
                   Clear
                 </button>
               </div>
-              <Button
-                size="sm"
-                onClick={() => setShowTransferDialog(true)}
-                disabled={isDemo}
-              >
-                <ArrowRightLeft className="w-4 h-4 mr-1.5" />
-                Transfer to Active Cycle
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const selectedLeadsList = allLeadsFlat.filter(l => selectedLeads.has(l.id))
+                    const csv = exportLeadsToCSV(selectedLeadsList)
+                    downloadCSV(csv, `archive-selected-${selectedLeads.size}-leads.csv`)
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-1.5" />
+                  Export Selected
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setShowTransferDialog(true)}
+                  disabled={isDemo}
+                >
+                  <ArrowRightLeft className="w-4 h-4 mr-1.5" />
+                  Transfer to Active Cycle
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -735,10 +907,25 @@ export default function ArchivePage() {
                             </p>
                           </div>
                         </div>
-                        <Badge variant="secondary" className="shrink-0">
-                          <Users className="w-3 h-3 mr-1" />
-                          {allLeads.length} lead{allLeads.length !== 1 ? "s" : ""}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {allLeads.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const csv = exportLeadsToCSV(allLeads)
+                                downloadCSV(csv, `archive-${year.name.replace(/\s+/g, "-")}.csv`)
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                              title={`Export ${allLeads.length} leads`}
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                          <Badge variant="secondary" className="shrink-0">
+                            <Users className="w-3 h-3 mr-1" />
+                            {allLeads.length} lead{allLeads.length !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
                       </div>
                     </CardHeader>
                   </button>
@@ -922,6 +1109,14 @@ export default function ArchivePage() {
         selectedCount={selectedLeads.size}
         selectedLeadIds={Array.from(selectedLeads)}
         activeSemesters={activeSemesters}
+      />
+
+      {/* Advanced Filters Panel */}
+      <LeadFiltersPanel
+        filters={filters}
+        onChange={setFilters}
+        onClose={() => setShowFiltersPanel(false)}
+        isOpen={showFiltersPanel}
       />
     </div>
   )

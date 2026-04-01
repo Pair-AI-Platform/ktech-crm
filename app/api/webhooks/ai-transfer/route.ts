@@ -175,7 +175,7 @@ export const POST = withApiHandler(
     // 8. Log activity
     await supabase.from('activities').insert({
       lead_id: leadId,
-      type: 'ai_transfer',
+      activity_type: 'ai_transfer',
       description: `Lead ${isNew ? 'created' : 'updated'} via AI transfer and assigned to ${assignedAgent.agent_name}`,
       metadata: {
         conversation_id: body.conversation_id || null,

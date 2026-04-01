@@ -34,8 +34,8 @@ interface TargetHeaderProps {
 const categoryConfig: { key: TargetCategory; label: string; shortLabel: string; color: string; dotColor: string }[] = [
   { key: 'puc_files', label: 'PUC Files', shortLabel: 'PUC', color: 'bg-green-500', dotColor: 'bg-green-500' },
   { key: 'sf_files', label: 'SF Files', shortLabel: 'SF', color: 'bg-orange-500', dotColor: 'bg-orange-500' },
-  { key: 'sf_applicants', label: 'SF Applicants', shortLabel: 'SF App', color: 'bg-blue-500', dotColor: 'bg-blue-500' },
-  { key: 'puc_app_submission', label: 'PUC App', shortLabel: 'PUC App', color: 'bg-purple-500', dotColor: 'bg-purple-500' },
+  { key: 'sf_applicants', label: 'SF Enrolled', shortLabel: 'SF Enr', color: 'bg-blue-500', dotColor: 'bg-blue-500' },
+  { key: 'puc_app_submission', label: 'PUC Enrolled', shortLabel: 'PUC Enr', color: 'bg-purple-500', dotColor: 'bg-purple-500' },
 ]
 
 export function TargetHeader({

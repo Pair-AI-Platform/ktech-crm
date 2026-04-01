@@ -247,7 +247,7 @@ const navigation: NavItem[] = [
   { name: "Leads", href: "/leads", icon: Users, description: "Manage prospects", roles: ["admin", "agent"], children: [
     { name: "PUC", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions" },
     { name: "Self Funded", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded submissions" },
-    { name: "Archive", href: "/leads/archive", icon: Archive, description: "Previous yearly cycles" },
+    { name: "Archive", href: "/leads/archive", icon: Archive, description: "Previous yearly cycles", roles: ["admin"] },
     { name: "Lost", href: "/leads?stage=lost", icon: Ban, description: "Lost leads" },
   ]},
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
@@ -391,9 +391,12 @@ export function Sidebar({ user }: SidebarProps) {
   const handleNavigate = () => setMobileOpen(false)
 
   const userRole = user?.role || "agent"
-  const filteredNavigation = navigation.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
-  )
+  const filteredNavigation = navigation
+    .filter((item) => !item.roles || item.roles.includes(userRole))
+    .map((item) => item.children
+      ? { ...item, children: item.children.filter((child) => !child.roles || child.roles.includes(userRole)) }
+      : item
+    )
 
   const sidebarContent = (
     <div className="flex flex-col h-full">

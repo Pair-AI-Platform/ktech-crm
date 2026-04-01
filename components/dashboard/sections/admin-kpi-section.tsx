@@ -2,16 +2,22 @@
 
 import { useMemo } from "react"
 import { motion } from "framer-motion"
-import { Users, GraduationCap, Layers, FileText, FolderOpen } from "lucide-react"
+import { Users, GraduationCap, Layers, FileText, FolderOpen, Calendar, Clock } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { StatGrid } from "@/components/dashboard/notion"
 import type { DashboardLead } from "@/lib/hooks/use-dashboard-stats"
 
 interface AdminKpiSectionProps {
   allLeads: DashboardLead[]
   loading: boolean
+  todayAppointments: number
+  todayCallbacks: number
+  appointmentsLoading: boolean
 }
 
-export function AdminKpiSection({ allLeads, loading }: AdminKpiSectionProps) {
+export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCallbacks, appointmentsLoading }: AdminKpiSectionProps) {
+  const router = useRouter()
+
   const stats = useMemo(() => {
     const total = allLeads.length
     const pucCount = allLeads.filter((l) => l.funding_type === "puc").length
@@ -65,8 +71,25 @@ export function AdminKpiSection({ allLeads, loading }: AdminKpiSectionProps) {
         icon: <FolderOpen className="w-5 h-5 text-[var(--info)]" />,
         iconBg: "bg-[var(--info)]/10",
       },
+      // Row 3: today's activity
+      {
+        id: "today-appts",
+        value: appointmentsLoading ? "..." : todayAppointments,
+        label: "Today's Appts",
+        icon: <Calendar className="w-5 h-5 text-[var(--primary)]" />,
+        iconBg: "bg-[var(--primary)]/10",
+        onClick: () => router.push("/calendar"),
+      },
+      {
+        id: "callbacks",
+        value: appointmentsLoading ? "..." : todayCallbacks,
+        label: "Today's Callbacks",
+        icon: <Clock className="w-5 h-5 text-[var(--warning)]" />,
+        iconBg: "bg-[var(--warning)]/10",
+        onClick: () => router.push("/leads?status=callback"),
+      },
     ]
-  }, [allLeads])
+  }, [allLeads, todayAppointments, todayCallbacks, appointmentsLoading, router])
 
   return (
     <motion.div

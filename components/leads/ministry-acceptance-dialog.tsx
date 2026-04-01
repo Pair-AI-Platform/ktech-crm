@@ -237,10 +237,10 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                 </p>
                 <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
                   <li>GPA below 70% → automatically <strong>converted to Self-Funded</strong></li>
-                  <li>Accepted first choice KTECH → moved to <strong>Applicant</strong></li>
-                  <li>Applied for KTECH but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
-                  <li>Accepted second choice KTECH → moved to <strong>Applicant</strong></li>
-                  <li>Leads in <strong>lost or other stages</strong> accepted for KTECH → moved to <strong>Applicant</strong> (marked as Ministry Assigned)</li>
+                  <li>Accepted first choice ktech → moved to <strong>Applicant</strong></li>
+                  <li>Applied for ktech but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
+                  <li>Accepted second choice ktech → moved to <strong>Applicant</strong></li>
+                  <li>Leads in <strong>lost or other stages</strong> accepted for ktech → moved to <strong>Applicant</strong> (marked as Ministry Assigned)</li>
                 </ul>
               </div>
             </div>
@@ -394,9 +394,9 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                 </p>
                 <ul className="text-sm text-blue-700 ml-5 list-disc space-y-0.5">
                   <li>GPA below 70% → automatically <strong>converted to Self-Funded</strong></li>
-                  <li>Existing leads accepted first choice KTECH → moved to <strong>Applicant</strong></li>
-                  <li>Applied for KTECH but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
-                  <li>Accepted second choice KTECH → moved to <strong>Applicant</strong></li>
+                  <li>Existing leads accepted first choice ktech → moved to <strong>Applicant</strong></li>
+                  <li>Applied for ktech but accepted elsewhere → moved to <strong>Lost</strong> (PUC Rejected)</li>
+                  <li>Accepted second choice ktech → moved to <strong>Applicant</strong></li>
                   <li>Leads in <strong>lost or other stages</strong> → moved to <strong>Applicant</strong> (Ministry Assigned)</li>
                 </ul>
               </div>
@@ -603,7 +603,7 @@ export function MinistryAcceptanceDialog({ isOpen, onClose, onSuccess }: Ministr
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-purple-50 border-b border-purple-200">
                     <span className="text-sm font-medium text-purple-700">
-                      Ministry Assigned (not 1st choice KTECH)
+                      Ministry Assigned (not 1st choice ktech)
                     </span>
                   </div>
                   <div className="max-h-32 overflow-y-auto">

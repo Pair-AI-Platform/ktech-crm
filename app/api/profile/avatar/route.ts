@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server"
 
 const MAX_SIZE = 2 * 1024 * 1024 // 2MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif"]
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+}
 const BUCKET = "avatars"
 
 export async function POST(request: NextRequest) {
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest) {
       console.error("Old avatar cleanup failed:", cleanupErr)
     }
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg"
+    const ext = MIME_TO_EXT[file.type] || "jpg"
     const storagePath = `${user.id}/${Date.now()}.${ext}`
 
     const arrayBuffer = await file.arrayBuffer()

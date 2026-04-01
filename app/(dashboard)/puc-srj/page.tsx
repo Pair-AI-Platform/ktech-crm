@@ -14,8 +14,10 @@ import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SearchInput } from "@/components/ui/input"
-import type { Lead, PipelineStage } from "@/types"
+import type { Lead, PipelineStage, PUCDocumentStatus } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
+import { computePUCDocumentStatus } from "@/lib/psp/document-status"
+import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { LeadFiltersPanel, type LeadFilters } from "@/components/leads/lead-filters"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
@@ -65,13 +67,14 @@ const defaultFilters: LeadFilters = {
   submissionStatuses: [],
   fundingType: "all",
   dateRange: "all",
+  dateFrom: "",
+  dateTo: "",
   assignedTo: "",
   hasEmail: null,
   hasPhone: null,
   gpaMin: null,
   gpaMax: null,
   isKuwaiti: null,
-  ministryBlocked: "all",
   blockReasons: [],
   hasNotes: "all",
   paymentStatus: "all",
@@ -79,8 +82,14 @@ const defaultFilters: LeadFilters = {
   paymentAmountMax: 5000,
   academicTrack: "all",
   lostReasonIds: [],
+  withdrawalReasons: [],
+  genders: [],
+  governorates: [],
   priority: "all",
   ministryAssigned: "all",
+  docStatuses: [],
+  placementLevels: [],
+  campaignIds: [],
 }
 
 export default function PUCSRJPage() {
@@ -217,6 +226,84 @@ export default function PUCSRJPage() {
       })
   }, [pucLeads, topTab])
 
+  // PUC payment completion + doc counts for doc status filtering
+  const [pucPaymentLeadIds, setPucPaymentLeadIds] = useState<Set<string>>(new Set())
+  const [pucDocCounts, setPucDocCounts] = useState<Record<string, { uploaded: number; required: number }>>({})
+
+  useEffect(() => {
+    if (topTab !== "puc" || pucLeads.length === 0) {
+      startTransition(() => { setPucPaymentLeadIds(new Set()); setPucDocCounts({}) })
+      return
+    }
+    const supabase = createClient()
+    const pucLeadIds = pucLeads.map(l => l.id)
+
+    // Fetch completed PSP payment leads
+    supabase
+      .from('payment_transactions')
+      .select('lead_id')
+      .in('lead_id', pucLeadIds)
+      .eq('status', 'completed')
+      .eq('notes', 'PSP Fee Payment')
+      .then(({ data }) => {
+        if (data) setPucPaymentLeadIds(new Set(data.map(t => t.lead_id)))
+      })
+
+    // Fetch doc counts
+    Promise.all([
+      supabase
+        .from('psp_documents')
+        .select('lead_id, document_type, graduate_type')
+        .in('lead_id', pucLeadIds),
+      supabase
+        .from('psp_document_configs')
+        .select('graduate_type, document_id, required')
+        .eq('is_active', true),
+    ]).then(([docsResult, configsResult]) => {
+      const uploadedByLead: Record<string, Set<string>> = {}
+      for (const doc of docsResult.data || []) {
+        if (!uploadedByLead[doc.lead_id]) uploadedByLead[doc.lead_id] = new Set()
+        uploadedByLead[doc.lead_id].add(doc.document_type)
+      }
+
+      const dbRequiredCounts: Record<string, number> = {}
+      const hasDbConfigs = (configsResult.data || []).length > 0
+      for (const cfg of configsResult.data || []) {
+        if (cfg.required) {
+          dbRequiredCounts[cfg.graduate_type] = (dbRequiredCounts[cfg.graduate_type] || 0) + 1
+        }
+      }
+
+      const result: Record<string, { uploaded: number; required: number }> = {}
+      for (const lead of pucLeads) {
+        const uploaded = uploadedByLead[lead.id]?.size ?? 0
+        let requiredCount = 0
+        const gradType = lead.academic_track || 'science'
+        if (hasDbConfigs && dbRequiredCounts[gradType] !== undefined) {
+          requiredCount = dbRequiredCounts[gradType]
+        } else {
+          const allDocs = getDocumentsForGraduateType(gradType as GraduateType, {
+            isTransfer: lead.is_transfer_student,
+            isSpecialNeeds: lead.is_special_needs,
+            isDiplomatic: lead.is_diplomatic,
+          })
+          requiredCount = allDocs.filter(d => d.required).length
+        }
+        result[lead.id] = { uploaded, required: requiredCount }
+      }
+      setPucDocCounts(result)
+    })
+  }, [pucLeads, topTab])
+
+  // Compute effective doc status for a lead (used in filtering)
+  const getLeadDocStatus = useCallback((lead: Lead): PUCDocumentStatus | null => {
+    if (lead.pipeline_stage !== 'puc_document_submission') return null
+    if (lead.puc_document_status_override) return lead.puc_document_status_override
+    const docInfo = pucDocCounts[lead.id]
+    const allDocsComplete = docInfo ? (docInfo.required > 0 && docInfo.uploaded >= docInfo.required) : false
+    return computePUCDocumentStatus(lead.submission_substage, allDocsComplete, pucPaymentLeadIds.has(lead.id))
+  }, [pucDocCounts, pucPaymentLeadIds])
+
   // Placement test stats (Amendment 3)
   const placementStats = useMemo(() => {
     if (topTab !== "puc") return { foundation1: 0, foundation2: 0, directEntry: 0, total: 0 }
@@ -271,9 +358,10 @@ export default function PUCSRJPage() {
         )
         if (!hasMatch) return false
       }
-      // Ministry blocked filter
-      if (filters.ministryBlocked === "blocked" && !lead.ministry_blocked) return false
-      if (filters.ministryBlocked === "not_blocked" && lead.ministry_blocked) return false
+      // Block reasons filter
+      if (filters.blockReasons.length > 0) {
+        if (!lead.submission_blocked_reason || !filters.blockReasons.includes(lead.submission_blocked_reason)) return false
+      }
       // Submission substage filter
       if (filters.submissionSubstages.length > 0) {
         if (!lead.submission_substage || !filters.submissionSubstages.includes(lead.submission_substage)) return false
@@ -285,9 +373,14 @@ export default function PUCSRJPage() {
       // Has notes filter
       if (filters.hasNotes === "with_notes" && (!lead.notes || lead.notes.trim() === "")) return false
       if (filters.hasNotes === "without_notes" && lead.notes && lead.notes.trim() !== "") return false
+      // Doc status filter
+      if (filters.docStatuses.length > 0) {
+        const docStatus = getLeadDocStatus(lead)
+        if (!docStatus || !filters.docStatuses.includes(docStatus)) return false
+      }
       return true
     })
-  }, [filters])
+  }, [filters, getLeadDocStatus])
 
   // PUC filtered leads
   const pucFilteredLeads = useMemo(() => {
@@ -317,9 +410,10 @@ export default function PUCSRJPage() {
     (filters.dateRange !== "all" ? 1 : 0) +
     (filters.gpaMin !== null ? 1 : 0) +
     (filters.gpaMax !== null ? 1 : 0) +
-    (filters.ministryBlocked !== "all" ? 1 : 0) +
+    filters.blockReasons.length +
     (filters.hasNotes !== "all" ? 1 : 0) +
-    (filters.paymentStatus !== "all" ? 1 : 0)
+    (filters.paymentStatus !== "all" ? 1 : 0) +
+    filters.docStatuses.length
 
   // SF SRJ filtered leads (self-funded, stage filtering done client-side for correct counts)
   const sfSrjFilteredLeads = useMemo(() => {

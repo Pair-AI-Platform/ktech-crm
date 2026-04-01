@@ -115,7 +115,7 @@ export async function createPaymentLink(
         ExpiryDate: params.expiryDate || '', // Optional expiry
         InvoiceItems: [
           {
-            ItemName: 'KTECH Enrollment Fee',
+            ItemName: 'ktech Enrollment Fee',
             Quantity: 1,
             UnitPrice: params.invoiceValue,
           }

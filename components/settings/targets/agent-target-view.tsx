@@ -24,8 +24,8 @@ function formatMonth(month: string): string {
 const categories: { key: TargetCategory; label: string; dot: string; text: string; bg: string }[] = [
   { key: 'puc_files', label: 'PUC Files', dot: 'bg-green-500', text: 'text-green-700 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-500/10' },
   { key: 'sf_files', label: 'SF Files', dot: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10' },
-  { key: 'sf_applicants', label: 'SF Applicants', dot: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
-  { key: 'puc_app_submission', label: 'PUC App', dot: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10' },
+  { key: 'sf_applicants', label: 'SF Enrolled', dot: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+  { key: 'puc_app_submission', label: 'PUC Enrolled', dot: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10' },
 ]
 
 function getWeekRanges(month: string) {

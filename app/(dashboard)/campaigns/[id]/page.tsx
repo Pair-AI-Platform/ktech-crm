@@ -26,6 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { RoleGuard } from "@/components/auth/role-guard"
 import {
   useCampaign,
   useUpdateCampaign,
@@ -197,6 +198,7 @@ export default function CampaignDetailsPage() {
   }
 
   return (
+    <RoleGuard allowedRoles={['admin']}>
     <div className="min-h-screen bg-[var(--bg-base)]">
       {/* Header */}
       <header className="px-6 lg:px-8 py-6 border-b border-[var(--border)] bg-[var(--bg-surface)]">
@@ -425,5 +427,6 @@ export default function CampaignDetailsPage() {
         )}
       </main>
     </div>
+    </RoleGuard>
   )
 }

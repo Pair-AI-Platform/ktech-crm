@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { isDemoMode, getDemoLeads } from '@/lib/demo-data'
 import { useUser } from './use-user'
+import { queryKeys } from './query-keys'
 
 /**
  * Lightweight lead shape — only the columns the dashboard page actually reads.
@@ -35,71 +37,74 @@ const DASHBOARD_LEAD_COLUMNS =
 
 /**
  * Single lightweight query that replaces the three useLeads(limit:200) calls
- * on the dashboard page.  Returns the full set (no limit) but only the columns
+ * on the dashboard page.  Returns the full set but only the columns
  * the dashboard actually reads, plus pre-split arrays for SF / PUC leads.
+ *
+ * Now uses React Query for caching, deduplication, and retry.
  */
 export function useDashboardStats() {
-  const [allLeads, setAllLeads] = useState<DashboardLead[]>([])
-  const [loading, setLoading] = useState(true)
   const { profile, isAdmin } = useUser()
 
-  useEffect(() => {
-    const abortController = new AbortController()
+  const { data: allLeads = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.dashboardStats.all,
+    queryFn: async (): Promise<DashboardLead[]> => {
+      if (isDemoMode()) {
+        const demoLeads = getDemoLeads()
+        return demoLeads.map(l => ({
+          id: l.id,
+          first_name: l.first_name,
+          last_name: l.last_name,
+          phone: l.phone,
+          pipeline_stage: l.pipeline_stage,
+          contact_status: l.status ?? null,
+          status: l.status ?? null,
+          funding_type: l.funding_type ?? null,
+          assigned_to: l.assigned_to ?? null,
+          created_at: l.created_at,
+          updated_at: l.updated_at,
+          last_contacted_at: l.last_contacted_at ?? null,
+          callback_date: l.callback_date ?? null,
+          date_of_birth: l.date_of_birth ?? null,
+          priority: null,
+          source: l.source ?? null,
+        }))
+      }
 
-    async function fetchStats() {
-      try {
-        if (isDemoMode()) {
-          // Map demo leads to the lightweight shape
-          const demoLeads = getDemoLeads()
-          const mapped: DashboardLead[] = demoLeads.map(l => ({
-            id: l.id,
-            first_name: l.first_name,
-            last_name: l.last_name,
-            phone: l.phone,
-            pipeline_stage: l.pipeline_stage,
-            contact_status: l.status ?? null,
-            status: l.status ?? null,
-            funding_type: l.funding_type ?? null,
-            assigned_to: l.assigned_to ?? null,
-            created_at: l.created_at,
-            updated_at: l.updated_at,
-            last_contacted_at: l.last_contacted_at ?? null,
-            callback_date: l.callback_date ?? null,
-            date_of_birth: l.date_of_birth ?? null,
-            priority: null,
-            source: l.source ?? null,
-          }))
-          setAllLeads(mapped)
-          setLoading(false)
-          return
-        }
+      const supabase = createClient()
 
-        const supabase = createClient()
+      // Fetch in batches to avoid timeout on large datasets
+      const PAGE_SIZE = 1000
+      let allData: DashboardLead[] = []
+      let from = 0
+      let hasMore = true
 
+      while (hasMore) {
         const { data, error } = await supabase
           .from('leads')
           .select(DASHBOARD_LEAD_COLUMNS)
           .order('created_at', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
 
-        if (abortController.signal.aborted) return
         if (error) {
           console.error('[useDashboardStats] Supabase error:', error.message)
+          break
         }
-        if (!error && data) {
-          setAllLeads(data.map((l: any) => ({ ...l, status: l.contact_status })) as DashboardLead[])
-        }
-      } catch (err) {
-        console.error('[useDashboardStats] Failed to fetch leads:', err)
-      } finally {
-        if (!abortController.signal.aborted) {
-          setLoading(false)
+
+        const mapped = (data || []).map((l: any) => ({ ...l, status: l.contact_status })) as DashboardLead[]
+        allData = allData.concat(mapped)
+
+        if (!data || data.length < PAGE_SIZE) {
+          hasMore = false
+        } else {
+          from += PAGE_SIZE
         }
       }
-    }
 
-    fetchStats()
-    return () => abortController.abort()
-  }, [])
+      return allData
+    },
+    staleTime: 60_000, // Cache for 1 minute
+    gcTime: 5 * 60_000,
+  })
 
   // ---------- Derived data (memoised) ----------
 

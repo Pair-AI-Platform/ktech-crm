@@ -120,7 +120,7 @@ export function useTargetSettings() {
   // ── Draft state ───────────────────────────────────────────────────────
   // Monthly drafts: only puc_files, sf_files, gender sub-targets, weekly monthly
   const [drafts, setDrafts] = useState<Record<string, Partial<AgentTargetDraft>>>({})
-  // Seasonal drafts: sf_applicants, puc_app_submission, weekly seasonal
+  // Seasonal drafts: sf_enrolled, puc_enrolled, weekly seasonal
   const [seasonalDrafts, setSeasonalDrafts] = useState<Record<string, Partial<AgentSeasonalDraft>>>({})
 
   // ── Getters ───────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ export function useTargetSettings() {
         }
       }
 
-      // Save seasonal rows (SF Applicants + PUC App Submission)
+      // Save seasonal rows (SF Enrolled + PUC Enrolled)
       if (effectiveSeasonId) {
         for (const agentId of agentIds) {
           const savedSeasonal = getSeasonalTargetForAgent(agentId)

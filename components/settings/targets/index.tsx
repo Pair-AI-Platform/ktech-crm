@@ -18,8 +18,8 @@ import type { AgentTargetDraft } from "@/lib/hooks/use-target-settings"
 const categoryLabels: { key: TargetCategory; label: string }[] = [
   { key: 'puc_files', label: 'PUC' },
   { key: 'sf_files', label: 'SF' },
-  { key: 'sf_applicants', label: 'SF App' },
-  { key: 'puc_app_submission', label: 'PUC App' },
+  { key: 'sf_applicants', label: 'SF Enr' },
+  { key: 'puc_app_submission', label: 'PUC Enrolled' },
 ]
 
 export function TargetSettings() {

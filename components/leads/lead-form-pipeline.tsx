@@ -112,13 +112,13 @@ export function LeadFormPipeline({
                 </div>
                 <button
                   type="button"
-                  disabled={!formData.phone.trim()}
+                  disabled={false}
                   onClick={() => {
                     const phone = formData.phone.replace(/\D/g, "")
                     const formattedPhone = phone.startsWith("965") ? phone : `965${phone}`
                     const discountLabel = DISCOUNT_TYPES.find(t => t.value === formData.discount_type)?.label || formData.discount_type
                     const studentName = [formData.first_name, formData.last_name].filter(Boolean).join(' ') || 'Student'
-                    const message = `مرحباً ${studentName}،\n\nنود إعلامكم بأنه تم تطبيق خصم (${discountLabel}) على ملفكم في كلية الكويت للتكنولوجيا.\n\nيرجى تعبئة وتوقيع نموذج الإقرار المرفق وإعادته إلينا في أقرب وقت.\n\nشكراً لكم،\nقسم القبول - KTECH`
+                    const message = `مرحباً ${studentName}،\n\nنود إعلامكم بأنه تم تطبيق خصم (${discountLabel}) على ملفكم في كلية الكويت للتكنولوجيا.\n\nيرجى تعبئة وتوقيع نموذج الإقرار المرفق وإعادته إلينا في أقرب وقت.\n\nشكراً لكم،\nقسم القبول - ktech`
                     const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
                     window.open(whatsappUrl, "_blank")
                     setDeclarationSent(true)
@@ -128,9 +128,7 @@ export function LeadFormPipeline({
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0",
                     declarationSent
                       ? "bg-emerald-500 text-white"
-                      : !formData.phone.trim()
-                        ? "bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
-                        : "bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-sm hover:shadow"
+                      : "bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-sm hover:shadow"
                   )}
                 >
                   {declarationSent ? (
@@ -147,21 +145,6 @@ export function LeadFormPipeline({
                 </button>
               </motion.div>
             )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="discount_percentage">Discount Percentage (%)</Label>
-                <Input
-                  id="discount_percentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.discount_percentage}
-                  onChange={(e) => setFormData(prev => ({ ...prev, discount_percentage: e.target.value }))}
-                  placeholder="e.g. 50"
-                />
-              </div>
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="discount_notes">Discount Notes</Label>

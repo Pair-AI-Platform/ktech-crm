@@ -71,6 +71,12 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
   const topSchoolByLeads = data.bySchool.length > 0
     ? data.bySchool.reduce((max, school) => school.leads > max.leads ? school : max, data.bySchool[0])
     : { label: 'N/A', leads: 0, applicationPercent: 0, pucPercent: 0 }
+  const topSchoolByEnrolledPuc = data.topSchools.length > 0
+    ? data.topSchools.reduce((max, school) => school.enrolledPuc > max.enrolledPuc ? school : max, data.topSchools[0])
+    : null
+  const topSchoolByEnrolledSf = data.topSchools.length > 0
+    ? data.topSchools.reduce((max, school) => school.enrolledSf > max.enrolledSf ? school : max, data.topSchools[0])
+    : null
 
   const totalSchools = data.bySchool.length
   const totalLeadsFromSchools = data.bySchool.reduce((sum, s) => sum + s.leads, 0)
@@ -118,12 +124,14 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
         { key: 'rank', label: '#', width: 40 },
         { key: 'school', label: 'School', width: 200 },
         { key: 'totalLeads', label: 'Total Leads', width: 100 },
-        { key: 'applications', label: 'Applications', width: 100 },
-        { key: 'applicationPercent', label: 'Application %', width: 100 },
+        { key: 'applications', label: 'Files', width: 100 },
+        { key: 'applicationPercent', label: 'Files %', width: 100 },
         { key: 'enrolled', label: 'Enrolled', width: 100 },
         { key: 'enrolledPercent', label: 'Enrolled %', width: 100 },
         { key: 'puc', label: 'PUC', width: 80 },
         { key: 'pucPercent', label: 'PUC %', width: 80 },
+        { key: 'sf', label: 'SF', width: 80 },
+        { key: 'sfPercent', label: 'SF %', width: 80 },
       ],
       rows: allSchools.map((school, index) => ({
         rank: index + 1,
@@ -135,6 +143,8 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
         enrolledPercent: `${school.enrolledPercent}%`,
         puc: school.pucCount,
         pucPercent: `${school.pucPercent}%`,
+        sf: school.sfCount,
+        sfPercent: `${school.sfPercent}%`,
       })),
     }
 
@@ -156,7 +166,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
   return (
     <div className="space-y-6">
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -170,7 +180,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                 </div>
                 <Badge variant="success" size="sm">Top School</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Performing School</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Performing School (by files)</p>
               <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchool?.schoolName || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
                 {topSchool?.applications || 0} files opened, {topSchool?.leads || 0} leads
@@ -196,7 +206,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
               <p className="text-sm text-[var(--text-secondary)] mb-1">Top School by Leads</p>
               <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchoolByLeads?.label || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {topSchoolByLeads?.leads || 0} leads, {topSchoolByLeads?.applicationPercent || 0}% application
+                {topSchoolByLeads?.leads || 0} leads, {topSchoolByLeads?.applicationPercent || 0}% files
               </p>
             </CardContent>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--primary)] opacity-50" />
@@ -223,6 +233,52 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
               </p>
             </CardContent>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--accent)] opacity-50" />
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.4 }}
+        >
+          <Card hover glow className="relative overflow-hidden">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-2.5 rounded-xl bg-[#8B5CF6] shadow-sm">
+                  <Award className="w-5 h-5 text-white" />
+                </div>
+                <Badge variant="info" size="sm">Enrolled PUC</Badge>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Best School (enrolled PUC)</p>
+              <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchoolByEnrolledPuc?.schoolName || 'N/A'}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {topSchoolByEnrolledPuc?.enrolledPuc || 0} enrolled PUC, {topSchoolByEnrolledPuc?.pucCount || 0} total PUC
+              </p>
+            </CardContent>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#8B5CF6] opacity-50" />
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
+          <Card hover glow className="relative overflow-hidden">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-2.5 rounded-xl bg-[#F59E0B] shadow-sm">
+                  <Award className="w-5 h-5 text-white" />
+                </div>
+                <Badge variant="warning" size="sm">Enrolled SF</Badge>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Best School (enrolled SF)</p>
+              <p className="text-xl font-bold text-[var(--text-primary)] truncate">{topSchoolByEnrolledSf?.schoolName || 'N/A'}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {topSchoolByEnrolledSf?.enrolledSf || 0} enrolled SF, {topSchoolByEnrolledSf?.sfCount || 0} total SF
+              </p>
+            </CardContent>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#F59E0B] opacity-50" />
           </Card>
         </motion.div>
       </div>
@@ -366,7 +422,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                   <Building className="w-5 h-5 text-[var(--success)]" />
                   School Breakdown
                 </CardTitle>
-                <CardDescription className="mt-1">Total leads, application stage %, enrolled %, and PUC % per school</CardDescription>
+                <CardDescription className="mt-1">Total leads, files %, enrolled %, PUC %, and SF % per school</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -401,12 +457,14 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                         <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
                         <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">School</th>
                         <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Total Leads</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Applications</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Application %</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Files</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Files %</th>
                         <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled</th>
                         <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled %</th>
                         <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC</th>
-                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3">PUC %</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">PUC %</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">SF</th>
+                        <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-3">SF %</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -440,9 +498,17 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                           <td className="py-3 px-3 text-center">
                             <span className="text-sm font-semibold text-[var(--text-primary)]">{school.pucCount}</span>
                           </td>
-                          <td className="py-3 pl-3 text-center">
+                          <td className="py-3 px-3 text-center">
                             <Badge variant="info" size="sm">
                               {school.pucPercent}%
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{school.sfCount}</span>
+                          </td>
+                          <td className="py-3 pl-3 text-center">
+                            <Badge variant="warning" size="sm">
+                              {school.sfPercent}%
                             </Badge>
                           </td>
                         </tr>

@@ -36,28 +36,34 @@ export function BirthdaySection({ birthdayLeads, loading }: BirthdaySectionProps
         return a + (item.isToday ? 1 : 1) // next age on birthday
       })()
 
+      const daysLabel = item.daysUntil === 1 ? 'Tomorrow' : `${item.daysUntil}d`
+
       return {
         id: item.lead.id,
         title: `${item.lead.first_name} ${item.lead.last_name}`,
         subtitle: item.isToday
           ? `Turns ${age} today!`
-          : `Turns ${age} in ${item.daysUntil} day${item.daysUntil > 1 ? 's' : ''}`,
+          : item.daysUntil === 1
+            ? `Turns ${age} tomorrow`
+            : `Turns ${age} in ${item.daysUntil} days`,
         metadata: item.lead.phone || '',
         badge: item.isToday ? (
           <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-[#E879F9]/10 text-[#C026D3]">
             Today
           </span>
+        ) : item.daysUntil <= 3 ? (
+          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-[#F59E0B]/10 text-[#D97706]">
+            {daysLabel}
+          </span>
         ) : (
           <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--info)]/10 text-[var(--info)]">
-            {item.daysUntil}d
+            {daysLabel}
           </span>
         ),
         onClick: () => router.push(`/leads/${item.lead.id}`),
       }
     })
   }, [birthdayLeads, router])
-
-  if (birthdayLeads.length === 0) return null
 
   return (
     <motion.div
@@ -66,7 +72,7 @@ export function BirthdaySection({ birthdayLeads, loading }: BirthdaySectionProps
       transition={{ delay: 0.18 }}
     >
       <StaticBlock
-        title={`Birthdays${birthdayLeads.some(b => b.isToday) ? ' - Today!' : ''}`}
+        title={`Upcoming Birthdays${birthdayLeads.some(b => b.isToday) ? ' - Today!' : ''}`}
         icon={<Cake className="w-4 h-4 text-[#C026D3]" />}
       >
         <ListBlock

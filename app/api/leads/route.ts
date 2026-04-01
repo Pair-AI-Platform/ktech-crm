@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
+import { SCHOOLS, GOVERNORATES } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,54 @@ export const GET = withApiHandler(
     }
 
     const usePagination = page !== undefined
+
+    // Resolve school slugs to UUIDs
+    let schoolIds: string[] | null = null
+    if (advancedFilters.schools?.length > 0) {
+      const schoolSlugs: string[] = advancedFilters.schools
+      const schoolNames = schoolSlugs
+        .map(slug => SCHOOLS.find(s => s.value === slug))
+        .filter(Boolean)
+        .map(s => s!.labelAr)
+
+      if (schoolNames.length > 0) {
+        const { data: schoolRows } = await supabase
+          .from('schools')
+          .select('id')
+          .in('name_ar', schoolNames)
+        schoolIds = schoolRows?.map(r => r.id) ?? []
+      }
+    }
+
+    // Resolve governorate filter to school IDs
+    let governorateSchoolIds: string[] | null = null
+    if (advancedFilters.governorates?.length > 0) {
+      const govSchoolNames = SCHOOLS
+        .filter(s => s.governorate && advancedFilters.governorates.includes(s.governorate))
+        .map(s => s.labelAr)
+      if (govSchoolNames.length > 0) {
+        const { data: govSchoolRows } = await supabase
+          .from('schools')
+          .select('id')
+          .in('name_ar', govSchoolNames)
+        governorateSchoolIds = govSchoolRows?.map(r => r.id) ?? []
+      }
+    }
+
+    // Resolve campaign filter to lead IDs
+    let campaignLeadIds: string[] | null = null
+    if (advancedFilters.campaignIds?.length > 0) {
+      const { data: contactRows } = await supabase
+        .from('campaign_contacts')
+        .select('lead_id')
+        .in('campaign_id', advancedFilters.campaignIds)
+        .not('lead_id', 'is', null)
+      campaignLeadIds = [...new Set((contactRows || []).map(r => r.lead_id).filter(Boolean))]
+      if (campaignLeadIds.length === 0) {
+        // No leads match these campaigns — return empty result
+        return NextResponse.json({ leads: [], totalCount: 0 })
+      }
+    }
 
     const buildQuery = (forCount: boolean) => {
       let q = supabase
@@ -63,8 +112,8 @@ export const GET = withApiHandler(
       if (advancedFilters.sources?.length > 0) {
         q = q.in('source', advancedFilters.sources)
       }
-      if (advancedFilters.schools?.length > 0) {
-        q = q.in('school_id', advancedFilters.schools)
+      if (schoolIds && schoolIds.length > 0) {
+        q = q.in('school_id', schoolIds)
       }
       if (advancedFilters.academicTrack && advancedFilters.academicTrack !== 'all') {
         q = q.eq('academic_track', advancedFilters.academicTrack)
@@ -80,11 +129,6 @@ export const GET = withApiHandler(
       }
       if (advancedFilters.gpaMax !== null && advancedFilters.gpaMax !== undefined) {
         q = q.or(`gpa_grade_12_expected.lte.${advancedFilters.gpaMax},gpa_grade_11.lte.${advancedFilters.gpaMax},gpa_grade_10.lte.${advancedFilters.gpaMax}`)
-      }
-      if (advancedFilters.ministryBlocked === 'blocked') {
-        q = q.eq('ministry_blocked', true)
-      } else if (advancedFilters.ministryBlocked === 'not_blocked') {
-        q = q.eq('ministry_blocked', false)
       }
       if (advancedFilters.ministryAssigned === 'assigned') {
         q = q.eq('ministry_assigned', true)
@@ -109,8 +153,14 @@ export const GET = withApiHandler(
       if (advancedFilters.lostReasonIds?.length > 0) {
         q = q.in('lost_reason_id', advancedFilters.lostReasonIds)
       }
-      if (advancedFilters.priority && advancedFilters.priority !== 'all') {
-        q = q.eq('priority', advancedFilters.priority)
+      if (advancedFilters.withdrawalReasons?.length > 0) {
+        q = q.in('withdrawal_reason', advancedFilters.withdrawalReasons)
+      }
+      if (advancedFilters.genders?.length > 0) {
+        q = q.in('gender', advancedFilters.genders)
+      }
+      if (governorateSchoolIds && governorateSchoolIds.length > 0) {
+        q = q.in('school_id', governorateSchoolIds)
       }
       if (advancedFilters.hasNotes === 'with_notes') {
         q = q.neq('notes', '').not('notes', 'is', null)
@@ -118,25 +168,46 @@ export const GET = withApiHandler(
         q = q.or('notes.is.null,notes.eq.')
       }
       if (advancedFilters.dateRange && advancedFilters.dateRange !== 'all') {
-        const now = new Date()
-        let cutoff: Date
-        switch (advancedFilters.dateRange) {
-          case 'today':
-            cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-            break
-          case 'week':
-            cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-            break
-          case 'month':
-            cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-            break
-          case 'quarter':
-            cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-            break
-          default:
-            cutoff = new Date(0)
+        if (advancedFilters.dateRange === 'custom') {
+          if (advancedFilters.dateFrom) {
+            q = q.gte('created_at', new Date(advancedFilters.dateFrom).toISOString())
+          }
+          if (advancedFilters.dateTo) {
+            const toDate = new Date(advancedFilters.dateTo)
+            toDate.setHours(23, 59, 59, 999)
+            q = q.lte('created_at', toDate.toISOString())
+          }
+        } else {
+          const now = new Date()
+          let cutoff: Date
+          switch (advancedFilters.dateRange) {
+            case 'today':
+              cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+              break
+            case 'week':
+              cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+              break
+            case 'month':
+              cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+              break
+            case 'quarter':
+              cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+              break
+            default:
+              cutoff = new Date(0)
+          }
+          q = q.gte('created_at', cutoff.toISOString())
         }
-        q = q.gte('created_at', cutoff.toISOString())
+      }
+
+      if (advancedFilters.docStatuses?.length > 0) {
+        q = q.in('puc_document_status_override', advancedFilters.docStatuses)
+      }
+      if (advancedFilters.placementLevels?.length > 0) {
+        q = q.in('placement_level', advancedFilters.placementLevels)
+      }
+      if (campaignLeadIds) {
+        q = q.in('id', campaignLeadIds)
       }
 
       // Agent role: only own leads

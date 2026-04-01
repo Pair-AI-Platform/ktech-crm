@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LEAD_SOURCES, SCHOOLS } from "@/types"
 import type { LeadSource, LeadSourceCategory } from "@/types"
 import { useMarketingLeads, useActiveSemester } from "@/lib/hooks/use-marketing-leads"
+import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useUser } from "@/lib/hooks/use-user"
 import { Plus, CheckCircle2 } from "lucide-react"
 
@@ -15,6 +16,10 @@ export function MarketingLeadForm() {
   const { user } = useUser()
   const { createLead } = useMarketingLeads()
   const { data: activeSemester } = useActiveSemester()
+  const { sources: dbSources } = useActiveSources()
+  const leadSources = dbSources.length > 0
+    ? dbSources.map(s => ({ value: s.value as LeadSource, label: s.label, category: s.category as LeadSourceCategory }))
+    : LEAD_SOURCES
   const [success, setSuccess] = useState(false)
 
   const [form, setForm] = useState({
@@ -31,7 +36,7 @@ export function MarketingLeadForm() {
     e.preventDefault()
     if (!user || !activeSemester || !form.source) return
 
-    const sourceObj = LEAD_SOURCES.find(s => s.value === form.source)
+    const sourceObj = leadSources.find(s => s.value === form.source)
 
     await createLead.mutateAsync({
       first_name: form.first_name.trim(),
@@ -105,7 +110,7 @@ export function MarketingLeadForm() {
                 <SelectValue placeholder="Select source" />
               </SelectTrigger>
               <SelectContent>
-                {LEAD_SOURCES.map((s) => (
+                {leadSources.map((s) => (
                   <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
