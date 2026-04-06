@@ -44,7 +44,7 @@ export const POST = withApiHandler(
 
     if (error) {
       logger.error("Error verifying document", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -81,7 +81,7 @@ export const GET = withApiHandler(
 
     if (error) {
       logger.error("Error fetching verification status", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
 
     const verifiedCount = data?.filter(d => d.is_verified).length || 0

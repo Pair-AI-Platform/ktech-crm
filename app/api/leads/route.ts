@@ -22,6 +22,11 @@ export const GET = withApiHandler(
       try { advancedFilters = JSON.parse(filtersParam) } catch {}
     }
 
+    const MAX_SEARCH_LENGTH = 100
+    if (searchQuery && searchQuery.length > MAX_SEARCH_LENGTH) {
+      return NextResponse.json({ error: 'Search query too long' }, { status: 400 })
+    }
+
     const usePagination = page !== undefined
 
     // Resolve school slugs to UUIDs
@@ -227,7 +232,7 @@ export const GET = withApiHandler(
 
       if (dataResult.error) {
         logger.error('Query failed', { error: dataResult.error.message })
-        return NextResponse.json({ error: dataResult.error.message }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 })
       }
 
       return NextResponse.json({
@@ -239,7 +244,7 @@ export const GET = withApiHandler(
 
       if (dataResult.error) {
         logger.error('Query failed', { error: dataResult.error.message })
-        return NextResponse.json({ error: dataResult.error.message }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 })
       }
 
       return NextResponse.json({

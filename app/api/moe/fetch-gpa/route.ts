@@ -135,7 +135,8 @@ export async function POST(request: NextRequest) {
     // Make sure to close browser on error
     await closeBrowser().catch(() => {})
 
-    const errorMessage = error instanceof Error ? error.message : "Failed to fetch GPA from MOE"
+    console.error('[MOE] GPA fetch error:', error)
+    const errorMessage = "Failed to fetch GPA from MOE"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

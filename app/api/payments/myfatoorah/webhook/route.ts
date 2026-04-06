@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
     logger.error('Webhook processing failed', {
       error: error instanceof Error ? error.message : String(error),
     })
-    const errorMessage = error instanceof Error ? error.message : 'Webhook processing failed'
+    const errorMessage = 'Webhook processing failed'
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

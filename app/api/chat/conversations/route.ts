@@ -12,7 +12,8 @@ export const GET = withApiHandler(
       .limit(50)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Failed to fetch conversations:', error.message)
+      return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
     }
 
     return NextResponse.json(data)

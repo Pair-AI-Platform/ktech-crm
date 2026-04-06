@@ -149,75 +149,86 @@ export function LeadTable({
       return
     }
 
-    const supabase = createClient()
-    const sfLeadIds = sfLeads.map(l => l.id)
+    try {
+      const supabase = createClient()
+      const sfLeadIds = sfLeads.map(l => l.id)
 
-    const { data: students } = await supabase
-      .from('students')
-      .select('lead_id, amount_paid, sf_enrolled_stage, sf_declaration_submitted, sf_passport_submitted, sf_civil_id_submitted, sf_payment_receipt_submitted, sf_official_transcript_submitted, transfer_type')
-      .in('lead_id', sfLeadIds)
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select('lead_id, amount_paid, sf_enrolled_stage, sf_declaration_submitted, sf_passport_submitted, sf_civil_id_submitted, sf_payment_receipt_submitted, sf_official_transcript_submitted, transfer_type')
+        .in('lead_id', sfLeadIds)
 
-    const greenIds = new Set<string>()
-    const paymentMap: Record<string, { amount_paid: number; sf_enrolled_stage?: string }> = {}
-
-    // Build set of lead IDs that have a student record
-    const leadsWithStudent = new Set<string>()
-
-    if (students && students.length > 0) {
-      for (const student of students) {
-        if (!student.lead_id) continue
-        leadsWithStudent.add(student.lead_id)
-
-        // Store payment data for display
-        paymentMap[student.lead_id] = {
-          amount_paid: student.amount_paid || 0,
-          sf_enrolled_stage: student.sf_enrolled_stage ?? undefined,
-        }
-
-        // Check paid more than 150 KD
-        const paidOver150 = student.amount_paid > 150 ||
-          student.sf_enrolled_stage === '400' ||
-          student.sf_enrolled_stage === 'other'
-        if (!paidOver150) continue
-
-        // Check all SF documents are done
-        const isTransfer = !!student.transfer_type
-        const allDocsDone = SF_DOCUMENTS.every(doc => {
-          if ('transferOnly' in doc && doc.transferOnly && !isTransfer) return true
-          return !!student[doc.key as keyof typeof student]
-        })
-        if (!allDocsDone) continue
-
-        greenIds.add(student.lead_id)
+      if (studentsError) {
+        console.warn('[LeadTable] Failed to fetch SF student data:', studentsError?.message || studentsError)
+        return
       }
-    }
 
-    // For SF leads without a student record, check payment_transactions
-    const leadsWithoutStudent = sfLeadIds.filter(id => !leadsWithStudent.has(id))
-    if (leadsWithoutStudent.length > 0) {
-      const { data: transactions } = await supabase
-        .from('payment_transactions')
-        .select('lead_id, amount')
-        .in('lead_id', leadsWithoutStudent)
-        .eq('status', 'completed')
+      const greenIds = new Set<string>()
+      const paymentMap: Record<string, { amount_paid: number; sf_enrolled_stage?: string }> = {}
 
-      if (transactions && transactions.length > 0) {
-        // Sum completed transaction amounts per lead
-        const txTotals: Record<string, number> = {}
-        for (const tx of transactions) {
-          if (!tx.lead_id) continue
-          txTotals[tx.lead_id] = (txTotals[tx.lead_id] || 0) + (tx.amount || 0)
+      // Build set of lead IDs that have a student record
+      const leadsWithStudent = new Set<string>()
+
+      if (students && students.length > 0) {
+        for (const student of students) {
+          if (!student.lead_id) continue
+          leadsWithStudent.add(student.lead_id)
+
+          // Store payment data for display
+          paymentMap[student.lead_id] = {
+            amount_paid: student.amount_paid || 0,
+            sf_enrolled_stage: student.sf_enrolled_stage ?? undefined,
+          }
+
+          // Check paid more than 150 KD
+          const paidOver150 = student.amount_paid > 150 ||
+            student.sf_enrolled_stage === '400' ||
+            student.sf_enrolled_stage === 'other'
+          if (!paidOver150) continue
+
+          // Check all SF documents are done
+          const isTransfer = !!student.transfer_type
+          const allDocsDone = SF_DOCUMENTS.every(doc => {
+            if ('transferOnly' in doc && doc.transferOnly && !isTransfer) return true
+            return !!student[doc.key as keyof typeof student]
+          })
+          if (!allDocsDone) continue
+
+          greenIds.add(student.lead_id)
         }
-        for (const [leadId, total] of Object.entries(txTotals)) {
-          paymentMap[leadId] = {
-            amount_paid: total,
+      }
+
+      // For SF leads without a student record, check payment_transactions
+      const leadsWithoutStudent = sfLeadIds.filter(id => !leadsWithStudent.has(id))
+      if (leadsWithoutStudent.length > 0) {
+        const { data: transactions, error: txError } = await supabase
+          .from('payment_transactions')
+          .select('lead_id, amount')
+          .in('lead_id', leadsWithoutStudent)
+          .eq('status', 'completed')
+
+        if (txError) {
+          console.warn('[LeadTable] Failed to fetch SF payment transactions:', txError?.message || txError)
+        } else if (transactions && transactions.length > 0) {
+          // Sum completed transaction amounts per lead
+          const txTotals: Record<string, number> = {}
+          for (const tx of transactions) {
+            if (!tx.lead_id) continue
+            txTotals[tx.lead_id] = (txTotals[tx.lead_id] || 0) + (tx.amount || 0)
+          }
+          for (const [leadId, total] of Object.entries(txTotals)) {
+            paymentMap[leadId] = {
+              amount_paid: total,
+            }
           }
         }
       }
-    }
 
-    setSfGreenLeads(greenIds)
-    setSfPaymentData(paymentMap)
+      setSfGreenLeads(greenIds)
+      setSfPaymentData(paymentMap)
+    } catch (error) {
+      console.warn('[LeadTable] Unexpected error refreshing SF green status:', error)
+    }
   }, [leads])
 
   useEffect(() => {
@@ -236,16 +247,24 @@ export function LeadTable({
       setPucPaymentLeads(new Set())
       return
     }
-    const supabase = createClient()
-    const pucLeadIds = pucLeads.map(l => l.id)
-    const { data: transactions } = await supabase
-      .from('payment_transactions')
-      .select('lead_id')
-      .in('lead_id', pucLeadIds)
-      .eq('status', 'completed')
-      .eq('notes', 'PSP Fee Payment')
-    if (transactions) {
-      setPucPaymentLeads(new Set(transactions.map(t => t.lead_id)))
+    try {
+      const supabase = createClient()
+      const pucLeadIds = pucLeads.map(l => l.id)
+      const { data: transactions, error } = await supabase
+        .from('payment_transactions')
+        .select('lead_id')
+        .in('lead_id', pucLeadIds)
+        .eq('status', 'completed')
+        .eq('notes', 'PSP Fee Payment')
+      if (error) {
+        console.warn('[LeadTable] Failed to fetch PUC payment status:', error?.message || error)
+        return
+      }
+      if (transactions) {
+        setPucPaymentLeads(new Set(transactions.map(t => t.lead_id)))
+      }
+    } catch (error) {
+      console.warn('[LeadTable] Unexpected error refreshing PUC payment status:', error)
     }
   }, [leads, isPucSrjView])
 
@@ -261,74 +280,87 @@ export function LeadTable({
       setPucDocCounts({})
       return
     }
-    const supabase = createClient()
-    const pucLeadIds = pucLeads.map(l => l.id)
+    try {
+      const supabase = createClient()
+      const pucLeadIds = pucLeads.map(l => l.id)
 
-    // Fetch uploaded docs and DB document configs in parallel
-    const [docsResult, configsResult] = await Promise.all([
-      supabase
-        .from('psp_documents')
-        .select('lead_id, document_type, graduate_type')
-        .in('lead_id', pucLeadIds),
-      supabase
-        .from('psp_document_configs')
-        .select('graduate_type, document_id, required')
-        .eq('is_active', true),
-    ])
+      // Fetch uploaded docs and DB document configs in parallel
+      const [docsResult, configsResult] = await Promise.all([
+        supabase
+          .from('psp_documents')
+          .select('lead_id, document_type, graduate_type')
+          .in('lead_id', pucLeadIds),
+        supabase
+          .from('psp_document_configs')
+          .select('graduate_type, document_id, required')
+          .eq('is_active', true),
+      ])
 
-    const docs = docsResult.data
-    const dbConfigs = configsResult.data
+      if (docsResult.error) {
+        console.warn('[LeadTable] Failed to fetch PUC documents:', docsResult.error?.message || docsResult.error)
+        return
+      }
+      if (configsResult.error) {
+        console.warn('[LeadTable] Failed to fetch PUC document configs:', configsResult.error?.message || configsResult.error)
+        return
+      }
 
-    // Build required counts from DB configs, grouped by graduate type
-    const dbRequiredCounts: Record<string, number> = {}
-    if (dbConfigs && dbConfigs.length > 0) {
-      for (const cfg of dbConfigs) {
-        if (cfg.required) {
-          const key = cfg.graduate_type.toUpperCase()
-          dbRequiredCounts[key] = (dbRequiredCounts[key] || 0) + 1
+      const docs = docsResult.data
+      const dbConfigs = configsResult.data
+
+      // Build required counts from DB configs, grouped by graduate type
+      const dbRequiredCounts: Record<string, number> = {}
+      if (dbConfigs && dbConfigs.length > 0) {
+        for (const cfg of dbConfigs) {
+          if (cfg.required) {
+            const key = cfg.graduate_type.toUpperCase()
+            dbRequiredCounts[key] = (dbRequiredCounts[key] || 0) + 1
+          }
         }
       }
-    }
 
-    // Group uploaded docs by lead_id and track graduate type
-    const uploadedMap: Record<string, { count: number; gradType: string }> = {}
-    if (docs) {
-      for (const doc of docs) {
-        if (!uploadedMap[doc.lead_id]) {
-          uploadedMap[doc.lead_id] = { count: 0, gradType: doc.graduate_type?.toUpperCase() || '' }
-        }
-        uploadedMap[doc.lead_id].count += 1
-        if (!uploadedMap[doc.lead_id].gradType && doc.graduate_type) {
-          uploadedMap[doc.lead_id].gradType = doc.graduate_type.toUpperCase()
-        }
-      }
-    }
-
-    // Build result for ALL PUC leads, using education_type as fallback for graduate type
-    const hasDbConfigs = dbConfigs && dbConfigs.length > 0
-    const result: Record<string, { uploaded: number; required: number }> = {}
-    for (const lead of pucLeads) {
-      const uploaded = uploadedMap[lead.id]?.count ?? 0
-      const gradType = uploadedMap[lead.id]?.gradType || lead.education_type?.toUpperCase() || ''
-
-      let requiredCount = 0
-      if (gradType) {
-        if (hasDbConfigs && dbRequiredCounts[gradType] !== undefined) {
-          // Use DB configs if available
-          requiredCount = dbRequiredCounts[gradType]
-        } else {
-          // Fallback to hardcoded rules
-          const allDocs = getDocumentsForGraduateType(gradType as GraduateType, {
-            isTransfer: lead.is_transfer_student,
-            isSpecialNeeds: lead.is_special_needs,
-            isDiplomatic: lead.is_diplomatic,
-          })
-          requiredCount = allDocs.filter(d => d.required).length
+      // Group uploaded docs by lead_id and track graduate type
+      const uploadedMap: Record<string, { count: number; gradType: string }> = {}
+      if (docs) {
+        for (const doc of docs) {
+          if (!uploadedMap[doc.lead_id]) {
+            uploadedMap[doc.lead_id] = { count: 0, gradType: doc.graduate_type?.toUpperCase() || '' }
+          }
+          uploadedMap[doc.lead_id].count += 1
+          if (!uploadedMap[doc.lead_id].gradType && doc.graduate_type) {
+            uploadedMap[doc.lead_id].gradType = doc.graduate_type.toUpperCase()
+          }
         }
       }
-      result[lead.id] = { uploaded, required: requiredCount }
+
+      // Build result for ALL PUC leads, using education_type as fallback for graduate type
+      const hasDbConfigs = dbConfigs && dbConfigs.length > 0
+      const result: Record<string, { uploaded: number; required: number }> = {}
+      for (const lead of pucLeads) {
+        const uploaded = uploadedMap[lead.id]?.count ?? 0
+        const gradType = uploadedMap[lead.id]?.gradType || lead.education_type?.toUpperCase() || ''
+
+        let requiredCount = 0
+        if (gradType) {
+          if (hasDbConfigs && dbRequiredCounts[gradType] !== undefined) {
+            // Use DB configs if available
+            requiredCount = dbRequiredCounts[gradType]
+          } else {
+            // Fallback to hardcoded rules
+            const allDocs = getDocumentsForGraduateType(gradType as GraduateType, {
+              isTransfer: lead.is_transfer_student,
+              isSpecialNeeds: lead.is_special_needs,
+              isDiplomatic: lead.is_diplomatic,
+            })
+            requiredCount = allDocs.filter(d => d.required).length
+          }
+        }
+        result[lead.id] = { uploaded, required: requiredCount }
+      }
+      setPucDocCounts(result)
+    } catch (error) {
+      console.warn('[LeadTable] Unexpected error refreshing PUC doc counts:', error)
     }
-    setPucDocCounts(result)
   }, [leads])
 
   useEffect(() => {
@@ -379,7 +411,7 @@ export function LeadTable({
     let comparison = 0
     switch (sortField) {
       case "name":
-        comparison = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+        comparison = `${a.first_name_ar || a.first_name} ${a.last_name_ar || a.last_name}`.localeCompare(`${b.first_name_ar || b.first_name} ${b.last_name_ar || b.last_name}`, 'ar')
         break
       case "pipeline_stage":
         const stageOrder = stageSettings.length > 0

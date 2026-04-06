@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
       })
 
       if (error) {
-        results.push({ statement: i + 1, success: false, error: error.message })
+        console.error(`[Migration] Statement ${i + 1} failed:`, error.message)
+        results.push({ statement: i + 1, success: false, error: "Statement failed" })
       } else {
         results.push({ statement: i + 1, success: true })
       }
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[Migration] Error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Migration failed" },
+      { error: "Migration failed" },
       { status: 500 }
     )
   }

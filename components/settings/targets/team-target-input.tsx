@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -29,22 +29,35 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
   const [app, setApp] = useState("")
   const [pucApp, setPucApp] = useState("")
 
-  // Auto-fill Male = Total - Female
-  useEffect(() => {
+  // Gender change handlers - auto-fill the other gender only when explicitly editing
+  const handlePucMale = (val: string) => {
+    const num = parseInt(val) || 0
     const total = parseInt(puc) || 0
-    const female = parseInt(pucFemale) || 0
-    if (puc && total >= female) {
-      setPucMale(String(total - female))
-    }
-  }, [puc, pucFemale])
-
-  useEffect(() => {
+    const clamped = puc ? Math.min(num, total) : num
+    setPucMale(val === '' ? '' : String(clamped))
+    if (puc && val !== '') setPucFemale(String(total - clamped))
+  }
+  const handlePucFemale = (val: string) => {
+    const num = parseInt(val) || 0
+    const total = parseInt(puc) || 0
+    const clamped = puc ? Math.min(num, total) : num
+    setPucFemale(val === '' ? '' : String(clamped))
+    if (puc && val !== '') setPucMale(String(total - clamped))
+  }
+  const handleSfMale = (val: string) => {
+    const num = parseInt(val) || 0
     const total = parseInt(sf) || 0
-    const female = parseInt(sfFemale) || 0
-    if (sf && total >= female) {
-      setSfMale(String(total - female))
-    }
-  }, [sf, sfFemale])
+    const clamped = sf ? Math.min(num, total) : num
+    setSfMale(val === '' ? '' : String(clamped))
+    if (sf && val !== '') setSfFemale(String(total - clamped))
+  }
+  const handleSfFemale = (val: string) => {
+    const num = parseInt(val) || 0
+    const total = parseInt(sf) || 0
+    const clamped = sf ? Math.min(num, total) : num
+    setSfFemale(val === '' ? '' : String(clamped))
+    if (sf && val !== '') setSfMale(String(total - clamped))
+  }
 
   const handleApply = () => {
     if (puc) onApplyToAll('puc_files', parseInt(puc) || 0)
@@ -126,7 +139,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {puc && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            ~{Math.floor((parseInt(puc) || 0) / agentCount)} per agent
+                            ~{Math.round((parseInt(puc) || 0) / agentCount)} per agent
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-2 pt-1">
@@ -135,14 +148,14 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             <Input
                               type="number"
                               value={pucMale}
-                              onChange={(e) => setPucMale(e.target.value)}
+                              onChange={(e) => handlePucMale(e.target.value)}
                               placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {pucMale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                ~{Math.floor((parseInt(pucMale) || 0) / agentCount)} each
+                                ~{Math.round((parseInt(pucMale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -151,14 +164,14 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             <Input
                               type="number"
                               value={pucFemale}
-                              onChange={(e) => setPucFemale(e.target.value)}
+                              onChange={(e) => handlePucFemale(e.target.value)}
                               placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {pucFemale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                ~{Math.floor((parseInt(pucFemale) || 0) / agentCount)} each
+                                ~{Math.round((parseInt(pucFemale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -181,7 +194,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {sf && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            ~{Math.floor((parseInt(sf) || 0) / agentCount)} per agent
+                            ~{Math.round((parseInt(sf) || 0) / agentCount)} per agent
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-2 pt-1">
@@ -190,14 +203,14 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             <Input
                               type="number"
                               value={sfMale}
-                              onChange={(e) => setSfMale(e.target.value)}
+                              onChange={(e) => handleSfMale(e.target.value)}
                               placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {sfMale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                ~{Math.floor((parseInt(sfMale) || 0) / agentCount)} each
+                                ~{Math.round((parseInt(sfMale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -206,14 +219,14 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                             <Input
                               type="number"
                               value={sfFemale}
-                              onChange={(e) => setSfFemale(e.target.value)}
+                              onChange={(e) => handleSfFemale(e.target.value)}
                               placeholder="0"
                               min={0}
                               className="h-7 text-xs"
                             />
                             {sfFemale && (
                               <p className="text-[10px] text-[var(--text-muted)]">
-                                ~{Math.floor((parseInt(sfFemale) || 0) / agentCount)} each
+                                ~{Math.round((parseInt(sfFemale) || 0) / agentCount)} each
                               </p>
                             )}
                           </div>
@@ -239,7 +252,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {app && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            ~{Math.floor((parseInt(app) || 0) / agentCount)} per agent
+                            ~{Math.round((parseInt(app) || 0) / agentCount)} per agent
                           </p>
                         )}
                       </div>
@@ -263,7 +276,7 @@ export function TeamTargetInput({ onApplyToAll, agentCount, activeCategories, se
                         />
                         {pucApp && (
                           <p className="text-[11px] text-[var(--primary)] font-medium">
-                            ~{Math.floor((parseInt(pucApp) || 0) / agentCount)} per agent
+                            ~{Math.round((parseInt(pucApp) || 0) / agentCount)} per agent
                           </p>
                         )}
                       </div>

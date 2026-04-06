@@ -152,7 +152,7 @@ export function WhatsAppTemplateSelector({
   })
 
   const phone = lead?.phone || student?.phone || ""
-  const contactName = lead ? `${lead.first_name} ${lead.last_name}` : student?.first_name || ""
+  const contactName = lead ? `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}` : student?.first_name || ""
   const firstName = lead?.first_name || student?.first_name || ""
 
   // Auto-fill variables when template is selected

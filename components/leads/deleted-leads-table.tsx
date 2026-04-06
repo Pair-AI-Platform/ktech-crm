@@ -100,7 +100,7 @@ export function DeletedLeadsTable({
     let comparison = 0
     switch (sortField) {
       case "name":
-        comparison = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+        comparison = `${a.first_name_ar || a.first_name} ${a.last_name_ar || a.last_name}`.localeCompare(`${b.first_name_ar || b.first_name} ${b.last_name_ar || b.last_name}`, 'ar')
         break
       case "deleted_at":
         const aTime = a.deleted_at ? new Date(a.deleted_at).getTime() : 0
@@ -221,12 +221,12 @@ export function DeletedLeadsTable({
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar size="sm">
                   <AvatarFallback className="bg-[var(--bg-sunken)] text-[var(--text-secondary)] text-xs font-semibold">
-                    {lead.first_name?.[0]}{lead.last_name?.[0]}
+                    {(lead.first_name_ar || lead.first_name)?.[0]}{(lead.last_name_ar || lead.last_name)?.[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
                   <p className="font-medium text-sm text-[var(--text-primary)] truncate">
-                    {lead.first_name} {lead.last_name}
+                    {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                     <Phone className="w-3 h-3" />

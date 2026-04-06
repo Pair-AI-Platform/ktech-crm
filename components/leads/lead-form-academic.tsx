@@ -378,7 +378,7 @@ export function LeadFormAcademic({
           </div>
 
           {/* Education Type */}
-          <div className="space-y-2">
+          <div id="education_type" className="space-y-2">
             <Label>Education Type <span className="text-[var(--error)]">*</span></Label>
             <div className="grid grid-cols-5 gap-2">
               {EDUCATION_TYPES.map((type) => (
@@ -513,7 +513,7 @@ export function LeadFormAcademic({
           </div>
 
           {/* Cycle / Semester */}
-          <div className="space-y-2">
+          <div id="semester_id" className="space-y-2">
             <Label>Term <span className="text-red-500">*</span></Label>
             <Select
               value={formData.semester_id}

@@ -85,7 +85,7 @@ export const POST = withApiHandler(
 
     if (error) {
       logger.error("Error seeding leads", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to seed test leads. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -109,7 +109,7 @@ export const DELETE = withApiHandler(
 
     if (error) {
       logger.error("Error deleting test leads", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to delete test leads. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({

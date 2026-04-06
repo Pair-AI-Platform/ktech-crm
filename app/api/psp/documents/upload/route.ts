@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       // If bucket doesn't exist, try to create it
       if (uploadError.message.includes("Bucket not found") || uploadError.message.includes("not found")) {
         const { error: bucketError } = await serviceClient.storage.createBucket("documents", {
-          public: true,
+          public: false,
           fileSizeLimit: 10 * 1024 * 1024,
         })
 
@@ -105,10 +105,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get public URL
-    const { data: urlData } = serviceClient.storage
+    // Get signed URL (1 hour expiry)
+    const { data: urlData, error: signedUrlError } = await serviceClient.storage
       .from("documents")
-      .getPublicUrl(storagePath)
+      .createSignedUrl(storagePath, 3600)
+
+    if (signedUrlError) {
+      console.error("Failed to create signed URL:", signedUrlError)
+      return NextResponse.json({ error: "Failed to generate document URL" }, { status: 500 })
+    }
 
     // Save to database using the user's supabase client (respects RLS)
     const { data, error } = await supabase
@@ -121,7 +126,7 @@ export async function POST(request: NextRequest) {
         file_type: file.type,
         file_size: file.size,
         storage_path: storagePath,
-        public_url: urlData?.publicUrl,
+        public_url: urlData?.signedUrl,
         expiration_date: expirationDate || null,
         uploaded_by: user.id,
         uploaded_at: new Date().toISOString(),
@@ -153,7 +158,7 @@ export async function POST(request: NextRequest) {
           file_type: file.type,
           file_size: file.size,
           storage_path: storagePath,
-          public_url: urlData?.publicUrl,
+          public_url: urlData?.signedUrl,
           expiration_date: expirationDate || null,
           uploaded_by: user.id,
           uploaded_at: new Date().toISOString(),
@@ -170,19 +175,19 @@ export async function POST(request: NextRequest) {
 
       if (fallbackError) {
         console.error("Fallback insert also failed:", fallbackError)
-        return NextResponse.json({ error: fallbackError.message }, { status: 500 })
+        return NextResponse.json({ error: "Failed to save document record" }, { status: 500 })
       }
 
       return NextResponse.json({
         document: fallbackData,
-        public_url: urlData?.publicUrl,
+        public_url: urlData?.signedUrl,
         storage_path: storagePath,
       })
     }
 
     return NextResponse.json({
       document: data,
-      public_url: urlData?.publicUrl,
+      public_url: urlData?.signedUrl,
       storage_path: storagePath,
     })
   } catch (err) {

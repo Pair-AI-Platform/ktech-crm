@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
         result.errors.push({
           civilId: record.civil_id,
           name: record.student_name || "Unknown",
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: "Failed to process record",
         })
       }
     }
@@ -406,7 +406,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error("[Ministry Acceptance] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to process ministry acceptance import"
+    const errorMessage = "Failed to process ministry acceptance import"
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

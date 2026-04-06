@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
     if (fetchError) {
       console.error('[Birthday Greetings] Error fetching leads:', fetchError)
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 })
     }
 
     // Filter leads whose birthday matches today (month + day)

@@ -314,7 +314,7 @@ export function SFDownPaymentCard({ lead, onSuccess }: SFDownPaymentCardProps) {
           <div>
             <span className="text-lg font-semibold text-amber-800 dark:text-amber-300">SF Down Payment</span>
             <p className="text-xs text-amber-600 dark:text-amber-400 font-normal mt-0.5">
-              {lead.first_name} {lead.last_name} — Self-funded
+              {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name} — Self-funded
             </p>
           </div>
         </div>

@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error("[PSP Payment Status] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to get payment status"
+    const errorMessage = "Failed to get payment status"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

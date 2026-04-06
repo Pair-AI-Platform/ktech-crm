@@ -4,6 +4,14 @@
  * that need Arabic-aware name comparison.
  */
 
+/** Regex matching Arabic characters (Basic + Supplement + Extended-A) and whitespace. */
+export const ARABIC_NAME_REGEX = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s]+$/
+
+/** Returns true if the text contains only Arabic characters and whitespace. */
+export function isArabicText(text: string): boolean {
+  return ARABIC_NAME_REGEX.test(text.trim())
+}
+
 /**
  * Normalize a name for comparison.
  * Removes Arabic prefixes, diacritics, and extra whitespace.

@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error("[PUC Fee Cash] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to record cash payment"
+    const errorMessage = "Failed to record cash payment"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

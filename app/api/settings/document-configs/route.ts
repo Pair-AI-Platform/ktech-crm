@@ -13,7 +13,7 @@ export const GET = withApiHandler(
 
     if (error) {
       logger.error("Failed to fetch document configs", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
     return NextResponse.json(data)
   }
@@ -46,7 +46,7 @@ export const POST = withApiHandler(
 
     if (error) {
       logger.error("Failed to create document config", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
     return NextResponse.json(data)
   }
@@ -75,7 +75,7 @@ export const PUT = withApiHandler(
 
     if (error) {
       logger.error("Failed to update document config", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
     return NextResponse.json(data)
   }
@@ -96,7 +96,7 @@ export const DELETE = withApiHandler(
 
     if (error) {
       logger.error("Failed to delete document config", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
     return NextResponse.json({ success: true })
   }

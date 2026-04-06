@@ -12,7 +12,7 @@ export const GET = withApiHandler(
 
     if (error) {
       logger.error('Failed to fetch SMS templates', { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ templates })
@@ -50,7 +50,7 @@ export const POST = withApiHandler(
 
     if (error) {
       logger.error('Failed to create SMS template', { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ template })
@@ -89,7 +89,7 @@ export const PUT = withApiHandler(
 
     if (error) {
       logger.error('Failed to update SMS template', { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ template })
@@ -113,7 +113,7 @@ export const DELETE = withApiHandler(
 
     if (error) {
       logger.error('Failed to delete SMS template', { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Operation failed. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

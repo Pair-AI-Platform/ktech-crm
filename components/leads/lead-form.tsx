@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
@@ -15,6 +15,7 @@ import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useCampaigns } from "@/lib/hooks/use-campaigns"
 import { createClient } from "@/lib/supabase/client"
 import { isValidKuwaitPhone, isValidKuwaitCivilId } from "@/lib/utils"
+import { isArabicText } from "@/lib/string-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
 import { useDuplicateCheck } from "@/lib/hooks/use-duplicate-check"
@@ -46,6 +47,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [agents, setAgents] = useState<{ id: string; full_name: string; email: string; avatar_url: string | null }[]>([])
   const [semesters, setSemesters] = useState<{ id: string; name: string; is_active: boolean; is_open: boolean; cycle_id?: string }[]>([])
+  const formScrollRef = useRef<HTMLDivElement>(null)
   const isEditing = !!lead
 
   // Fetch schools, agents, and semesters from database
@@ -267,15 +269,14 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     const newErrors: Record<string, string> = {}
 
     // Personal Info validation
-    const arabicRegex = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s]+$/
     if (!formData.first_name.trim()) {
       newErrors.first_name = "First name is required"
-    } else if (!arabicRegex.test(formData.first_name.trim())) {
+    } else if (!isArabicText(formData.first_name)) {
       newErrors.first_name = "Name must be in Arabic"
     }
     if (!formData.last_name.trim()) {
       newErrors.last_name = "Last name is required"
-    } else if (!arabicRegex.test(formData.last_name.trim())) {
+    } else if (!isArabicText(formData.last_name)) {
       newErrors.last_name = "Name must be in Arabic"
     }
 
@@ -306,7 +307,11 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     }
 
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const errorKeys = Object.keys(newErrors)
+    if (errorKeys.length > 0) {
+      scrollToFirstError(errorKeys)
+    }
+    return errorKeys.length === 0
   }
 
   // Performs the actual lead creation/update (called directly or after duplicate check)
@@ -320,7 +325,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       gender: formData.gender || undefined,
       civil_id: formData.civil_id ? formData.civil_id.replace(/\D/g, "") : undefined,
       date_of_birth: formData.date_of_birth || undefined,
-      school: dbSchools.length > 0 ? undefined : (formData.school || undefined) as School | undefined,
+      school_name_custom: dbSchools.length > 0 ? undefined : (formData.school || undefined) as string | undefined,
       school_id: dbSchools.length > 0 && formData.school ? formData.school : undefined,
       education_type: (formData.education_type || undefined) as EducationType | undefined,
       education_type_custom: formData.education_type === 'other' ? formData.education_type_custom.trim() || undefined : undefined,
@@ -403,6 +408,22 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       onClose()
     }
   }
+
+  const scrollToFirstError = useCallback((errorKeys: string[]) => {
+    if (errorKeys.length === 0 || !formScrollRef.current) return
+    const firstKey = errorKeys[0]
+    const el = formScrollRef.current.querySelector<HTMLElement>(`#${CSS.escape(firstKey)}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setTimeout(() => {
+        // Focus the element itself if it's an input, otherwise find the first focusable child
+        const focusTarget = el.matches('input, select, textarea, button')
+          ? el
+          : el.querySelector<HTMLElement>('input, select, textarea, button')
+        focusTarget?.focus()
+      }, 300)
+    }
+  }, [])
 
   const handleSubmit = async () => {
     if (!validateForm()) {
@@ -601,7 +622,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   return (
     <>
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0" onKeyDown={(e) => e.stopPropagation()} onInput={(e) => e.stopPropagation()}>
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-[var(--border)]">
           <DialogTitle className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-[#2D347D] flex items-center justify-center">
@@ -619,7 +640,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
         </DialogHeader>
 
         {/* Form Content - Single Scrollable Page */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div ref={formScrollRef} className="flex-1 overflow-y-auto px-6 py-6">
           {errors.submit && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}

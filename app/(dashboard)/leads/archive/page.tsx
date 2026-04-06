@@ -41,7 +41,9 @@ import { useReRegisterLeads, useActiveSemesters } from "@/lib/hooks/use-semester
 import { createClient } from "@/lib/supabase/client"
 import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
+import { useStageSettings } from "@/lib/hooks/use-stage-settings"
 import type { Lead, Semester, EducationCycle, Profile, PipelineStage } from "@/types"
+import { PIPELINE_STAGES } from "@/types"
 
 const defaultFilters: LeadFilters = {
   searchQuery: "",
@@ -436,6 +438,77 @@ function TransferDialog({
   )
 }
 
+// ── Compact per-cycle stage pills ────────────────────────────────────────────
+
+function CycleStagePills({
+  stats,
+  total,
+  activeStage,
+  onStageChange,
+}: {
+  stats: Record<PipelineStage, number>
+  total: number
+  activeStage: PipelineStage | "all"
+  onStageChange: (stage: PipelineStage | "all") => void
+}) {
+  const { settings: stageSettings } = useStageSettings()
+  const orderedStages = stageSettings.length > 0
+    ? stageSettings.map(s => PIPELINE_STAGES.find(p => p.value === s.stage)).filter(Boolean) as typeof PIPELINE_STAGES
+    : PIPELINE_STAGES
+  const stagesToShow = orderedStages.filter(s => s.value !== 'lost')
+
+  return (
+    <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+      <button
+        onClick={() => onStageChange("all")}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shrink-0",
+          activeStage === "all"
+            ? "bg-[var(--primary)] text-white"
+            : "bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+        )}
+      >
+        All
+        <span className={cn(
+          "px-1.5 py-0.5 rounded-md text-[10px] font-semibold",
+          activeStage === "all"
+            ? "bg-white/20 text-white"
+            : "bg-[var(--bg-base)] text-[var(--text-muted)]"
+        )}>
+          {total - (stats.lost || 0)}
+        </span>
+      </button>
+      {stagesToShow.map((stage) => {
+        const count = stats[stage.value] || 0
+        return (
+          <button
+            key={stage.value}
+            onClick={() => onStageChange(stage.value)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shrink-0",
+              activeStage === stage.value
+                ? "bg-[var(--primary)] text-white"
+                : "bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            )}
+          >
+            {stage.label}
+            {count > 0 && (
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[10px] font-semibold",
+                activeStage === stage.value
+                  ? "bg-white/20 text-white"
+                  : "bg-[var(--bg-base)] text-[var(--text-muted)]"
+              )}>
+                {count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main Archive Page ────────────────────────────────────────────────────────
 
 export default function ArchivePage() {
@@ -478,8 +551,8 @@ export default function ArchivePage() {
         // Use demo data
         setAcademicYears(DEMO_CYCLES)
         setLeadsBySemester(DEMO_LEADS)
-        setExpandedYears(new Set([DEMO_CYCLES[0].id]))
-        setExpandedSemesters(new Set(DEMO_CYCLES[0].semesters.map((s) => s.id)))
+        setExpandedYears(new Set(DEMO_CYCLES.map((c) => c.id)))
+        setExpandedSemesters(new Set(DEMO_CYCLES.flatMap((c) => c.semesters.map((s) => s.id))))
         setIsDemo(true)
         setLoading(false)
         return
@@ -513,16 +586,15 @@ export default function ArchivePage() {
           civil_id,
           nationality,
           pipeline_stage,
-          status,
+          contact_status,
           funding_type,
           source,
-          school,
+          school_id,
           semester_id,
           created_at,
           assigned_to,
           assigned_agent:profiles!leads_assigned_to_fkey(full_name),
           is_kuwaiti,
-          expected_gpa,
           gpa_grade_12_expected,
           gpa_grade_11,
           gender,
@@ -533,8 +605,7 @@ export default function ArchivePage() {
           notes,
           ministry_blocked,
           ministry_block_reasons,
-          ministry_assigned,
-          school
+          ministry_assigned
         `)
         .in("semester_id", semesterIds)
         .order("created_at", { ascending: false })
@@ -556,6 +627,9 @@ export default function ArchivePage() {
       }
 
       setLeadsBySemester(grouped)
+
+      // Auto-expand all cycles so per-cycle filters are visible
+      setExpandedYears(new Set(years.map((y) => y.id)))
 
       // Check which archived leads have already been re-registered
       const allLeadIds = leadsData?.map((l) => l.id) || []
@@ -798,7 +872,7 @@ export default function ArchivePage() {
           </p>
         </div>
 
-        {/* Quick Filters + Search */}
+        {/* Global Quick Filters + Search */}
         <QuickFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -876,6 +950,13 @@ export default function ArchivePage() {
           <div className="space-y-3">
             {academicYears.map((year) => {
               const allLeads = getLeadsForCycle(year)
+              // Unfiltered leads for this cycle (for per-cycle stage stats)
+              const unfilteredCycleLeads = year.semesters.flatMap((sem) => leadsBySemester[sem.id] || [])
+              const cycleStageStats: Record<PipelineStage, number> = {} as Record<PipelineStage, number>
+              for (const lead of unfilteredCycleLeads) {
+                const stage = lead.pipeline_stage as PipelineStage
+                cycleStageStats[stage] = (cycleStageStats[stage] || 0) + 1
+              }
               const isExpanded = expandedYears.has(year.id)
               // Sort semesters: fall first, then spring, then summer
               const termOrder: Record<string, number> = { fall: 0, spring: 1, summer: 2 }
@@ -932,14 +1013,23 @@ export default function ArchivePage() {
 
                   {isExpanded && (
                     <CardContent className="pt-0 pb-4 px-5 space-y-4">
+                      {/* Per-cycle stage pills */}
+                      <CycleStagePills
+                        stats={cycleStageStats}
+                        total={unfilteredCycleLeads.length}
+                        activeStage={stageFilter}
+                        onStageChange={setStageFilter}
+                      />
+
                       {allLeads.length === 0 ? (
                         <p className="text-sm text-[var(--text-muted)] py-4 text-center">
-                          {searchQuery ? "No leads match your search." : "No leads in this cycle."}
+                          {searchQuery || stageFilter !== "all" ? "No leads match your filters." : "No leads in this cycle."}
                         </p>
                       ) : (
                         sortedSemesters.map((semester) => {
                           const semLeads = filteredBySemester[semester.id] || []
-                          if (semLeads.length === 0 && searchQuery) return null
+                          const hasActiveFilters = searchQuery || stageFilter !== "all"
+                          if (semLeads.length === 0 && hasActiveFilters) return null
                           const termLabel = semester.term_type
                             ? semester.term_type.charAt(0).toUpperCase() + semester.term_type.slice(1)
                             : semester.name

@@ -149,8 +149,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
 
   const personName = hasLeads
     ? appointmentLeads.length === 1
-      ? `${appointmentLeads[0]!.first_name} ${appointmentLeads[0]!.last_name}`
-      : `${appointmentLeads[0]!.first_name} ${appointmentLeads[0]!.last_name} +${appointmentLeads.length - 1}`
+      ? `${appointmentLeads[0]!.first_name_ar || appointmentLeads[0]!.first_name} ${appointmentLeads[0]!.last_name_ar || appointmentLeads[0]!.last_name}`
+      : `${appointmentLeads[0]!.first_name_ar || appointmentLeads[0]!.first_name} ${appointmentLeads[0]!.last_name_ar || appointmentLeads[0]!.last_name} +${appointmentLeads.length - 1}`
     : appointment.student
     ? `${appointment.student.first_name} ${appointment.student.last_name}`
     : "Unknown"

@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { SCHOOLS, MAJORS, type Lead, type School, type IntendedMajor, type SchoolEntity } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
+import { isArabicText } from "@/lib/string-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { createClient } from "@/lib/supabase/client"
 import type { MOEFetchResponse } from "@/lib/moe/types"
@@ -109,9 +110,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     // Name validation
     if (!formData.first_name.trim()) {
       newErrors.first_name = "First name is required"
+    } else if (!isArabicText(formData.first_name)) {
+      newErrors.first_name = "Name must be in Arabic"
     }
     if (!formData.last_name.trim()) {
       newErrors.last_name = "Last name is required"
+    } else if (!isArabicText(formData.last_name)) {
+      newErrors.last_name = "Name must be in Arabic"
     }
 
     // Mobile validation
@@ -306,12 +311,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         </div>
         <div className="grid grid-cols-2 gap-4 pl-10">
           <div className="space-y-2">
-            <Label htmlFor="first_name">First Name *</Label>
+            <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
               id="first_name"
               value={formData.first_name}
               onChange={(e) => handleChange("first_name", e.target.value)}
-              placeholder="Enter first name"
+              placeholder="الاسم الأول"
+              dir="rtl"
               error={errors.first_name}
             />
             {errors.first_name && (
@@ -319,12 +325,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="last_name">Last Name *</Label>
+            <Label htmlFor="last_name">Last Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
               id="last_name"
               value={formData.last_name}
               onChange={(e) => handleChange("last_name", e.target.value)}
-              placeholder="Enter last name"
+              placeholder="اسم العائلة"
+              dir="rtl"
               error={errors.last_name}
             />
             {errors.last_name && (

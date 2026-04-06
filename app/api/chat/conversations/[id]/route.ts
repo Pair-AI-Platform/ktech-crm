@@ -25,7 +25,8 @@ export const GET = withApiHandler(
       .order('created_at', { ascending: true })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Failed to fetch conversation messages:', error.message)
+      return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
     }
 
     return NextResponse.json(messages)
@@ -44,7 +45,8 @@ export const DELETE = withApiHandler(
       .eq('user_id', user.id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Failed to delete conversation:', error.message)
+      return NextResponse.json({ error: 'Failed to delete conversation' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

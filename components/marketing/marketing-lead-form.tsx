@@ -10,6 +10,7 @@ import type { LeadSource, LeadSourceCategory } from "@/types"
 import { useMarketingLeads, useActiveSemester } from "@/lib/hooks/use-marketing-leads"
 import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useUser } from "@/lib/hooks/use-user"
+import { isArabicText } from "@/lib/string-utils"
 import { Plus, CheckCircle2 } from "lucide-react"
 
 export function MarketingLeadForm() {
@@ -21,6 +22,7 @@ export function MarketingLeadForm() {
     ? dbSources.map(s => ({ value: s.value as LeadSource, label: s.label, category: s.category as LeadSourceCategory }))
     : LEAD_SOURCES
   const [success, setSuccess] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const [form, setForm] = useState({
     first_name: "",
@@ -32,8 +34,25 @@ export function MarketingLeadForm() {
     notes: "",
   })
 
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+    if (!form.first_name.trim()) {
+      newErrors.first_name = "First name is required"
+    } else if (!isArabicText(form.first_name)) {
+      newErrors.first_name = "Name must be in Arabic"
+    }
+    if (!form.last_name.trim()) {
+      newErrors.last_name = "Last name is required"
+    } else if (!isArabicText(form.last_name)) {
+      newErrors.last_name = "Name must be in Arabic"
+    }
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validateForm()) return
     if (!user || !activeSemester || !form.source) return
 
     const sourceObj = leadSources.find(s => s.value === form.source)
@@ -71,24 +90,30 @@ export function MarketingLeadForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="first_name">First Name *</Label>
+            <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
               id="first_name"
               value={form.first_name}
               onChange={(e) => setForm(f => ({ ...f, first_name: e.target.value }))}
-              placeholder="First name"
+              placeholder="الاسم الأول"
+              dir="rtl"
               required
+              error={errors.first_name}
             />
+            {errors.first_name && <p className="text-xs text-[var(--error)]">{errors.first_name}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="last_name">Last Name *</Label>
+            <Label htmlFor="last_name">Last Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
               id="last_name"
               value={form.last_name}
               onChange={(e) => setForm(f => ({ ...f, last_name: e.target.value }))}
-              placeholder="Last name"
+              placeholder="اسم العائلة"
+              dir="rtl"
               required
+              error={errors.last_name}
             />
+            {errors.last_name && <p className="text-xs text-[var(--error)]">{errors.last_name}</p>}
           </div>
         </div>
 

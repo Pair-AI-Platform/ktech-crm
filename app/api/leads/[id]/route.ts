@@ -26,7 +26,10 @@ export const GET = withApiHandler(
 
     if (error) {
       logger.error('Lead query failed', { error: error.message, id })
-      return NextResponse.json({ error: error.message }, { status: error.code === 'PGRST116' ? 404 : 500 })
+      return NextResponse.json(
+        { error: error.code === 'PGRST116' ? 'Lead not found' : 'Failed to fetch lead' },
+        { status: error.code === 'PGRST116' ? 404 : 500 }
+      )
     }
 
     // Auto-assign to active cycle's open term if lead has no semester

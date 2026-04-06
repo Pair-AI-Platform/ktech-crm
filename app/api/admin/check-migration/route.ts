@@ -16,7 +16,7 @@ export const GET = withApiHandler(
       logger.warn("Migration not applied", { error: error.message })
       return NextResponse.json({
         migrationApplied: false,
-        error: error.message,
+        error: "Table not found",
         action: "Please run the migration in Supabase Dashboard",
         migrationFile: "supabase/migrations/021_payment_transactions.sql",
       })

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 
+// Simple in-memory guard to prevent duplicate runs within 50 seconds
+let lastRunTimestamp = 0
+
 export async function GET(request: NextRequest) {
   try {
     // Verify cron secret
@@ -8,7 +11,7 @@ export async function GET(request: NextRequest) {
     if (!cronSecret) {
       console.error('[Priority Reminders] CRON_SECRET is not configured')
       return NextResponse.json(
-        { error: 'Server misconfiguration: CRON_SECRET is not set' },
+        { error: 'Server misconfiguration' },
         { status: 500 }
       )
     }
@@ -17,6 +20,15 @@ export async function GET(request: NextRequest) {
     if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Duplicate run protection: skip if last run was less than 50 seconds ago
+    // NOTE: This is an in-memory guard and only works within a single instance.
+    // For distributed deployments, consider using a database-based lock.
+    const runCheckTime = Date.now()
+    if (runCheckTime - lastRunTimestamp < 50_000) {
+      return NextResponse.json({ ok: true, skipped: true, message: 'Already ran recently' })
+    }
+    lastRunTimestamp = runCheckTime
 
     const supabase = createServiceRoleClient()
 
@@ -28,7 +40,8 @@ export async function GET(request: NextRequest) {
       .eq('status', 'pending')
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[Priority Reminders] Failed to fetch reminders:', error.message)
+      return NextResponse.json({ error: 'Failed to fetch reminders' }, { status: 500 })
     }
 
     const now = new Date()
@@ -83,6 +96,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ ok: true, triggered })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[Priority Reminders] Unhandled error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

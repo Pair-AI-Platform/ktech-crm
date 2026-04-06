@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
     if (fetchError) {
       console.error('Error fetching appointments:', fetchError)
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch appointments' }, { status: 500 })
     }
 
     // Filter appointments by exact time range

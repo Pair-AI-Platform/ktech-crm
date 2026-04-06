@@ -16,6 +16,8 @@ export interface DashboardLead {
   id: string
   first_name: string
   last_name: string
+  first_name_ar?: string | null
+  last_name_ar?: string | null
   phone: string
   pipeline_stage: string
   contact_status: string | null
@@ -33,7 +35,7 @@ export interface DashboardLead {
 }
 
 const DASHBOARD_LEAD_COLUMNS =
-  'id, first_name, last_name, phone, pipeline_stage, contact_status, funding_type, assigned_to, created_at, updated_at, last_contacted_at, callback_date, date_of_birth, priority, source'
+  'id, first_name, last_name, first_name_ar, last_name_ar, phone, pipeline_stage, contact_status, funding_type, assigned_to, created_at, updated_at, last_contacted_at, callback_date, date_of_birth, priority, source'
 
 /**
  * Single lightweight query that replaces the three useLeads(limit:200) calls

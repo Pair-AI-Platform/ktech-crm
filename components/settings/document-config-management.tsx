@@ -91,45 +91,66 @@ export function DocumentConfigManagement() {
   const fetchConfigs = useCallback(async () => {
     setLoading(true)
     setError("")
-    try {
-      const res = await fetch("/api/settings/document-configs")
-      if (!res.ok) {
-        // API failed — fall back to hardcoded rules but still allow editing via API
-        console.warn("Failed to fetch from API, using fallback")
+
+    const useFallback = () => {
+      try {
         setConfigs(buildFallbackConfigs())
         setUsingFallback(true)
+      } catch {
+        // If even fallback data fails, show empty state
+        setConfigs([])
+        setUsingFallback(true)
+      }
+    }
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000)
+
+      const res = await fetch("/api/settings/document-configs", { signal: controller.signal })
+      clearTimeout(timeout)
+
+      if (!res.ok) {
+        console.warn("Failed to fetch from API, using fallback")
+        useFallback()
         return
       }
 
       const data = await res.json()
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data) && data.length > 0) {
         setConfigs(data)
         setUsingFallback(false)
-      } else {
-        // DB table is empty — auto-seed from hardcoded rules
-        try {
-          const seedRes = await fetch("/api/settings/document-configs/seed", { method: "POST" })
-          if (seedRes.ok) {
-            // Re-fetch after seeding
-            const refetchRes = await fetch("/api/settings/document-configs")
-            if (refetchRes.ok) {
-              const seededData = await refetchRes.json()
-              if (seededData && seededData.length > 0) {
-                setConfigs(seededData)
-                setUsingFallback(false)
-                return
-              }
+        return
+      }
+
+      // DB table is empty — auto-seed from hardcoded rules
+      try {
+        const seedController = new AbortController()
+        const seedTimeout = setTimeout(() => seedController.abort(), 5000)
+        const seedRes = await fetch("/api/settings/document-configs/seed", { method: "POST", signal: seedController.signal })
+        clearTimeout(seedTimeout)
+
+        if (seedRes.ok) {
+          const refetchController = new AbortController()
+          const refetchTimeout = setTimeout(() => refetchController.abort(), 5000)
+          const refetchRes = await fetch("/api/settings/document-configs", { signal: refetchController.signal })
+          clearTimeout(refetchTimeout)
+
+          if (refetchRes.ok) {
+            const seededData = await refetchRes.json()
+            if (seededData && Array.isArray(seededData) && seededData.length > 0) {
+              setConfigs(seededData)
+              setUsingFallback(false)
+              return
             }
           }
-        } catch {
-          // Seed failed — continue with fallback
         }
-        setConfigs(buildFallbackConfigs())
-        setUsingFallback(true)
+      } catch {
+        // Seed failed — continue with fallback
       }
+      useFallback()
     } catch {
-      setConfigs(buildFallbackConfigs())
-      setUsingFallback(true)
+      useFallback()
     } finally {
       setLoading(false)
     }

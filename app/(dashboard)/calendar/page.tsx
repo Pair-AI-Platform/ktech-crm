@@ -136,7 +136,7 @@ export default function CalendarPage() {
       const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
       if (apt.lead) leads.push(apt.lead)
       return leads.some(lead =>
-        `${lead!.first_name} ${lead!.last_name}`.toLowerCase().includes(q) ||
+        `${lead!.first_name_ar || lead!.first_name} ${lead!.last_name_ar || lead!.last_name}`.toLowerCase().includes(q) ||
         lead!.phone?.includes(q)
       )
     })
@@ -189,12 +189,12 @@ export default function CalendarPage() {
     const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
     if (leads.length > 0) {
       if (leads.length === 1) {
-        return `${leads[0]!.first_name} ${leads[0]!.last_name}`
+        return `${leads[0]!.first_name_ar || leads[0]!.first_name} ${leads[0]!.last_name_ar || leads[0]!.last_name}`
       }
-      return `${leads[0]!.first_name} ${leads[0]!.last_name} +${leads.length - 1}`
+      return `${leads[0]!.first_name_ar || leads[0]!.first_name} ${leads[0]!.last_name_ar || leads[0]!.last_name} +${leads.length - 1}`
     }
     // Legacy fallback
-    if (apt.lead) return `${apt.lead.first_name} ${apt.lead.last_name}`
+    if (apt.lead) return `${apt.lead.first_name_ar || apt.lead.first_name} ${apt.lead.last_name_ar || apt.lead.last_name}`
     if (apt.student) return `${apt.student.first_name} ${apt.student.last_name}`
     return "Unknown"
   }

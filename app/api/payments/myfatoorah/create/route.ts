@@ -66,6 +66,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check for existing pending payment (idempotency)
+    const { data: existingPending } = await supabase
+      .from('payment_transactions')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (existingPending) {
+      return NextResponse.json(
+        { error: 'A pending payment already exists for this lead' },
+        { status: 409 }
+      )
+    }
+
     // Determine payment amount (custom or default)
     const paymentAmount = typeof customAmount === "number" && customAmount > 0
       ? customAmount
@@ -137,7 +152,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error("[MyFatoorah Create] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to create payment link"
+    const errorMessage = "Failed to create payment link"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

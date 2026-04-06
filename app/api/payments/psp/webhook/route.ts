@@ -455,7 +455,7 @@ Kuwait Technical College`
     }
   } catch (error: unknown) {
     console.error("[PSP Payment Webhook] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Webhook processing failed"
+    const errorMessage = "Webhook processing failed"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

@@ -43,7 +43,8 @@ export async function POST() {
       })
 
       if (error) {
-        results.push({ email: user.email, status: "error", error: error.message })
+        console.error(`[Setup Demo] Failed to create user ${user.email}:`, error.message)
+        results.push({ email: user.email, status: "error", error: "Failed to create user" })
         continue
       }
       userId = data.user.id

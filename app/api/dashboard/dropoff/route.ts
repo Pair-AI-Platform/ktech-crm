@@ -14,7 +14,8 @@ export const GET = withApiHandler(
       .eq('pipeline_stage', 'lost')
 
     if (e1) {
-      return NextResponse.json({ error: e1.message }, { status: 500 })
+      console.error('Failed to fetch drop-off data:', e1.message)
+      return NextResponse.json({ error: 'Failed to fetch drop-off data' }, { status: 500 })
     }
 
     const hasStage = (leadsWithStage ?? []).filter((l) => l.lost_at_stage)

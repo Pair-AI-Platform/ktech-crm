@@ -1,31 +1,35 @@
 import { z } from 'zod'
+import { ARABIC_NAME_REGEX } from '@/lib/string-utils'
 
 // =============================================
 // Lead Schemas
 // =============================================
 
 export const leadCreateSchema = z.object({
-  first_name: z.string().min(1, 'First name is required').max(100),
-  last_name: z.string().min(1, 'Last name is required').max(100),
+  first_name: z.string().min(1, 'First name is required').max(100).regex(ARABIC_NAME_REGEX, 'First name must be in Arabic'),
+  last_name: z.string().min(1, 'Last name is required').max(100).regex(ARABIC_NAME_REGEX, 'Last name must be in Arabic'),
   phone: z
     .string()
+    .max(20)
     .regex(/^\d{8}$/, 'Phone must be exactly 8 digits'),
   phone_secondary: z
     .string()
+    .max(20)
     .regex(/^\d{8}$/, 'Secondary phone must be exactly 8 digits')
     .optional()
     .nullable(),
-  email: z.string().email('Invalid email address').optional().nullable(),
+  email: z.string().email('Invalid email address').max(255).optional().nullable(),
   civil_id: z
     .string()
+    .max(20)
     .regex(/^\d{12}$/, 'Civil ID must be exactly 12 digits')
     .optional()
     .nullable(),
-  date_of_birth: z.string().optional().nullable(),
-  gender: z.string().optional().nullable(),
-  nationality: z.string().optional().nullable(),
+  date_of_birth: z.string().max(500).optional().nullable(),
+  gender: z.string().max(50).optional().nullable(),
+  nationality: z.string().max(100).optional().nullable(),
   is_kuwaiti: z.boolean().optional(),
-  school: z.string().optional().nullable(),
+  school: z.string().max(500).optional().nullable(),
   school_name_custom: z.string().max(200).optional().nullable(),
   grade_level: z.enum(['10th', '11th', '12th']).optional().nullable(),
   academic_track: z.enum(['science', 'arts']).optional().nullable(),
@@ -87,7 +91,7 @@ export const paymentWebhookSchema = z.object({
 // =============================================
 
 export const smsSchema = z.object({
-  phone: z.string().min(1, 'Phone number is required'),
+  phone: z.string().min(1, 'Phone number is required').max(20),
   message: z.string().min(1, 'Message is required').max(1600),
   leadId: z.string().uuid().optional(),
 })

@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TYPE user_role AS ENUM ('admin', 'agent', 'user');
 
 CREATE TYPE lead_source_category AS ENUM (
-  'direct', 'events', 'digital', 'referrals', 'outreach'
+  'direct', 'events', 'marketing', 'referrals', 'outreach'
 );
 
 CREATE TYPE lead_source AS ENUM (

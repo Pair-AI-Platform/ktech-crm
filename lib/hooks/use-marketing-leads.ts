@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { isArabicText } from "@/lib/string-utils"
 import { queryKeys } from "./query-keys"
 import type { LeadSource, LeadSourceCategory, PipelineStage, ContactStatus } from "@/types"
 
@@ -9,6 +10,8 @@ export interface MarketingLead {
   id: string
   first_name: string
   last_name: string
+  first_name_ar?: string | null
+  last_name_ar?: string | null
   phone: string
   pipeline_stage: PipelineStage
   contact_status: ContactStatus
@@ -40,7 +43,7 @@ export function useMarketingLeads() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leads")
-        .select("id, first_name, last_name, phone, pipeline_stage, contact_status, assigned_to, created_at, source, assigned_agent:profiles!leads_assigned_to_fkey(full_name)")
+        .select("id, first_name, last_name, first_name_ar, last_name_ar, phone, pipeline_stage, contact_status, assigned_to, created_at, source, assigned_agent:profiles!leads_assigned_to_fkey(full_name)")
         .order("created_at", { ascending: false })
 
       if (error) throw new Error(error.message)
@@ -64,6 +67,13 @@ export function useMarketingLeads() {
 
   const createLead = useMutation({
     mutationFn: async (data: CreateMarketingLeadData) => {
+      if (!isArabicText(data.first_name)) {
+        throw new Error('First name must be in Arabic')
+      }
+      if (!isArabicText(data.last_name)) {
+        throw new Error('Last name must be in Arabic')
+      }
+
       const { error } = await supabase
         .from("leads")
         .insert({

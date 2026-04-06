@@ -67,7 +67,7 @@ export function WhatsAppChat({ lead, student, onCall }: WhatsAppChatProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const contact = lead || student
-  const name = contact ? `${contact.first_name} ${contact.last_name}` : "Contact"
+  const name = contact ? `${'first_name_ar' in contact && contact.first_name_ar || contact.first_name} ${'last_name_ar' in contact && contact.last_name_ar || contact.last_name}` : "Contact"
   const phone = contact?.phone || ""
   const initials = contact ? getInitials(contact.first_name || '', contact.last_name || '') || "?" : "?"
 

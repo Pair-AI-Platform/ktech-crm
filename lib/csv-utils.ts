@@ -1,5 +1,6 @@
 import type { Lead, LeadFormData, LeadSource, LeadSourceCategory, FundingType, School, GradeLevel, AcademicTrack, IntendedMajor } from "@/types"
 import { LEAD_SOURCES } from "@/types"
+import { isArabicText } from "@/lib/string-utils"
 
 // CSV column definitions for leads
 export const LEAD_CSV_COLUMNS: { key: string; label: string; required?: boolean }[] = [
@@ -187,7 +188,9 @@ export function parseLeadFromCSV(row: string[], headerMap: Map<string, number>):
   const phone = getValue("phone").replace(/[^0-9]/g, "")
 
   if (!firstName) errors.push("First name is required")
+  else if (!isArabicText(firstName)) errors.push("First name must be in Arabic")
   if (!lastName) errors.push("Last name is required")
+  else if (!isArabicText(lastName)) errors.push("Last name must be in Arabic")
   if (!phone) errors.push("Phone is required")
   if (phone && phone.length !== 8) errors.push("Phone must be 8 digits")
 

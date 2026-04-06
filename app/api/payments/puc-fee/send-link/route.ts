@@ -156,7 +156,7 @@ ${transaction.myfatoorah_invoice_url}
     })
   } catch (error: unknown) {
     console.error("[PUC Fee Send Link] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to send payment link"
+    const errorMessage = "Failed to send payment link"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   FileText,
   Upload,
@@ -19,16 +19,30 @@ import { createClient } from "@/lib/supabase/client"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 import { ScanLine } from "lucide-react"
-import type { Lead } from "@/types"
+import type { Lead, EducationType } from "@/types"
+import { getDocumentsForGraduateType, type GraduateType, type DocumentRule } from "@/lib/psp/document-rules"
 
-// The 5 PUC document types that appear on the lead profile
-const PUC_PROFILE_DOCUMENTS = [
+// Fallback documents when no education type is set
+const DEFAULT_PROFILE_DOCUMENTS = [
   { id: "civil_id", name: "Civil ID", nameAr: "البطاقة المدنية" },
   { id: "parent_civil_id", name: "Parent Civil ID", nameAr: "البطاقة المدنية للوالد" },
   { id: "passport", name: "Passport", nameAr: "جواز السفر" },
   { id: "extra_document_1", name: "Extra Document 1", nameAr: "مستند إضافي 1" },
   { id: "extra_document_2", name: "Extra Document 2", nameAr: "مستند إضافي 2" },
 ] as const
+
+function educationToGraduateType(educationType?: EducationType): GraduateType | null {
+  if (!educationType) return null
+  if (educationType === 'other') return 'OTHER'
+  return educationType as GraduateType
+}
+
+function getProfileDocuments(educationType?: EducationType): { id: string; name: string; nameAr: string; required?: boolean }[] {
+  const graduateType = educationToGraduateType(educationType)
+  if (!graduateType) return [...DEFAULT_PROFILE_DOCUMENTS]
+  const docs = getDocumentsForGraduateType(graduateType)
+  return docs.map(d => ({ id: d.id, name: d.name, nameAr: d.nameAr, required: d.required }))
+}
 
 interface StoredDocument {
   id: string
@@ -67,6 +81,7 @@ function getFileIcon(type: string) {
 }
 
 export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUCDocumentUploadProps) {
+  const profileDocuments = useMemo(() => getProfileDocuments(lead?.education_type), [lead?.education_type])
   const [documents, setDocuments] = useState<Record<string, StoredDocument | null>>({})
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
@@ -80,7 +95,7 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
   // Load existing documents from the psp_documents table
   useEffect(() => {
     loadDocuments()
-  }, [leadId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leadId, lead?.education_type]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDocuments = async () => {
     setLoading(true)
@@ -89,7 +104,7 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
       if (!response.ok) throw new Error("Failed to load documents")
       const data = await response.json()
       const docs: Record<string, StoredDocument | null> = {}
-      for (const docType of PUC_PROFILE_DOCUMENTS) {
+      for (const docType of profileDocuments) {
         const found = (data.documents || []).find(
           (d: StoredDocument) => d.document_type === docType.id
         )
@@ -247,7 +262,7 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
     document.body.removeChild(link)
   }
 
-  const uploadedCount = PUC_PROFILE_DOCUMENTS.filter((d) => documents[d.id]).length
+  const uploadedCount = profileDocuments.filter((d) => documents[d.id]).length
 
   if (loading) {
     return (
@@ -266,23 +281,23 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
             Documents Uploaded
           </span>
           <span className="text-sm text-[var(--primary)] font-semibold">
-            {uploadedCount} / {PUC_PROFILE_DOCUMENTS.length}
+            {uploadedCount} / {profileDocuments.length}
           </span>
         </div>
         <div className="w-full bg-[var(--border)] rounded-full h-2">
           <div
             className={cn(
               "h-2 rounded-full transition-all duration-300",
-              uploadedCount === PUC_PROFILE_DOCUMENTS.length
+              uploadedCount === profileDocuments.length
                 ? "bg-[var(--success)]"
                 : "bg-[var(--primary)]"
             )}
             style={{
-              width: `${Math.round((uploadedCount / PUC_PROFILE_DOCUMENTS.length) * 100)}%`,
+              width: `${Math.round((uploadedCount / profileDocuments.length) * 100)}%`,
             }}
           />
         </div>
-        {uploadedCount === PUC_PROFILE_DOCUMENTS.length && (
+        {uploadedCount === profileDocuments.length && (
           <p className="text-xs text-[var(--success)] mt-2 flex items-center gap-1">
             <Check className="w-3 h-3" />
             All documents uploaded
@@ -292,7 +307,7 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
 
       {/* Document List */}
       <div className="space-y-2">
-        {PUC_PROFILE_DOCUMENTS.map((docType) => {
+        {profileDocuments.map((docType) => {
           const doc = documents[docType.id]
           const hasFile = !!doc
           const isUploading = uploading === docType.id

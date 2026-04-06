@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error("[PSP Payment Create] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to create payment link"
+    const errorMessage = "Failed to create payment link"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

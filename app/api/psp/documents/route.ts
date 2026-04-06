@@ -147,7 +147,7 @@ export const POST = withApiHandler(
 
     if (error) {
       logger.error("Error creating PSP document", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to save document. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ document: data })
@@ -197,7 +197,7 @@ export const DELETE = withApiHandler(
 
     if (deleteError) {
       logger.error("Error deleting document from DB", { error: deleteError.message })
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to delete document. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
@@ -238,7 +238,7 @@ export const PATCH = withApiHandler(
 
     if (error) {
       logger.error("Error updating document", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update document. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ document: data })

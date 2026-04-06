@@ -162,7 +162,7 @@ Kuwait Technical College`
     })
   } catch (error: unknown) {
     console.error("[PSP Send Receipt] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to send receipt"
+    const errorMessage = "Failed to send receipt"
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

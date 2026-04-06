@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScanLine, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { isArabicText } from "@/lib/string-utils"
 import type { Lead } from "@/types"
 
 export interface ExtractedCivilIdData {
@@ -43,10 +44,8 @@ const FIELD_CONFIG: {
   label: string
   leadKey: keyof Lead
 }[] = [
-  { key: "first_name", label: "First Name (EN)", leadKey: "first_name" },
-  { key: "last_name", label: "Last Name (EN)", leadKey: "last_name" },
-  { key: "first_name_ar", label: "First Name (AR)", leadKey: "first_name_ar" },
-  { key: "last_name_ar", label: "Last Name (AR)", leadKey: "last_name_ar" },
+  { key: "first_name_ar", label: "First Name", leadKey: "first_name" },
+  { key: "last_name_ar", label: "Last Name", leadKey: "last_name" },
   { key: "civil_id", label: "Civil ID", leadKey: "civil_id" },
   { key: "date_of_birth", label: "Date of Birth", leadKey: "date_of_birth" },
   { key: "gender", label: "Gender", leadKey: "gender" },
@@ -101,6 +100,10 @@ export function CivilIdExtractionDialog({
       const updates: Partial<Lead> = {}
       for (const field of FIELD_CONFIG) {
         if (selectedFields.has(field.key) && editedValues[field.key]) {
+          // Skip name fields that aren't Arabic
+          if ((field.leadKey === 'first_name' || field.leadKey === 'last_name') && !isArabicText(editedValues[field.key])) {
+            continue
+          }
           ;(updates as Record<string, unknown>)[field.leadKey] = editedValues[field.key]
         }
       }

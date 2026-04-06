@@ -521,7 +521,7 @@ export async function GET(
     })
   } catch (error: unknown) {
     console.error("[PSP Receipt] Error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to generate receipt"
+    const errorMessage = "Failed to generate receipt"
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

@@ -345,8 +345,8 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                       </span>
                     </SimpleTooltip>
                   )}
-                  <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate">
-                    {lead.first_name} {lead.last_name}
+                  <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate" dir="auto">
+                    {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                   </p>
                   {isSentToRegistration && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 whitespace-nowrap flex-shrink-0">

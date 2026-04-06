@@ -69,12 +69,13 @@ export function LeadFormPersonal({
       <div className="space-y-4 pl-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="first_name">First Name *</Label>
+            <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
               id="first_name"
               value={formData.first_name}
               onChange={(e) => handleChange("first_name", e.target.value)}
-              placeholder="First name"
+              placeholder="الاسم الأول"
+              dir="rtl"
               error={errors.first_name}
             />
             {errors.first_name && (
@@ -82,12 +83,13 @@ export function LeadFormPersonal({
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="last_name">Last Name *</Label>
+            <Label htmlFor="last_name">Last Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
               id="last_name"
               value={formData.last_name}
               onChange={(e) => handleChange("last_name", e.target.value)}
-              placeholder="Last name"
+              placeholder="اسم العائلة"
+              dir="rtl"
               error={errors.last_name}
             />
             {errors.last_name && (

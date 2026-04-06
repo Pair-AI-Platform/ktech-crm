@@ -239,9 +239,9 @@ export function EnrollmentPaymentDialog({
               <DialogDescription>
                 {step === "success"
                   ? (isSF
-                    ? `${lead.first_name} ${lead.last_name} has been moved to Applicant`
-                    : `${lead.first_name} ${lead.last_name} is now enrolled`)
-                  : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${lead.first_name} ${lead.last_name}`}
+                    ? `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} has been moved to Applicant`
+                    : `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} is now enrolled`)
+                  : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}`}
               </DialogDescription>
             </div>
           </div>
@@ -461,8 +461,8 @@ export function EnrollmentPaymentDialog({
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
                   {isSF
-                    ? `${lead.first_name} ${lead.last_name} has been moved to Applicant.`
-                    : `${lead.first_name} ${lead.last_name} has been successfully enrolled.`}
+                    ? `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} has been moved to Applicant.`
+                    : `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} has been successfully enrolled.`}
                 </p>
               </div>
 

@@ -8,6 +8,7 @@ import type { Lead, PipelineStage, FundingType, LeadStatus } from "@/types"
 import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
 import { GPA_SELF_FUNDED_THRESHOLD, PUC_SRJ_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
+import { isArabicText } from "@/lib/string-utils"
 import { queryKeys } from "./query-keys"
 
 interface UseLeadsFilters {
@@ -283,6 +284,14 @@ export function useLeadMutations() {
   const createLeadMutation = useMutation({
     mutationKey: ['lead-mutation'],
     mutationFn: async (leadData: Partial<Lead>) => {
+      // Validate Arabic names
+      if (leadData.first_name && !isArabicText(leadData.first_name)) {
+        throw new Error('First name must be in Arabic')
+      }
+      if (leadData.last_name && !isArabicText(leadData.last_name)) {
+        throw new Error('Last name must be in Arabic')
+      }
+
       // Demo mode - simulate success
       if (isDemoMode()) {
         await new Promise(resolve => setTimeout(resolve, 300))
@@ -369,6 +378,14 @@ export function useLeadMutations() {
   const updateLeadMutation = useMutation({
     mutationKey: ['lead-mutation'],
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Lead> }) => {
+      // Validate Arabic names if being updated
+      if (updates.first_name && !isArabicText(updates.first_name)) {
+        throw new Error('First name must be in Arabic')
+      }
+      if (updates.last_name && !isArabicText(updates.last_name)) {
+        throw new Error('Last name must be in Arabic')
+      }
+
       // Demo mode - save to localStorage and simulate success
       if (isDemoMode()) {
         await new Promise(resolve => setTimeout(resolve, 300))
@@ -429,6 +446,12 @@ export function useLeadMutations() {
       // Assign next position when moving to a different stage
       if (updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage) {
         updates.position_in_stage = await getNextPosition(updates.pipeline_stage)
+      }
+
+      // Map client-side 'status' field to DB column 'contact_status'
+      if ('status' in updates) {
+        updates.contact_status = updates.status as unknown as Lead['contact_status']
+        delete updates.status
       }
 
       const { data, error } = await supabase

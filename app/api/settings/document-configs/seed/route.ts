@@ -28,7 +28,7 @@ export const POST = withApiHandler(
 
     if (error) {
       logger.error("Failed to seed document configs", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to seed document configs. Please try again.' }, { status: 500 })
     }
 
     logger.info("Document configs seeded", { count: rows.length })

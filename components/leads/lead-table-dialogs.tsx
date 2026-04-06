@@ -134,7 +134,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setLostDialogLead(null)
         }}
-        leadName={lostDialogLead ? `${lostDialogLead.first_name} ${lostDialogLead.last_name}` : ''}
+        leadName={lostDialogLead ? `${lostDialogLead.first_name_ar || lostDialogLead.first_name} ${lostDialogLead.last_name_ar || lostDialogLead.last_name}` : ''}
         onConfirm={assignReasonMode && handleAssignLostReason ? handleAssignLostReason : handleLostConfirm}
         assignReasonMode={assignReasonMode}
       />
@@ -145,7 +145,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setContactedDialogLead(null)
         }}
-        leadName={contactedDialogLead ? `${contactedDialogLead.first_name} ${contactedDialogLead.last_name}` : ''}
+        leadName={contactedDialogLead ? `${contactedDialogLead.first_name_ar || contactedDialogLead.first_name} ${contactedDialogLead.last_name_ar || contactedDialogLead.last_name}` : ''}
         currentStatus={contactedDialogLead?.status as LeadStatus | null | undefined}
         onConfirm={handleContactedConfirm}
       />
@@ -156,7 +156,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setWithdrawDialogLead(null)
         }}
-        leadName={withdrawDialogLead ? `${withdrawDialogLead.first_name} ${withdrawDialogLead.last_name}` : ''}
+        leadName={withdrawDialogLead ? `${withdrawDialogLead.first_name_ar || withdrawDialogLead.first_name} ${withdrawDialogLead.last_name_ar || withdrawDialogLead.last_name}` : ''}
         onConfirm={handleWithdrawConfirm}
       />
 
@@ -166,7 +166,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setEditWithdrawReasonLead(null)
         }}
-        leadName={editWithdrawReasonLead ? `${editWithdrawReasonLead.first_name} ${editWithdrawReasonLead.last_name}` : ''}
+        leadName={editWithdrawReasonLead ? `${editWithdrawReasonLead.first_name_ar || editWithdrawReasonLead.first_name} ${editWithdrawReasonLead.last_name_ar || editWithdrawReasonLead.last_name}` : ''}
         onConfirm={handleEditWithdrawReasonConfirm}
       />
 
@@ -176,7 +176,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setBlockedDialogLead(null)
         }}
-        leadName={blockedDialogLead ? `${blockedDialogLead.first_name} ${blockedDialogLead.last_name}` : ''}
+        leadName={blockedDialogLead ? `${blockedDialogLead.first_name_ar || blockedDialogLead.first_name} ${blockedDialogLead.last_name_ar || blockedDialogLead.last_name}` : ''}
         onConfirm={handleBlockedConfirm}
       />
 

@@ -481,8 +481,8 @@ function EditMemberModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[460px] overflow-hidden p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <Edit className="w-5 h-5 text-[var(--primary)]" />
             Edit Team Member
@@ -492,7 +492,7 @@ function EditMemberModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 px-6">
           <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)]">
             <Avatar className="w-12 h-12">
               <AvatarImage src={member.avatar_url} />
@@ -555,7 +555,7 @@ function EditMemberModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 px-6 pb-6 pt-2">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

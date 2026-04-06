@@ -379,7 +379,7 @@ export function AppointmentBooking({
                       {selectedLeads.length > 0 && (
                         <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                           for {selectedLeads.length === 1
-                            ? `${selectedLeads[0].first_name} ${selectedLeads[0].last_name}`
+                            ? `${selectedLeads[0].first_name_ar || selectedLeads[0].first_name} ${selectedLeads[0].last_name_ar || selectedLeads[0].last_name}`
                             : `${selectedLeads.length} leads`}
                         </p>
                       )}
@@ -410,7 +410,7 @@ export function AppointmentBooking({
                             </span>
                           </div>
                           <span className="text-xs font-medium text-[var(--text-primary)]">
-                            {lead.first_name} {lead.last_name}
+                            {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                           </span>
                           {!preselectedLead && (
                             <button
@@ -471,7 +471,7 @@ export function AppointmentBooking({
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm text-[var(--text-primary)] truncate">
-                                        {lead.first_name} {lead.last_name}
+                                        {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                                       </p>
                                       <p className="text-xs text-[var(--text-muted)]">{lead.phone}</p>
                                     </div>
@@ -746,7 +746,7 @@ export function AppointmentBooking({
                 <span className="text-lg">{skipToDateTime ? "Schedule Appointment" : "Book Appointment"}</span>
                 <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                   {skipToDateTime && selectedLead
-                    ? `Select date and time for ${selectedLead.first_name} ${selectedLead.last_name}`
+                    ? `Select date and time for ${selectedLead.first_name_ar || selectedLead.first_name} ${selectedLead.last_name_ar || selectedLead.last_name}`
                     : "Schedule a new appointment with a lead"}
                 </p>
               </div>
@@ -1015,7 +1015,7 @@ export function AppointmentBooking({
                           </span>
                         </div>
                         <span className="text-xs font-medium text-[var(--text-primary)]">
-                          {lead.first_name} {lead.last_name}
+                          {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                         </span>
                         <button
                           type="button"
@@ -1103,7 +1103,7 @@ export function AppointmentBooking({
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-[var(--text-primary)] truncate">
-                                  {lead.first_name} {lead.last_name}
+                                  {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                                 </p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] px-2 py-0.5 rounded-md bg-[var(--bg-sunken)]">
@@ -1423,7 +1423,7 @@ export function AppointmentBooking({
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-sm text-[var(--text-primary)]">
-                                {lead.first_name} {lead.last_name}
+                                {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
                               </p>
                               <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                                 <Phone className="w-3 h-3" />
@@ -1581,7 +1581,7 @@ export function AppointmentBooking({
                       </div>
                       <p className="text-xs text-[var(--text-muted)]">
                         {selectedLeads.length === 1
-                          ? `${selectedLeads[0].first_name} ${selectedLeads[0].last_name}`
+                          ? `${selectedLeads[0].first_name_ar || selectedLeads[0].first_name} ${selectedLeads[0].last_name_ar || selectedLeads[0].last_name}`
                           : `${selectedLeads.length} leads`}
                       </p>
                     </div>
