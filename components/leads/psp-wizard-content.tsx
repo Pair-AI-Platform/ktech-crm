@@ -891,7 +891,7 @@ Kuwait Technical College`
       {/* Step Content */}
       <div className={cn(
         "p-6",
-        variant === "modal" ? "min-h-[400px] max-h-[50vh] overflow-y-auto" : "flex-1 overflow-y-auto"
+        variant === "modal" ? "flex-1 min-h-0 overflow-y-auto" : "flex-1 overflow-y-auto"
       )}>
         <AnimatePresence mode="wait">
           {/* Step 1: Info & Documents */}

@@ -880,7 +880,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         </div>
 
         {/* Footer Actions - Status Action Buttons */}
-        {isActionable && !showPostponedForm && !showCancelForm && !showDeleteConfirm && (
+        {isActionable && !appointment.is_callback && !showPostponedForm && !showCancelForm && !showDeleteConfirm && (
           <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
             {/* Reminder */}
             <p className="text-[11px] font-semibold text-[var(--warning)] mb-2.5 flex items-center gap-1.5">

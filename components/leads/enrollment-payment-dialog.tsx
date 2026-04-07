@@ -85,6 +85,21 @@ export function EnrollmentPaymentDialog({
     }
   }
 
+  const openWhatsAppLink = (paymentUrl: string) => {
+    const leadName = lead.first_name_ar || lead.first_name
+    const paymentAmount = parsedAmount > 0 ? parsedAmount : ENROLLMENT_PAYMENT_AMOUNT
+
+    const message = `مرحباً ${leadName}،\n\nلإتمام عملية التسجيل في كلية الكويت التقنية، يرجى دفع رسوم التسجيل بقيمة ${paymentAmount} د.ك من خلال الرابط التالي:\n\n${paymentUrl}\n\n---\n\nHello ${leadName},\n\nTo complete your enrollment at Kuwait Technical College, please pay the registration fee of ${paymentAmount} KD using the following link:\n\n${paymentUrl}\n\nشكراً لكم / Thank you`
+
+    // Format phone for wa.me (digits only, with country code)
+    let phone = (lead.phone || "").replace(/\D/g, "")
+    if (!phone.startsWith("965")) {
+      phone = `965${phone}`
+    }
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank")
+  }
+
   const handleCreatePaymentLink = async () => {
     if (!civilId.trim()) {
       setError("Civil ID is required")
@@ -97,8 +112,10 @@ export function EnrollmentPaymentDialog({
     // Demo mode: simulate payment link sent
     if (isDemoMode()) {
       await new Promise(resolve => setTimeout(resolve, 500))
-      setInvoiceUrl("https://demo.myfatoorah.com/payment/demo")
+      const demoUrl = "https://demo.myfatoorah.com/payment/demo"
+      setInvoiceUrl(demoUrl)
       setStep("link-sent")
+      openWhatsAppLink(demoUrl)
       setLoading(false)
       return
     }
@@ -124,37 +141,10 @@ export function EnrollmentPaymentDialog({
       setInvoiceUrl(data.invoiceUrl)
       setStep("link-sent")
 
-      // Automatically send WhatsApp
-      await handleSendWhatsApp(data.transactionId)
+      // Open WhatsApp with payment link
+      openWhatsAppLink(data.invoiceUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create payment link")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSendWhatsApp = async (txId?: string) => {
-    const id = txId || transactionId
-    if (!id) return
-
-    setLoading(true)
-    try {
-      const response = await fetch("/api/payments/send-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transactionId: id }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send WhatsApp")
-      }
-
-      // WhatsApp sent successfully
-    } catch (err) {
-      // Don't fail - link is still created
-      console.error("Failed to send WhatsApp:", err)
     } finally {
       setLoading(false)
     }
@@ -360,19 +350,16 @@ export function EnrollmentPaymentDialog({
                 </div>
               )}
 
-              <Button
-                variant="ghost"
-                onClick={() => handleSendWhatsApp()}
-                disabled={loading}
-                className="text-sm"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
+              {invoiceUrl && (
+                <Button
+                  variant="ghost"
+                  onClick={() => openWhatsAppLink(invoiceUrl)}
+                  className="text-sm"
+                >
                   <Send className="w-4 h-4 mr-2" />
-                )}
-                Resend WhatsApp
-              </Button>
+                  Resend via WhatsApp
+                </Button>
+              )}
             </div>
           )}
 

@@ -243,10 +243,12 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
 
   // Filter pipeline stages based on source and funding type
   // Walk-in leads can only go to: test or application
-  // Submission stage is only for PUC leads
+  // Document Submission & Application Submission are only for PUC leads
+  const isPuc = formData.funding_type === 'puc'
+  const PUC_ONLY_STAGES = ['puc_document_submission', 'puc_application_submission']
   const availablePipelineStages = isWalkIn
     ? PIPELINE_STAGES.filter(s => s.value === 'test' || s.value === 'application')
-    : PIPELINE_STAGES.filter(s => s.value !== 'lost')
+    : PIPELINE_STAGES.filter(s => s.value !== 'lost' && (isPuc || !PUC_ONLY_STAGES.includes(s.value)))
 
   // Calculate placement level based on passed subjects
   const calculatePlacementLevel = () => {

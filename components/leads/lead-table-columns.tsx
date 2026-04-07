@@ -80,7 +80,7 @@ export function LeadTableHeader({
                 </span>
               </th>
             )}
-            {!isPucApplicantView && (
+            {isPucSrjView && !isPucApplicantView && (
             <th className="px-3 py-1.5 text-left min-w-[150px] w-[170px]">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                 Status

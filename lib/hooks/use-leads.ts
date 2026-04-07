@@ -765,7 +765,7 @@ export function useLeadMutations() {
 
   const bulkUpdateStageMutation = useMutation({
     mutationKey: ['lead-mutation'],
-    mutationFn: async ({ leadIds, stage }: { leadIds: string[]; stage: PipelineStage }) => {
+    mutationFn: async ({ leadIds, stage, lostReasonId, lostReasonNotes }: { leadIds: string[]; stage: PipelineStage; lostReasonId?: string; lostReasonNotes?: string }) => {
       // Demo mode - simulate success
       if (isDemoMode()) {
         await new Promise(resolve => setTimeout(resolve, 300))
@@ -778,13 +778,38 @@ export function useLeadMutations() {
       // Update each lead individually with sequential positions
       const errors: string[] = []
       for (const id of leadIds) {
+        // Get old stage for lost_at_stage tracking
+        let oldStage: PipelineStage | null = null
+        if (stage === 'lost') {
+          const { data: oldLead } = await supabase
+            .from("leads")
+            .select("pipeline_stage")
+            .eq("id", id)
+            .single()
+          oldStage = oldLead?.pipeline_stage || null
+        }
+
+        const updateData: Record<string, unknown> = {
+          pipeline_stage: stage,
+          position_in_stage: nextPos,
+          last_contacted_at: new Date().toISOString(),
+        }
+
+        if (stage === 'lost') {
+          if (lostReasonId) {
+            updateData.lost_reason_id = lostReasonId
+          }
+          if (lostReasonNotes) {
+            updateData.lost_reason_notes = lostReasonNotes
+          }
+          if (oldStage && oldStage !== 'lost') {
+            updateData.lost_at_stage = oldStage
+          }
+        }
+
         const { error } = await supabase
           .from("leads")
-          .update({
-            pipeline_stage: stage,
-            position_in_stage: nextPos,
-            last_contacted_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq("id", id)
 
         if (error) {
@@ -912,9 +937,9 @@ export function useLeadMutations() {
     }
   }
 
-  const bulkUpdateStage = async (leadIds: string[], stage: PipelineStage) => {
+  const bulkUpdateStage = async (leadIds: string[], stage: PipelineStage, lostReasonId?: string, lostReasonNotes?: string) => {
     try {
-      const result = await bulkUpdateStageMutation.mutateAsync({ leadIds, stage })
+      const result = await bulkUpdateStageMutation.mutateAsync({ leadIds, stage, lostReasonId, lostReasonNotes })
       return result
     } catch (err) {
       console.error("Error bulk updating stage:", err)

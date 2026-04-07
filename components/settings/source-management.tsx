@@ -150,7 +150,7 @@ function SourceRow({
             </Badge>
             <button
               onClick={() => setEditing(true)}
-              className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors opacity-0 group-hover:opacity-100"
+              className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
               title="Edit source"
             >
               <Pencil className="w-3 h-3" />
@@ -180,7 +180,7 @@ function SourceRow({
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="text-[var(--text-muted)] hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+            className="text-[var(--text-muted)] hover:text-rose-500 transition-colors"
             title="Delete source"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -201,6 +201,14 @@ export function SourceManagement() {
   const [newLabel, setNewLabel] = useState("")
   const [newValue, setNewValue] = useState("")
   const [newCategory, setNewCategory] = useState("direct")
+
+  const openFormForCategory = (category: string) => {
+    setNewCategory(category)
+    setNewLabel("")
+    setNewValue("")
+    setError(null)
+    setShowForm(true)
+  }
   const [error, setError] = useState<string | null>(null)
 
   const handleLabelChange = (label: string) => {
@@ -252,7 +260,7 @@ export function SourceManagement() {
   const grouped = CATEGORIES.map((cat) => ({
     ...cat,
     sources: sources.filter((s) => s.category === cat.value),
-  })).filter((g) => g.sources.length > 0)
+  }))
 
   return (
     <div className="space-y-6">
@@ -278,7 +286,7 @@ export function SourceManagement() {
                 Manage lead sources and their categories. Inactive sources won&apos;t appear in lead forms.
               </CardDescription>
             </div>
-            <Button onClick={() => setShowForm(true)} size="sm">
+            <Button onClick={() => openFormForCategory("direct")} size="sm">
               <Plus className="w-4 h-4 mr-1" />
               New Source
             </Button>
@@ -300,30 +308,45 @@ export function SourceManagement() {
               {grouped.map((group) => (
                 <div key={group.value} className="border rounded-xl overflow-hidden border-[var(--border)]">
                   <div className="px-4 py-2 bg-[var(--bg-sunken)] border-b border-[var(--border)]">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={cn(
-                          "text-[10px] border px-1.5 py-0",
-                          CATEGORY_COLORS[group.value]
-                        )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          className={cn(
+                            "text-[10px] border px-1.5 py-0",
+                            CATEGORY_COLORS[group.value]
+                          )}
+                        >
+                          {group.label}
+                        </Badge>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {group.sources.length} source{group.sources.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => openFormForCategory(group.value)}
+                        className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
+                        title={`Add source to ${group.label}`}
                       >
-                        {group.label}
-                      </Badge>
-                      <span className="text-xs text-[var(--text-muted)]">
-                        {group.sources.length} source{group.sources.length !== 1 ? "s" : ""}
-                      </span>
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  {group.sources.map((source, idx) => (
-                    <SourceRow
-                      key={source.id}
-                      source={source}
-                      isLast={idx === group.sources.length - 1}
-                      isSaving={isSaving}
-                      onUpdate={(updates) => handleUpdate(source, updates)}
-                      onDelete={() => handleDelete(source)}
-                    />
-                  ))}
+                  {group.sources.length === 0 ? (
+                    <div className="px-4 py-3 text-xs text-[var(--text-muted)] italic">
+                      No sources yet. Click + to add one.
+                    </div>
+                  ) : (
+                    group.sources.map((source, idx) => (
+                      <SourceRow
+                        key={source.id}
+                        source={source}
+                        isLast={idx === group.sources.length - 1}
+                        isSaving={isSaving}
+                        onUpdate={(updates) => handleUpdate(source, updates)}
+                        onDelete={() => handleDelete(source)}
+                      />
+                    ))
+                  )}
                 </div>
               ))}
             </div>

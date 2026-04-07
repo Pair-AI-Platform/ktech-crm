@@ -456,7 +456,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   }
 
   const handleBulkLostConfirm = async (reasonId: string, notes?: string) => {
-    const result = await bulkUpdateStage(selectedLeads, "lost" as PipelineStage)
+    const result = await bulkUpdateStage(selectedLeads, "lost" as PipelineStage, reasonId, notes)
     if (!result.error) {
       setShowLostModal(false)
       setSelectedLeads([])

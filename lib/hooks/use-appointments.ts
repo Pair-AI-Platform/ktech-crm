@@ -385,15 +385,13 @@ export function useAppointmentMutations() {
         return updatedApt ? { ...updatedApt, ...updates } : null
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("appointments")
         .update(updates)
         .eq("id", id)
-        .select()
-        .single()
 
       if (error) throw new Error(error.message)
-      return data
+      return { id, ...updates }
     },
     onSuccess: () => {
       invalidateAppointments()

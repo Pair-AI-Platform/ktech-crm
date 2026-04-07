@@ -12,10 +12,8 @@ interface AdminDropoffSectionProps {
 }
 
 export function AdminDropoffSection({ dropoffData, loading }: AdminDropoffSectionProps) {
-  const sorted = useMemo(
-    () => [...dropoffData].sort((a, b) => b.count - a.count),
-    [dropoffData]
-  )
+  // Use pipeline funnel order from hook (don't re-sort by count)
+  const sorted = dropoffData
 
   const maxCount = useMemo(
     () => Math.max(...sorted.map((d) => d.count), 1),

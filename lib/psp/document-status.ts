@@ -21,16 +21,15 @@ export function computePUCDocumentStatus(
   const effectiveSubstage = substage || "documents"
 
   switch (effectiveSubstage) {
-    case "documents":
-      if (!allDocsComplete) return "missing_document"
-      if (!paymentComplete) return "pending_payment"
-      return "ready_to_apply"
-
     case "submissions":
       return "applied"
 
+    case "documents":
     default:
-      return null
+      // "documents", "pending", or any other substage — show document status
+      if (!allDocsComplete) return "missing_document"
+      if (!paymentComplete) return "pending_payment"
+      return "ready_to_apply"
   }
 }
 

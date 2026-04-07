@@ -160,8 +160,12 @@ export function NoUpdatedAppointments({
     setLoadingId(postponeTarget.id)
     setLoadingAction("postponed")
     try {
-      await postponeAppointment(postponeTarget.id, postponeDate, postponeTime)
-      onUpdate?.()
+      const result = await postponeAppointment(postponeTarget.id, postponeDate, postponeTime)
+      if (result?.error) {
+        console.error("Error postponing:", result.error)
+      } else {
+        onUpdate?.()
+      }
     } catch (error) {
       console.error("Error postponing:", error)
     } finally {

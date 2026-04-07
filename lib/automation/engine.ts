@@ -176,6 +176,11 @@ async function executeAction(
         }
         const { target_stage } = action_config as { target_stage: string }
 
+        // Block automated moves to "lost" — lost reason must be chosen manually via the UI dialog
+        if (target_stage === "lost") {
+          return { success: false, error: "Cannot auto-move to lost stage — lost reason must be selected manually" }
+        }
+
         const { error } = await supabase
           .from("leads")
           .update({ pipeline_stage: target_stage })

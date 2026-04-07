@@ -539,13 +539,19 @@ export default function ArchivePage() {
         .eq("is_active", false)
         .order("start_year", { ascending: false })
 
-      const { data: termsData } = await supabase
-        .from("semesters")
-        .select("*")
-        .eq("is_active", false)
-        .order("start_date", { ascending: true })
-
       const hasCycles = cyclesData && cyclesData.length > 0
+
+      // Fetch semesters belonging to those inactive cycles (not by is_active flag,
+      // because a semester's is_active means "currently in session" and may not be
+      // toggled when its parent cycle becomes inactive)
+      const inactiveCycleIds = hasCycles ? cyclesData.map((c) => c.id) : []
+      const { data: termsData } = inactiveCycleIds.length > 0
+        ? await supabase
+            .from("semesters")
+            .select("*")
+            .in("cycle_id", inactiveCycleIds)
+            .order("start_date", { ascending: true })
+        : { data: [] as Semester[] }
 
       if (!hasCycles) {
         // Use demo data

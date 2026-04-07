@@ -101,7 +101,8 @@ export function LeadTable({
   const [viewingAppointment, setViewingAppointment] = useState<import("@/types").Appointment | null>(null)
 
   // Check if we're viewing submission stage
-  const isPucSrjView = fundingTypeFilter === 'puc'
+  // Auto-enable PUC view when viewing PUC-specific stages (even without funding type filter)
+  const isPucSrjView = fundingTypeFilter === 'puc' || currentStageFilter === 'puc_document_submission' || currentStageFilter === 'puc_application_submission'
   const isWithdrawView = currentStageFilter === 'withdraw'
   const isSubmissionView = !isWithdrawView && (currentStageFilter === 'applicant' || isPucSrjView)
   const isLostView = currentStageFilter === 'lost'
@@ -110,9 +111,9 @@ export function LeadTable({
   // PUC Applicant view: show orientation instead of status
   const isPucApplicantView = isPucSrjView && currentStageFilter === 'applicant'
   // PUC Doc Submission view: show doc status column
-  const isPucDocSubmissionView = isPucSrjView && currentStageFilter === 'puc_document_submission'
+  const isPucDocSubmissionView = currentStageFilter === 'puc_document_submission'
   const isPucContactedView = isPucSrjView && currentStageFilter === 'contacted'
-  const isPucAppSubmissionView = isPucSrjView && currentStageFilter === 'puc_application_submission'
+  const isPucAppSubmissionView = currentStageFilter === 'puc_application_submission'
 
   // Function to refresh document completion status
   const refreshDocumentStatus = React.useCallback(() => {
@@ -474,6 +475,19 @@ export function LeadTable({
       return
     }
 
+    // Intercept "applicant" stage change for non-PUC leads that haven't paid - show payment dialog first
+    // The stage promotion will happen via RPC after payment, not via direct update
+    if (newStage === 'applicant' && !isPucSrjView) {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead && lead.funding_type !== 'puc') {
+        const paid = sfPaymentData[leadId]?.amount_paid ?? 0
+        if (paid < 150) {
+          setPaymentDialogLead(lead)
+          return
+        }
+      }
+    }
+
     // Optimistic update - immediately show the new value
     // Always clear status when changing stage so user must re-select
     const nextCount = getNextCount(leadId)
@@ -514,16 +528,8 @@ export function LeadTable({
       }
     }
 
-    // After moving to "applicant", open payment dialog if lead hasn't paid 150 (skip for PUC leads)
-    if (newStage === 'applicant' && !result.error && !isPucSrjView) {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead && lead.funding_type !== 'puc') {
-        const paid = sfPaymentData[leadId]?.amount_paid ?? 0
-        if (paid < 150) {
-          setPaymentDialogLead(lead)
-        }
-      }
-    }
+    // Note: "applicant" stage for unpaid non-PUC leads is intercepted above (before stage update)
+    // Payment dialog opens first, and the RPC promotes the lead after payment
   }
 
   const handleLostConfirm = async (reasonId: string, notes?: string) => {

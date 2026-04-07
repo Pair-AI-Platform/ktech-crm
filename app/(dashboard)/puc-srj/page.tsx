@@ -108,12 +108,32 @@ export default function PUCSRJPage() {
     }
   }, [tabParam])
   const stagePillsRef = useRef<HTMLDivElement>(null)
+  const pendingScrollRestore = useRef<number | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [sfSrjStageFilter, setSfSrjStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSrjSearchQuery, setSfSrjSearchQuery] = useState("")
   const [sfStageFilter, setSfStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSearchQuery, setSfSearchQuery] = useState("")
+
+  // Restore view state from sessionStorage on mount (for back navigation)
+  useEffect(() => {
+    const saved = sessionStorage.getItem("puc-srj-view-state")
+    if (!saved) return
+    sessionStorage.removeItem("puc-srj-view-state")
+    try {
+      const state = JSON.parse(saved)
+      if (state.topTab) setTopTab(state.topTab)
+      if (state.searchQuery) setSearchQuery(state.searchQuery)
+      if (state.stageFilter) setStageFilter(state.stageFilter)
+      if (state.sfSrjStageFilter) setSfSrjStageFilter(state.sfSrjStageFilter)
+      if (state.sfSrjSearchQuery) setSfSrjSearchQuery(state.sfSrjSearchQuery)
+      if (state.sfStageFilter) setSfStageFilter(state.sfStageFilter)
+      if (state.sfSearchQuery) setSfSearchQuery(state.sfSearchQuery)
+      if (state.scrollTop) pendingScrollRestore.current = state.scrollTop
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [bookingLead, setBookingLead] = useState<Lead | null>(null)
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
   const [filters, setFilters] = useState<LeadFilters>(defaultFilters)
@@ -157,6 +177,21 @@ export default function PUCSRJPage() {
   const leads = topTab === "puc" ? pucLeads : topTab === "sf_srj" ? sfSrjLeads : sfLeads
   const loading = topTab === "puc" ? pucLoading : topTab === "sf_srj" ? sfSrjLoading : sfLoading
   const refetch = topTab === "puc" ? pucRefetch : topTab === "sf_srj" ? sfSrjRefetch : sfRefetch
+
+  // Restore scroll position after data loads
+  useEffect(() => {
+    if (!loading && pendingScrollRestore.current !== null) {
+      const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
+      if (scrollEl) {
+        requestAnimationFrame(() => {
+          scrollEl.scrollTop = pendingScrollRestore.current!
+          pendingScrollRestore.current = null
+        })
+      } else {
+        pendingScrollRestore.current = null
+      }
+    }
+  }, [loading])
 
   // Clear selection when switching tabs
   useEffect(() => {
@@ -798,6 +833,18 @@ export default function PUCSRJPage() {
             onSelectLead={toggleSelectLead}
             onSelectAll={toggleSelectAll}
             onLeadClick={(lead) => {
+              // Save view state so we can restore it on back navigation
+              const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
+              sessionStorage.setItem("puc-srj-view-state", JSON.stringify({
+                topTab,
+                searchQuery,
+                stageFilter,
+                sfSrjStageFilter,
+                sfSrjSearchQuery,
+                sfStageFilter,
+                sfSearchQuery,
+                scrollTop: scrollEl?.scrollTop ?? 0,
+              }))
               router.push(`/leads/${lead.id}?from=${topTab}`)
             }}
             currentStageFilter={topTab === "puc" ? (stageFilter === "link_sent" ? "all" : stageFilter as PipelineStage | "all") : topTab === "sf_srj" ? sfSrjStageFilter : sfStageFilter}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Loader2, AlertTriangle, Check } from "lucide-react"
 import {
   Dialog,
@@ -46,6 +46,14 @@ export function MarkLostDialog({
   const [selectedReasonId, setSelectedReasonId] = useState<string | null>(null)
   const [notes, setNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
+
+  // Always reset state when dialog opens to ensure no stale reason is pre-selected
+  useEffect(() => {
+    if (open) {
+      setSelectedReasonId(null)
+      setNotes("")
+    }
+  }, [open])
 
   // Group reasons by category
   const groupedReasons = reasons.reduce((acc, reason) => {

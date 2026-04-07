@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { createClient } from "@/lib/supabase/client"
 
 interface AnnouncementButtonProps {
   isAdmin: boolean
@@ -35,48 +34,25 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
 
     setSending(true)
     try {
-      const supabase = createClient()
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), message: message.trim() }),
+      })
 
-      // Get all active agent profiles
-      const { data: agents, error: agentsError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("is_active", true)
+      const data = await res.json()
 
-      if (agentsError) throw agentsError
-      if (!agents || agents.length === 0) {
-        alert("No active agents found")
-        setSending(false)
-        return
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to send announcement")
       }
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // Insert a notification for each agent
-      const notifications = agents.map((agent) => ({
-        user_id: agent.id,
-        type: "system_alert" as const,
-        title: `📢 ${title.trim()}`,
-        body: message.trim() || null,
-        is_read: false,
-        created_by: user?.id || null,
-        metadata: { announcement: true },
-      }))
-
-      const { error: insertError } = await supabase
-        .from("notifications")
-        .insert(notifications)
-
-      if (insertError) throw insertError
-
-      alert(`Announcement sent to ${agents.length} team members`)
+      alert(`Announcement sent to ${data.count} team members`)
       setTitle("")
       setMessage("")
       setOpen(false)
     } catch (err) {
       console.error("Failed to send announcement:", err)
-      alert("Failed to send announcement")
+      alert(err instanceof Error ? err.message : "Failed to send announcement")
     } finally {
       setSending(false)
     }

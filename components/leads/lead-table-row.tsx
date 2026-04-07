@@ -503,7 +503,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               return (
                 <InlineTagSelect
                   value={currentStage}
-                  options={PIPELINE_STAGES.filter((stage) => stage.value !== 'lost').map((stage) => ({
+                  options={PIPELINE_STAGES.filter((stage) => {
+                    if (stage.value === 'lost') return false
+                    if (!isPucSrjView && lead.funding_type !== 'puc' && (stage.value === 'puc_document_submission' || stage.value === 'puc_application_submission')) return false
+                    return true
+                  }).map((stage) => ({
                     value: stage.value,
                     label: stage.label,
                     color: stage.value,
@@ -665,7 +669,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
             </td>
           )}
           {/* Submission Status column (hidden in PUC view) */}
-          {!isPucSrjView && (
+          {!isPucSrjView && !isSubmissionView && (
           <td className="px-3 py-3 min-w-[150px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <InlineTagSelect
                 value={getEffectiveValue(lead.id, 'submission_status', lead.submission_status) || ''}
@@ -889,7 +893,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
           <td className="px-3 py-3 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <InlineTagSelect
               value={lead.pipeline_stage}
-              options={PIPELINE_STAGES.filter((stage) => stage.value !== 'lost').map((stage) => ({
+              options={PIPELINE_STAGES.filter((stage) => {
+                if (stage.value === 'lost') return false
+                if (lead.funding_type !== 'puc' && (stage.value === 'puc_document_submission' || stage.value === 'puc_application_submission')) return false
+                return true
+              }).map((stage) => ({
                 value: stage.value,
                 label: stage.label,
                 color: stage.value,
@@ -976,7 +984,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               return (
                 <InlineTagSelect
                   value={currentStage}
-                  options={PIPELINE_STAGES.filter((stage) => stage.value !== 'lost').map((stage) => ({
+                  options={PIPELINE_STAGES.filter((stage) => {
+                    if (stage.value === 'lost') return false
+                    if (lead.funding_type !== 'puc' && (stage.value === 'puc_document_submission' || stage.value === 'puc_application_submission')) return false
+                    return true
+                  }).map((stage) => ({
                     value: stage.value,
                     label: stage.label,
                     color: stage.value,

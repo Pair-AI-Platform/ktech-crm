@@ -131,9 +131,9 @@ export const POST = withApiHandler(
       .single()
 
     if (campaignError) {
-      logger.error('Error creating campaign', { error: campaignError.message })
+      logger.error('Error creating campaign', { error: campaignError.message, code: campaignError.code, details: campaignError.details, hint: campaignError.hint })
       return NextResponse.json(
-        { error: 'Failed to create campaign' },
+        { error: `Failed to create campaign: ${campaignError.message}` },
         { status: 500 }
       )
     }
@@ -203,7 +203,7 @@ export const POST = withApiHandler(
         .eq('id', campaign.id)
     }
 
-    // Log activity
+    // Log activity (non-blocking — don't fail campaign creation if this errors)
     await supabase.from('activities').insert({
       activity_type: 'campaign_created',
       title: `Campaign "${body.name}" created`,
@@ -214,6 +214,8 @@ export const POST = withApiHandler(
         schedule_type: body.scheduleType,
       },
       created_by: user.id,
+    }).then(({ error }) => {
+      if (error) logger.warn('Failed to log campaign activity', { error: error.message })
     })
 
     return NextResponse.json({

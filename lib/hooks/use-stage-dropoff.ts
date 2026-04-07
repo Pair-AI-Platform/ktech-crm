@@ -42,15 +42,26 @@ export function useStageDropoff() {
     enabled: isAdmin,
   })
 
-  const stageLabels = Object.fromEntries(
-    PIPELINE_STAGES.map((s) => [s.value, s.label])
-  )
+  const stageLabels: Record<string, string> = {
+    ...Object.fromEntries(PIPELINE_STAGES.map((s) => [s.value, s.label])),
+    // Shorter labels for dashboard chart
+    puc_document_submission: 'Document',
+    puc_application_submission: 'Submission',
+  }
+
+  // Normalize old/variant stage values to canonical ones
+  const stageAliases: Record<string, string> = {
+    applied: 'applicant',
+    document_submission: 'puc_document_submission',
+    application_submission: 'puc_application_submission',
+  }
+  const normalize = (s: string) => stageAliases[s] ?? s
 
   const countMap = new Map<string, number>()
 
   // Count from lost_at_stage column
   for (const row of data?.hasStage ?? []) {
-    const stage = row.lost_at_stage as string
+    const stage = normalize(row.lost_at_stage as string)
     countMap.set(stage, (countMap.get(stage) ?? 0) + 1)
   }
 
@@ -61,18 +72,24 @@ export function useStageDropoff() {
     const meta = row.metadata
     if (meta?.new_stage === 'lost' && meta?.old_stage) {
       seenLeads.add(row.lead_id)
-      const stage = meta.old_stage
+      const stage = normalize(meta.old_stage)
       countMap.set(stage, (countMap.get(stage) ?? 0) + 1)
     }
   }
 
+  // Order by pipeline funnel order, not by count
+  const stageOrder = PIPELINE_STAGES.map(s => s.value)
   const dropoffData = Array.from(countMap.entries())
     .map(([stage, count]) => ({
       stage,
       count,
       label: stageLabels[stage] ?? stage,
     }))
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => {
+      const ai = stageOrder.indexOf(a.stage as typeof stageOrder[number])
+      const bi = stageOrder.indexOf(b.stage as typeof stageOrder[number])
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+    })
 
   return { dropoffData, loading: isLoading }
 }
