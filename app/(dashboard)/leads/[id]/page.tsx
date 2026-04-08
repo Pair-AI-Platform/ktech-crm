@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/input"
@@ -656,7 +657,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         title=""
         breadcrumbs={[
           { label: backLabel || "Leads", href: backUrl },
-          { label: `${lead.first_name_ar} ${lead.last_name_ar}` },
+          { label: getLeadDisplayName(lead) },
         ]}
         hideSearch
       />
@@ -750,7 +751,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5"
                     >
                       <h1 className="text-[1.625rem] sm:text-[1.875rem] font-bold text-[var(--text-primary)] tracking-[-0.025em] leading-none" dir="auto">
-                        {lead.first_name_ar} {lead.last_name_ar}
+                        {getLeadDisplayName(lead)}
                       </h1>
                       {lead.priority === 'critical' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide rounded bg-red-500/15 text-red-600 dark:text-red-400 ring-1 ring-red-500/25 animate-pulse">
@@ -1821,7 +1822,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       <MarkLostDialog
         open={showLostDialog}
         onOpenChange={setShowLostDialog}
-        leadName={`${lead.first_name_ar} ${lead.last_name_ar}`}
+        leadName={getLeadDisplayName(lead)}
         onConfirm={async (reasonId, notes) => {
           await updateLeadStage(lead.id, 'lost', reasonId, notes)
           await refetchLead()

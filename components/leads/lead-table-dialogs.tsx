@@ -12,6 +12,12 @@ import { BlockedReasonDialog } from "@/components/leads/blocked-reason-dialog"
 import { WithdrawReasonDialog } from "@/components/leads/withdraw-reason-dialog"
 import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
+import { getLeadDisplayName as _getLeadDisplayName } from "@/lib/lead-utils"
+
+function getLeadDisplayName(lead: Lead | null): string {
+  if (!lead) return ''
+  return _getLeadDisplayName(lead)
+}
 
 export interface LeadTableDialogsProps {
   bookingLead: Lead | null
@@ -134,7 +140,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setLostDialogLead(null)
         }}
-        leadName={lostDialogLead ? `${lostDialogLead.first_name_ar} ${lostDialogLead.last_name_ar}` : ''}
+        leadName={getLeadDisplayName(lostDialogLead)}
         onConfirm={assignReasonMode && handleAssignLostReason ? handleAssignLostReason : handleLostConfirm}
         assignReasonMode={assignReasonMode}
       />
@@ -145,7 +151,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setContactedDialogLead(null)
         }}
-        leadName={contactedDialogLead ? `${contactedDialogLead.first_name_ar} ${contactedDialogLead.last_name_ar}` : ''}
+        leadName={getLeadDisplayName(contactedDialogLead)}
         currentStatus={contactedDialogLead?.status as LeadStatus | null | undefined}
         onConfirm={handleContactedConfirm}
       />
@@ -156,7 +162,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setWithdrawDialogLead(null)
         }}
-        leadName={withdrawDialogLead ? `${withdrawDialogLead.first_name_ar} ${withdrawDialogLead.last_name_ar}` : ''}
+        leadName={getLeadDisplayName(withdrawDialogLead)}
         onConfirm={handleWithdrawConfirm}
       />
 
@@ -166,7 +172,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setEditWithdrawReasonLead(null)
         }}
-        leadName={editWithdrawReasonLead ? `${editWithdrawReasonLead.first_name_ar} ${editWithdrawReasonLead.last_name_ar}` : ''}
+        leadName={getLeadDisplayName(editWithdrawReasonLead)}
         onConfirm={handleEditWithdrawReasonConfirm}
       />
 
@@ -176,7 +182,7 @@ export function LeadTableDialogs({
         onOpenChange={(open) => {
           if (!open) setBlockedDialogLead(null)
         }}
-        leadName={blockedDialogLead ? `${blockedDialogLead.first_name_ar} ${blockedDialogLead.last_name_ar}` : ''}
+        leadName={getLeadDisplayName(blockedDialogLead)}
         onConfirm={handleBlockedConfirm}
       />
 

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Send, Check, CheckCheck, Phone, MoreVertical } from "lucide-react"
 import { cn, getInitials } from "@/lib/utils"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import type { Lead, Student } from "@/types"
 
 interface Message {
@@ -67,7 +68,7 @@ export function WhatsAppChat({ lead, student, onCall }: WhatsAppChatProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const contact = lead || student
-  const name = contact ? `${'first_name_ar' in contact && contact.first_name_ar} ${'last_name_ar' in contact && contact.last_name_ar}` : "Contact"
+  const name = contact ? getLeadDisplayName(contact) : "Contact"
   const phone = contact?.phone || ""
   const initials = contact ? getInitials(contact.first_name || '', contact.last_name || '') || "?" : "?"
 

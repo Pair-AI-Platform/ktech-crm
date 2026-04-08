@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import {
   Loader2,
   CreditCard,
@@ -229,9 +230,9 @@ export function EnrollmentPaymentDialog({
               <DialogDescription>
                 {step === "success"
                   ? (isSF
-                    ? `${lead.first_name_ar} ${lead.last_name_ar} has been moved to Applicant`
-                    : `${lead.first_name_ar} ${lead.last_name_ar} is now enrolled`)
-                  : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${lead.first_name_ar} ${lead.last_name_ar}`}
+                    ? `${getLeadDisplayName(lead)} has been moved to Applicant`
+                    : `${getLeadDisplayName(lead)} is now enrolled`)
+                  : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${getLeadDisplayName(lead)}`}
               </DialogDescription>
             </div>
           </div>
@@ -448,8 +449,8 @@ export function EnrollmentPaymentDialog({
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
                   {isSF
-                    ? `${lead.first_name_ar} ${lead.last_name_ar} has been moved to Applicant.`
-                    : `${lead.first_name_ar} ${lead.last_name_ar} has been successfully enrolled.`}
+                    ? `${getLeadDisplayName(lead)} has been moved to Applicant.`
+                    : `${getLeadDisplayName(lead)} has been successfully enrolled.`}
                 </p>
               </div>
 

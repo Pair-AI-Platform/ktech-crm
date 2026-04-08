@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { APPOINTMENT_TYPES } from "@/types"
 import type { Appointment } from "@/types"
 import { cn } from "@/lib/utils"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { AppointmentDetail } from "@/components/calendar/appointment-detail"
 import { NoUpdatedAppointments } from "@/components/calendar/no-updated-appointments"
 
@@ -30,10 +31,10 @@ function getAppointmentColor(type: string) {
 function getAppointmentName(apt: Appointment) {
   const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
   if (leads.length > 0) {
-    if (leads.length === 1) return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar}`
-    return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar} +${leads.length - 1}`
+    if (leads.length === 1) return getLeadDisplayName(leads[0]!)
+    return `${getLeadDisplayName(leads[0]!)} +${leads.length - 1}`
   }
-  if (apt.lead) return `${apt.lead.first_name_ar} ${apt.lead.last_name_ar}`
+  if (apt.lead) return getLeadDisplayName(apt.lead)
   return "Unknown"
 }
 

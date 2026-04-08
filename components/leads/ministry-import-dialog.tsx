@@ -209,7 +209,7 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                   Drag & drop or click to select an Excel file (.xlsx)
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  File should contain: Civil ID, Name, School, and GPA columns
+                  Required: Civil ID, GPA. Optional: Name, School, Seat Number, Track, Education Type, Graduation Year
                 </p>
               </div>
 
@@ -233,9 +233,9 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
 
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700">
-                  <strong>How it works:</strong> Leads will be matched by Civil ID.
-                  Matching leads will have their Actual GPA updated. Unmatched records
-                  will create new leads.
+                  <strong>How it works:</strong> Leads are matched by Civil ID.
+                  Matching leads get their GPA, seat number, school, track, and other fields updated.
+                  Unmatched records create new leads. Schools are auto-matched from the database.
                 </p>
               </div>
             </div>
@@ -268,6 +268,18 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Name</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">School</th>
                         <th className="px-3 py-2 text-right font-medium text-[var(--text-secondary)]">GPA</th>
+                        {records.some(r => r.seat_number) && (
+                          <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Seat #</th>
+                        )}
+                        {records.some(r => r.academic_track) && (
+                          <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Track</th>
+                        )}
+                        {records.some(r => r.education_type) && (
+                          <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Education</th>
+                        )}
+                        {records.some(r => r.graduation_year) && (
+                          <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Grad Year</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
@@ -285,6 +297,26 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                           <td className="px-3 py-2 text-right font-medium text-emerald-600">
                             {record.gpa}%
                           </td>
+                          {records.some(r => r.seat_number) && (
+                            <td className="px-3 py-2 font-mono text-xs">
+                              {record.seat_number || <span className="text-[var(--text-muted)]">-</span>}
+                            </td>
+                          )}
+                          {records.some(r => r.academic_track) && (
+                            <td className="px-3 py-2 text-xs capitalize">
+                              {record.academic_track || <span className="text-[var(--text-muted)]">-</span>}
+                            </td>
+                          )}
+                          {records.some(r => r.education_type) && (
+                            <td className="px-3 py-2 text-xs">
+                              {record.education_type || <span className="text-[var(--text-muted)]">-</span>}
+                            </td>
+                          )}
+                          {records.some(r => r.graduation_year) && (
+                            <td className="px-3 py-2 text-xs">
+                              {record.graduation_year || <span className="text-[var(--text-muted)]">-</span>}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

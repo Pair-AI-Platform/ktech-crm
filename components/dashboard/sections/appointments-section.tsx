@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StaticBlock, ListBlock } from "@/components/dashboard/notion"
 import { APPOINTMENT_TYPES } from "@/types"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import type { Appointment } from "@/types"
 
 interface AppointmentsSectionProps {
@@ -24,10 +25,10 @@ export function AppointmentsSection({ todayAppointments, loading }: Appointments
       const aptLeads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
       const leadName = aptLeads.length > 0
         ? aptLeads.length === 1
-          ? `${aptLeads[0]!.first_name_ar} ${aptLeads[0]!.last_name_ar}`
-          : `${aptLeads[0]!.first_name_ar} ${aptLeads[0]!.last_name_ar} +${aptLeads.length - 1}`
+          ? getLeadDisplayName(aptLeads[0]!)
+          : `${getLeadDisplayName(aptLeads[0]!)} +${aptLeads.length - 1}`
         : apt.lead
-        ? `${apt.lead.first_name_ar} ${apt.lead.last_name_ar}`
+        ? getLeadDisplayName(apt.lead)
         : 'Unknown'
       const typeInfo = APPOINTMENT_TYPES.find(t => apt.appointment_type.includes(t.value))
 

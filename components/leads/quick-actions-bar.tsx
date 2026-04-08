@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -102,7 +103,7 @@ export function QuickActionsBar({
       ) : (
         <Button asChild className="gap-2 bg-emerald-500 hover:bg-emerald-600">
           <Link
-            href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name_ar} ${lead.last_name_ar}`)}`}
+            href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(getLeadDisplayName(lead))}`}
           >
             <Phone className="w-4 h-4" />
             Call

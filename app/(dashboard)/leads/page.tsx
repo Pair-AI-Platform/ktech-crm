@@ -582,13 +582,14 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               <GraduationCap className="w-4 h-4" />
             </Button>
             <Button
-              variant="ghost"
-              size="icon"
-              className="hidden sm:inline-flex text-[var(--text-muted)]"
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex items-center gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
               onClick={() => setShowMinistryImportModal(true)}
               title="Import Ministry GPA List"
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Ministry Import</span>
             </Button>
             <Button
               variant="ghost"

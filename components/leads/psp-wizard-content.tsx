@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -820,7 +821,7 @@ Kuwait Technical College`
             <div>
               <span className="text-lg font-semibold">PUC Submission</span>
               <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
-                {lead ? `${lead.first_name_ar} ${lead.last_name_ar}` : "Submit lead to PSP"}
+                {lead ? getLeadDisplayName(lead) : "Submit lead to PSP"}
               </p>
             </div>
           </div>

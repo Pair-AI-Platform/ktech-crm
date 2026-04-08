@@ -69,9 +69,37 @@ export async function POST(request: NextRequest) {
         gpa_grade_12_expected,
         school_id,
         school_name_custom,
+        seat_number,
+        academic_track,
+        education_type,
+        graduation_year,
+        grade_level,
         school:schools(id, name_en, name_ar)
       `)
       .in("civil_id", civilIds)
+
+    // Fetch all schools for fuzzy matching
+    const { data: allSchools } = await supabase
+      .from("schools")
+      .select("id, name_en, name_ar")
+      .eq("is_active", true)
+
+    // Helper to match school name to school_id
+    const matchSchool = (schoolName?: string): string | undefined => {
+      if (!schoolName || !allSchools?.length) return undefined
+      const normalized = schoolName.toLowerCase().trim()
+      // Exact match first
+      const exact = allSchools.find(
+        s => s.name_en?.toLowerCase() === normalized || s.name_ar === schoolName.trim()
+      )
+      if (exact) return exact.id
+      // Partial match
+      const partial = allSchools.find(
+        s => s.name_en?.toLowerCase().includes(normalized) || normalized.includes(s.name_en?.toLowerCase() || '') ||
+             s.name_ar?.includes(schoolName.trim()) || schoolName.trim().includes(s.name_ar || '')
+      )
+      return partial?.id
+    }
 
     if (leadsError) {
       console.error("[Ministry Import] Failed to fetch leads:", leadsError)
@@ -133,14 +161,41 @@ export async function POST(request: NextRequest) {
             continue
           }
 
-          // Update the lead's actual_gpa
+          // Build update payload with all available fields
+          const updatePayload: Record<string, unknown> = {
+            actual_gpa: record.gpa,
+            moe_fetch_status: "success",
+            moe_fetched_at: new Date().toISOString(),
+          }
+          // Only update additional fields if they have values and the lead doesn't already have them
+          if (record.seat_number && !existingLead.seat_number) {
+            updatePayload.seat_number = record.seat_number
+          }
+          if (record.academic_track && !existingLead.academic_track) {
+            updatePayload.academic_track = record.academic_track
+          }
+          if (record.education_type && !existingLead.education_type) {
+            updatePayload.education_type = record.education_type
+          }
+          if (record.graduation_year && !existingLead.graduation_year) {
+            updatePayload.graduation_year = record.graduation_year
+          }
+          if (record.grade_level && !existingLead.grade_level) {
+            updatePayload.grade_level = record.grade_level
+          }
+          // Match school if lead doesn't have one
+          if (record.school_name && !existingLead.school_id) {
+            const matchedSchoolId = matchSchool(record.school_name)
+            if (matchedSchoolId) {
+              updatePayload.school_id = matchedSchoolId
+            } else {
+              updatePayload.school_name_custom = record.school_name
+            }
+          }
+
           const { error: updateError } = await supabase
             .from("leads")
-            .update({
-              actual_gpa: record.gpa,
-              moe_fetch_status: "success",
-              moe_fetched_at: new Date().toISOString(),
-            })
+            .update(updatePayload)
             .eq("id", existingLead.id)
 
           if (updateError) {
@@ -160,6 +215,10 @@ export async function POST(request: NextRequest) {
               new_gpa: record.gpa,
               source: "ministry_import",
               school_name: record.school_name,
+              ...(record.seat_number && { seat_number: record.seat_number }),
+              ...(record.academic_track && { academic_track: record.academic_track }),
+              ...(record.education_type && { education_type: record.education_type }),
+              ...(record.graduation_year && { graduation_year: record.graduation_year }),
             },
             created_by: user.id,
           })
@@ -172,6 +231,7 @@ export async function POST(request: NextRequest) {
           })
         } else {
           // Lead doesn't exist - create new lead
+          const matchedSchoolId = matchSchool(record.school_name)
           const { data: newLead, error: createError } = await supabase
             .from("leads")
             .insert({
@@ -181,12 +241,18 @@ export async function POST(request: NextRequest) {
               actual_gpa: record.gpa,
               moe_fetch_status: "success",
               moe_fetched_at: new Date().toISOString(),
-              school_name_custom: record.school_name,
+              ...(matchedSchoolId
+                ? { school_id: matchedSchoolId }
+                : { school_name_custom: record.school_name }),
               source: "gpa_lists",
               source_category: "outreach",
               pipeline_stage: "new",
-              grade_level: "12th", // Assume 12th grade since this is graduation data
+              grade_level: record.grade_level || "12th",
               phone: "", // Required field - will need to be filled later
+              ...(record.seat_number && { seat_number: record.seat_number }),
+              ...(record.academic_track && { academic_track: record.academic_track }),
+              ...(record.education_type && { education_type: record.education_type }),
+              ...(record.graduation_year && { graduation_year: record.graduation_year }),
               ...(activeSemester && { semester_id: activeSemester.id }),
             })
             .select()

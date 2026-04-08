@@ -31,6 +31,7 @@ import { checkAllDocumentsUploaded, type SortField, type SortDirection } from ".
 import { LeadTableHeader } from "./lead-table-columns"
 import { LeadTableRow } from "./lead-table-row"
 import { LeadTableDialogs } from "./lead-table-dialogs"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 
 interface LeadTableProps {
   leads: Lead[]
@@ -413,7 +414,7 @@ export function LeadTable({
     let comparison = 0
     switch (sortField) {
       case "name":
-        comparison = `${a.first_name_ar} ${a.last_name_ar}`.localeCompare(`${b.first_name_ar} ${b.last_name_ar}`, 'ar')
+        comparison = getLeadDisplayName(a).localeCompare(getLeadDisplayName(b), 'ar')
         break
       case "pipeline_stage":
         const stageOrder = stageSettings.length > 0

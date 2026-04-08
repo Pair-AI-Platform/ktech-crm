@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import {
   Dialog,
   DialogContent,
@@ -118,7 +119,7 @@ export function SendRSVPDialog({
     const allLinks = rsvpLinks
       .map((link) => {
         const lead = selectedLeads.find((l) => l.id === link.lead_id)
-        return `${lead?.first_name_ar} ${lead?.last_name_ar}: ${link.rsvp_url}`
+        return `${lead ? getLeadDisplayName(lead) : 'Unknown'}: ${link.rsvp_url}`
       })
       .join("\n")
     await navigator.clipboard.writeText(allLinks)

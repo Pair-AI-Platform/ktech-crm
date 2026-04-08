@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn, toDateString } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
@@ -379,7 +380,7 @@ export function AppointmentBooking({
                       {selectedLeads.length > 0 && (
                         <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                           for {selectedLeads.length === 1
-                            ? `${selectedLeads[0].first_name_ar} ${selectedLeads[0].last_name_ar}`
+                            ? getLeadDisplayName(selectedLeads[0])
                             : `${selectedLeads.length} leads`}
                         </p>
                       )}
@@ -746,7 +747,7 @@ export function AppointmentBooking({
                 <span className="text-lg">{skipToDateTime ? "Schedule Appointment" : "Book Appointment"}</span>
                 <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                   {skipToDateTime && selectedLead
-                    ? `Select date and time for ${selectedLead.first_name_ar} ${selectedLead.last_name_ar}`
+                    ? `Select date and time for ${getLeadDisplayName(selectedLead)}`
                     : "Schedule a new appointment with a lead"}
                 </p>
               </div>
@@ -1581,7 +1582,7 @@ export function AppointmentBooking({
                       </div>
                       <p className="text-xs text-[var(--text-muted)]">
                         {selectedLeads.length === 1
-                          ? `${selectedLeads[0].first_name_ar} ${selectedLeads[0].last_name_ar}`
+                          ? getLeadDisplayName(selectedLeads[0])
                           : `${selectedLeads.length} leads`}
                       </p>
                     </div>

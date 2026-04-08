@@ -2,21 +2,25 @@ import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES } from '@/types'
 import type { PipelineStage } from '@/types'
 
 /**
- * Returns the full display name for a lead, using Arabic names only.
+ * Returns the full display name for a lead.
+ * Prefers Arabic name, falls back to English name, then phone.
  */
-export function getLeadDisplayName(lead: { first_name: string; last_name: string; first_name_ar?: string | null; last_name_ar?: string | null }): string {
-  const first = lead.first_name_ar || ''
-  const last = lead.last_name_ar || ''
-  return `${first} ${last}`.trim()
+export function getLeadDisplayName(lead: { first_name?: string | null; last_name?: string | null; first_name_ar?: string | null; last_name_ar?: string | null; phone?: string | null }): string {
+  const arName = [lead.first_name_ar, lead.last_name_ar].filter(Boolean).join(' ')
+  if (arName) return arName
+  const enName = [lead.first_name, lead.last_name].filter(Boolean).join(' ')
+  if (enName) return enName
+  return lead.phone || 'Unknown'
 }
 
 /**
- * Returns initials (first letter of first and last name), using Arabic names only.
+ * Returns initials (first letter of first and last name).
+ * Prefers Arabic, falls back to English.
  */
-export function getLeadInitials(lead: { first_name: string; last_name: string; first_name_ar?: string | null; last_name_ar?: string | null }): string {
-  const first = (lead.first_name_ar)?.charAt(0) ?? ''
-  const last = (lead.last_name_ar)?.charAt(0) ?? ''
-  return `${first}${last}`
+export function getLeadInitials(lead: { first_name?: string | null; last_name?: string | null; first_name_ar?: string | null; last_name_ar?: string | null }): string {
+  const first = (lead.first_name_ar || lead.first_name)?.charAt(0) ?? ''
+  const last = (lead.last_name_ar || lead.last_name)?.charAt(0) ?? ''
+  return `${first}${last}` || '?'
 }
 
 /**

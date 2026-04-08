@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, startTransition } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/modal"
@@ -149,8 +150,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
 
   const personName = hasLeads
     ? appointmentLeads.length === 1
-      ? `${appointmentLeads[0]!.first_name_ar} ${appointmentLeads[0]!.last_name_ar}`
-      : `${appointmentLeads[0]!.first_name_ar} ${appointmentLeads[0]!.last_name_ar} +${appointmentLeads.length - 1}`
+      ? getLeadDisplayName(appointmentLeads[0]!)
+      : `${getLeadDisplayName(appointmentLeads[0]!)} +${appointmentLeads.length - 1}`
     : appointment.student
     ? `${appointment.student.first_name} ${appointment.student.last_name}`
     : "Unknown"

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useEffect, useState } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion } from "framer-motion"
 import { cn, toDateString } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -211,12 +212,12 @@ export function CalendarView({
     const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
     if (leads.length > 0) {
       if (leads.length === 1) {
-        return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar}`
+        return getLeadDisplayName(leads[0]!)
       }
-      return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar} +${leads.length - 1}`
+      return `${getLeadDisplayName(leads[0]!)} +${leads.length - 1}`
     }
     // Legacy fallback
-    if (apt.lead) return `${apt.lead.first_name_ar} ${apt.lead.last_name_ar}`
+    if (apt.lead) return getLeadDisplayName(apt.lead)
     if (apt.student) return `${apt.student.first_name} ${apt.student.last_name}`
     return "Unknown"
   }

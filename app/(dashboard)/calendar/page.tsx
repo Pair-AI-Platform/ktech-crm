@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card } from "@/components/ui/card"
@@ -136,7 +137,7 @@ export default function CalendarPage() {
       const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
       if (apt.lead) leads.push(apt.lead)
       return leads.some(lead =>
-        `${lead!.first_name_ar} ${lead!.last_name_ar}`.toLowerCase().includes(q) ||
+        getLeadDisplayName(lead!).toLowerCase().includes(q) ||
         lead!.phone?.includes(q)
       )
     })
@@ -189,12 +190,12 @@ export default function CalendarPage() {
     const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
     if (leads.length > 0) {
       if (leads.length === 1) {
-        return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar}`
+        return getLeadDisplayName(leads[0]!)
       }
-      return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar} +${leads.length - 1}`
+      return `${getLeadDisplayName(leads[0]!)} +${leads.length - 1}`
     }
     // Legacy fallback
-    if (apt.lead) return `${apt.lead.first_name_ar} ${apt.lead.last_name_ar}`
+    if (apt.lead) return getLeadDisplayName(apt.lead)
     if (apt.student) return `${apt.student.first_name} ${apt.student.last_name}`
     return "Unknown"
   }

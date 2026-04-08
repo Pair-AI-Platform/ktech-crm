@@ -9,6 +9,7 @@ import { StaticBlock, ListBlock } from "@/components/dashboard/notion"
 import type { ListItem } from "@/components/dashboard/notion"
 import type { DashboardLead } from "@/lib/hooks/use-dashboard-stats"
 import { cn } from "@/lib/utils"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import Link from "next/link"
 
 interface AttentionSectionProps {
@@ -26,7 +27,7 @@ export function AttentionSection({ priorityLeads, loading }: AttentionSectionPro
   const items: ListItem[] = useMemo(() => {
     return priorityLeads.map(({ lead, reason, urgency }) => ({
       id: lead.id,
-      title: `${lead.first_name_ar} ${lead.last_name_ar}`,
+      title: getLeadDisplayName(lead),
       subtitle: lead.pipeline_stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       metadata: reason,
       badge: (

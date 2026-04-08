@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { InlineTagSelect, type RowVariant } from "@/components/ui/notion-tag-select"
 import {
   Phone,
-  Mail,
   Check,
   PhoneForwarded,
   FileText,
@@ -23,6 +22,7 @@ import {
   GraduationCap,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import {
   PIPELINE_STAGES,
   SCHOOLS,
@@ -346,7 +346,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                     </SimpleTooltip>
                   )}
                   <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate" dir="auto">
-                    {lead.first_name_ar} {lead.last_name_ar}
+                    {getLeadDisplayName(lead)}
                   </p>
                   {isSentToRegistration && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 whitespace-nowrap flex-shrink-0">
@@ -456,14 +456,6 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 {copiedPhone === lead.phone_secondary ? "Copied!" : formatKuwaitPhone(lead.phone_secondary)}
               </span>
             </button>
-          )}
-          {lead.email && (
-            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <div className="w-6 h-6 rounded-lg bg-[var(--bg-sunken)] flex items-center justify-center">
-                <Mail className="w-3 h-3" />
-              </div>
-              <span className="truncate max-w-[120px]">{lead.email}</span>
-            </div>
           )}
         </div>
       </td>

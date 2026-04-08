@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -152,7 +153,7 @@ export function WhatsAppTemplateSelector({
   })
 
   const phone = lead?.phone || student?.phone || ""
-  const contactName = lead ? `${lead.first_name_ar} ${lead.last_name_ar}` : student?.first_name || ""
+  const contactName = lead ? getLeadDisplayName(lead) : student?.first_name || ""
   const firstName = lead?.first_name || student?.first_name || ""
 
   // Auto-fill variables when template is selected

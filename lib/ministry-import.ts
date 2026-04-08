@@ -8,6 +8,11 @@ export interface MinistryRecord {
   full_name?: string
   school_name?: string
   gpa: number
+  seat_number?: string
+  academic_track?: string
+  education_type?: string
+  graduation_year?: number
+  grade_level?: string
 }
 
 export interface MinistryImportResult {
@@ -76,6 +81,49 @@ const MINISTRY_COLUMN_MAPPINGS: Record<string, string> = {
   'percentage': 'gpa',
   'percent': 'gpa',
   'المجموع': 'gpa',
+
+  // Seat number variations
+  'seat_number': 'seat_number',
+  'seat number': 'seat_number',
+  'seat': 'seat_number',
+  'رقم الجلوس': 'seat_number',
+  'رقم المقعد': 'seat_number',
+  'الرقم التسلسلي': 'seat_number',
+
+  // Academic track variations
+  'academic_track': 'academic_track',
+  'academic track': 'academic_track',
+  'track': 'academic_track',
+  'section': 'academic_track',
+  'القسم': 'academic_track',
+  'التخصص': 'academic_track',
+  'المسار': 'academic_track',
+  'علمي': 'academic_track',
+  'أدبي': 'academic_track',
+
+  // Education type variations
+  'education_type': 'education_type',
+  'education type': 'education_type',
+  'education': 'education_type',
+  'curriculum': 'education_type',
+  'نوع التعليم': 'education_type',
+  'المنهج': 'education_type',
+  'النظام': 'education_type',
+
+  // Graduation year variations
+  'graduation_year': 'graduation_year',
+  'graduation year': 'graduation_year',
+  'grad year': 'graduation_year',
+  'year': 'graduation_year',
+  'سنة التخرج': 'graduation_year',
+  'عام التخرج': 'graduation_year',
+
+  // Grade level variations
+  'grade_level': 'grade_level',
+  'grade level': 'grade_level',
+  'class': 'grade_level',
+  'الصف': 'grade_level',
+  'المرحلة': 'grade_level',
 }
 
 // Normalize header for matching
@@ -164,6 +212,44 @@ export function parseMinistryRow(row: (string | number)[], headerMap: Map<string
     return null
   }
 
+  // Parse academic track - normalize to 'science' or 'arts'
+  const rawTrack = getValue('academic_track')
+  let academicTrack: string | undefined
+  if (rawTrack) {
+    const lower = rawTrack.toLowerCase()
+    if (lower.includes('علم') || lower.includes('science') || lower === 'sci') {
+      academicTrack = 'science'
+    } else if (lower.includes('أدب') || lower.includes('art') || lower === 'lit') {
+      academicTrack = 'arts'
+    }
+  }
+
+  // Parse education type - normalize to known values
+  const rawEducation = getValue('education_type')
+  let educationType: string | undefined
+  if (rawEducation) {
+    const lower = rawEducation.toLowerCase()
+    if (lower.includes('حكوم') || lower.includes('gov')) educationType = 'GOV'
+    else if (lower.includes('أمريك') || lower.includes('us') || lower.includes('american')) educationType = 'US'
+    else if (lower.includes('بريطان') || lower.includes('uk') || lower.includes('british')) educationType = 'UK'
+    else if (lower.includes('سعود') || lower.includes('ksa') || lower.includes('saudi')) educationType = 'KSA'
+    else educationType = 'other'
+  }
+
+  // Parse graduation year
+  const gradYear = getNumericValue('graduation_year')
+  const graduationYear = gradYear && gradYear >= 2000 && gradYear <= 2100 ? gradYear : undefined
+
+  // Parse grade level
+  const rawGradeLevel = getValue('grade_level')
+  let gradeLevel: string | undefined
+  if (rawGradeLevel) {
+    const lower = rawGradeLevel.toLowerCase().replace(/[^\d\w\u0600-\u06FF]/g, '')
+    if (lower.includes('12') || lower.includes('ثاني عشر')) gradeLevel = '12th'
+    else if (lower.includes('11') || lower.includes('حادي عشر')) gradeLevel = '11th'
+    else if (lower.includes('10') || lower.includes('عاشر')) gradeLevel = '10th'
+  }
+
   return {
     civil_id: civilId,
     first_name: firstName,
@@ -171,6 +257,11 @@ export function parseMinistryRow(row: (string | number)[], headerMap: Map<string
     full_name: fullName,
     school_name: getValue('school_name'),
     gpa: gpa,
+    seat_number: getValue('seat_number'),
+    academic_track: academicTrack,
+    education_type: educationType,
+    graduation_year: graduationYear,
+    grade_level: gradeLevel,
   }
 }
 
