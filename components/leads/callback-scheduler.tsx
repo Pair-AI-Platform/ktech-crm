@@ -190,7 +190,7 @@ export function CallbackScheduler({
                   <div>
                     <span className="text-base font-semibold">Schedule Callback</span>
                     <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
-                      for {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                      for {lead.first_name_ar} {lead.last_name_ar}
                     </p>
                   </div>
                 </DialogTitle>
@@ -223,7 +223,7 @@ export function CallbackScheduler({
                       <User className="w-3.5 h-3.5 text-white" />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)]">
-                      {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                      {lead.first_name_ar} {lead.last_name_ar}
                     </span>
                     {lead.phone && (
                       <span className="text-xs text-[var(--text-muted)] ml-auto" dir="ltr">

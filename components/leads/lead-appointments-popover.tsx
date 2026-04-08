@@ -115,7 +115,7 @@ export function LeadAppointmentsPopover({
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">Appointments</p>
                   <p className="text-[10px] text-[var(--text-muted)]">
-                    {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                    {lead.first_name_ar} {lead.last_name_ar}
                   </p>
                 </div>
               </div>

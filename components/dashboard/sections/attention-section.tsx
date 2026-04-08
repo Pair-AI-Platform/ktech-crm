@@ -26,7 +26,7 @@ export function AttentionSection({ priorityLeads, loading }: AttentionSectionPro
   const items: ListItem[] = useMemo(() => {
     return priorityLeads.map(({ lead, reason, urgency }) => ({
       id: lead.id,
-      title: `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}`,
+      title: `${lead.first_name_ar} ${lead.last_name_ar}`,
       subtitle: lead.pipeline_stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       metadata: reason,
       badge: (

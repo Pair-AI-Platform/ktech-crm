@@ -17,6 +17,8 @@ interface AppointmentLead {
   lead: {
     id: string
     first_name: string
+    first_name_ar?: string
+    last_name_ar?: string
     phone: string | null
     preferred_language?: string
   } | null
@@ -94,6 +96,8 @@ export async function POST(request: Request) {
           lead:leads(
             id,
             first_name,
+            first_name_ar,
+            last_name_ar,
             phone,
             preferred_language
           )
@@ -133,7 +137,7 @@ export async function POST(request: Request) {
     // Collect all SMS tasks to send in batches
     interface SMSTask {
       appointmentId: string
-      lead: { id: string; first_name: string; phone: string; preferred_language?: string }
+      lead: { id: string; first_name: string; first_name_ar?: string; last_name_ar?: string; phone: string; preferred_language?: string }
       message: string
     }
 
@@ -143,7 +147,7 @@ export async function POST(request: Request) {
       // Get all leads from junction table (filter guarantees phone is non-null)
       const leads = (apt.appointment_leads || [])
         .map((al) => al.lead)
-        .filter((l): l is { id: string; first_name: string; phone: string; preferred_language?: string } =>
+        .filter((l): l is { id: string; first_name: string; first_name_ar?: string; last_name_ar?: string; phone: string; preferred_language?: string } =>
           l !== null && !!l.phone
         )
 
@@ -174,7 +178,7 @@ export async function POST(request: Request) {
         const timeStr = apt.scheduled_time.slice(0, 5)
 
         const message = replaceTemplateVariables(template, {
-          first_name: lead.first_name || 'Student',
+          first_name: lead.first_name_ar || 'طالب',
           date: dateStr,
           time: timeStr
         })
@@ -183,7 +187,7 @@ export async function POST(request: Request) {
           results.sent++
           results.details.push({
             appointmentId: apt.id,
-            leadName: `${lead.first_name}`,
+            leadName: `${lead.first_name_ar || ""}`,
             phone: lead.phone,
             status: 'dry_run'
           })
@@ -238,7 +242,7 @@ export async function POST(request: Request) {
             results.sent++
             results.details.push({
               appointmentId: task.appointmentId,
-              leadName: `${task.lead.first_name}`,
+              leadName: `${task.lead.first_name_ar || ""}`,
               phone: task.lead.phone,
               status: 'sent'
             })
@@ -246,7 +250,7 @@ export async function POST(request: Request) {
             results.failed++
             results.details.push({
               appointmentId: task.appointmentId,
-              leadName: `${task.lead.first_name}`,
+              leadName: `${task.lead.first_name_ar || ""}`,
               phone: task.lead.phone,
               status: 'failed',
               error: smsResult.error

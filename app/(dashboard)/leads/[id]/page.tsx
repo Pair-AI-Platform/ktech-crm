@@ -656,7 +656,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         title=""
         breadcrumbs={[
           { label: backLabel || "Leads", href: backUrl },
-          { label: `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}` },
+          { label: `${lead.first_name_ar} ${lead.last_name_ar}` },
         ]}
         hideSearch
       />
@@ -711,7 +711,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     className="text-xl sm:text-2xl font-semibold text-white rounded-lg"
                     style={{ background: stageGradient.from }}
                   >
-                    {(lead.first_name_ar || lead.first_name || '').charAt(0)}
+                    {(lead.first_name_ar || '').charAt(0)}
                   </AvatarFallback>
                 </Avatar>
                 {/* Heat indicator — small dot */}
@@ -750,7 +750,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5"
                     >
                       <h1 className="text-[1.625rem] sm:text-[1.875rem] font-bold text-[var(--text-primary)] tracking-[-0.025em] leading-none" dir="auto">
-                        {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                        {lead.first_name_ar} {lead.last_name_ar}
                       </h1>
                       {lead.priority === 'critical' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide rounded bg-red-500/15 text-red-600 dark:text-red-400 ring-1 ring-red-500/25 animate-pulse">
@@ -1821,7 +1821,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       <MarkLostDialog
         open={showLostDialog}
         onOpenChange={setShowLostDialog}
-        leadName={`${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}`}
+        leadName={`${lead.first_name_ar} ${lead.last_name_ar}`}
         onConfirm={async (reasonId, notes) => {
           await updateLeadStage(lead.id, 'lost', reasonId, notes)
           await refetchLead()

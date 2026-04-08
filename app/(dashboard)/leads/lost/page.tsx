@@ -367,12 +367,12 @@ export default function LostLeadsPage() {
                               <Avatar className="w-7 h-7 shrink-0">
                                 <AvatarImage src={undefined} />
                                 <AvatarFallback className="text-[10px] bg-[var(--bg-sunken)] text-[var(--text-muted)]">
-                                  {getInitials(`${lead.first_name} ${lead.last_name}`)}
+                                  {getInitials(`${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                                  {lead.first_name} {lead.last_name}
+                                  {lead.first_name_ar} {lead.last_name_ar}
                                 </p>
                                 {lead.civil_id && (
                                   <p className="text-[10px] text-[var(--text-muted)] truncate">{lead.civil_id}</p>

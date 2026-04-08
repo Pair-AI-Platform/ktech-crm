@@ -8,6 +8,8 @@ interface Lead {
   phone: string
   first_name: string
   last_name: string
+  first_name_ar?: string
+  last_name_ar?: string
 }
 
 interface UseLeadShortcutsOptions {
@@ -57,7 +59,7 @@ export function useLeadShortcuts({
           e.preventDefault()
           router.push(
             `/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(
-              `${lead.first_name} ${lead.last_name}`
+              `${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`
             )}`
           )
           break

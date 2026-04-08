@@ -413,7 +413,7 @@ export function LeadTable({
     let comparison = 0
     switch (sortField) {
       case "name":
-        comparison = `${a.first_name_ar || a.first_name} ${a.last_name_ar || a.last_name}`.localeCompare(`${b.first_name_ar || b.first_name} ${b.last_name_ar || b.last_name}`, 'ar')
+        comparison = `${a.first_name_ar} ${a.last_name_ar}`.localeCompare(`${b.first_name_ar} ${b.last_name_ar}`, 'ar')
         break
       case "pipeline_stage":
         const stageOrder = stageSettings.length > 0

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       // Get lead name for the notification
       const { data: lead } = await supabase
         .from('leads')
-        .select('first_name, last_name, priority')
+        .select('first_name, last_name, first_name_ar, last_name_ar, priority')
         .eq('id', reminder.lead_id)
         .single()
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const leadName = `${lead.first_name} ${lead.last_name}`.trim()
+      const leadName = `${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`.trim()
 
       // Create notification
       await supabase.from('notifications').insert({

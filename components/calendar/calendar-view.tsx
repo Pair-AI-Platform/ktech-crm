@@ -211,12 +211,12 @@ export function CalendarView({
     const leads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
     if (leads.length > 0) {
       if (leads.length === 1) {
-        return `${leads[0]!.first_name_ar || leads[0]!.first_name} ${leads[0]!.last_name_ar || leads[0]!.last_name}`
+        return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar}`
       }
-      return `${leads[0]!.first_name_ar || leads[0]!.first_name} ${leads[0]!.last_name_ar || leads[0]!.last_name} +${leads.length - 1}`
+      return `${leads[0]!.first_name_ar} ${leads[0]!.last_name_ar} +${leads.length - 1}`
     }
     // Legacy fallback
-    if (apt.lead) return `${apt.lead.first_name_ar || apt.lead.first_name} ${apt.lead.last_name_ar || apt.lead.last_name}`
+    if (apt.lead) return `${apt.lead.first_name_ar} ${apt.lead.last_name_ar}`
     if (apt.student) return `${apt.student.first_name} ${apt.student.last_name}`
     return "Unknown"
   }

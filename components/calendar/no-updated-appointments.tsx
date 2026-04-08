@@ -271,10 +271,10 @@ export function NoUpdatedAppointments({
                       const aptLeads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
                       const personName = aptLeads.length > 0
                         ? aptLeads.length === 1
-                          ? `${aptLeads[0]!.first_name_ar || aptLeads[0]!.first_name} ${aptLeads[0]!.last_name_ar || aptLeads[0]!.last_name}`
-                          : `${aptLeads[0]!.first_name_ar || aptLeads[0]!.first_name} ${aptLeads[0]!.last_name_ar || aptLeads[0]!.last_name} +${aptLeads.length - 1}`
+                          ? `${aptLeads[0]!.first_name_ar} ${aptLeads[0]!.last_name_ar}`
+                          : `${aptLeads[0]!.first_name_ar} ${aptLeads[0]!.last_name_ar} +${aptLeads.length - 1}`
                         : apt.lead
-                        ? `${apt.lead.first_name_ar || apt.lead.first_name} ${apt.lead.last_name_ar || apt.lead.last_name}`
+                        ? `${apt.lead.first_name_ar} ${apt.lead.last_name_ar}`
                         : apt.student
                         ? `${apt.student.first_name} ${apt.student.last_name}`
                         : "Unknown"

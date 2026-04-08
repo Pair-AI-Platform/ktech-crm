@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       .from("payment_transactions")
       .select(`
         *,
-        lead:leads(id, first_name, last_name, phone)
+        lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, phone)
       `)
       .eq("id", transactionId)
       .single()
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
     // Compose PSP fee payment message
-    const message = `مرحباً ${lead.first_name}،
+    const message = `مرحباً ${lead.first_name_ar || ""}،
 
 لإتمام إجراءات التقديم لبرنامج PSP في كلية الكويت التقنية، يرجى دفع الرسوم المطلوبة (${transaction.amount} د.ك) من خلال الرابط التالي:
 
@@ -91,7 +91,7 @@ ${transaction.myfatoorah_invoice_url}
 
 ---
 
-Hello ${lead.first_name},
+Hello ${lead.first_name_ar || ""},
 
 To complete your PSP (PUC Submission Pipeline) application at Kuwait Technical College, please pay the required fees (${transaction.amount} KD) using the following link:
 

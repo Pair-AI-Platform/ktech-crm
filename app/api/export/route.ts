@@ -43,7 +43,7 @@ function getStatusLabel(status: string): string {
 
 function formatLeadRows(leads: Lead[]): ExportData['rows'] {
   return leads.map((lead) => ({
-    name: `${lead.first_name} ${lead.last_name}`,
+    name: `${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`.trim(),
     phone: lead.phone,
     email: lead.email ?? '',
     civil_id: lead.civil_id ?? '',

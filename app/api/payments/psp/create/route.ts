@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Fetch lead details
     const { data: lead, error: leadError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, phone, email, civil_id")
+      .select("id, first_name, last_name, first_name_ar, last_name_ar, phone, email, civil_id")
       .eq("id", leadId)
       .single()
 
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     // Create MyFatoorah payment link for PSP fees
     const paymentResult = await createPaymentLink({
-      customerName: `${lead.first_name} ${lead.last_name}`,
+      customerName: `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}`,
       customerEmail: lead.email || undefined,
       customerMobile: lead.phone,
       customerCivilId: leadCivilId,

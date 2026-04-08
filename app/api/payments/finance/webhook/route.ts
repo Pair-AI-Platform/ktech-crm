@@ -169,7 +169,7 @@ export const POST = withApiHandler(
     // Look up lead by civil_id
     const { data: lead, error: leadError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, phone, email, civil_id")
+      .select("id, first_name, last_name, first_name_ar, last_name_ar, phone, email, civil_id")
       .eq("civil_id", civil_id)
       .single()
 
@@ -248,7 +248,7 @@ export const POST = withApiHandler(
     // Generate and upload payment receipt
     try {
       const leadName =
-        student_name || `${lead.first_name} ${lead.last_name}`
+        student_name || `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}`
       const receiptHtml = generateFinanceReceiptHtml({
         receiptNumber: receipt_number,
         studentName: leadName,

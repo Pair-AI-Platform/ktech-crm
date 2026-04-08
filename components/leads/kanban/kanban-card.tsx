@@ -79,9 +79,9 @@ export const KanbanCard = memo(function KanbanCard({
 
   const displayDragging = isDragging || isSortableDragging
 
-  // Format the lead name
-  const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(" ") || "Untitled Lead"
-  const initials = getInitials(lead.first_name || '', lead.last_name || '')
+  // Format the lead name (Arabic only)
+  const fullName = [lead.first_name_ar, lead.last_name_ar].filter(Boolean).join(" ") || "Untitled Lead"
+  const initials = getInitials(lead.first_name_ar || '', lead.last_name_ar || '')
 
   // Get the highest GPA available
   const gpa = lead.gpa_grade_12_expected ?? lead.gpa_grade_11 ?? lead.gpa_grade_10
@@ -251,8 +251,8 @@ export const KanbanCard = memo(function KanbanCard({
 
 // Lightweight card for drag overlay
 export function KanbanCardOverlay({ lead }: { lead: Lead }) {
-  const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(" ") || "Untitled Lead"
-  const initials = getInitials(lead.first_name || '', lead.last_name || '')
+  const fullName = [lead.first_name_ar, lead.last_name_ar].filter(Boolean).join(" ") || "Untitled Lead"
+  const initials = getInitials(lead.first_name_ar || '', lead.last_name_ar || '')
 
   return (
     <div className="bg-[var(--bg-surface)] rounded-lg border-2 border-[var(--primary)] shadow-2xl p-3 w-72">

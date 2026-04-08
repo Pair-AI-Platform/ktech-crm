@@ -102,7 +102,7 @@ export function QuickActionsBar({
       ) : (
         <Button asChild className="gap-2 bg-emerald-500 hover:bg-emerald-600">
           <Link
-            href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}`)}`}
+            href={`/voice?call=${lead.phone}&leadId=${lead.id}&name=${encodeURIComponent(`${lead.first_name_ar} ${lead.last_name_ar}`)}`}
           >
             <Phone className="w-4 h-4" />
             Call

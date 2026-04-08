@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Fetch ALL leads with matching civil IDs (any stage, any funding type)
     const { data: existingLeads, error: leadsError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, civil_id, pipeline_stage, status, funding_type, position_in_stage, ministry_assigned")
+      .select("id, first_name, last_name, first_name_ar, last_name_ar, civil_id, pipeline_stage, status, funding_type, position_in_stage, ministry_assigned")
       .in("civil_id", civilIds)
 
     if (leadsError) {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
         if (lead) {
           // ── EXISTING LEAD ──
-          const leadName = `${lead.first_name} ${lead.last_name}`
+          const leadName = `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}`
 
           // Skip if already at applicant/enrolled (don't move backwards)
           if (["applicant", "enrolled"].includes(lead.pipeline_stage)) {

@@ -1179,7 +1179,7 @@ function calculateReports(
         const studentName = student
           ? `${student.first_name} ${student.last_name}`
           : appt.lead
-            ? `${appt.lead.first_name} ${appt.lead.last_name}`
+            ? `${appt.lead.first_name_ar || ''} ${appt.lead.last_name_ar || ''}`.trim() || 'Unknown'
             : 'Unknown'
 
         return {

@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
     // Compose payment message
-    const message = `مرحباً ${lead.first_name}،
+    const message = `مرحباً ${lead.first_name_ar || ""}،
 
 لإتمام عملية التسجيل في كلية الكويت التقنية، يرجى دفع رسوم التسجيل بقيمة ${transaction.amount} د.ك من خلال الرابط التالي:
 
@@ -92,7 +92,7 @@ ${transaction.myfatoorah_invoice_url}
 
 ---
 
-Hello ${lead.first_name},
+Hello ${lead.first_name_ar || ""},
 
 To complete your enrollment at Kuwait Technical College, please pay the registration fee of ${transaction.amount} KD using the following link:
 

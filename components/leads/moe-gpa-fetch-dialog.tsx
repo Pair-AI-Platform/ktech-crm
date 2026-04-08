@@ -166,7 +166,7 @@ export function MOEGPAFetchDialog({
                         {eligibleLeads.slice(0, 10).map((lead) => (
                           <tr key={lead.id}>
                             <td className="px-3 py-2">
-                              {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                              {lead.first_name_ar} {lead.last_name_ar}
                             </td>
                             <td className="px-3 py-2 font-mono text-xs">
                               {lead.civil_id}
@@ -200,7 +200,7 @@ export function MOEGPAFetchDialog({
                   <ul className="mt-2 text-xs text-amber-600 list-disc list-inside">
                     {ineligibleLeads.slice(0, 3).map((lead) => (
                       <li key={lead.id}>
-                        {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                        {lead.first_name_ar} {lead.last_name_ar}
                         {!lead.civil_id && " (no Civil ID)"}
                         {!lead.seat_number && " (no Seat Number)"}
                       </li>

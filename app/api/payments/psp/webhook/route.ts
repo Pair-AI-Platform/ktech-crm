@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
     // Find the payment transaction by invoice ID
     const { data: transaction, error: txError } = await supabase
       .from("payment_transactions")
-      .select("*, lead:leads(id, first_name, last_name, phone, email, civil_id)")
+      .select("*, lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, phone, email, civil_id)")
       .eq("myfatoorah_invoice_id", invoiceId.toString())
       .eq("notes", "PSP Fee Payment")
       .single()
@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
       // Generate invoice HTML
       const invoiceHtml = generateInvoiceHtml({
         invoiceNumber,
-        leadName: `${lead.first_name} ${lead.last_name}`,
+        leadName: `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}`,
         civilId: lead.civil_id || transaction.civil_id,
         phone: lead.phone,
         email: lead.email,
@@ -357,7 +357,7 @@ export async function POST(request: NextRequest) {
         const whatsappTo = `whatsapp:+${formattedPhone}`
         const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
-        const receiptMessage = `مرحباً ${lead.first_name}،
+        const receiptMessage = `مرحباً ${lead.first_name_ar || ""}،
 
 تم استلام دفعتكم بنجاح ✅
 
@@ -369,7 +369,7 @@ ${urlData?.publicUrl ? `رابط الإيصال: ${urlData.publicUrl}` : ""}
 
 ---
 
-Hello ${lead.first_name},
+Hello ${lead.first_name_ar || ""},
 
 Your payment has been received successfully ✅
 

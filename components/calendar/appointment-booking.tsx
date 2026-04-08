@@ -379,7 +379,7 @@ export function AppointmentBooking({
                       {selectedLeads.length > 0 && (
                         <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                           for {selectedLeads.length === 1
-                            ? `${selectedLeads[0].first_name_ar || selectedLeads[0].first_name} ${selectedLeads[0].last_name_ar || selectedLeads[0].last_name}`
+                            ? `${selectedLeads[0].first_name_ar} ${selectedLeads[0].last_name_ar}`
                             : `${selectedLeads.length} leads`}
                         </p>
                       )}
@@ -406,11 +406,11 @@ export function AppointmentBooking({
                         >
                           <div className="w-6 h-6 rounded-md bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                             <span className="text-[10px] font-semibold text-[var(--primary)]">
-                              {lead.first_name[0]}{lead.last_name[0]}
+                              {(lead.first_name_ar || '')[0]}{(lead.last_name_ar || '')[0]}
                             </span>
                           </div>
                           <span className="text-xs font-medium text-[var(--text-primary)]">
-                            {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                            {lead.first_name_ar} {lead.last_name_ar}
                           </span>
                           {!preselectedLead && (
                             <button
@@ -466,12 +466,12 @@ export function AppointmentBooking({
                                   >
                                     <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                                       <span className="text-xs font-semibold text-[var(--primary)]">
-                                        {lead.first_name[0]}{lead.last_name[0]}
+                                        {(lead.first_name_ar || '')[0]}{(lead.last_name_ar || '')[0]}
                                       </span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm text-[var(--text-primary)] truncate">
-                                        {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                                        {lead.first_name_ar} {lead.last_name_ar}
                                       </p>
                                       <p className="text-xs text-[var(--text-muted)]">{lead.phone}</p>
                                     </div>
@@ -746,7 +746,7 @@ export function AppointmentBooking({
                 <span className="text-lg">{skipToDateTime ? "Schedule Appointment" : "Book Appointment"}</span>
                 <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
                   {skipToDateTime && selectedLead
-                    ? `Select date and time for ${selectedLead.first_name_ar || selectedLead.first_name} ${selectedLead.last_name_ar || selectedLead.last_name}`
+                    ? `Select date and time for ${selectedLead.first_name_ar} ${selectedLead.last_name_ar}`
                     : "Schedule a new appointment with a lead"}
                 </p>
               </div>
@@ -1011,11 +1011,11 @@ export function AppointmentBooking({
                       >
                         <div className="w-6 h-6 rounded-md bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                           <span className="text-[10px] font-semibold text-[var(--primary)]">
-                            {lead.first_name[0]}{lead.last_name[0]}
+                            {(lead.first_name_ar || '')[0]}{(lead.last_name_ar || '')[0]}
                           </span>
                         </div>
                         <span className="text-xs font-medium text-[var(--text-primary)]">
-                          {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                          {lead.first_name_ar} {lead.last_name_ar}
                         </span>
                         <button
                           type="button"
@@ -1098,12 +1098,12 @@ export function AppointmentBooking({
                             <div className="flex items-center gap-3">
                               <div className="w-11 h-11 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                                 <span className="text-sm font-semibold text-[var(--primary)]">
-                                  {lead.first_name[0]}{lead.last_name[0]}
+                                  {(lead.first_name_ar || '')[0]}{(lead.last_name_ar || '')[0]}
                                 </span>
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-[var(--text-primary)] truncate">
-                                  {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                                  {lead.first_name_ar} {lead.last_name_ar}
                                 </p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] px-2 py-0.5 rounded-md bg-[var(--bg-sunken)]">
@@ -1418,12 +1418,12 @@ export function AppointmentBooking({
                           <div key={lead.id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-surface)]">
                             <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                               <span className="text-[10px] font-semibold text-[var(--primary)]">
-                                {lead.first_name[0]}{lead.last_name[0]}
+                                {(lead.first_name_ar || '')[0]}{(lead.last_name_ar || '')[0]}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-sm text-[var(--text-primary)]">
-                                {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                                {lead.first_name_ar} {lead.last_name_ar}
                               </p>
                               <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                                 <Phone className="w-3 h-3" />
@@ -1581,7 +1581,7 @@ export function AppointmentBooking({
                       </div>
                       <p className="text-xs text-[var(--text-muted)]">
                         {selectedLeads.length === 1
-                          ? `${selectedLeads[0].first_name_ar || selectedLeads[0].first_name} ${selectedLeads[0].last_name_ar || selectedLeads[0].last_name}`
+                          ? `${selectedLeads[0].first_name_ar} ${selectedLeads[0].last_name_ar}`
                           : `${selectedLeads.length} leads`}
                       </p>
                     </div>

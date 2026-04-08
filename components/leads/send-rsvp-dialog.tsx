@@ -118,7 +118,7 @@ export function SendRSVPDialog({
     const allLinks = rsvpLinks
       .map((link) => {
         const lead = selectedLeads.find((l) => l.id === link.lead_id)
-        return `${lead?.first_name_ar || lead?.first_name} ${lead?.last_name_ar || lead?.last_name}: ${link.rsvp_url}`
+        return `${lead?.first_name_ar} ${lead?.last_name_ar}: ${link.rsvp_url}`
       })
       .join("\n")
     await navigator.clipboard.writeText(allLinks)
@@ -229,7 +229,7 @@ export function SendRSVPDialog({
                       <tbody className="divide-y divide-[var(--border)]">
                         {eligibleLeads.slice(0, 10).map((lead) => (
                           <tr key={lead.id}>
-                            <td className="px-3 py-2">{lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}</td>
+                            <td className="px-3 py-2">{lead.first_name_ar} {lead.last_name_ar}</td>
                             <td className="px-3 py-2 font-mono text-xs">{lead.phone || "—"}</td>
                           </tr>
                         ))}

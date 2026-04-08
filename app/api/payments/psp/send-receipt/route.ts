@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Fetch lead details
     const { data: lead, error: leadError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, phone, email, civil_id")
+      .select("id, first_name, last_name, first_name_ar, last_name_ar, phone, email, civil_id")
       .eq("id", leadId)
       .single()
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     const whatsappTo = `whatsapp:+${formattedPhone}`
     const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
-    const receiptMessage = `مرحباً ${lead.first_name}،
+    const receiptMessage = `مرحباً ${lead.first_name_ar || ""}،
 
 تم استلام دفعتكم بنجاح ✅
 
@@ -109,7 +109,7 @@ ${receiptDoc?.public_url ? `رابط الإيصال: ${receiptDoc.public_url}` :
 
 ---
 
-Hello ${lead.first_name},
+Hello ${lead.first_name_ar || ""},
 
 Your payment has been received successfully ✅
 
@@ -146,7 +146,7 @@ Kuwait Technical College`
       lead_id: lead.id,
       activity_type: "psp_receipt_sent",
       title: "PSP Receipt Sent",
-      description: `PSP payment receipt sent to ${lead.first_name} ${lead.last_name} via WhatsApp`,
+      description: `PSP payment receipt sent to ${lead.first_name_ar || ""} ${lead.last_name} via WhatsApp`,
       metadata: {
         transaction_id: transaction.id,
         whatsapp_message_sid: twilioMessage.sid,

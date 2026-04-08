@@ -23,7 +23,7 @@ export async function GET(
     const { data: transaction, error: txError } = await supabase
       .from("payment_transactions")
       .select(
-        "id, amount, currency, payment_method, status, cash_invoice_number, myfatoorah_invoice_id, myfatoorah_payment_id, notes, completed_at, created_at, lead:leads(id, first_name, last_name, civil_id, phone, email)"
+        "id, amount, currency, payment_method, status, cash_invoice_number, myfatoorah_invoice_id, myfatoorah_payment_id, notes, completed_at, created_at, lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, civil_id, phone, email)"
       )
       .eq("id", transactionId)
       .single()
@@ -40,6 +40,8 @@ export async function GET(
       id: string
       first_name: string
       last_name: string
+      first_name_ar: string | null
+      last_name_ar: string | null
       civil_id: string | null
       phone: string | null
       email: string | null
@@ -91,7 +93,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Receipt - ${escapeHtml(lead.first_name)} ${escapeHtml(lead.last_name)}</title>
+  <title>Payment Receipt - ${escapeHtml(lead.first_name_ar || "")} ${escapeHtml(lead.last_name_ar || "")}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -440,7 +442,7 @@ export async function GET(
           <div class="details-card">
             <div class="detail-row">
               <span class="detail-label">Name</span>
-              <span class="detail-value">${escapeHtml(lead.first_name)} ${escapeHtml(lead.last_name)}</span>
+              <span class="detail-value">${escapeHtml(lead.first_name_ar || "")} ${escapeHtml(lead.last_name_ar || "")}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Civil ID</span>

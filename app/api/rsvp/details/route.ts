@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Fetch lead name
     const { data: lead } = await supabase
       .from('leads')
-      .select('first_name, last_name')
+      .select('first_name, last_name, first_name_ar, last_name_ar')
       .eq('id', rsvp.lead_id)
       .single()
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       event_title: rsvp.event_title,
       event_date: rsvp.event_date,
       event_location: rsvp.event_location,
-      lead_name: lead ? `${lead.first_name} ${lead.last_name}` : '',
+      lead_name: lead ? `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}` : '',
       already_confirmed: !!rsvp.confirmed_at,
     })
   } catch (err) {

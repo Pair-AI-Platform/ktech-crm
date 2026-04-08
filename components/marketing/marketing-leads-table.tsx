@@ -102,7 +102,7 @@ export function MarketingLeadsTable() {
               {leads.map((lead) => (
                 <tr key={lead.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)]">
                   <td className="px-6 py-3 text-[var(--text-primary)] font-medium">
-                    {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                    {lead.first_name_ar} {lead.last_name_ar}
                   </td>
                   <td className="px-6 py-3 text-[var(--text-secondary)] font-mono text-xs">
                     {lead.phone}

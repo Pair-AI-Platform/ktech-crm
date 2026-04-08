@@ -153,7 +153,7 @@ export function AdminStaleSection({
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-[var(--text-primary)] truncate">
-                          {item.lead.first_name} {item.lead.last_name}
+                          {item.lead.first_name_ar} {item.lead.last_name_ar}
                         </p>
                         <p className="text-xs text-[var(--text-tertiary)]">
                           {item.agentName || "Unassigned"} &middot;{" "}

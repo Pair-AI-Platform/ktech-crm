@@ -86,7 +86,7 @@ export function EnrollmentPaymentDialog({
   }
 
   const openWhatsAppLink = (paymentUrl: string) => {
-    const leadName = lead.first_name_ar || lead.first_name
+    const leadName = lead.first_name_ar
     const paymentAmount = parsedAmount > 0 ? parsedAmount : ENROLLMENT_PAYMENT_AMOUNT
 
     const message = `مرحباً ${leadName}،\n\nلإتمام عملية التسجيل في كلية الكويت التقنية، يرجى دفع رسوم التسجيل بقيمة ${paymentAmount} د.ك من خلال الرابط التالي:\n\n${paymentUrl}\n\n---\n\nHello ${leadName},\n\nTo complete your enrollment at Kuwait Technical College, please pay the registration fee of ${paymentAmount} KD using the following link:\n\n${paymentUrl}\n\nشكراً لكم / Thank you`
@@ -229,9 +229,9 @@ export function EnrollmentPaymentDialog({
               <DialogDescription>
                 {step === "success"
                   ? (isSF
-                    ? `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} has been moved to Applicant`
-                    : `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} is now enrolled`)
-                  : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name}`}
+                    ? `${lead.first_name_ar} ${lead.last_name_ar} has been moved to Applicant`
+                    : `${lead.first_name_ar} ${lead.last_name_ar} is now enrolled`)
+                  : `Complete ${ENROLLMENT_PAYMENT_AMOUNT} KWD payment for ${lead.first_name_ar} ${lead.last_name_ar}`}
               </DialogDescription>
             </div>
           </div>
@@ -448,8 +448,8 @@ export function EnrollmentPaymentDialog({
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
                   {isSF
-                    ? `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} has been moved to Applicant.`
-                    : `${lead.first_name_ar || lead.first_name} ${lead.last_name_ar || lead.last_name} has been successfully enrolled.`}
+                    ? `${lead.first_name_ar} ${lead.last_name_ar} has been moved to Applicant.`
+                    : `${lead.first_name_ar} ${lead.last_name_ar} has been successfully enrolled.`}
                 </p>
               </div>
 

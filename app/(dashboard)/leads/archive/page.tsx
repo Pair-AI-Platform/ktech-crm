@@ -745,8 +745,8 @@ export default function ArchivePage() {
       filtered[semId] = leads.filter((lead) => {
         // Search query
         if (q && !(
-          lead.first_name?.toLowerCase().includes(q) ||
-          lead.last_name?.toLowerCase().includes(q) ||
+          lead.first_name_ar?.toLowerCase().includes(q) ||
+          lead.last_name_ar?.toLowerCase().includes(q) ||
           lead.phone?.includes(q) ||
           lead.email?.toLowerCase().includes(q) ||
           lead.civil_id?.includes(q)
@@ -1134,7 +1134,7 @@ export default function ArchivePage() {
                                                       href={`/leads/${lead.id}`}
                                                       className="font-medium text-[var(--text-primary)] hover:text-[var(--primary)] transition-colors"
                                                     >
-                                                      {lead.first_name} {lead.last_name}
+                                                      {lead.first_name_ar} {lead.last_name_ar}
                                                     </Link>
                                                     {isReRegistered && (
                                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[var(--success)]/10 text-[10px] font-medium text-[var(--success)] whitespace-nowrap">

@@ -85,7 +85,7 @@ export async function POST(_request: NextRequest) {
     // Fetch all eligible PUC leads (not in submission, enrolled, or lost stages)
     const { data: eligibleLeads, error: leadsError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, pipeline_stage")
+      .select("id, first_name, last_name, first_name_ar, last_name_ar, pipeline_stage")
       .eq("funding_type", "puc")
       .not("pipeline_stage", "in", '("enrolled","lost")')
 
@@ -151,7 +151,7 @@ export async function POST(_request: NextRequest) {
       lead_id: lead.id,
       activity_type: "stage_change",
       title: "PSP Transfer",
-      description: `${lead.first_name} ${lead.last_name}: ${lead.pipeline_stage} → applicant (PSP bulk transfer)`,
+      description: `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}: ${lead.pipeline_stage} → applicant (PSP bulk transfer)`,
       metadata: {
         old_stage: lead.pipeline_stage,
         new_stage: "applicant",

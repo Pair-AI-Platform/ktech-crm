@@ -2,21 +2,21 @@ import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES } from '@/types'
 import type { PipelineStage } from '@/types'
 
 /**
- * Returns the full display name for a lead, preferring Arabic names.
+ * Returns the full display name for a lead, using Arabic names only.
  */
 export function getLeadDisplayName(lead: { first_name: string; last_name: string; first_name_ar?: string | null; last_name_ar?: string | null }): string {
-  const first = lead.first_name_ar || lead.first_name
-  const last = lead.last_name_ar || lead.last_name
+  const first = lead.first_name_ar || ''
+  const last = lead.last_name_ar || ''
   return `${first} ${last}`.trim()
 }
 
 /**
- * Returns uppercase initials (first letter of first and last name), preferring Arabic.
+ * Returns initials (first letter of first and last name), using Arabic names only.
  */
 export function getLeadInitials(lead: { first_name: string; last_name: string; first_name_ar?: string | null; last_name_ar?: string | null }): string {
-  const first = (lead.first_name_ar || lead.first_name)?.charAt(0) ?? ''
-  const last = (lead.last_name_ar || lead.last_name)?.charAt(0) ?? ''
-  return `${first}${last}`.toUpperCase()
+  const first = (lead.first_name_ar)?.charAt(0) ?? ''
+  const last = (lead.last_name_ar)?.charAt(0) ?? ''
+  return `${first}${last}`
 }
 
 /**
