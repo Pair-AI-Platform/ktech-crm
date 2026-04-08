@@ -575,7 +575,7 @@ export function LeadTable({
     setLostDialogLead(lead)
   }, [])
 
-  const handleContactedConfirm = async (status: LeadStatus) => {
+  const handleContactedConfirm = async (status: LeadStatus, notes?: string) => {
     if (!contactedDialogLead) return
 
     const leadId = contactedDialogLead.id
@@ -587,7 +587,9 @@ export function LeadTable({
     }))
     setEditingStage(leadId)
 
-    const result = await updateLead(leadId, { pipeline_stage: 'contacted' as PipelineStage, status })
+    const updateData: Partial<Lead> = { pipeline_stage: 'contacted' as PipelineStage, status }
+    if (notes) updateData.notes = notes
+    const result = await updateLead(leadId, updateData)
 
     setEditingStage(null)
     setContactedDialogLead(null)

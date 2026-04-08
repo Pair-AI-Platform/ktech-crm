@@ -40,7 +40,7 @@ export interface LeadTableDialogsProps {
   handleLostConfirm: (reasonId: string, notes?: string) => Promise<void>
   handleAssignLostReason?: (reasonId: string, notes?: string) => Promise<void>
   assignReasonMode?: boolean
-  handleContactedConfirm: (status: LeadStatus) => Promise<void>
+  handleContactedConfirm: (status: LeadStatus, notes?: string) => Promise<void>
   handleBlockedConfirm: (reason: SubmissionBlockedReason, notes?: string) => Promise<void>
   handleWithdrawConfirm: (reason: string, notes?: string) => Promise<void>
   editWithdrawReasonLead: Lead | null
