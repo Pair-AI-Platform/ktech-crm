@@ -346,7 +346,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                     </SimpleTooltip>
                   )}
                   <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors truncate" dir="auto">
-                    {lead.first_name_ar || lead.first_name} {lead.last_name_ar || lead.last_name}
+                    {lead.first_name_ar} {lead.last_name_ar}
                   </p>
                   {isSentToRegistration && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 whitespace-nowrap flex-shrink-0">
@@ -794,6 +794,42 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               </td>
             </>
           )}
+          {/* Actual GPA column for submission view */}
+          <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+            {editingGpa?.leadId === lead.id && editingGpa.field === 'actual_gpa' ? (
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                autoFocus
+                value={gpaInputValue}
+                onChange={(e) => setGpaInputValue(e.target.value)}
+                onBlur={handleGpaSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleGpaSave()
+                  if (e.key === 'Escape') setEditingGpa(null)
+                }}
+                className="w-20 text-sm border border-[var(--border)] rounded px-2 py-1 bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            ) : (() => {
+                const val = getEffectiveValue(lead.id, 'actual_gpa', lead.actual_gpa)
+                const hasValue = val != null
+                return (
+                  <button
+                    className={cn(
+                      "group flex items-center gap-1 rounded px-2 py-1 text-sm transition-colors",
+                      hasValue
+                        ? "text-[var(--text-primary)] hover:bg-[var(--accent-muted)]"
+                        : "border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    )}
+                    onClick={() => handleGpaEdit(lead.id, 'actual_gpa', lead.actual_gpa ?? undefined)}
+                  >
+                    {hasValue ? `${val}%` : <><Pencil className="w-3 h-3" /><span>Add</span></>}
+                  </button>
+                )
+              })()}
+          </td>
           {/* Agent column - hidden in PUC Contacted view */}
           {!isPucContactedView && (
           <td className="px-3 py-3">
@@ -886,6 +922,42 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               loading={editingSchool === lead.id}
             />
           </td>
+          {/* Actual GPA column for lost view */}
+          <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+            {editingGpa?.leadId === lead.id && editingGpa.field === 'actual_gpa' ? (
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                autoFocus
+                value={gpaInputValue}
+                onChange={(e) => setGpaInputValue(e.target.value)}
+                onBlur={handleGpaSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleGpaSave()
+                  if (e.key === 'Escape') setEditingGpa(null)
+                }}
+                className="w-20 text-sm border border-[var(--border)] rounded px-2 py-1 bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            ) : (() => {
+                const val = getEffectiveValue(lead.id, 'actual_gpa', lead.actual_gpa)
+                const hasValue = val != null
+                return (
+                  <button
+                    className={cn(
+                      "group flex items-center gap-1 rounded px-2 py-1 text-sm transition-colors",
+                      hasValue
+                        ? "text-[var(--text-primary)] hover:bg-[var(--accent-muted)]"
+                        : "border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    )}
+                    onClick={() => handleGpaEdit(lead.id, 'actual_gpa', lead.actual_gpa ?? undefined)}
+                  >
+                    {hasValue ? `${val}%` : <><Pencil className="w-3 h-3" /><span>Add</span></>}
+                  </button>
+                )
+              })()}
+          </td>
         </>
       ) : isWithdrawView ? (
         <>
@@ -946,6 +1018,42 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 </button>
               )
             })()}
+          </td>
+          {/* Actual GPA column for withdraw view */}
+          <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+            {editingGpa?.leadId === lead.id && editingGpa.field === 'actual_gpa' ? (
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                autoFocus
+                value={gpaInputValue}
+                onChange={(e) => setGpaInputValue(e.target.value)}
+                onBlur={handleGpaSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleGpaSave()
+                  if (e.key === 'Escape') setEditingGpa(null)
+                }}
+                className="w-20 text-sm border border-[var(--border)] rounded px-2 py-1 bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            ) : (() => {
+                const val = getEffectiveValue(lead.id, 'actual_gpa', lead.actual_gpa)
+                const hasValue = val != null
+                return (
+                  <button
+                    className={cn(
+                      "group flex items-center gap-1 rounded px-2 py-1 text-sm transition-colors",
+                      hasValue
+                        ? "text-[var(--text-primary)] hover:bg-[var(--accent-muted)]"
+                        : "border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    )}
+                    onClick={() => handleGpaEdit(lead.id, 'actual_gpa', lead.actual_gpa ?? undefined)}
+                  >
+                    {hasValue ? `${val}%` : <><Pencil className="w-3 h-3" /><span>Add</span></>}
+                  </button>
+                )
+              })()}
           </td>
           {/* Agent column */}
           <td className="px-3 py-3">

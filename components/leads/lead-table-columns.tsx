@@ -137,6 +137,15 @@ export function LeadTableHeader({
                 </th>
               </>
             )}
+            <th className="px-3 py-1.5 text-left w-[75px]">
+              <button
+                onClick={() => handleSort("actual_gpa")}
+                className="flex items-center text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group whitespace-nowrap"
+              >
+                Act. GPA
+                <span className="group-hover:scale-110 transition-transform">{getSortIcon("actual_gpa")}</span>
+              </button>
+            </th>
             {!isPucContactedView && (
             <th className="px-3 py-1.5 text-left w-[180px] min-w-[160px]">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
@@ -171,6 +180,15 @@ export function LeadTableHeader({
                 <span className="group-hover:scale-110 transition-transform">{getSortIcon("school")}</span>
               </button>
             </th>
+            <th className="px-3 py-1.5 text-left w-[75px]">
+              <button
+                onClick={() => handleSort("actual_gpa")}
+                className="flex items-center text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group whitespace-nowrap"
+              >
+                Act. GPA
+                <span className="group-hover:scale-110 transition-transform">{getSortIcon("actual_gpa")}</span>
+              </button>
+            </th>
           </>
         ) : isWithdrawView ? (
           <>
@@ -183,6 +201,15 @@ export function LeadTableHeader({
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                 Reason
               </span>
+            </th>
+            <th className="px-3 py-1.5 text-left w-[75px]">
+              <button
+                onClick={() => handleSort("actual_gpa")}
+                className="flex items-center text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group whitespace-nowrap"
+              >
+                Act. GPA
+                <span className="group-hover:scale-110 transition-transform">{getSortIcon("actual_gpa")}</span>
+              </button>
             </th>
             <th className="px-3 py-1.5 text-left w-[180px] min-w-[160px]">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">

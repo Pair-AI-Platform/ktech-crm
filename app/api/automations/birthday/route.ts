@@ -21,6 +21,8 @@ interface BirthdayLead {
   id: string
   first_name: string
   last_name: string | null
+  first_name_ar?: string
+  last_name_ar?: string
   phone: string | null
   date_of_birth: string
 }
@@ -58,7 +60,7 @@ export async function POST(request: Request) {
     // Find leads whose birthday is today (match month + day)
     const { data: birthdayLeads, error: fetchError } = await supabase
       .from('leads')
-      .select('id, first_name, last_name, phone, date_of_birth')
+      .select('id, first_name, last_name, first_name_ar, last_name_ar, phone, date_of_birth')
       .not('date_of_birth', 'is', null)
       .not('phone', 'is', null)
 
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
         results.sent++
         results.details.push({
           leadId: lead.id,
-          leadName: `${lead.first_name} ${lead.last_name || ''}`.trim(),
+          leadName: `${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`.trim(),
           phone: lead.phone!,
           status: 'dry_run',
         })
@@ -142,7 +144,7 @@ export async function POST(request: Request) {
           const templateText = dbTemplate?.content_ar || BIRTHDAY_TEMPLATES.ar
 
           const message = replaceTemplateVariables(templateText, {
-            first_name: lead.first_name || 'Student',
+            first_name: lead.first_name_ar || 'طالب',
           })
 
           const smsResult = await sendSMS(lead.phone!, message)
@@ -179,7 +181,7 @@ export async function POST(request: Request) {
             results.sent++
             results.details.push({
               leadId: lead.id,
-              leadName: `${lead.first_name} ${lead.last_name || ''}`.trim(),
+              leadName: `${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`.trim(),
               phone: lead.phone!,
               status: 'sent',
             })
@@ -187,7 +189,7 @@ export async function POST(request: Request) {
             results.failed++
             results.details.push({
               leadId: lead.id,
-              leadName: `${lead.first_name} ${lead.last_name || ''}`.trim(),
+              leadName: `${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`.trim(),
               phone: lead.phone!,
               status: 'failed',
               error: smsResult.error,

@@ -12,6 +12,8 @@ interface BirthdaySectionProps {
       id: string
       first_name: string
       last_name: string
+      first_name_ar?: string | null
+      last_name_ar?: string | null
       date_of_birth: string | null
       phone?: string
       pipeline_stage: string
@@ -40,7 +42,7 @@ export function BirthdaySection({ birthdayLeads, loading }: BirthdaySectionProps
 
       return {
         id: item.lead.id,
-        title: `${item.lead.first_name} ${item.lead.last_name}`,
+        title: `${item.lead.first_name_ar || ''} ${item.lead.last_name_ar || ''}`.trim() || item.lead.first_name,
         subtitle: item.isToday
           ? `Turns ${age} today!`
           : item.daysUntil === 1
