@@ -106,6 +106,7 @@ export function LeadTable({
   const isWithdrawView = currentStageFilter === 'withdraw'
   const isSubmissionView = !isWithdrawView && (currentStageFilter === 'applicant' || isPucSrjView)
   const isLostView = currentStageFilter === 'lost'
+  const isEnrolledView = currentStageFilter === 'enrolled'
   // SF applicant view: show orientation status column
   const isApplicantSFView = currentStageFilter === 'applicant' && !isPucSrjView
   // PUC Applicant view: show orientation instead of status
@@ -1023,6 +1024,7 @@ export function LeadTable({
             isSubmissionView={isSubmissionView}
             isLostView={isLostView}
             isWithdrawView={isWithdrawView}
+            isEnrolledView={isEnrolledView}
             isPucSrjView={isPucSrjView}
             isPucApplicantView={isPucApplicantView}
             isPucDocSubmissionView={isPucDocSubmissionView}

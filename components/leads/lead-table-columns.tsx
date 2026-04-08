@@ -9,6 +9,7 @@ interface LeadTableHeaderProps {
   isSubmissionView: boolean
   isLostView: boolean
   isWithdrawView: boolean
+  isEnrolledView: boolean
   isPucSrjView: boolean
   isPucApplicantView: boolean
   isPucDocSubmissionView: boolean
@@ -26,6 +27,7 @@ export function LeadTableHeader({
   isSubmissionView,
   isLostView,
   isWithdrawView,
+  isEnrolledView,
   isPucSrjView,
   isPucApplicantView,
   isPucDocSubmissionView,
@@ -204,6 +206,7 @@ export function LeadTableHeader({
                 Status
               </span>
             </th>
+            {!isEnrolledView && (
             <th className="px-3 py-1.5 text-left w-[150px] min-w-[150px]">
               <button
                 onClick={() => handleSort("school")}
@@ -213,6 +216,7 @@ export function LeadTableHeader({
                 <span className="group-hover:scale-110 transition-transform">{getSortIcon("school")}</span>
               </button>
             </th>
+            )}
             <th className="px-3 py-1.5 text-left w-[75px]">
               <button
                 onClick={() => handleSort("expected_gpa")}

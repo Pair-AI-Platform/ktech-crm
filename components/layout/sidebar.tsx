@@ -248,7 +248,7 @@ const navigation: NavItem[] = [
     { name: "PUC", href: "/puc-srj", icon: GraduationCap, description: "PUC submissions" },
     { name: "Self Funded", href: "/puc-srj?tab=sf_srj", icon: Wallet, description: "Self-funded submissions" },
     { name: "Archive", href: "/leads/archive", icon: Archive, description: "Previous yearly cycles", roles: ["admin"] },
-    { name: "Lost", href: "/leads?stage=lost", icon: Ban, description: "Lost leads" },
+    { name: "Lost", href: "/leads/lost", icon: Ban, description: "Lost leads" },
   ]},
   { name: "Calendar", href: "/calendar", icon: Calendar, description: "Schedule & appointments" },
   { name: "Campaigns", href: "/campaigns", icon: Send, description: "Outreach campaigns", roles: ["admin"] },

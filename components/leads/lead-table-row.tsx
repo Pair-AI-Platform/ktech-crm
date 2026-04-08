@@ -1057,6 +1057,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               )
             })()}
           </td>
+          {currentStageFilter !== 'enrolled' && (
           <td className="px-3 py-3">
             <InlineTagSelect
               value={getEffectiveValue(lead.id, 'school', lead.school) || ""}
@@ -1070,6 +1071,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               loading={editingSchool === lead.id}
             />
           </td>
+          )}
           <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
             {editingGpa?.leadId === lead.id && editingGpa.field === 'expected_gpa' ? (
               <input

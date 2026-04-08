@@ -1495,7 +1495,7 @@ export const EDUCATION_TYPES: { value: EducationType; label: string; description
 
 export const MAJORS: { value: IntendedMajor; label: string }[] = [
   { value: 'cyber_security', label: 'الأمن السيبراني' },
-  { value: 'cis', label: 'نظم المعلومات الحاسوبية' },
+  { value: 'cis', label: 'ادارة نظم معلومات' },
   { value: 'marketing', label: 'التسويق' },
   { value: 'accounting', label: 'المحاسبة' },
   { value: 'network_security', label: 'أمن الشبكات' },
