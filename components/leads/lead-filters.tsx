@@ -134,8 +134,8 @@ const STAGE_ALLOWED_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none
   applicant: ['no_answer', 'cant_reach', 'informed', 'travelling', 'might_withdraw'],
   enrolled: 'none',
   withdraw: 'all',
-  puc_document_submission: 'none',
-  puc_application_submission: 'none',
+  puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
+  puc_application_submission: ['applied', 'documents_missing', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
 }
 
 function getStatusesForStages(stages: PipelineStage[]) {

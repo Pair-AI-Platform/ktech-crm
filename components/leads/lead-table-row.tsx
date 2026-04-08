@@ -536,7 +536,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   enrolled: 'none',
                   withdraw: 'none',
                   puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
-                  puc_application_submission: ['applied', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
+                  puc_application_submission: ['applied', 'documents_missing', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_gpa', 'blocked_other'],
                 }
 
                 const stageConfig = PUC_STAGE_STATUSES[effectiveStage] ?? 'none'
@@ -1123,7 +1123,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 enrolled: 'none',
                 withdraw: 'all',
                 puc_document_submission: ['no_answer', 'cant_reach', 'interested', 'not_interested', 'will_see'],
-                puc_application_submission: ['applied', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_other'],
+                puc_application_submission: ['applied', 'documents_missing', 'changed_preferences', 'blocked_ku', 'blocked_paaet', 'blocked_abroad', 'blocked_aasu', 'blocked_paci', 'blocked_puc', 'blocked_gpa', 'blocked_other'],
               }
               const stageConfig = effectiveStage ? (STAGE_STATUSES[effectiveStage as PipelineStage] ?? 'all') : 'all'
               const isStatusDisabled = stageConfig === 'none'

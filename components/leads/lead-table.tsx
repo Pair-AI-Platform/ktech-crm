@@ -809,13 +809,8 @@ export function LeadTable({
         setOpenPreferenceForLead(leadId)
       }
 
-      // If status changed to a blocked variant (App Submission), open blocked reason dialog
+      // Auto-set preferred_college if this blocked status maps to a college and none is set yet
       if (newStatus.startsWith('blocked_')) {
-        const lead = leads.find(l => l.id === leadId)
-        if (lead) {
-          setBlockedDialogLead(lead)
-        }
-        // Auto-set preferred_college if this blocked status maps to a college and none is set yet
         const mappedCollege = STATUS_TO_COLLEGE[newStatus]
         const currentCollege = pendingUpdates[leadId]?.preferred_college ?? leads.find(l => l.id === leadId)?.preferred_college
         if (mappedCollege && !currentCollege) {

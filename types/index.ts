@@ -1035,7 +1035,7 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; labelAr: string;
   { value: 'blocked_paci', label: 'PACI', labelAr: 'الهيئة العامة للمعلومات المدنية', color: 'destructive' },
   { value: 'blocked_puc', label: 'PUC', labelAr: 'ديوان الخدمة المدنية', color: 'destructive' },
   { value: 'blocked_gpa', label: 'GPA', labelAr: 'المعدل', color: 'destructive' },
-  { value: 'documents_missing', label: 'Documents Missing', labelAr: 'مستندات ناقصة', color: 'warning' },
+  { value: 'documents_missing', label: 'Missing Requirement', labelAr: 'متطلب ناقص', color: 'warning' },
   { value: 'payment_pending', label: 'Payment Pending', labelAr: 'بانتظار الدفع', color: 'warning' },
   { value: 'blocked_other', label: 'Other', labelAr: 'أخرى', color: 'secondary' },
   { value: 'changed_preferences', label: 'Changed Preferences', labelAr: 'غير تفضيلاته', color: 'purple' },
@@ -1699,7 +1699,7 @@ export const SUBMISSION_BLOCKED_REASONS: { value: SubmissionBlockedReason; label
   { value: 'paci', label: 'PACI', labelAr: 'الهيئة العامة للمعلومات المدنية' },
   { value: 'puc', label: 'PUC', labelAr: 'ديوان الخدمة المدنية' },
   { value: 'gpa', label: 'GPA', labelAr: 'المعدل' },
-  { value: 'documents_missing', label: 'Documents Missing', labelAr: 'مستندات ناقصة' },
+  { value: 'documents_missing', label: 'Missing Requirement', labelAr: 'متطلب ناقص' },
   { value: 'payment_pending', label: 'Payment Pending', labelAr: 'دفع معلق' },
   { value: 'other', label: 'Other', labelAr: 'أخرى' },
 ]
