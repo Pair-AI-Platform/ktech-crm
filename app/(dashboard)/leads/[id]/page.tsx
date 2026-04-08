@@ -47,11 +47,13 @@ import {
   Star,
   Shield,
   GraduationCap,
+  PhoneForwarded,
+  RefreshCw,
 } from "lucide-react"
 import { PIPELINE_STAGES, SCHOOLS, MINISTRY_BLOCK_REASONS, ORIENTATION_STATUSES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, MAJORS, type PipelineStage, type OrientationStatus, type Lead, type LeadStatus } from "@/types"
 import { formatKuwaitPhone, formatDate, cn, getInitials } from "@/lib/utils"
 import { useLead, useLeadMutations } from "@/lib/hooks/use-leads"
-import { useLeadAppointments } from "@/lib/hooks/use-appointments"
+import { useLeadAppointments, useAppointmentMutations } from "@/lib/hooks/use-appointments"
 import { useUser } from "@/lib/hooks/use-user"
 
 import { useLeadShortcuts } from "@/lib/hooks/use-lead-shortcuts"
@@ -63,6 +65,7 @@ import { SFDownPaymentCard } from "@/components/leads/sf-down-payment-card"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { InlineTagSelect } from "@/components/ui/notion-tag-select"
 import { FollowUpReminders } from "@/components/leads/follow-up-reminders"
+import { CallbackScheduler } from "@/components/leads/callback-scheduler"
 import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
 import { LeadDocuments } from "@/components/leads/lead-documents"
 import { SFDocumentManager } from "@/components/leads/sf-document-manager"
@@ -303,6 +306,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
   const [showPSPWizard, setShowPSPWizard] = useState(false)
   const [showRSVPDialog, setShowRSVPDialog] = useState(false)
+  const [showCallbackScheduler, setShowCallbackScheduler] = useState(false)
+  const [rescheduleAppointmentId, setRescheduleAppointmentId] = useState<string | null>(null)
+  const [rescheduleDate, setRescheduleDate] = useState("")
+  const [rescheduleTime, setRescheduleTime] = useState("")
+  const [rescheduling, setRescheduling] = useState(false)
+  const { updateAppointment } = useAppointmentMutations()
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
 
   useLeadShortcuts({
@@ -1023,32 +1032,162 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
 
-            {/* Upcoming Appointment */}
+            {/* Upcoming Appointments */}
             {upcomingAppointments.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.35 }}
-                className="mt-5"
+                className="mt-5 space-y-2"
               >
-                <Link
-                  href={`/calendar?highlight=${upcomingAppointments[0].id}`}
-                  className="group flex items-center gap-3.5 px-4 py-3 rounded-lg bg-[var(--info-bg)] ring-1 ring-[var(--info)]/15 hover:ring-[var(--info)]/30 transition-all duration-200"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--info)] flex items-center justify-center shadow-sm">
-                    <CalendarDays className="w-5 h-5 text-white" />
+                {upcomingAppointments.map((apt) => (
+                  <div key={apt.id}>
+                    <div
+                      className={cn(
+                        "flex items-center gap-3.5 px-4 py-3 rounded-lg ring-1 transition-all duration-200",
+                        apt.is_callback
+                          ? "bg-amber-50 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30"
+                          : "bg-[var(--info-bg)] ring-[var(--info)]/15"
+                      )}
+                    >
+                      <Link
+                        href={`/calendar?highlight=${apt.id}`}
+                        className="flex items-center gap-3.5 flex-1 min-w-0 group"
+                      >
+                        <div className={cn(
+                          "w-10 h-10 rounded-lg flex items-center justify-center shadow-sm",
+                          apt.is_callback ? "bg-amber-500" : "bg-[var(--info)]"
+                        )}>
+                          {apt.is_callback ? (
+                            <PhoneForwarded className="w-5 h-5 text-white" />
+                          ) : (
+                            <CalendarDays className="w-5 h-5 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-primary)] capitalize">
+                            {apt.is_callback ? "Callback" : apt.appointment_type.map(t => t.replace(/_/g, ' ')).join(', ')}
+                          </p>
+                          <p className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-1">
+                            <Clock className="w-3 h-3 opacity-50" />
+                            {formatDate(apt.scheduled_date)} at {apt.scheduled_time?.slice(0, 5)}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:translate-x-0.5 transition-all" />
+                      </Link>
+                      {/* Reschedule button for callbacks */}
+                      {apt.is_callback && (
+                        <SimpleTooltip content="Reschedule callback" side="top">
+                          <button
+                            onClick={() => {
+                              // Default to 1 hour from now
+                              const inOneHour = new Date()
+                              inOneHour.setHours(inOneHour.getHours() + 1)
+                              const mins = inOneHour.getMinutes()
+                              const roundedMins = mins < 15 ? "00" : mins < 45 ? "30" : "00"
+                              const roundedHrs = mins >= 45 ? inOneHour.getHours() + 1 : inOneHour.getHours()
+                              let timeStr = `${String(roundedHrs).padStart(2, "0")}:${roundedMins}`
+                              if (timeStr < "08:00") timeStr = "08:00"
+                              else if (timeStr > "21:30") timeStr = "21:30"
+                              setRescheduleDate(inOneHour.toISOString().split("T")[0])
+                              setRescheduleTime(timeStr)
+                              setRescheduleAppointmentId(apt.id)
+                            }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        </SimpleTooltip>
+                      )}
+                    </div>
+
+                    {/* Inline Reschedule Form */}
+                    <AnimatePresence>
+                      {rescheduleAppointmentId === apt.id && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-2 p-4 rounded-lg bg-[var(--bg-surface)] ring-1 ring-amber-200 dark:ring-amber-800/40 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
+                              <RefreshCw className="w-4 h-4" />
+                              Reschedule Callback
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Date</label>
+                                <input
+                                  type="date"
+                                  value={rescheduleDate}
+                                  onChange={(e) => setRescheduleDate(e.target.value)}
+                                  className="w-full h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Time</label>
+                                <select
+                                  value={rescheduleTime}
+                                  onChange={(e) => setRescheduleTime(e.target.value)}
+                                  className="w-full h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                >
+                                  {["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30"].map(t => (
+                                    <option key={t} value={t}>{t}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                onClick={() => setRescheduleAppointmentId(null)}
+                                className="px-3 py-1.5 text-xs font-medium rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                                onClick={async () => {
+                                  setRescheduling(true)
+                                  try {
+                                    await updateAppointment(apt.id, {
+                                      scheduled_date: rescheduleDate,
+                                      scheduled_time: rescheduleTime,
+                                      status: "scheduled",
+                                    })
+                                    if (lead) {
+                                      await updateLead(lead.id, { callback_date: rescheduleDate })
+                                    }
+                                    setRescheduleAppointmentId(null)
+                                    refetchLead()
+                                  } catch (err) {
+                                    console.error("Reschedule failed:", err)
+                                  } finally {
+                                    setRescheduling(false)
+                                  }
+                                }}
+                                className={cn(
+                                  "px-4 py-1.5 text-xs font-semibold rounded-md transition-colors",
+                                  "bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                )}
+                              >
+                                {rescheduling ? (
+                                  <span className="flex items-center gap-1.5">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Saving...
+                                  </span>
+                                ) : (
+                                  "Reschedule"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] capitalize">
-                      {upcomingAppointments[0].appointment_type.map(t => t.replace(/_/g, ' ')).join(', ')}
-                    </p>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-1">
-                      <Clock className="w-3 h-3 opacity-50" />
-                      {formatDate(upcomingAppointments[0].scheduled_date)} at {upcomingAppointments[0].scheduled_time?.slice(0, 5)}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--info)] group-hover:translate-x-0.5 transition-all" />
-                </Link>
+                ))}
               </motion.div>
             )}
 
@@ -1114,6 +1253,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     <Calendar className="w-[18px] h-[18px]" />
                   </motion.div>
                 </Link>
+              </SimpleTooltip>
+
+              {/* Schedule Callback button */}
+              <SimpleTooltip content="Schedule callback" side="bottom">
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowCallbackScheduler(true)}
+                  className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-amber-50 hover:text-amber-600 ring-1 ring-[var(--border-subtle)] hover:ring-amber-200 transition-all duration-200 cursor-pointer"
+                >
+                  <PhoneForwarded className="w-[18px] h-[18px]" />
+                </motion.div>
               </SimpleTooltip>
 
               {/* RSVP button - only for applicants */}
@@ -1708,6 +1859,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           onSuccess={() => refetchLead()}
         />
       )}
+
+      {/* Callback Scheduler */}
+      <CallbackScheduler
+        isOpen={showCallbackScheduler}
+        onClose={() => setShowCallbackScheduler(false)}
+        lead={lead}
+        onUpdateLead={async (id, updates) => {
+          await updateLead(id, updates)
+        }}
+        onSuccess={() => refetchLead()}
+      />
 
     </div>
   )

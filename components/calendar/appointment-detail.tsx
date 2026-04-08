@@ -483,6 +483,140 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
             </div>
           </div>
 
+          {/* Appointment Status */}
+          <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+              Appointment Status
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+                const Icon = config.icon
+                const isActive = appointment.status === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      if (key === "postponed") {
+                        setShowPostponedForm(true)
+                        setShowCancelForm(false)
+                      } else if (key === "cancelled") {
+                        setShowCancelForm(true)
+                        setShowPostponedForm(false)
+                      } else if (key === "confirmed") {
+                        handleConfirm()
+                      } else if (key === "no_answer") {
+                        handleMarkNA()
+                      } else if (key === "cant_reach") {
+                        handleMarkCantReach()
+                      } else if (key === "on_the_way") {
+                        handleMarkOnTheWay()
+                      } else if (key === "will_see") {
+                        handleMarkWillSee()
+                      }
+                    }}
+                    disabled={isLoading || isActive}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5",
+                      isActive
+                        ? cn(config.color, "ring-2 ring-offset-1 ring-current/30 scale-105")
+                        : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                      isLoading && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {config.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Inline Postpone/Reschedule Form */}
+            {showPostponedForm && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mt-3 p-4 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary)]/5"
+              >
+                <p className="text-sm font-semibold text-[var(--primary)] mb-3 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  {appointment.status === "postponed" ? "Reschedule to new date/time" : "Postpone to new date/time"}
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <Input
+                    type="date"
+                    value={postponedDate}
+                    onChange={(e) => setPostponedDate(e.target.value)}
+                    className="rounded-lg"
+                  />
+                  <Input
+                    type="time"
+                    value={postponedTime}
+                    onChange={(e) => setPostponedTime(e.target.value)}
+                    className="rounded-lg"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPostponedForm(false)}
+                    className="rounded-lg"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handlePostpone}
+                    disabled={isLoading || !postponedDate || !postponedTime}
+                    className="rounded-lg"
+                  >
+                    {isLoading ? "Saving..." : appointment.status === "postponed" ? "Confirm Reschedule" : "Confirm Postpone"}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Inline Cancel Form */}
+            {showCancelForm && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mt-3 p-4 rounded-xl border border-red-500/30 bg-red-500/5"
+              >
+                <p className="text-sm font-semibold text-red-500 mb-3 flex items-center gap-2">
+                  <XCircle className="w-4 h-4" />
+                  Cancel — Add Notes
+                </p>
+                <textarea
+                  value={cancelNotes}
+                  onChange={(e) => setCancelNotes(e.target.value)}
+                  placeholder="Enter cancellation reason or notes..."
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-red-500/30 min-h-[80px] resize-none"
+                />
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setShowCancelForm(false); setCancelNotes("") }}
+                    className="rounded-lg"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleMarkCanceled}
+                    disabled={isLoading}
+                    className="rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                  >
+                    {isLoading ? "Saving..." : "Confirm Cancel"}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+
           {/* Lead Status */}
           {hasLeads && availableLeadStatuses.length > 0 && (
             <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
@@ -629,91 +763,6 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
             </motion.div>
           )}
 
-          {/* Cancel Form */}
-          {showCancelForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="p-4 rounded-xl border border-red-500/30 bg-red-500/5"
-            >
-              <p className="text-sm font-semibold text-red-500 mb-3 flex items-center gap-2">
-                <XCircle className="w-4 h-4" />
-                Cancel — Add Notes
-              </p>
-              <textarea
-                value={cancelNotes}
-                onChange={(e) => setCancelNotes(e.target.value)}
-                placeholder="Enter cancellation reason or notes..."
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-red-500/30 min-h-[80px] resize-none"
-              />
-              <div className="flex gap-2 mt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setShowCancelForm(false); setCancelNotes("") }}
-                  className="rounded-lg"
-                >
-                  Back
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleMarkCanceled}
-                  disabled={isLoading}
-                  className="rounded-lg bg-red-500 hover:bg-red-600 text-white"
-                >
-                  {isLoading ? "Saving..." : "Confirm Cancel"}
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Postponed Form */}
-          {showPostponedForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="p-4 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary)]/5"
-            >
-              <p className="text-sm font-semibold text-[var(--primary)] mb-3 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Postpone to new date/time
-              </p>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <Input
-                  type="date"
-                  value={postponedDate}
-                  onChange={(e) => setPostponedDate(e.target.value)}
-                  className="rounded-lg"
-                />
-                <Input
-                  type="time"
-                  value={postponedTime}
-                  onChange={(e) => setPostponedTime(e.target.value)}
-                  className="rounded-lg"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPostponedForm(false)}
-                  className="rounded-lg"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handlePostpone}
-                  disabled={isLoading || !postponedDate || !postponedTime}
-                  className="rounded-lg"
-                >
-                  {isLoading ? "Saving..." : "Confirm Postpone"}
-                </Button>
-              </div>
-            </motion.div>
-          )}
 
           {/* Delete Confirmation */}
           {showDeleteConfirm && (
@@ -879,109 +928,21 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           </div>
         </div>
 
-        {/* Footer Actions - Status Action Buttons */}
-        {isActionable && !appointment.is_callback && !showPostponedForm && !showCancelForm && !showDeleteConfirm && (
+        {/* Footer Actions */}
+        {isActionable && !appointment.is_callback && !showDeleteConfirm && (
           <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
-            {/* Reminder */}
-            <p className="text-[11px] font-semibold text-[var(--warning)] mb-2.5 flex items-center gap-1.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
-              Please select an appointment status before closing
-            </p>
-            {/* Status Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
-              {appointment.status !== "confirmed" && (
-                <Button
-                  variant="outline"
-                  onClick={handleConfirm}
-                  disabled={isLoading}
-                  className="rounded-xl border-[var(--success)]/30 text-[var(--success)] hover:bg-[var(--success)]/10"
-                >
-                  <CheckCircle2 className="w-5 h-5 mr-2" />
-                  Confirmed
-                </Button>
-              )}
-
-              {appointment.status !== "on_the_way" && (
-                <Button
-                  variant="outline"
-                  onClick={handleMarkOnTheWay}
-                  disabled={isLoading}
-                  className="rounded-xl border-[var(--info)]/30 text-[var(--info)] hover:bg-[var(--info)]/10"
-                >
-                  <Car className="w-5 h-5 mr-2" />
-                  OTW
-                </Button>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => setShowPostponedForm(true)}
-                disabled={isLoading}
-                className="rounded-xl border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary)]/10"
-              >
-                <Calendar className="w-5 h-5 mr-2" />
-                {appointment.status === "postponed" ? "Reschedule" : "Postponed"}
-              </Button>
-
-              {appointment.status !== "no_answer" && (
-                <Button
-                  variant="outline"
-                  onClick={handleMarkNA}
-                  disabled={isLoading}
-                  className="rounded-xl border-[var(--warning)]/30 text-[var(--warning)] hover:bg-[var(--warning)]/10"
-                >
-                  <PhoneMissed className="w-5 h-5 mr-2" />
-                  No Answer
-                </Button>
-              )}
-
-              {appointment.status !== "cant_reach" && (
-                <Button
-                  variant="outline"
-                  onClick={handleMarkCantReach}
-                  disabled={isLoading}
-                  className="rounded-xl border-[var(--error)]/30 text-[var(--error)] hover:bg-[var(--error)]/10"
-                >
-                  <PhoneOff className="w-5 h-5 mr-2" />
-                  Can&apos;t Reach
-                </Button>
-              )}
-
-              {appointment.status !== "will_see" && (
-                <Button
-                  variant="outline"
-                  onClick={handleMarkWillSee}
-                  disabled={isLoading}
-                  className="rounded-xl border-[var(--info)]/30 text-[var(--info)] hover:bg-[var(--info)]/10"
-                >
-                  <Eye className="w-5 h-5 mr-2" />
-                  Will See
-                </Button>
-              )}
-
-              {/* Lead Status Actions - Canceled and Callback */}
+              {/* Lead Status Actions - Callback */}
               {hasLeads && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCancelForm(true)}
-                    disabled={isLoading}
-                    className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10"
-                  >
-                    <XCircle className="w-5 h-5 mr-2" />
-                    Canceled
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={handleMarkCB}
-                    disabled={isLoading}
-                    className="rounded-xl border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/10"
-                  >
-                    <PhoneCall className="w-5 h-5 mr-2" />
-                    Callback
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  onClick={handleMarkCB}
+                  disabled={isLoading}
+                  className="rounded-xl border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                >
+                  <PhoneCall className="w-5 h-5 mr-2" />
+                  Callback
+                </Button>
               )}
 
               {/* Delete Button */}
