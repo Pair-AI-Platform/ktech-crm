@@ -26,7 +26,6 @@ const SOURCE_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp",
   email: "Email",
   school_visit: "School Visit",
-  expo: "Expo",
   exhibitions: "Exhibitions",
   karnival: "Karnival",
   website_form: "Website",
