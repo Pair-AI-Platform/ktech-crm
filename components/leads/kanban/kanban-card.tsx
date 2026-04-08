@@ -12,6 +12,7 @@ import {
   Clock,
   AlertCircle,
   ExternalLink,
+  Star,
 } from "lucide-react"
 import { cn, getInitials } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -133,7 +134,8 @@ export const KanbanCard = memo(function KanbanCard({
             </Avatar>
           )}
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-[var(--text-primary)] truncate text-sm">
+            <h4 className="font-medium text-[var(--text-primary)] truncate text-sm flex items-center gap-1">
+              {lead.ministry_flagged && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />}
               {fullName}
             </h4>
             {lead.school && (

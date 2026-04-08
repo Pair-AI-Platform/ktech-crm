@@ -74,6 +74,7 @@ export default function LostLeadsPage() {
     genders: [],
     governorates: [],
     ministryAssigned: "all" as const,
+    ministryFlagged: "all" as const,
     docStatuses: [],
     placementLevels: [],
     campaignIds: [],

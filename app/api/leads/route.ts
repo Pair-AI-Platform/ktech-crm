@@ -140,6 +140,11 @@ export const GET = withApiHandler(
       } else if (advancedFilters.ministryAssigned === 'not_assigned') {
         q = q.or('ministry_assigned.is.null,ministry_assigned.eq.false')
       }
+      if (advancedFilters.ministryFlagged === 'flagged') {
+        q = q.eq('ministry_flagged', true)
+      } else if (advancedFilters.ministryFlagged === 'not_flagged') {
+        q = q.or('ministry_flagged.is.null,ministry_flagged.eq.false')
+      }
       if (advancedFilters.blockReasons?.length > 0) {
         q = q.in('submission_blocked_reason', advancedFilters.blockReasons)
       }

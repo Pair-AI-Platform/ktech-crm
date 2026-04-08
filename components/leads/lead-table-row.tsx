@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Wand2,
   GraduationCap,
+  Star,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { getLeadDisplayName } from "@/lib/lead-utils"
@@ -337,6 +338,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   )
                 })()}
                 <div className="flex items-center gap-1.5">
+                  {lead.ministry_flagged && (
+                    <SimpleTooltip content="Ministry file: not in PUC Submission stage">
+                      <Star className="w-4 h-4 text-amber-500 fill-amber-400 shrink-0" />
+                    </SimpleTooltip>
+                  )}
                   {lead.ministry_assigned && (
                     <SimpleTooltip content="Ministry assigned (not 1st choice ktech)">
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 ring-1 ring-purple-500/20 shrink-0">

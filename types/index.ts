@@ -130,7 +130,7 @@ export type SFEnrolledStage = '150' | '400' | 'other'
 
 export type HighSchoolCertificateType = 'original' | 'true_copy'
 
-export type OrientationStatus = 'paid' | 'confirmed' | 'informed' | 'no_answer' | 'cant_reach' | 'might_withdraw'
+export type OrientationStatus = 'paid' | 'confirmed' | 'informed' | 'no_answer' | 'cant_reach' | 'might_withdraw' | 'cant_attend'
 
 export type MOEFetchStatus = 'pending' | 'success' | 'error'
 
@@ -392,6 +392,7 @@ export interface Lead {
   // Ministry Submission Block
   ministry_blocked?: boolean
   ministry_block_reasons?: MinistryBlockReason[]
+  ministry_flagged?: boolean
 
   // PUC Choice (from ministry acceptance import)
   puc_choice?: '1' | '2' | '3' | '4' | null
@@ -1050,6 +1051,7 @@ export const ORIENTATION_STATUSES: { value: OrientationStatus; label: string; co
   { value: 'informed', label: 'Informed', color: 'secondary' },
   { value: 'no_answer', label: 'No Answer', color: 'secondary' },
   { value: 'cant_reach', label: "Can't Reach", color: 'secondary' },
+  { value: 'cant_attend', label: "Can't Attend", color: 'secondary' },
   { value: 'might_withdraw', label: 'Might Withdraw', color: 'secondary' },
 ]
 

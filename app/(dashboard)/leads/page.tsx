@@ -14,6 +14,7 @@ import {
   Sparkles,
   GraduationCap,
   BookOpen,
+  Star,
 } from "lucide-react"
 import { type PipelineStage, type Lead, type LeadStatus, PIPELINE_STAGES } from "@/types"
 import { useLeads, useLeadStats, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
@@ -25,6 +26,8 @@ import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/lea
 import { CSVImportModal } from "@/components/leads/csv-import-modal"
 import { PUCImportDialog } from "@/components/leads/puc-import-dialog"
 import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
+import { EnrollFromListDialog } from "@/components/leads/enroll-from-list-dialog"
+import { MinistryFileDialog } from "@/components/leads/ministry-file-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
 import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
@@ -66,6 +69,7 @@ const defaultFilters: LeadFilters = {
   governorates: [],
   priority: "all",
   ministryAssigned: "all",
+  ministryFlagged: "all",
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
@@ -94,6 +98,8 @@ export default function LeadsPage() {
 const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const [showRSVPModal, setShowRSVPModal] = useState(false)
   const [showMinistryImportModal, setShowMinistryImportModal] = useState(false)
+  const [showEnrollFromListModal, setShowEnrollFromListModal] = useState(false)
+  const [showMinistryFileModal, setShowMinistryFileModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
@@ -245,6 +251,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     genders: filters.genders,
     governorates: filters.governorates,
     ministryAssigned: filters.ministryAssigned,
+    ministryFlagged: filters.ministryFlagged,
     docStatuses: filters.docStatuses,
     placementLevels: filters.placementLevels,
     campaignIds: filters.campaignIds,
@@ -505,6 +512,16 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     refetch()
   }
 
+  const handleMinistryFileSuccess = (matchedCount: number, flaggedCount: number, createdCount: number) => {
+    const messages = []
+    if (matchedCount > 0) messages.push(`${matchedCount} matched`)
+    if (flaggedCount > 0) messages.push(`${flaggedCount} flagged`)
+    if (createdCount > 0) messages.push(`${createdCount} created`)
+    setSuccessMessage(`Ministry file: ${messages.join(", ")} → Applicant`)
+    setShowSuccessToast(true)
+    refetch()
+  }
+
   // Get the selected lead objects for the MOE dialog
   const selectedLeadObjects = filteredLeads.filter((lead) =>
     selectedLeads.includes(lead.id)
@@ -590,6 +607,26 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             >
               <BookOpen className="w-3.5 h-3.5" />
               <span className="text-xs font-medium">Ministry Import</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex items-center gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300"
+              onClick={() => setShowEnrollFromListModal(true)}
+              title="Enroll Applicants from List"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Enroll from List</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex items-center gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300"
+              onClick={() => setShowMinistryFileModal(true)}
+              title="Ministry File - Cross-reference with PUC Submission"
+            >
+              <Star className="w-3.5 h-3.5 fill-amber-400" />
+              <span className="text-xs font-medium">Ministry File</span>
             </Button>
             <Button
               variant="ghost"
@@ -809,6 +846,24 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         isOpen={showMinistryImportModal}
         onClose={() => setShowMinistryImportModal(false)}
         onSuccess={handleMinistryImportSuccess}
+      />
+
+      {/* Enroll from List Modal */}
+      <EnrollFromListDialog
+        isOpen={showEnrollFromListModal}
+        onClose={() => setShowEnrollFromListModal(false)}
+        onSuccess={(count) => {
+          setSuccessMessage(`${count} lead${count !== 1 ? "s" : ""} moved to Enrolled`)
+          setShowSuccessToast(true)
+          refetch()
+        }}
+      />
+
+      {/* Ministry File Import Modal */}
+      <MinistryFileDialog
+        isOpen={showMinistryFileModal}
+        onClose={() => setShowMinistryFileModal(false)}
+        onSuccess={handleMinistryFileSuccess}
       />
 
       {/* PSP Transfer Modal */}

@@ -116,7 +116,21 @@ function calculateDaysInStage(updatedAt: string): number {
 }
 
 // Note types for activity feed
-type NoteType = 'all' | 'call' | 'meeting' | 'follow-up' | 'email' | 'note' | 'stage_change' | 'status_change'
+type NoteType = string
+
+// Filter categories group related activity types for the filter pills
+type FilterCategory = 'all' | 'stage' | 'status' | 'payment' | 'communication' | 'enrollment' | 'system' | 'note'
+
+const FILTER_CATEGORIES: { key: FilterCategory; label: string; icon: typeof Phone; color: string; types: string[] }[] = [
+  { key: 'all', label: 'All', icon: FileText, color: 'text-slate-500', types: [] },
+  { key: 'stage', label: 'Stage', icon: ArrowRightLeft, color: 'text-indigo-500', types: ['stage_change', 'funding_type_change', 'funding_change', 'doc_status_change'] },
+  { key: 'status', label: 'Status', icon: CircleDot, color: 'text-rose-500', types: ['status_change'] },
+  { key: 'payment', label: 'Payment', icon: CheckCircle2, color: 'text-green-500', types: ['payment_received', 'payment_failed', 'payment_link_created', 'payment_link_sent', 'psp_payment_received', 'psp_payment_failed', 'psp_fee_link_created', 'psp_fee_link_sent', 'psp_receipt_sent', 'puc_fee_paid', 'puc_fee_link_created', 'puc_fee_link_sent'] },
+  { key: 'communication', label: 'Communication', icon: Send, color: 'text-blue-500', types: ['call', 'meeting', 'follow-up', 'email', 'sms_sent', 'ai_transfer'] },
+  { key: 'enrollment', label: 'Enrollment', icon: GraduationCap, color: 'text-purple-500', types: ['puc_enrollment', 'enrollment_failed', 'gpa_override', 'gpa_update', 'moe_gpa_fetch', 'lms_sync', 'lms_sync_failed'] },
+  { key: 'system', label: 'System', icon: RefreshCw, color: 'text-cyan-500', types: ['lead_created', 'campaign_created', 'campaign_updated', 'campaign_deleted'] },
+  { key: 'note', label: 'Note', icon: StickyNote, color: 'text-amber-500', types: ['note'] },
+]
 
 interface ParsedNote {
   id: string
@@ -129,15 +143,43 @@ interface ParsedNote {
   createdByName?: string
 }
 
-const NOTE_TYPE_CONFIG: Record<NoteType, { label: string; icon: typeof Phone; color: string }> = {
+const NOTE_TYPE_CONFIG: Record<string, { label: string; icon: typeof Phone; color: string }> = {
   all: { label: "All", icon: FileText, color: "text-slate-500" },
   call: { label: "Call", icon: Phone, color: "text-emerald-500" },
   meeting: { label: "Meeting", icon: Calendar, color: "text-blue-500" },
   'follow-up': { label: "Follow-up", icon: Bell, color: "text-amber-500" },
   email: { label: "Email", icon: Mail, color: "text-purple-500" },
-  note: { label: "Note", icon: FileText, color: "text-slate-500" },
-  stage_change: { label: "Stage", icon: ArrowRightLeft, color: "text-indigo-500" },
-  status_change: { label: "Status", icon: CircleDot, color: "text-rose-500" },
+  note: { label: "Note", icon: StickyNote, color: "text-slate-500" },
+  stage_change: { label: "Stage Change", icon: ArrowRightLeft, color: "text-indigo-500" },
+  status_change: { label: "Status Change", icon: CircleDot, color: "text-rose-500" },
+  funding_type_change: { label: "Funding Change", icon: ArrowRightLeft, color: "text-indigo-500" },
+  funding_change: { label: "Funding Change", icon: ArrowRightLeft, color: "text-indigo-500" },
+  doc_status_change: { label: "Doc Status", icon: ClipboardList, color: "text-indigo-500" },
+  gpa_override: { label: "GPA Override", icon: Edit, color: "text-purple-500" },
+  gpa_update: { label: "GPA Update", icon: GraduationCap, color: "text-purple-500" },
+  moe_gpa_fetch: { label: "MOE GPA", icon: GraduationCap, color: "text-purple-500" },
+  payment_received: { label: "Payment Received", icon: CheckCircle2, color: "text-green-500" },
+  payment_failed: { label: "Payment Failed", icon: XCircle, color: "text-red-500" },
+  payment_link_created: { label: "Payment Link", icon: Send, color: "text-green-500" },
+  payment_link_sent: { label: "Link Sent", icon: Send, color: "text-green-500" },
+  psp_payment_received: { label: "PSP Payment", icon: CheckCircle2, color: "text-green-500" },
+  psp_payment_failed: { label: "PSP Failed", icon: XCircle, color: "text-red-500" },
+  psp_fee_link_created: { label: "PSP Fee Link", icon: Send, color: "text-green-500" },
+  psp_fee_link_sent: { label: "PSP Fee Sent", icon: Send, color: "text-green-500" },
+  psp_receipt_sent: { label: "PSP Receipt", icon: Send, color: "text-green-500" },
+  puc_enrollment: { label: "PUC Enrollment", icon: GraduationCap, color: "text-purple-500" },
+  puc_fee_paid: { label: "PUC Fee Paid", icon: CheckCircle2, color: "text-green-500" },
+  puc_fee_link_created: { label: "PUC Fee Link", icon: Send, color: "text-green-500" },
+  puc_fee_link_sent: { label: "PUC Fee Sent", icon: Send, color: "text-green-500" },
+  enrollment_failed: { label: "Enrollment Failed", icon: XCircle, color: "text-red-500" },
+  sms_sent: { label: "SMS Sent", icon: Send, color: "text-blue-500" },
+  ai_transfer: { label: "AI Transfer", icon: PhoneForwarded, color: "text-cyan-500" },
+  lms_sync: { label: "LMS Sync", icon: RefreshCw, color: "text-cyan-500" },
+  lms_sync_failed: { label: "LMS Sync Failed", icon: XCircle, color: "text-red-500" },
+  campaign_created: { label: "Campaign Created", icon: Star, color: "text-cyan-500" },
+  campaign_updated: { label: "Campaign Updated", icon: RefreshCw, color: "text-cyan-500" },
+  campaign_deleted: { label: "Campaign Deleted", icon: XCircle, color: "text-cyan-500" },
+  lead_created: { label: "Lead Created", icon: User, color: "text-cyan-500" },
 }
 
 function detectNoteType(content: string): NoteType {
@@ -302,7 +344,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [showReactivateMenu, setShowReactivateMenu] = useState(false)
   const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
-  const [noteFilter, setNoteFilter] = useState<NoteType>('all')
+  const [noteFilter, setNoteFilter] = useState<FilterCategory>('all')
   const [pinnedNoteIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
   const [showPSPWizard, setShowPSPWizard] = useState(false)
@@ -644,7 +686,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   const filteredNotes = noteFilter === 'all'
     ? allNotes
-    : allNotes.filter(n => n.type === noteFilter)
+    : allNotes.filter(n => {
+        const category = FILTER_CATEGORIES.find(c => c.key === noteFilter)
+        return category ? category.types.includes(n.type) : false
+      })
   const groupedNotes = groupNotesByDate(filteredNotes)
 
   const stageGradient = STAGE_GRADIENT[lead.pipeline_stage] || STAGE_GRADIENT.new
@@ -769,6 +814,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/25">
                           <GraduationCap className="w-3.5 h-3.5" />
                           Ministry Assigned
+                        </span>
+                      )}
+                      {lead.ministry_flagged && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/25">
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          Ministry File
                         </span>
                       )}
                       {/* Admin-only priority toggle */}
@@ -1599,18 +1650,19 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {/* Filter Pills */}
                 <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
                   <Filter className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
-                  {(['all', 'stage_change', 'status_change', 'meeting', 'follow-up', 'email', 'note'] as NoteType[]).map((type) => (
+                  {FILTER_CATEGORIES.map((cat) => (
                     <button
-                      key={type}
-                      onClick={() => setNoteFilter(type)}
+                      key={cat.key}
+                      onClick={() => setNoteFilter(cat.key)}
                       className={cn(
-                        "px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-                        noteFilter === type
+                        "px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors inline-flex items-center gap-1.5",
+                        noteFilter === cat.key
                           ? "bg-[var(--primary)] text-white"
                           : "bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                       )}
                     >
-                      {NOTE_TYPE_CONFIG[type].label}
+                      <cat.icon className="w-3 h-3" />
+                      {cat.label}
                     </button>
                   ))}
                   <span className="text-xs text-[var(--text-muted)] ml-auto shrink-0">
