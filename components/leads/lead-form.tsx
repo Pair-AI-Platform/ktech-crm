@@ -307,6 +307,9 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     if (!formData.education_type) {
       newErrors.education_type = "Education type is required"
     }
+    if (!formData.academic_track) {
+      newErrors.academic_track = "Type (Science/Art) is required"
+    }
 
     setErrors(newErrors)
     const errorKeys = Object.keys(newErrors)

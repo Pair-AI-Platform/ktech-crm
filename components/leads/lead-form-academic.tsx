@@ -587,8 +587,8 @@ export function LeadFormAcademic({
               <Input
                 id="ministry_accepted_major"
                 value={formData.ministry_accepted_major}
-                onChange={(e) => handleChange("ministry_accepted_major", e.target.value)}
                 placeholder="From ministry file"
+                disabled
               />
             </div>
           </div>
@@ -624,10 +624,15 @@ export function LeadFormAcademic({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="academic_track" className="text-xs">Type</Label>
+                <Label htmlFor="academic_track" className="text-xs">Type <span className="text-red-500">*</span></Label>
                 <Select
                   value={formData.academic_track}
-                  onValueChange={(value) => handleChange("academic_track", value)}
+                  onValueChange={(value) => {
+                    handleChange("academic_track", value)
+                    if (errors.academic_track) {
+                      setErrors(prev => ({ ...prev, academic_track: "" }))
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -637,6 +642,9 @@ export function LeadFormAcademic({
                     <SelectItem value="arts">Art</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.academic_track && (
+                  <p className="text-xs text-red-500">{errors.academic_track}</p>
+                )}
               </div>
             </div>
           </div>
