@@ -37,7 +37,7 @@ export function useLeadActivities(leadId: string) {
         `)
         .eq("lead_id", leadId)
         .order("created_at", { ascending: false })
-        .limit(50)
+        .limit(200)
 
       if (error) throw new Error(error.message)
       setActivities(data || [])

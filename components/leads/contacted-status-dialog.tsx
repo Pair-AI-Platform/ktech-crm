@@ -105,7 +105,7 @@ export function ContactedStatusDialog({
           </div>
         </DialogHeader>
 
-        <DialogBody>
+        <DialogBody className="!overflow-visible">
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-[var(--text-primary)]">
               Status <span className="text-red-500">*</span>
@@ -130,7 +130,7 @@ export function ContactedStatusDialog({
               </button>
 
               {dropdownOpen && (
-                <div className="absolute z-50 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] shadow-lg">
+                <div className="absolute z-[100] mt-1 w-full rounded-lg border border-[var(--border)] bg-white dark:bg-[#111525] shadow-lg">
                   <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)]">
                     <Search className="w-4 h-4 text-[var(--text-tertiary)]" />
                     <input

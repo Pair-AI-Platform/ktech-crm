@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -27,8 +28,11 @@ import {
   CheckCircle2,
   XCircle,
   ScanLine,
+  ClipboardList,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react"
-import { SCHOOLS, MAJORS, type Lead, type School, type IntendedMajor, type SchoolEntity } from "@/types"
+import { SCHOOLS, MAJORS, PLACEMENT_LEVELS, type Lead, type School, type IntendedMajor, type SchoolEntity, type PlacementLevel } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
@@ -119,6 +123,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     })
   }
 
+  const [placementOpen, setPlacementOpen] = useState(true)
   const [formData, setFormData] = useState({
     first_name: lead.first_name || "",
     last_name: lead.last_name || "",
@@ -131,6 +136,11 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     actual_gpa: lead.actual_gpa?.toString() || lead.gpa_grade_11?.toString() || "",
     funding_type: "puc", // Fixed to PUC only
     intended_major: lead.intended_major || "",
+    // Placement Test fields
+    has_ielts_toefl: lead.has_ielts_toefl ?? false,
+    placement_english_override: lead.placement_english_override ?? false,
+    placement_math_override: lead.placement_math_override ?? false,
+    placement_computer_override: lead.placement_computer_override ?? false,
   })
 
   // Use database schools if available, fallback to hardcoded SCHOOLS
@@ -235,9 +245,15 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       gpa_grade_11: parseFloat(formData.actual_gpa),
       funding_type: "puc" as const,
       intended_major: formData.intended_major as IntendedMajor,
+      // Placement Test fields
+      has_ielts_toefl: formData.has_ielts_toefl,
+      placement_english_override: formData.placement_english_override,
+      placement_math_override: formData.placement_math_override,
+      placement_computer_override: formData.placement_computer_override,
+      placement_level: hasAnyPlacementData ? calculatedPlacementLevel : lead.placement_level,
     }
 
-    const result = await updateLead(lead.id, leadData)
+    const result = await updateLead(lead.id, leadData as Partial<Lead>)
 
     if (result.error) {
       setErrors({ submit: result.error })
@@ -327,6 +343,29 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   }
 
   const canFetchMOE = formData.civil_id.trim() && formData.seat_number.trim()
+
+  // Auto-calculate placement level based on passed subjects
+  const englishPassed = formData.has_ielts_toefl || formData.placement_english_override || (lead.placement_english_passed ?? false)
+  const mathPassed = formData.placement_math_override || (lead.placement_math_passed ?? false)
+  const computerPassed = formData.placement_computer_override || (lead.placement_computer_passed ?? false)
+
+  let calculatedPlacementLevel: PlacementLevel | null = null
+  if (englishPassed && mathPassed && computerPassed) {
+    calculatedPlacementLevel = 'majors'
+  } else if (englishPassed && mathPassed) {
+    calculatedPlacementLevel = 'foundation_2'
+  } else {
+    calculatedPlacementLevel = 'foundation_1'
+  }
+  // Only show level if at least one subject score exists or test was taken
+  const hasAnyPlacementData = lead.placement_english_passed !== undefined ||
+    lead.placement_english_score !== undefined ||
+    lead.placement_math_score !== undefined ||
+    lead.placement_computer_score !== undefined ||
+    formData.has_ielts_toefl ||
+    formData.placement_english_override ||
+    formData.placement_math_override ||
+    formData.placement_computer_override
 
   return (
     <div className="space-y-6">
@@ -784,6 +823,213 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Placement Test */}
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setPlacementOpen(!placementOpen)}
+          className="flex items-center gap-2 w-full text-left cursor-pointer"
+        >
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
+            <ClipboardList className="w-4 h-4 text-[var(--primary)]" />
+          </div>
+          <h4 className="font-semibold text-[var(--text-primary)]">Placement Test</h4>
+          <ChevronDown className={cn(
+            "w-4 h-4 text-[var(--text-muted)] transition-transform ml-auto",
+            placementOpen && "rotate-180"
+          )} />
+        </button>
+
+        {placementOpen && (
+          <div className="space-y-4 pl-10">
+            {/* Placement Level */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Placement Level
+                <span className="text-xs text-[var(--text-muted)] font-normal">(auto-calculated based on passed subjects)</span>
+              </Label>
+              <div className="grid grid-cols-3 gap-3">
+                {PLACEMENT_LEVELS.map((level) => {
+                  const isActive = hasAnyPlacementData
+                    ? calculatedPlacementLevel === level.value
+                    : lead.placement_level === level.value
+                  return (
+                    <div
+                      key={level.value}
+                      className={cn(
+                        "flex flex-col items-center gap-1 p-4 rounded-xl border text-center transition-all",
+                        isActive
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] ring-2 ring-[var(--primary)]/20"
+                          : "border-[var(--border)] opacity-50"
+                      )}
+                    >
+                      <span className={cn(
+                        "text-lg font-bold",
+                        isActive ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                      )}>
+                        {level.value === 'foundation_1' ? 'F1' : level.value === 'foundation_2' ? 'F2' : 'Major'}
+                      </span>
+                      <span className={cn(
+                        "text-xs",
+                        isActive ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                      )}>
+                        {level.label.split(' - ')[1] || level.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* IELTS/TOEFL */}
+            <div
+              onClick={() => setFormData(prev => ({ ...prev, has_ielts_toefl: !prev.has_ielts_toefl }))}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                formData.has_ielts_toefl
+                  ? "border-green-500 bg-green-50 dark:bg-green-950/30"
+                  : "border-[var(--border)] hover:border-green-300"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                formData.has_ielts_toefl
+                  ? "bg-green-500 text-white"
+                  : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+              )}>
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">IELTS/TOEFL Certificate</p>
+                <p className="text-xs text-[var(--text-muted)]">Automatically marks English as passed</p>
+              </div>
+              <Switch
+                checked={formData.has_ielts_toefl}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_ielts_toefl: checked }))}
+              />
+            </div>
+
+            {/* Subject Scores */}
+            <div className="space-y-3">
+              <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-2">
+                Subject Scores
+                <span className="text-xs text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> From LMS
+                </span>
+              </Label>
+
+              {/* English */}
+              <div className={cn(
+                "p-4 rounded-xl border transition-all",
+                englishPassed
+                  ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                  : "border-[var(--border)]"
+              )}>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">English</span>
+                      {englishPassed && (
+                        <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Passed
+                        </span>
+                      )}
+                      {formData.has_ielts_toefl && (
+                        <span className="text-xs text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                          IELTS/TOEFL
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
+                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {lead.placement_english_score ?? "\u2014"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs text-[var(--text-muted)]">Pass</span>
+                    <Switch
+                      checked={formData.placement_english_override}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, placement_english_override: checked }))}
+                      disabled={formData.has_ielts_toefl}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Math */}
+              <div className={cn(
+                "p-4 rounded-xl border transition-all",
+                mathPassed
+                  ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                  : "border-[var(--border)]"
+              )}>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">Math</span>
+                      {mathPassed && (
+                        <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Passed
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
+                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {lead.placement_math_score ?? "\u2014"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs text-[var(--text-muted)]">Pass</span>
+                    <Switch
+                      checked={formData.placement_math_override}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, placement_math_override: checked }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Computer */}
+              <div className={cn(
+                "p-4 rounded-xl border transition-all",
+                computerPassed
+                  ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                  : "border-[var(--border)]"
+              )}>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">Computer</span>
+                      {computerPassed && (
+                        <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Passed
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
+                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {lead.placement_computer_score ?? "\u2014"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs text-[var(--text-muted)]">Pass</span>
+                    <Switch
+                      checked={formData.placement_computer_override}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, placement_computer_override: checked }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Save Button */}

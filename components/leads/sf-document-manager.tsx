@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { CheckSquare, Square, Paperclip, GraduationCap, Check, Send, Upload, FileText, Loader2, X, Download, ScanLine } from "lucide-react"
+import { CheckSquare, Square, Paperclip, GraduationCap, Check, Upload, FileText, Loader2, X, Download, ScanLine, Mail } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { type Lead, type EducationType } from "@/types"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
@@ -47,6 +48,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedDocFile>>({})
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
   const [sentToRegistration, setSentToRegistration] = useState(false)
+  const [sendingRegistration, setSendingRegistration] = useState(false)
   const [isTransfer, setIsTransfer] = useState(false)
   const [isSpecialNeeds, setIsSpecialNeeds] = useState(false)
   const { updateLead } = useLeadMutations()
@@ -72,11 +74,28 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
     }
   }, [lead.id])
 
-  const handleSendToRegistration = () => {
-    localStorage.setItem(`sf-sent-to-registration-${lead.id}`, 'true')
-    setSentToRegistration(true)
-    // Dispatch storage event so lead-table can pick it up in real time
-    window.dispatchEvent(new Event('storage'))
+  const handleSendToRegistration = async () => {
+    setSendingRegistration(true)
+    try {
+      const res = await fetch('/api/leads/send-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to send registration email')
+        return
+      }
+      localStorage.setItem(`sf-sent-to-registration-${lead.id}`, 'true')
+      setSentToRegistration(true)
+      window.dispatchEvent(new Event('storage'))
+      toast.success('Registration email sent successfully')
+    } catch {
+      toast.error('Failed to send registration email')
+    } finally {
+      setSendingRegistration(false)
+    }
   }
 
   const handleUndoRegistration = () => {
@@ -550,10 +569,20 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
           <button
             type="button"
             onClick={handleSendToRegistration}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors"
+            disabled={sendingRegistration}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Send className="w-4 h-4" />
-            Send to Registration
+            {sendingRegistration ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending Email...
+              </>
+            ) : (
+              <>
+                <Mail className="w-4 h-4" />
+                Send to Registration
+              </>
+            )}
           </button>
         )}
       </div>
