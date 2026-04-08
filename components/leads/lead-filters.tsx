@@ -30,6 +30,7 @@ import {
 import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, GOVERNORATES, PUC_DOCUMENT_STATUSES, PLACEMENT_LEVELS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack, type Governorate, type PUCDocumentStatus, type PlacementLevel } from "@/types"
 import { WITHDRAWAL_REASONS, COMPETITOR_OPTIONS, MILITARY_SECURITY_OPTIONS } from "@/lib/config/withdrawal-reasons"
 import { useActiveSources } from "@/lib/hooks/use-sources"
+import { useCycles } from "@/lib/hooks/use-cycles"
 import { useLostReasons } from "@/lib/hooks/use-leads"
 import { useCampaigns, type Campaign } from "@/lib/hooks/use-campaigns"
 import { useUser, useAgents } from "@/lib/hooks/use-user"
@@ -71,6 +72,7 @@ export interface LeadFilters {
   docStatuses: PUCDocumentStatus[]
   placementLevels: PlacementLevel[]
   campaignIds: string[]
+  semesterIds: string[]
 }
 
 interface LeadFiltersProps {
@@ -115,6 +117,7 @@ const defaultFilters: LeadFilters = {
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
+  semesterIds: [],
 }
 
 // Stages that leads can be lost at (excludes 'lost' and 'enrolled')
@@ -172,6 +175,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
   const { isAdmin } = useUser()
   const { agents } = useAgents()
   const { campaigns = [] } = useCampaigns()
+  const { cycles } = useCycles()
   const leadSources = dbSources.length > 0
     ? dbSources.map(s => ({ value: s.value as LeadSource, label: s.label, category: s.category }))
     : LEAD_SOURCES
@@ -343,7 +347,8 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     (localFilters.ministryAssigned !== "all" ? 1 : 0) +
     localFilters.docStatuses.length +
     localFilters.placementLevels.length +
-    localFilters.campaignIds.length
+    localFilters.campaignIds.length +
+    localFilters.semesterIds.length
 
   return (
     <AnimatePresence>
@@ -1214,6 +1219,98 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                           <span className="text-xs text-[var(--text-muted)]">{campaign.type} &middot; {campaign.total_contacts} contacts</span>
                         </div>
                       </button>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+              )}
+
+              {/* Cycle / Semester Filter */}
+              {cycles.length > 0 && (
+              <FilterSection
+                title="Cycle"
+                icon={<CalendarDays className="w-4 h-4" />}
+                isExpanded={expandedSections.includes("cycle")}
+                onToggle={() => toggleSection("cycle")}
+                count={localFilters.semesterIds.length}
+              >
+                <div className="space-y-3 max-h-56 overflow-y-auto">
+                  {cycles.map((cycle) => {
+                    const semesters = cycle.terms || []
+                    const allSemesterIds = semesters.map(s => s.id)
+                    const selectedCount = allSemesterIds.filter(id => localFilters.semesterIds.includes(id)).length
+                    const allSelected = semesters.length > 0 && selectedCount === semesters.length
+
+                    return (
+                      <div key={cycle.id} className="space-y-1">
+                        <button
+                          onClick={() => {
+                            setLocalFilters(prev => {
+                              if (allSelected) {
+                                return { ...prev, semesterIds: prev.semesterIds.filter(id => !allSemesterIds.includes(id)) }
+                              }
+                              const newIds = new Set([...prev.semesterIds, ...allSemesterIds])
+                              return { ...prev, semesterIds: [...newIds] }
+                            })
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2 p-2 rounded-lg border text-sm font-medium transition-all",
+                            allSelected
+                              ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                              : selectedCount > 0
+                                ? "border-[var(--primary)]/50 bg-[var(--primary-muted)]/50 text-[var(--primary)]"
+                                : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                            allSelected
+                              ? "bg-[var(--primary)] border-[var(--primary)]"
+                              : "border-[var(--border)]"
+                          )}>
+                            {allSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <span>{cycle.name}</span>
+                          {cycle.is_active && <Badge variant="success" size="sm">Active</Badge>}
+                          {selectedCount > 0 && !allSelected && (
+                            <span className="text-xs text-[var(--text-muted)] ml-auto">{selectedCount}/{semesters.length}</span>
+                          )}
+                        </button>
+                        {semesters.length > 0 && (
+                          <div className="ml-6 space-y-1">
+                            {semesters.map((semester) => {
+                              const isSelected = localFilters.semesterIds.includes(semester.id)
+                              return (
+                                <button
+                                  key={semester.id}
+                                  onClick={() => setLocalFilters(prev => ({
+                                    ...prev,
+                                    semesterIds: isSelected
+                                      ? prev.semesterIds.filter(id => id !== semester.id)
+                                      : [...prev.semesterIds, semester.id]
+                                  }))}
+                                  className={cn(
+                                    "w-full flex items-center gap-2 p-2 rounded-lg border text-sm text-left transition-all",
+                                    isSelected
+                                      ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                                      : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                                    isSelected
+                                      ? "bg-[var(--primary)] border-[var(--primary)]"
+                                      : "border-[var(--border)]"
+                                  )}>
+                                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                                  </div>
+                                  <span className="truncate">{semester.name}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>

@@ -211,6 +211,9 @@ export const GET = withApiHandler(
       if (advancedFilters.placementLevels?.length > 0) {
         q = q.in('placement_level', advancedFilters.placementLevels)
       }
+      if (advancedFilters.semesterIds?.length > 0) {
+        q = q.in('semester_id', advancedFilters.semesterIds)
+      }
       if (campaignLeadIds) {
         q = q.in('id', campaignLeadIds)
       }

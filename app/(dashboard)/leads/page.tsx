@@ -69,6 +69,7 @@ const defaultFilters: LeadFilters = {
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
+  semesterIds: [],
 }
 
 export default function LeadsPage() {
@@ -247,6 +248,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     docStatuses: filters.docStatuses,
     placementLevels: filters.placementLevels,
     campaignIds: filters.campaignIds,
+    semesterIds: filters.semesterIds,
   }
 
   // Reset to page 1 when any filter changes

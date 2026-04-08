@@ -90,6 +90,7 @@ const defaultFilters: LeadFilters = {
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
+  semesterIds: [],
 }
 
 export default function PUCSRJPage() {

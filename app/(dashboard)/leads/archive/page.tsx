@@ -80,6 +80,7 @@ const defaultFilters: LeadFilters = {
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
+  semesterIds: [],
 }
 
 interface AcademicYear {
