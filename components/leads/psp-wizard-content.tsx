@@ -733,6 +733,15 @@ Kuwait Technical College`
   const handleSubmit = async () => {
     if (!lead) return
 
+    // Re-validate all previous steps before submitting
+    if (!validateInfo() || !validateDocuments()) {
+      setCurrentStep("info")
+      return
+    }
+    if (!validatePayments()) {
+      setCurrentStep("payments")
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -838,15 +847,29 @@ Kuwait Technical College`
                 const isCompleted = idx < currentStepIndex
                 const StepIcon = step.icon
 
+                const canNavigateToStep = (targetIdx: number): boolean => {
+                  // Can always go back
+                  if (targetIdx <= currentStepIndex) return true
+                  // Can go to payments if info is filled
+                  if (targetIdx === 1) return !!firstName && !!lastName && !!civilId && !!phone
+                  // Cannot click directly to submission - must use Continue button
+                  if (targetIdx === 2) return false
+                  return false
+                }
+
                 return (
                   <button
                     key={step.id}
                     type="button"
                     onClick={() => {
+                      if (!canNavigateToStep(idx)) return
                       setCurrentStep(step.id)
                       setValidationErrors({})
                     }}
-                    className="relative z-10 flex flex-col items-center w-[72px] cursor-pointer group/step"
+                    className={cn(
+                      "relative z-10 flex flex-col items-center w-[72px] group/step",
+                      canNavigateToStep(idx) ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                    )}
                   >
                     <motion.div
                       initial={false}
@@ -1073,22 +1096,6 @@ Kuwait Technical College`
                   max={100}
                   step={0.01}
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                  Preferred College
-                </label>
-                <select
-                  value={preferredCollege}
-                  onChange={(e) => setPreferredCollege(e.target.value)}
-                  className="w-full text-sm border border-[var(--border)] rounded-md px-3 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                >
-                  <option value="">— Select college —</option>
-                  {PREFERRED_COLLEGES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
               </div>
 
               {/* Documents Section */}
@@ -1759,14 +1766,6 @@ Kuwait Technical College`
                         {actualGpa || "N/A"}
                       </span>
                     </div>
-                    {preferredCollege && (
-                      <div>
-                        <span className="text-[var(--text-muted)]">Preferred College:</span>
-                        <span className="ml-2 text-[var(--text-primary)] font-medium">
-                          {PREFERRED_COLLEGES.find(c => c.value === preferredCollege)?.label ?? preferredCollege}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
 

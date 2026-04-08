@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,7 @@ import {
   BookOpen,
   CheckCircle2,
   XCircle,
+  ScanLine,
 } from "lucide-react"
 import { SCHOOLS, MAJORS, type Lead, type School, type IntendedMajor, type SchoolEntity } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
@@ -33,6 +34,7 @@ import { isArabicText } from "@/lib/string-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { createClient } from "@/lib/supabase/client"
 import type { MOEFetchResponse } from "@/lib/moe/types"
+import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 
 interface StudentInfoFormProps {
   lead: Lead
@@ -61,6 +63,61 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         if (data) setDbSchools(data)
       })
   }, [])
+
+  const civilIdFileRef = useRef<HTMLInputElement>(null)
+  const [scanning, setScanning] = useState(false)
+  const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false)
+
+  const handleCivilIdScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith("image/")) return
+
+    setScanning(true)
+    try {
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      const res = await fetch("/api/civil-id-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
+      })
+
+      if (res.ok) {
+        const { extracted } = await res.json()
+        if (extracted && Object.keys(extracted).some(k => extracted[k])) {
+          setExtractedData(extracted)
+          setShowExtractionDialog(true)
+        }
+      } else {
+        const err = await res.json().catch(() => ({ error: "Extraction failed" }))
+        alert(err.error || "Failed to extract data from Civil ID")
+      }
+    } catch (err) {
+      console.error("Civil ID scan failed:", err)
+      alert("Failed to scan Civil ID. Please try again.")
+    } finally {
+      setScanning(false)
+      if (civilIdFileRef.current) civilIdFileRef.current.value = ""
+    }
+  }
+
+  const handleApplyExtracted = async (fieldsToUpdate: Partial<Lead>) => {
+    setFormData(prev => {
+      const updated = { ...prev }
+      for (const [key, value] of Object.entries(fieldsToUpdate)) {
+        if (value !== undefined && value !== null && key in updated) {
+          ;(updated as Record<string, unknown>)[key] = typeof value === 'boolean' ? value : String(value)
+        }
+      }
+      return updated
+    })
+  }
 
   const [formData, setFormData] = useState({
     first_name: lead.first_name || "",
@@ -301,13 +358,56 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         </motion.div>
       )}
 
+      {/* Civil ID Extraction Dialog */}
+      {showExtractionDialog && extractedData && (
+        <CivilIdExtractionDialog
+          isOpen={showExtractionDialog}
+          onClose={() => setShowExtractionDialog(false)}
+          extractedData={extractedData}
+          currentLead={lead}
+          onApply={handleApplyExtracted}
+        />
+      )}
+
       {/* Name Fields */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <User className="w-4 h-4 text-[var(--primary)]" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
+              <User className="w-4 h-4 text-[var(--primary)]" />
+            </div>
+            <h4 className="font-semibold text-[var(--text-primary)]">Student Name</h4>
           </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Student Name</h4>
+          <div>
+            <input
+              ref={civilIdFileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleCivilIdScan}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={scanning}
+              onClick={() => civilIdFileRef.current?.click()}
+              className="gap-2 text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-950/30"
+            >
+              {scanning ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <ScanLine className="w-4 h-4" />
+                  Scan Civil ID
+                </>
+              )}
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4 pl-10">
           <div className="space-y-2">

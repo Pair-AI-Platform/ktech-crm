@@ -1163,13 +1163,12 @@ export interface PSPDocumentCompletionStatus {
 }
 
 // PUC Document Status (auto-computed)
-export type PUCDocumentStatus = 'ready_to_apply' | 'pending_payment' | 'missing_document' | 'applied'
+export type PUCDocumentStatus = 'ready_to_apply' | 'pending_payment' | 'missing_document'
 
 export const PUC_DOCUMENT_STATUSES: { value: PUCDocumentStatus; label: string; color: string }[] = [
   { value: 'missing_document', label: 'Missing Document', color: 'red' },
   { value: 'pending_payment', label: 'Pending Payment', color: 'amber' },
   { value: 'ready_to_apply', label: 'Ready to Apply', color: 'green' },
-  { value: 'applied', label: 'Applied', color: 'blue' },
 ]
 
 // Ministry Website Block Reasons
@@ -1622,8 +1621,7 @@ export const DISCOUNT_TYPES: { value: DiscountType; label: string; percentage?: 
   { value: 'athletes_full', label: 'Athletes Full Scholarship (100%)', percentage: 100 },
   { value: 'president', label: 'President Scholarship (100%)', percentage: 100 },
   { value: 'charity', label: 'Charity (100%)', percentage: 100 },
-  { value: 'non_kuwaiti_ministry', label: 'Ministry Scholarship (100%)', percentage: 100 },
-  { value: 'service_civil_commission', label: 'SCC (100%)', percentage: 100 }
+  { value: 'non_kuwaiti_ministry', label: 'Ministry Scholarship (100%)', percentage: 100 }
 ]
 
 export const APPOINTMENT_TYPES: {

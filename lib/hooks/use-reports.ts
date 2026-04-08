@@ -1077,7 +1077,8 @@ function calculateReports(
         kuwaiti_new_certificate: 'Kuwaiti New Certificate (25%)', kuwaiti_old_certificate: 'Kuwaiti Old Certificate (20%)', non_kuwaiti: 'Non-Kuwaiti (37.5%)',
         athletes: 'Athletes (60%)', marketing: 'Marketing (70%)', employee: 'Employee (50%)',
         athletes_full: 'Athletes Full', president: 'President', charity: 'Charity',
-        non_kuwaiti_ministry: 'Ministry', service_civil_commission: 'SCC', employee_full: 'Employee Full'
+        non_kuwaiti_ministry: 'Ministry', employee_full: 'Employee Full',
+        service_civil_commission: 'Service Civil Commission',
       }
       const groups: Record<string, typeof activeStudents> = {}
       activeStudents.forEach(s => {
@@ -1722,7 +1723,8 @@ function calculateReports(
     kuwaiti_new_certificate: 'Kuwaiti New Certificate (25%)', kuwaiti_old_certificate: 'Kuwaiti Old Certificate (20%)', non_kuwaiti: 'Non-Kuwaiti (37.5%)',
     athletes: 'Athletes (60%)', marketing: 'Marketing (70%)', employee: 'Employee (50%)',
     athletes_full: 'Athletes Full', president: 'President', charity: 'Charity',
-    non_kuwaiti_ministry: 'Ministry', service_civil_commission: 'SCC', employee_full: 'Employee Full'
+    non_kuwaiti_ministry: 'Ministry', employee_full: 'Employee Full',
+    service_civil_commission: 'Service Civil Commission',
   }
 
   const genderCounts = { male: 0, female: 0, other: 0 }

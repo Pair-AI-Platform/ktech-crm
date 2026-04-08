@@ -604,7 +604,6 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   missing_document: 'red',
                   pending_payment: 'orange',
                   ready_to_apply: 'green',
-                  applied: 'blue',
                   blocked: 'warning',
                 }
 
