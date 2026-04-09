@@ -911,7 +911,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               )}
 
               {/* Preview */}
-              {formData.messageContent && formData.type !== 'voice' && (
+              {formData.messageContent && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                     Preview

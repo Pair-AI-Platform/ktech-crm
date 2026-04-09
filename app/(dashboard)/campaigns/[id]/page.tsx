@@ -6,7 +6,6 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  Phone,
   MessageSquare,
   Smartphone,
   ArrowLeft,
@@ -42,12 +41,6 @@ import {
 // ============================================================================
 
 const CAMPAIGN_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string; iconColor: string }> = {
-  voice: {
-    icon: Phone,
-    label: "Voice",
-    color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    iconColor: "text-blue-500",
-  },
   whatsapp: {
     icon: MessageSquare,
     label: "WhatsApp",
@@ -175,7 +168,7 @@ export default function CampaignDetailsPage() {
   }
 
   const typeConfig = CAMPAIGN_TYPE_CONFIG[campaign.type]
-  const TypeIcon = typeConfig?.icon || Phone
+  const TypeIcon = typeConfig?.icon || MessageSquare
   const progress = campaign.total_contacts > 0 ? Math.round((campaign.sent_count / campaign.total_contacts) * 100) : 0
   const contacts = (Array.isArray(campaign.campaign_contacts)
     ? campaign.campaign_contacts
