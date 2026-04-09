@@ -1575,7 +1575,7 @@ function KPICardsGrid({ data, mounted, onNavigate }: { data: ReportData; mounted
   ]
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+    <div className="grid grid-cols-4 gap-5">
       {kpis.map((kpi, index) => {
         const colors = KPI_COLOR_CLASSES[kpi.color] ?? KPI_COLOR_CLASSES.amber
         return (
