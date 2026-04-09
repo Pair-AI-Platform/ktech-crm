@@ -263,6 +263,8 @@ export interface AgentComparisonData {
   appointmentRate: number
   enrollmentRate: number
   filesRate: number
+  sfFiles?: number
+  pucFiles?: number
 }
 
 export interface TimeToConversionData {
