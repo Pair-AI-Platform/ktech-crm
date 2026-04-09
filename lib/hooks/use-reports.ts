@@ -166,6 +166,8 @@ export interface EnrollmentReportData {
     total: number
     rate: number
     byReason: Array<{ reasonId: string; reason: string; count: number; percent: number }>
+    byReasonPUC: Array<{ reasonId: string; reason: string; count: number; percent: number }>
+    byReasonSF: Array<{ reasonId: string; reason: string; count: number; percent: number }>
   }
 }
 
@@ -756,6 +758,15 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
 
+      // All-time lead counts for lost rate calculation (no date filter)
+      const allTimeLeadsCountQuery = supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+      const allTimeLostCountQuery = supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("pipeline_stage", "lost")
+
       // Previous period data for comparison (same duration before start)
       const periodMs = end.getTime() - start.getTime()
       const prevStart = new Date(start.getTime() - periodMs)
@@ -795,6 +806,8 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
         { data: agentTargetsData },
         { data: overallTargetsData },
         { data: stageChangesData },
+        { count: allTimeLeadsCount },
+        { count: allTimeLostCount },
       ] = await Promise.race([
         Promise.all([
           leadsQuery,
@@ -808,6 +821,8 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
           agentTargetsQuery,
           overallTargetsQuery,
           stageChangesQuery,
+          allTimeLeadsCountQuery,
+          allTimeLostCountQuery,
         ]),
         timeoutPromise,
       ])
@@ -1260,6 +1275,42 @@ function calculateReports(
     }
   })
 
+  // PUC-specific withdrawal reasons
+  const withdrawnStudentsPUC = withdrawnStudents.filter(s => s.funding_type === 'puc')
+  const withdrawnLeadsPUC = withdrawnLeads.filter(l => l.funding_type === 'puc')
+  // SF-specific withdrawal reasons
+  const withdrawnStudentsSF = withdrawnStudents.filter(s => s.funding_type === 'self_funded')
+  const withdrawnLeadsSF = withdrawnLeads.filter(l => l.funding_type === 'self_funded')
+
+  const buildByReason = (
+    wStudents: typeof withdrawnStudents,
+    wLeads: typeof withdrawnLeads
+  ) => {
+    const byStudentReason: Record<string, number> = {}
+    wStudents.forEach(s => {
+      if (s.withdrawal_reason_id) byStudentReason[s.withdrawal_reason_id] = (byStudentReason[s.withdrawal_reason_id] || 0) + 1
+    })
+    const byLeadReason: Record<string, number> = {}
+    wLeads.forEach(l => {
+      if (l.withdrawal_reason) byLeadReason[l.withdrawal_reason] = (byLeadReason[l.withdrawal_reason] || 0) + 1
+    })
+    const total = wStudents.length + wLeads.length
+    return [
+      ...Object.entries(byStudentReason).map(([reasonId, count]) => ({
+        reasonId, reason: lostReasons.find(r => r.id === reasonId)?.reason_en || 'Unknown', count, percent: 0,
+      })),
+      ...Object.entries(byLeadReason).map(([reasonId, count]) => ({
+        reasonId, reason: ALL_REASON_LABELS[reasonId] || reasonId, count, percent: 0,
+      })),
+    ].reduce((merged, item) => {
+      const existing = merged.find(m => m.reason === item.reason)
+      if (existing) { existing.count += item.count } else { merged.push({ ...item }) }
+      return merged
+    }, [] as Array<{ reasonId: string; reason: string; count: number; percent: number }>)
+    .map(item => ({ ...item, percent: total > 0 ? Math.round((item.count / total) * 100) : 0 }))
+    .sort((a, b) => b.count - a.count)
+  }
+
   const enrollment: EnrollmentReportData = {
     totalEnrolled: activeStudents.length,
     pucEnrolled: activeStudents.filter(s => s.funding_type === 'puc').length,
@@ -1313,7 +1364,9 @@ function calculateReports(
         const totalW = withdrawnStudents.length + withdrawnLeads.length
         return { ...item, percent: totalW > 0 ? Math.round((item.count / totalW) * 100) : 0 }
       })
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => b.count - a.count),
+      byReasonPUC: buildByReason(withdrawnStudentsPUC, withdrawnLeadsPUC),
+      byReasonSF: buildByReason(withdrawnStudentsSF, withdrawnLeadsSF),
     }
   }
 
@@ -2370,7 +2423,7 @@ function calculateReports(
     totalLost: lostLeads.length,
     sfLost,
     pucLost,
-    lostRate: leads.length > 0 ? Math.round((lostLeads.length / leads.length) * 100) : 0,
+    lostRate: (allTimeLeadsCount ?? 0) > 0 ? Math.round(((allTimeLostCount ?? 0) / (allTimeLeadsCount ?? 1)) * 100) : 0,
     byReason: lostReasonEntries,
     byStage: Object.entries(lostByStage)
       .map(([stage, count]) => {

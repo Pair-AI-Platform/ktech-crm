@@ -68,6 +68,18 @@ const DEMO_ENROLLMENT: EnrollmentReportData = {
       { reasonId: 'studying_abroad', reason: 'Studying Abroad', count: 3, percent: 13 },
       { reasonId: 'language_issues', reason: 'Language Issues', count: 2, percent: 9 },
     ],
+    byReasonPUC: [
+      { reasonId: 'payment_issue', reason: 'Payment Issue', count: 4, percent: 36 },
+      { reasonId: 'far_away', reason: 'Far Away', count: 3, percent: 27 },
+      { reasonId: 'language_issues', reason: 'Language Issues', count: 2, percent: 18 },
+      { reasonId: 'personal_reasons', reason: 'Personal Reasons', count: 2, percent: 18 },
+    ],
+    byReasonSF: [
+      { reasonId: 'personal_reasons', reason: 'Personal Reasons', count: 5, percent: 42 },
+      { reasonId: 'competitor_gust', reason: 'GUST', count: 3, percent: 25 },
+      { reasonId: 'studying_abroad', reason: 'Studying Abroad', count: 3, percent: 25 },
+      { reasonId: 'far_away', reason: 'Far Away', count: 1, percent: 8 },
+    ],
   },
 }
 
@@ -90,7 +102,15 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent, isAgent 
   const displayEnrollment = hasRealData ? enrollmentData : DEMO_ENROLLMENT
   const displayWithdrawals = hasRealData ? withdrawalsByAgent : DEMO_WITHDRAWALS
 
-  const pieData = displayEnrollment.withdrawals.byReason.map((item, index) => ({
+  const pieDataPUC = displayEnrollment.withdrawals.byReasonPUC.map((item, index) => ({
+    name: item.reason,
+    reason: item.reason,
+    value: item.count,
+    percent: item.percent,
+    color: COLORS[index % COLORS.length],
+  }))
+
+  const pieDataSF = displayEnrollment.withdrawals.byReasonSF.map((item, index) => ({
     name: item.reason,
     reason: item.reason,
     value: item.count,
@@ -174,9 +194,9 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent, isAgent 
 
       </div>
 
-      {/* Withdrawal Reasons Chart */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Withdrawal Reasons Pie */}
+      {/* Withdrawal Reasons Charts — PUC + SF side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* PUC */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -185,29 +205,21 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent, isAgent 
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <UserMinus className="w-5 h-5 text-[var(--error)]" />
-                Withdrawal Reasons
+                <UserMinus className="w-5 h-5 text-[var(--warning)]" />
+                Withdrawal Reasons — PUC
               </CardTitle>
-              <CardDescription>Why students withdraw</CardDescription>
+              <CardDescription>Why PUC students withdraw</CardDescription>
             </CardHeader>
             <CardContent>
-              {pieData.length > 0 ? (
+              {pieDataPUC.length > 0 ? (
                 <>
                   <div className="h-[200px]" style={{ minWidth: 0 }}>
                     {mounted ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie
-                            data={pieData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={2}
-                            dataKey="value"
-                          >
-                            {pieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Pie data={pieDataPUC} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+                            {pieDataPUC.map((entry, index) => (
+                              <Cell key={`cell-puc-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
                           <Tooltip content={<CustomTooltip />} />
@@ -217,30 +229,72 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent, isAgent 
                       <div className="h-full bg-[var(--bg-sunken)] rounded animate-pulse" />
                     )}
                   </div>
-                  {/* Legend */}
                   <div className="space-y-2 mt-4">
-                    {pieData.slice(0, 5).map((item) => (
+                    {pieDataPUC.slice(0, 5).map((item) => (
                       <div key={item.reason} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-sm text-[var(--text-secondary)] truncate max-w-[150px]">
-                            {item.reason}
-                          </span>
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm text-[var(--text-secondary)] truncate max-w-[150px]">{item.reason}</span>
                         </div>
-                        <span className="text-sm font-medium text-[var(--text-primary)]">
-                          {item.value} ({item.percent}%)
-                        </span>
+                        <span className="text-sm font-medium text-[var(--text-primary)]">{item.value} ({item.percent}%)</span>
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-center h-[200px] text-[var(--text-muted)]">
-                  No withdrawal data
-                </div>
+                <div className="flex items-center justify-center h-[200px] text-[var(--text-muted)]">No PUC withdrawal data</div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Self Funded */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.7 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserMinus className="w-5 h-5 text-[var(--primary)]" />
+                Withdrawal Reasons — Self Funded
+              </CardTitle>
+              <CardDescription>Why self-funded students withdraw</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pieDataSF.length > 0 ? (
+                <>
+                  <div className="h-[200px]" style={{ minWidth: 0 }}>
+                    {mounted ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={pieDataSF} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+                            {pieDataSF.map((entry, index) => (
+                              <Cell key={`cell-sf-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full bg-[var(--bg-sunken)] rounded animate-pulse" />
+                    )}
+                  </div>
+                  <div className="space-y-2 mt-4">
+                    {pieDataSF.slice(0, 5).map((item) => (
+                      <div key={item.reason} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm text-[var(--text-secondary)] truncate max-w-[150px]">{item.reason}</span>
+                        </div>
+                        <span className="text-sm font-medium text-[var(--text-primary)]">{item.value} ({item.percent}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-[var(--text-muted)]">No SF withdrawal data</div>
               )}
             </CardContent>
           </Card>
