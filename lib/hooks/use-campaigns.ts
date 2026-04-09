@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { queryKeys } from "./query-keys"
 
 // Types
-export type CampaignType = 'whatsapp' | 'sms' | 'email'
+export type CampaignType = 'whatsapp' | 'sms'
 export type CampaignStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'completed'
 
 export interface Campaign {

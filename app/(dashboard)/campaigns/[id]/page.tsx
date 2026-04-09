@@ -18,7 +18,6 @@ import {
   CheckCheck,
   Eye,
   XCircle,
-  Mail,
   Users,
   Trash2,
   Loader2,
@@ -52,12 +51,6 @@ const CAMPAIGN_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ classNa
     label: "SMS",
     color: "bg-purple-500/10 text-purple-600 border-purple-500/20",
     iconColor: "text-purple-500",
-  },
-  email: {
-    icon: Mail,
-    label: "Email",
-    color: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-    iconColor: "text-orange-500",
   },
 }
 
@@ -302,16 +295,9 @@ export default function CampaignDetailsPage() {
             {campaign.message_content && (
               <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-6">
                 <h3 className="text-lg font-medium text-[var(--text-primary)] mb-4">Message</h3>
-                {campaign.subject && (
-                  <p className="font-medium text-[var(--text-primary)] mb-2 pb-2 border-b border-[var(--border)]">
-                    Subject: {campaign.subject}
-                  </p>
-                )}
                 <div className={cn(
                   "p-4 rounded-xl border",
-                  campaign.type === 'whatsapp' ? "bg-[#DCF8C6] border-emerald-200" :
-                  campaign.type === 'sms' ? "bg-blue-50 border-blue-200" :
-                  "bg-white border-gray-200"
+                  campaign.type === 'whatsapp' ? "bg-[#DCF8C6] border-emerald-200" : "bg-blue-50 border-blue-200"
                 )}>
                   <p className="text-sm whitespace-pre-wrap text-gray-700">{campaign.message_content}</p>
                 </div>

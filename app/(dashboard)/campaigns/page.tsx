@@ -30,7 +30,6 @@ import {
   Globe,
   Upload,
   X,
-  Mail,
   AlertCircle,
   Check,
   FileSpreadsheet,
@@ -56,7 +55,7 @@ import {
 // Types
 // ============================================================================
 
-type CampaignView = "all" | "whatsapp" | "sms" | "email"
+type CampaignView = "all" | "whatsapp" | "sms"
 type AudienceSource = "filter" | "upload"
 type ScheduleType = "immediate" | "scheduled" | "optimal"
 
@@ -80,7 +79,6 @@ interface CampaignFormData {
   scheduledTime?: string
   messageContent: string
   messageContentAr?: string
-  subject?: string
   useTemplate: boolean
   templateId?: string
 }
@@ -105,14 +103,6 @@ const CAMPAIGN_TYPE_CONFIG = {
     color: "bg-purple-500/10 text-purple-600 border-purple-500/20",
     iconColor: "text-purple-500",
     bgColor: "bg-purple-500",
-  },
-  email: {
-    icon: Mail,
-    label: "Email",
-    description: "Professional email campaigns",
-    color: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-    iconColor: "text-orange-500",
-    bgColor: "bg-orange-500",
   },
 }
 
@@ -348,7 +338,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     scheduleType: "optimal",
     messageContent: "",
     messageContentAr: "",
-    subject: "",
     useTemplate: false,
   })
 
@@ -392,12 +381,8 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   }, [])
 
   const downloadTemplate = () => {
-    const headers = formData.type === 'email'
-      ? 'First Name,Last Name,Email'
-      : 'First Name,Last Name,Phone,Email'
-    const sample = formData.type === 'email'
-      ? 'John,Doe,john@example.com'
-      : 'John,Doe,96512345678,john@example.com'
+    const headers = 'First Name,Last Name,Phone'
+    const sample = 'John,Doe,96512345678'
     const csv = `${headers}\n${sample}`
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -422,7 +407,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         if (formData.audienceSource === 'upload') return validContacts.length > 0
         return formData.audienceFilter !== ''
       case 4:
-        if (formData.type === 'email') return formData.subject && formData.messageContent
         return formData.messageContent.trim().length > 0
       default: return false
     }
@@ -448,7 +432,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         scheduledTime: formData.scheduledTime,
         messageContent: formData.messageContent || undefined,
         messageContentAr: formData.messageContentAr || undefined,
-        subject: formData.subject || undefined,
       },
       {
         onSuccess: () => {
@@ -522,7 +505,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           {/* Step 1: Channel Selection */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-4">
-              {(["whatsapp", "sms", "email"] as CampaignType[]).map((type) => {
+              {(["whatsapp", "sms"] as CampaignType[]).map((type) => {
                 const config = CAMPAIGN_TYPE_CONFIG[type]
                 const Icon = config.icon
                 return (
@@ -804,8 +787,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                     <div>
                       <p className="font-medium text-[var(--text-primary)]">{getAudienceCount()} contacts selected</p>
                       <p className="text-sm text-[var(--text-muted)]">
-                        {formData.type === 'email' && 'Will be sent within minutes'}
-                        {(formData.type === 'sms' || formData.type === 'whatsapp') && `Est. ${Math.ceil(getAudienceCount() / 100)} minutes to send`}
+                        {`Est. ${Math.ceil(getAudienceCount() / 100)} minutes to send`}
                       </p>
                     </div>
                   </div>
@@ -817,24 +799,8 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           {/* Step 4: Message Composition */}
           {step === 4 && (
             <div className="space-y-6">
-              {/* Email Campaign - Subject Line */}
-              {formData.type === "email" && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                    Subject Line *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.subject || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-                    placeholder="e.g., Your Journey to ktech Starts Here"
-                    className="w-full h-12 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50"
-                  />
-                </div>
-              )}
-
-              {/* Message Content - SMS/WhatsApp/Email */}
-              {(formData.type === "whatsapp" || formData.type === "sms" || formData.type === "email") && (
+              {/* Message Content */}
+              {(formData.type === "whatsapp" || formData.type === "sms") && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-[var(--text-primary)]">
@@ -862,7 +828,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                     placeholder={showArabic
                       ? "Type your Arabic message here..."
                       : "Hello {{first_name}}! I wanted to reach out..."}
-                    rows={formData.type === 'email' ? 8 : 4}
+                    rows={4}
                     className={cn(
                       "w-full p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50 resize-none",
                       showArabic && "text-right font-arabic"
@@ -918,15 +884,8 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                   </label>
                   <div className={cn(
                     "p-4 rounded-xl border",
-                    formData.type === 'whatsapp' ? "bg-[#DCF8C6] border-emerald-200" :
-                    formData.type === 'sms' ? "bg-blue-50 border-blue-200" :
-                    "bg-white border-gray-200"
+                    formData.type === 'whatsapp' ? "bg-[#DCF8C6] border-emerald-200" : "bg-blue-50 border-blue-200"
                   )}>
-                    {formData.type === 'email' && formData.subject && (
-                      <p className="font-medium text-gray-900 mb-2 pb-2 border-b border-gray-200">
-                        {formData.subject.replace('{{first_name}}', 'Ahmed')}
-                      </p>
-                    )}
                     <p className={cn(
                       "text-sm whitespace-pre-wrap",
                       formData.type === 'whatsapp' ? "text-gray-800" : "text-gray-700"
@@ -999,7 +958,6 @@ const CAMPAIGN_VIEWS: { id: CampaignView; label: string; icon?: React.ComponentT
   { id: "all", label: "All" },
   { id: "whatsapp", label: "WhatsApp", icon: MessageSquare },
   { id: "sms", label: "SMS", icon: Smartphone },
-  { id: "email", label: "Email", icon: Mail },
 ]
 
 export default function CampaignsPage() {
