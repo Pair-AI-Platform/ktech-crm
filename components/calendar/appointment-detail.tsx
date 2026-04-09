@@ -42,20 +42,12 @@ interface AppointmentDetailProps {
   onUpdate?: () => void
 }
 
-const STATUS_CONFIG: Record<string, {
-  label: string
-  color: string
-  icon: typeof CheckCircle2
-}> = {
+type StatusConfig = { label: string; color: string; icon: typeof CheckCircle2 }
+const ALL_STATUS_CONFIG: Record<string, StatusConfig> = {
   scheduled: {
     label: "Scheduled",
     color: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/30",
     icon: Calendar
-  },
-  no_answer: {
-    label: "No Answer",
-    color: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
-    icon: PhoneMissed
   },
   confirmed: {
     label: "Confirmed",
@@ -72,6 +64,16 @@ const STATUS_CONFIG: Record<string, {
     color: "bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/30",
     icon: Calendar
   },
+  cancelled: {
+    label: "Canceled",
+    color: "bg-red-500/10 text-red-500 border-red-500/30",
+    icon: XCircle
+  },
+  no_answer: {
+    label: "No Answer",
+    color: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
+    icon: PhoneMissed
+  },
   cant_reach: {
     label: "Can't Reach",
     color: "bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/30",
@@ -82,12 +84,12 @@ const STATUS_CONFIG: Record<string, {
     color: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/30",
     icon: Eye
   },
-  cancelled: {
-    label: "Canceled",
-    color: "bg-red-500/10 text-red-500 border-red-500/30",
-    icon: XCircle
-  },
 }
+
+// Statuses shown for regular appointments
+const APPOINTMENT_STATUS_KEYS = ["scheduled", "confirmed", "on_the_way", "postponed", "cancelled"]
+// Statuses shown for callbacks
+const CALLBACK_STATUS_KEYS = ["scheduled", "no_answer", "cant_reach", "will_see", "cancelled"]
 
 export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: AppointmentDetailProps) {
   const [showPostponedForm, setShowPostponedForm] = useState(false)
@@ -144,7 +146,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
 
   if (!appointment) return null
 
-  const statusConfig = STATUS_CONFIG[appointment.status] || STATUS_CONFIG.scheduled
+  const statusConfig = ALL_STATUS_CONFIG[appointment.status] || ALL_STATUS_CONFIG.scheduled
   const StatusIcon = statusConfig.icon
 
   // Derive leads list from junction table with legacy fallback
@@ -165,6 +167,15 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   // Get all lead IDs for bulk operations
   const allLeadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
     (appointment.lead_id ? [appointment.lead_id] : [])
+
+  // Update contact_status for all linked leads
+  const updateLeadContactStatus = async (status: string) => {
+    if (allLeadIds.length === 0) return
+    const supabase = createClient()
+    for (const lid of allLeadIds) {
+      await supabase.from("leads").update({ contact_status: status }).eq("id", lid)
+    }
+  }
 
   const handleAction = async (action: () => Promise<unknown>, closeAfter = false) => {
     setIsLoading(true)
@@ -187,6 +198,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
     setLocalStatusOverride("confirmed")
     setLocalTimestamps(prev => ({ ...prev, confirmed_at: new Date().toISOString() }))
+    await updateLeadContactStatus("interested")
     onUpdate?.()
   }
   const handleMarkNA = async () => {
@@ -197,6 +209,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
     setLocalStatusOverride("no_answer")
     setLocalTimestamps(prev => ({ ...prev, na_marked_at: new Date().toISOString() }))
+    await updateLeadContactStatus("no_answer")
     onUpdate?.()
   }
   const handleMarkCantReach = async () => {
@@ -207,6 +220,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
     setLocalStatusOverride("cant_reach")
     setLocalTimestamps(prev => ({ ...prev, cant_reach_at: new Date().toISOString() }))
+    await updateLeadContactStatus("no_answer")
     onUpdate?.()
   }
   const handleMarkOnTheWay = async () => {
@@ -217,6 +231,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
     setLocalStatusOverride("on_the_way")
     setLocalTimestamps(prev => ({ ...prev, on_the_way_at: new Date().toISOString() }))
+    await updateLeadContactStatus("will_see")
     onUpdate?.()
   }
   const handleMarkWillSee = async () => {
@@ -227,6 +242,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
     setLocalStatusOverride("will_see")
     setLocalTimestamps(prev => ({ ...prev, will_see_at: new Date().toISOString() }))
+    await updateLeadContactStatus("will_see")
     onUpdate?.()
   }
 
@@ -371,9 +387,10 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     onUpdate?.()
   }
 
-  const handlePostpone = () => handleAction(() =>
-    postponeAppointment(appointment.id, postponedDate, postponedTime), true
-  )
+  const handlePostpone = async () => {
+    await handleAction(() => postponeAppointment(appointment.id, postponedDate, postponedTime), true)
+    await updateLeadContactStatus("callback")
+  }
 
   const handleDelete = () => handleAction(() =>
     deleteAppointment(appointment.id), true
@@ -557,10 +574,12 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           {/* Appointment Status */}
           <div className="p-4 rounded-xl border border-[var(--border)]/50 bg-[var(--bg-sunken)]">
             <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
-              Appointment Status
+              {appointment.is_callback ? "Callback Status" : "Appointment Status"}
             </p>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+              {(appointment.is_callback ? CALLBACK_STATUS_KEYS : APPOINTMENT_STATUS_KEYS)
+                .map((key) => ({ key, config: ALL_STATUS_CONFIG[key] }))
+                .map(({ key, config }) => {
                 const Icon = config.icon
                 const isActive = (localStatusOverride || appointment.status) === key
                 return (

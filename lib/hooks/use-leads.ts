@@ -140,12 +140,13 @@ export function useLeads(options: UseLeadsOptions = {}) {
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "leads",
           ...(filter ? { filter } : {}),
         },
         () => {
+          // Only invalidate on new leads — updates are handled in-place by mutations
           queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
         }
       )
@@ -651,7 +652,7 @@ export function useLeadMutations() {
       return { data, error: null }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+      // Intentionally not invalidating — lead stays in current view until user manually refreshes
     },
   })
 
@@ -717,7 +718,7 @@ export function useLeadMutations() {
       return { error: null, count: leadIds.length }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+      // Intentionally not invalidating — leads stay in current view until user manually refreshes
     },
   })
 
@@ -823,7 +824,7 @@ export function useLeadMutations() {
       return { error: null, count: leadIds.length }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+      // Intentionally not invalidating — leads stay in current view until user manually refreshes
     },
   })
 

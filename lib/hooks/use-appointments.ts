@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toDateString } from "@/lib/utils"
 import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, saveDemoAppointmentUpdate, getDemoLeadById, DEMO_AGENTS } from "@/lib/demo-data"
 import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
+import { queryKeys } from "@/lib/hooks/query-keys"
 
 // ---------------------------------------------------------------------------
 // Query key factory (local – will defer to query-keys.ts once it exists)
@@ -194,8 +195,9 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       .channel(`${id}-changes`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments" },
+        { event: "INSERT", schema: "public", table: "appointments" },
         () => {
+          // Only invalidate on new appointments — updates are handled in-place by mutations
           invalidate()
         }
       )
@@ -205,7 +207,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       .channel(`${id}-leads-changes`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointment_leads" },
+        { event: "INSERT", schema: "public", table: "appointment_leads" },
         () => {
           invalidate()
         }
@@ -369,8 +371,13 @@ export function useAppointmentMutations() {
 
       return data
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       invalidateAppointments()
+      // Invalidate leads cache if any lead was moved from "new" to "contacted"
+      const leadIds = variables.lead_ids || (variables.lead_id ? [variables.lead_id] : [])
+      if (leadIds.length > 0) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+      }
     },
   })
 
@@ -394,7 +401,7 @@ export function useAppointmentMutations() {
       return { id, ...updates }
     },
     onSuccess: () => {
-      invalidateAppointments()
+      // Intentionally not invalidating — appointment stays in current view until user manually refreshes
     },
   })
 
