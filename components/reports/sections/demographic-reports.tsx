@@ -284,6 +284,69 @@ export function DemographicReports({ data }: DemographicReportsProps) {
         </Card>
       </motion.div>
 
+      {/* Major Files */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.62 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-[var(--success)]" />
+              Major Files
+            </CardTitle>
+            <CardDescription>Files opened by intended major</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]" style={{ minWidth: 0 }}>
+              {mounted && data.byMajorFiles.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data.byMajorFiles}
+                    layout="vertical"
+                    margin={{ left: 100 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={true} vertical={false} />
+                    <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                    <YAxis
+                      type="category"
+                      dataKey="label"
+                      tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                      width={95}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
+                              <p className="text-xs text-[var(--text-muted)]">{payload[0].payload.label}</p>
+                              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                                {payload[0].value} files ({payload[0].payload.percent}%)
+                              </p>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                    />
+                    <Bar dataKey="count" fill="var(--success)" radius={[0, 4, 4, 0]}>
+                      {data.byMajorFiles.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={MAJOR_COLORS[index % MAJOR_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
+                  No files data available
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
       {/* Governorate Distribution */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

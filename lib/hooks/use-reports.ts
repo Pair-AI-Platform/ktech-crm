@@ -143,6 +143,7 @@ export interface PUCReportData {
   applicationSubmitted: number
   feePaid: number
   convertedToSF: number
+  convertedToSFByAgent: Array<{ agentId: string; agentName: string; avatarUrl: string | null; count: number; percent: number }>
   accepted2ndChoice: number
   diplomaticCount: number
   specialNeedsCount: number
@@ -204,6 +205,7 @@ export interface ChannelReportData {
   byCategory: Array<{ category: LeadSourceCategory; label: string; count: number; percent: number }>
   topSchools: Array<{ schoolId: string; schoolName: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number; sfCount: number; sfPercent: number; enrolled: number; enrolledPercent: number; enrolledPuc: number; enrolledSf: number }>
   bySchool: Array<{ schoolId: string; label: string; leads: number; applications: number; applicationPercent: number; pucCount: number; pucPercent: number }>
+  bySchoolType: Array<{ type: string; label: string; leads: number; files: number; enrolled: number; filesRate: number; enrollRate: number }>
 }
 
 export interface LeaderboardData {
@@ -244,6 +246,7 @@ export interface DemographicReportData {
   byNationality: Array<{ nationality: string; label: string; count: number; percent: number }>
   byFunding: Array<{ funding: FundingType; label: string; count: number; percent: number }>
   byMajor: Array<{ major: IntendedMajor; label: string; count: number; percent: number }>
+  byMajorFiles: Array<{ major: IntendedMajor; label: string; count: number; percent: number }>
   byGovernorate: Array<{ governorate: Governorate; label: string; count: number; percent: number }>
   discountAnalysis: Array<{ discountType: DiscountType; label: string; count: number; totalDiscount: number }>
   byLeadType: Array<{ type: string; label: string; count: number; percent: number }>
@@ -334,6 +337,7 @@ export interface EnrollmentFromApplicationsData {
 export interface WithdrawalsByAgentData {
   totalWithdrawnSF: number
   totalWithdrawnPUC: number
+  totalWithdrawnPUCSecondChoice: number
   byAgent: Array<{
     agentId: string
     agentName: string
@@ -1258,6 +1262,24 @@ function calculateReports(
       l.actual_gpa !== undefined && l.actual_gpa !== null &&
       l.actual_gpa < GPA_SELF_FUNDED_THRESHOLD
     ).length,
+    convertedToSFByAgent: (() => {
+      const sfLeads = leads.filter(l =>
+        l.funding_type === 'self_funded' &&
+        l.actual_gpa !== undefined && l.actual_gpa !== null &&
+        l.actual_gpa < GPA_SELF_FUNDED_THRESHOLD
+      )
+      const total = sfLeads.length
+      return agents.map(agent => {
+        const count = sfLeads.filter(l => l.assigned_to === agent.id).length
+        return {
+          agentId: agent.id,
+          agentName: agent.full_name,
+          avatarUrl: agent.avatar_url || null,
+          count,
+          percent: total > 0 ? Math.round((count / total) * 100) : 0,
+        }
+      }).filter(a => a.count > 0).sort((a, b) => b.count - a.count)
+    })(),
     accepted2ndChoice: pucLeadsAll.filter(l => pucAcceptedStages.includes(l.pipeline_stage) && l.puc_choice && l.puc_choice !== '1').length,
     diplomaticCount: pucLeadsAll.filter(l => l.is_diplomatic).length,
     specialNeedsCount: pucLeadsAll.filter(l => l.is_special_needs).length,
@@ -1850,6 +1872,18 @@ function calculateReports(
       })
       .filter(m => m.count > 0)
       .sort((a, b) => b.count - a.count),
+    byMajorFiles: (['cyber_security', 'cis', 'marketing', 'accounting', 'mis', 'network_security', 'other'] as IntendedMajor[])
+      .map(major => {
+        const fileLeads = leads.filter(l => l.intended_major === major && ['application', 'test', 'applicant', 'enrolled', 'puc_document_submission', 'puc_application_submission'].includes(l.pipeline_stage))
+        return {
+          major,
+          label: majorLabels[major],
+          count: fileLeads.length,
+          percent: leads.length > 0 ? Math.round((fileLeads.length / leads.length) * 100) : 0
+        }
+      })
+      .filter(m => m.count > 0)
+      .sort((a, b) => b.count - a.count),
     byGovernorate: GOVERNORATES.map(gov => {
       // Get all school values that belong to this governorate
       const govSchools = SCHOOLS.filter(s => s.governorate === gov.value).map(s => s.value)
@@ -2010,6 +2044,7 @@ function calculateReports(
   const withdrawalsByAgent: WithdrawalsByAgentData = {
     totalWithdrawnSF: sfWithdrawnStudents.length + sfWithdrawnLeads.length,
     totalWithdrawnPUC: pucWithdrawnStudents.length + pucWithdrawnLeads.length,
+    totalWithdrawnPUCSecondChoice: pucWithdrawnLeads.filter(l => l.puc_choice && l.puc_choice !== '1').length,
     byAgent: agents.map(agent => {
       const agentWithdrawnStudents = withdrawnStudents.filter(s => s.assigned_to === agent.id)
       const agentWithdrawnLeads = withdrawnLeads.filter(l => l.assigned_to === agent.id)
