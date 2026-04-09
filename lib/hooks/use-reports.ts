@@ -1751,7 +1751,7 @@ function calculateReports(
       appointments: agentAppointments.length,
       applications: agentApplications.length,
       enrolled: agentEnrolled.length,
-      conversionRate: agentLeads.length > 0 ? Math.round((agentEnrolled.length / agentLeads.length) * 100) : 0,
+      conversionRate: agentApplications.length > 0 ? Math.round((agentEnrolled.length / agentApplications.length) * 100) : 0,
       target,
       progress: target > 0 ? Math.min(100, Math.round((agentApplications.length / target) * 100)) : 0,
       // PUC funnel
