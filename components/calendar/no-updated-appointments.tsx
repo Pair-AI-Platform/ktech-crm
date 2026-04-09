@@ -82,12 +82,22 @@ export function NoUpdatedAppointments({
     try {
       const supabase = createClient()
 
+      const leadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
+        (appointment.lead_id ? [appointment.lead_id] : [])
+      const updateLeadStatus = async (status: string) => {
+        for (const lid of leadIds) {
+          await supabase.from("leads").update({ contact_status: status }).eq("id", lid)
+        }
+      }
+
       switch (action) {
         case "confirmed":
           await confirmAppointment(appointment.id)
+          await updateLeadStatus("interested")
           break
         case "on_the_way":
           await markOnTheWay(appointment.id)
+          await updateLeadStatus("will_see")
           break
         case "postponed":
           // Open postpone popup to let user pick date/time
@@ -99,9 +109,11 @@ export function NoUpdatedAppointments({
           return
         case "no_answer":
           await markNA(appointment.id)
+          await updateLeadStatus("no_answer")
           break
         case "cant_reach":
           await markCantReach(appointment.id)
+          await updateLeadStatus("no_answer")
           break
         case "not_interested":
           // Open cancel popup instead of direct action
@@ -165,6 +177,12 @@ export function NoUpdatedAppointments({
       if (result?.error) {
         console.error("Error postponing:", result.error)
       } else {
+        const supabase = createClient()
+        const postponeLeadIds = postponeTarget.appointment_leads?.map(al => al.lead_id) ||
+          (postponeTarget.lead_id ? [postponeTarget.lead_id] : [])
+        for (const lid of postponeLeadIds) {
+          await supabase.from("leads").update({ contact_status: "callback" }).eq("id", lid)
+        }
         onUpdate?.()
       }
     } catch (error) {

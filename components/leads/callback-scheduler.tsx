@@ -38,6 +38,14 @@ const TIME_OPTIONS = [
   "20:00", "20:30", "21:00", "21:30",
 ]
 
+function formatTime12h(time24: string): string {
+  const [hourStr, minute] = time24.split(":")
+  const hour = parseInt(hourStr, 10)
+  const ampm = hour < 12 ? "AM" : "PM"
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12
+  return `${hour12}:${minute} ${ampm}`
+}
+
 export function CallbackScheduler({
   isOpen,
   onClose,
@@ -254,12 +262,14 @@ export function CallbackScheduler({
                     </label>
                     <Select value={selectedTime} onValueChange={setSelectedTime}>
                       <SelectTrigger className="h-10 text-sm">
-                        <SelectValue placeholder="Select time" />
+                        <SelectValue placeholder="Select time">
+                          {selectedTime ? formatTime12h(selectedTime) : null}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {TIME_OPTIONS.map((time) => (
                           <SelectItem key={time} value={time}>
-                            {time}
+                            {formatTime12h(time)}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -485,26 +485,6 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               )}
             </div>
             <div className="flex gap-1.5">
-              {personPhone && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-9 w-9 rounded-xl hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]"
-                    onClick={() => window.open(`tel:${personPhone}`)}
-                  >
-                    <Phone className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-9 w-9 rounded-xl hover:bg-[var(--success)]/10 hover:text-[var(--success)]"
-                    onClick={() => window.open(`https://wa.me/965${personPhone}`)}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
             </div>
           </div>
 
