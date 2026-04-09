@@ -277,7 +277,7 @@ export default function CampaignDetailsPage() {
               <h3 className="text-lg font-medium text-[var(--text-primary)] mb-4">Progress</h3>
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-[var(--text-muted)]">
-                  {campaign.sent_count} of {campaign.total_contacts} {campaign.type === "voice" ? "calls" : "messages"} sent
+                  {campaign.sent_count} of {campaign.total_contacts} messages sent
                 </span>
                 <span className="font-medium text-[var(--text-primary)]">{progress}%</span>
               </div>
