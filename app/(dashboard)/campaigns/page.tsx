@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   MessageSquare,
   Smartphone,
+  Eye,
   Plus,
   Play,
   Pause,
@@ -261,7 +262,7 @@ function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
         )}
 
         {/* Stats summary */}
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm flex-wrap">
           <div className="flex items-center gap-1.5">
             <Users className="w-4 h-4 text-[var(--text-muted)]" />
             <span className="text-[var(--text-primary)]">{campaign.total_contacts}</span>
@@ -272,6 +273,20 @@ function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               <span className="text-[var(--text-primary)]">{campaign.delivered_count}</span>
               <span className="text-[var(--text-muted)]">delivered</span>
+            </div>
+          )}
+          {(campaign.read_count ?? 0) > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Eye className="w-4 h-4 text-blue-500" />
+              <span className="text-[var(--text-primary)]">{campaign.read_count}</span>
+              <span className="text-[var(--text-muted)]">read</span>
+            </div>
+          )}
+          {(campaign.replied_count ?? 0) > 0 && (
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4 text-purple-500" />
+              <span className="text-[var(--text-primary)]">{campaign.replied_count}</span>
+              <span className="text-[var(--text-muted)]">replied</span>
             </div>
           )}
           {campaign.failed_count > 0 && (

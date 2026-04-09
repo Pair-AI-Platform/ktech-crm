@@ -29,6 +29,8 @@ export interface Campaign {
   sent_count: number
   delivered_count: number
   failed_count: number
+  read_count: number
+  replied_count: number
   created_by: string | null
   created_at: string
   updated_at: string

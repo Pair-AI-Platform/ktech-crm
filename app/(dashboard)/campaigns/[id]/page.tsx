@@ -284,10 +284,12 @@ export default function CampaignDetailsPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <StatCard label="Total Contacts" value={campaign.total_contacts} icon={Users} color="text-[var(--text-muted)]" />
               <StatCard label="Sent" value={campaign.sent_count} icon={Send} color="text-blue-500" />
               <StatCard label="Delivered" value={campaign.delivered_count} icon={CheckCheck} color="text-emerald-500" />
+              <StatCard label="Read" value={campaign.read_count ?? 0} icon={Eye} color="text-blue-400" />
+              <StatCard label="Replied" value={campaign.replied_count ?? 0} icon={MessageSquare} color="text-purple-500" />
               <StatCard label="Failed" value={campaign.failed_count} icon={XCircle} color="text-red-500" />
             </div>
 
