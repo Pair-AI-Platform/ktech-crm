@@ -99,7 +99,9 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [stageLoading, setStageLoading] = useState(false)
   const [localStageOverride, setLocalStageOverride] = useState<PipelineStage | null>(null)
-  const [, setLocalStatusOverride] = useState<string | null>(null)
+  const [localStatusOverride, setLocalStatusOverride] = useState<string | null>(null)
+  const [localTimestamps, setLocalTimestamps] = useState<Record<string, string>>({})
+  const [stageChangeLog, setStageChangeLog] = useState<{ stage: string; label: string; at: string }[]>([])
   const [showLostDialog, setShowLostDialog] = useState(false)
   const [localLeadStatusOverride, setLocalLeadStatusOverride] = useState<LeadStatus | null>(null)
   const [leadStatusLoading, setLeadStatusLoading] = useState(false)
@@ -131,6 +133,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     startTransition(() => {
       setLocalStageOverride(null)
       setLocalStatusOverride(null)
+      setLocalTimestamps({})
+      setStageChangeLog([])
       setLocalLeadStatusOverride(null)
       setEditingNotes(false)
       setNotesValue(appointment?.notes || "")
@@ -162,7 +166,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const allLeadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
     (appointment.lead_id ? [appointment.lead_id] : [])
 
-  const handleAction = async (action: () => Promise<unknown>) => {
+  const handleAction = async (action: () => Promise<unknown>, closeAfter = false) => {
     setIsLoading(true)
     setActionError(null)
     const result = await action() as { data?: unknown; error?: string | null } | undefined
@@ -172,14 +176,59 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
       return
     }
     onUpdate?.()
-    onClose()
+    if (closeAfter) onClose()
   }
 
-  const handleConfirm = () => handleAction(() => confirmAppointment(appointment.id))
-  const handleMarkNA = () => handleAction(() => markNA(appointment.id))
-  const handleMarkCantReach = () => handleAction(() => markCantReach(appointment.id))
-  const handleMarkOnTheWay = () => handleAction(() => markOnTheWay(appointment.id))
-  const handleMarkWillSee = () => handleAction(() => markWillSee(appointment.id))
+  const handleConfirm = async () => {
+    setIsLoading(true)
+    setActionError(null)
+    const result = await confirmAppointment(appointment.id) as { error?: string | null } | undefined
+    setIsLoading(false)
+    if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
+    setLocalStatusOverride("confirmed")
+    setLocalTimestamps(prev => ({ ...prev, confirmed_at: new Date().toISOString() }))
+    onUpdate?.()
+  }
+  const handleMarkNA = async () => {
+    setIsLoading(true)
+    setActionError(null)
+    const result = await markNA(appointment.id) as { error?: string | null } | undefined
+    setIsLoading(false)
+    if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
+    setLocalStatusOverride("no_answer")
+    setLocalTimestamps(prev => ({ ...prev, na_marked_at: new Date().toISOString() }))
+    onUpdate?.()
+  }
+  const handleMarkCantReach = async () => {
+    setIsLoading(true)
+    setActionError(null)
+    const result = await markCantReach(appointment.id) as { error?: string | null } | undefined
+    setIsLoading(false)
+    if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
+    setLocalStatusOverride("cant_reach")
+    setLocalTimestamps(prev => ({ ...prev, cant_reach_at: new Date().toISOString() }))
+    onUpdate?.()
+  }
+  const handleMarkOnTheWay = async () => {
+    setIsLoading(true)
+    setActionError(null)
+    const result = await markOnTheWay(appointment.id) as { error?: string | null } | undefined
+    setIsLoading(false)
+    if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
+    setLocalStatusOverride("on_the_way")
+    setLocalTimestamps(prev => ({ ...prev, on_the_way_at: new Date().toISOString() }))
+    onUpdate?.()
+  }
+  const handleMarkWillSee = async () => {
+    setIsLoading(true)
+    setActionError(null)
+    const result = await markWillSee(appointment.id) as { error?: string | null } | undefined
+    setIsLoading(false)
+    if (result?.error) { setActionError(typeof result.error === 'string' ? result.error : 'Failed'); return }
+    setLocalStatusOverride("will_see")
+    setLocalTimestamps(prev => ({ ...prev, will_see_at: new Date().toISOString() }))
+    onUpdate?.()
+  }
 
   const handleSaveNotes = async () => {
     setNotesSaving(true)
@@ -217,6 +266,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     setIsLoading(false)
     setShowCancelForm(false)
     setCancelNotes("")
+    setLocalStatusOverride("cancelled")
+    setLocalTimestamps(prev => ({ ...prev, cancelled_at: new Date().toISOString() }))
     onUpdate?.()
     onClose()
   }
@@ -246,6 +297,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     }
     setStageLoading(true)
     setLocalStageOverride(stage)
+    const stageLabel = PIPELINE_STAGES.find(s => s.value === stage)?.label || stage
+    setStageChangeLog(prev => [...prev, { stage, label: stageLabel, at: new Date().toISOString() }])
     const supabase = createClient()
     for (const lid of allLeadIds) {
       const updates: Record<string, unknown> = { pipeline_stage: stage }
@@ -319,11 +372,11 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   }
 
   const handlePostpone = () => handleAction(() =>
-    postponeAppointment(appointment.id, postponedDate, postponedTime)
+    postponeAppointment(appointment.id, postponedDate, postponedTime), true
   )
 
   const handleDelete = () => handleAction(() =>
-    deleteAppointment(appointment.id)
+    deleteAppointment(appointment.id), true
   )
 
   const getTypeGradient = () => {
@@ -438,6 +491,23 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
             </div>
           </div>
 
+          {/* Appointment Type */}
+          {appointment.appointment_type?.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]/50">
+              <div className="flex items-center gap-2 text-[var(--text-muted)] mb-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Appointment Type</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {appointment.appointment_type.map((type) => (
+                  <Badge key={type} variant="outline" size="sm" className="font-medium">
+                    {APPOINTMENT_TYPES.find(t => t.value === type)?.label || type}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3.5 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)]/50">
@@ -492,7 +562,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
             <div className="flex flex-wrap gap-2">
               {Object.entries(STATUS_CONFIG).map(([key, config]) => {
                 const Icon = config.icon
-                const isActive = appointment.status === key
+                const isActive = (localStatusOverride || appointment.status) === key
                 return (
                   <button
                     key={key}
@@ -820,43 +890,69 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                   },
                 ]
 
-                if (appointment.confirmed_at) {
+                const confirmedAt = localTimestamps.confirmed_at || appointment.confirmed_at
+                if (confirmedAt) {
                   events.push({
                     key: "confirmed",
-                    timestamp: new Date(appointment.confirmed_at),
+                    timestamp: new Date(confirmedAt),
                     label: "Confirmed",
                     dotClass: "bg-[var(--bg-surface)] border-2 border-[var(--primary)]",
                     agentName: appointment.confirmed_by ? agentMap.get(appointment.confirmed_by) : undefined,
                   })
                 }
 
-                if (appointment.na_marked_at) {
+                const naAt = localTimestamps.na_marked_at || appointment.na_marked_at
+                if (naAt) {
                   events.push({
                     key: "na",
-                    timestamp: new Date(appointment.na_marked_at),
-                    label: "NA (No Answer)",
+                    timestamp: new Date(naAt),
+                    label: "No Answer",
                     dotClass: "bg-[var(--warning)]",
                     agentName: appointment.na_marked_by ? agentMap.get(appointment.na_marked_by) : undefined,
                   })
                 }
 
-                if (appointment.cant_reach_at) {
+                const cantReachAt = localTimestamps.cant_reach_at || appointment.cant_reach_at
+                if (cantReachAt) {
                   events.push({
                     key: "cant_reach",
-                    timestamp: new Date(appointment.cant_reach_at),
+                    timestamp: new Date(cantReachAt),
                     label: "Can't Reach",
                     dotClass: "bg-[var(--error)]",
                     agentName: appointment.cant_reach_by ? agentMap.get(appointment.cant_reach_by) : undefined,
                   })
                 }
 
-                if (appointment.on_the_way_at) {
+                const onTheWayAt = localTimestamps.on_the_way_at || appointment.on_the_way_at
+                if (onTheWayAt) {
                   events.push({
                     key: "on_the_way",
-                    timestamp: new Date(appointment.on_the_way_at),
+                    timestamp: new Date(onTheWayAt),
                     label: "On The Way",
                     dotClass: "bg-[var(--info)]",
                     agentName: appointment.on_the_way_marked_by ? agentMap.get(appointment.on_the_way_marked_by) : undefined,
+                  })
+                }
+
+                const willSeeAt = localTimestamps.will_see_at || appointment.will_see_at
+                if (willSeeAt) {
+                  events.push({
+                    key: "will_see",
+                    timestamp: new Date(willSeeAt),
+                    label: "Will See",
+                    dotClass: "bg-[var(--info)]",
+                    agentName: appointment.will_see_marked_by ? agentMap.get(appointment.will_see_marked_by) : undefined,
+                  })
+                }
+
+                const cancelledAt = localTimestamps.cancelled_at || appointment.cancelled_at
+                if (cancelledAt) {
+                  events.push({
+                    key: "cancelled",
+                    timestamp: new Date(cancelledAt),
+                    label: "Cancelled",
+                    dotClass: "bg-red-500",
+                    agentName: appointment.cancelled_by ? agentMap.get(appointment.cancelled_by) : undefined,
                   })
                 }
 
@@ -888,6 +984,16 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
                     dotClass: "bg-[var(--primary)]",
                   })
                 }
+
+                // Stage changes made from this dialog session
+                stageChangeLog.forEach((change, idx) => {
+                  events.push({
+                    key: `stage-change-${idx}`,
+                    timestamp: new Date(change.at),
+                    label: `Stage → ${change.label}`,
+                    dotClass: "bg-[var(--accent)]",
+                  })
+                })
 
                 // Sort by timestamp ascending (oldest first)
                 events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
