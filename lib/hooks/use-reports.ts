@@ -905,7 +905,9 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
         targetMode,
         statusChangesMap,
         (stageChangesData || []) as Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }>,
-        filters.dateRange.preset
+        filters.dateRange.preset,
+        allTimeLeadsCount,
+        allTimeLostCount
       )
 
       // If DB returned zero leads, fall back to demo data so reports aren't empty
@@ -1025,7 +1027,9 @@ function calculateReports(
   targetMode: TargetMode = 'simple',
   statusChangesMap: Map<string, number> = new Map(),
   stageChangesRaw: Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }> = [],
-  datePreset: ReportFilters['dateRange']['preset'] = 'month'
+  datePreset: ReportFilters['dateRange']['preset'] = 'month',
+  allTimeLeadsCount: number | null = null,
+  allTimeLostCount: number | null = null
 ): ReportData {
   // Date range for trend generation
   const trendDates = getDatesBetween(startDate, endDate)
