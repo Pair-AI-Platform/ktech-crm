@@ -262,6 +262,7 @@ export interface AgentComparisonData {
   contactRate: number
   appointmentRate: number
   enrollmentRate: number
+  filesRate: number
 }
 
 export interface TimeToConversionData {
@@ -1920,6 +1921,7 @@ function calculateReports(
       contactRate: total > 0 ? Math.round((contacted / total) * 100) : 0,
       appointmentRate: total > 0 ? Math.round((appts / total) * 100) : 0,
       enrollmentRate: total > 0 ? Math.round((enrolled / total) * 100) : 0,
+      filesRate: total > 0 ? Math.round((apps / total) * 100) : 0,
     }
   }).filter(a => a.totalLeads > 0).sort((a, b) => b.enrollmentRate - a.enrollmentRate)
 
