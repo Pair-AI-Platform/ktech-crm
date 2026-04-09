@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  Phone,
   MessageSquare,
   Smartphone,
   Plus,
@@ -57,7 +56,7 @@ import {
 // Types
 // ============================================================================
 
-type CampaignView = "all" | "voice" | "whatsapp" | "sms" | "email"
+type CampaignView = "all" | "whatsapp" | "sms" | "email"
 type AudienceSource = "filter" | "upload"
 type ScheduleType = "immediate" | "scheduled" | "optimal"
 
@@ -84,7 +83,6 @@ interface CampaignFormData {
   subject?: string
   useTemplate: boolean
   templateId?: string
-  voiceWorkflowId?: string
 }
 
 // ============================================================================
@@ -92,14 +90,6 @@ interface CampaignFormData {
 // ============================================================================
 
 const CAMPAIGN_TYPE_CONFIG = {
-  voice: {
-    icon: Phone,
-    label: "Voice",
-    description: "Kadi AI calls leads automatically",
-    color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    iconColor: "text-blue-500",
-    bgColor: "bg-blue-500",
-  },
   whatsapp: {
     icon: MessageSquare,
     label: "WhatsApp",
@@ -261,7 +251,7 @@ function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
             </div>
             <ProgressBar value={campaign.sent_count} max={campaign.total_contacts} />
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              {campaign.sent_count} of {campaign.total_contacts} {campaign.type === "voice" ? "calls" : "messages"}
+              {campaign.sent_count} of {campaign.total_contacts} messages
             </p>
           </div>
         )}
@@ -351,7 +341,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
   const [formData, setFormData] = useState<CampaignFormData>({
     name: "",
-    type: "voice",
+    type: "whatsapp",
     audienceSource: "filter",
     audienceFilter: "",
     uploadedContacts: [],
@@ -432,7 +422,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         if (formData.audienceSource === 'upload') return validContacts.length > 0
         return formData.audienceFilter !== ''
       case 4:
-        if (formData.type === 'voice') return true
         if (formData.type === 'email') return formData.subject && formData.messageContent
         return formData.messageContent.trim().length > 0
       default: return false
@@ -460,7 +449,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         messageContent: formData.messageContent || undefined,
         messageContentAr: formData.messageContentAr || undefined,
         subject: formData.subject || undefined,
-        voiceWorkflowId: formData.voiceWorkflowId || undefined,
       },
       {
         onSuccess: () => {
@@ -534,7 +522,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           {/* Step 1: Channel Selection */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-4">
-              {(["voice", "whatsapp", "sms", "email"] as CampaignType[]).map((type) => {
+              {(["whatsapp", "sms", "email"] as CampaignType[]).map((type) => {
                 const config = CAMPAIGN_TYPE_CONFIG[type]
                 const Icon = config.icon
                 return (
@@ -816,7 +804,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                     <div>
                       <p className="font-medium text-[var(--text-primary)]">{getAudienceCount()} contacts selected</p>
                       <p className="text-sm text-[var(--text-muted)]">
-                        {formData.type === 'voice' && `Est. ${Math.ceil(getAudienceCount() * 2 / 60)} hours to complete`}
                         {formData.type === 'email' && 'Will be sent within minutes'}
                         {(formData.type === 'sms' || formData.type === 'whatsapp') && `Est. ${Math.ceil(getAudienceCount() / 100)} minutes to send`}
                       </p>
@@ -830,44 +817,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           {/* Step 4: Message Composition */}
           {step === 4 && (
             <div className="space-y-6">
-              {/* Voice Campaign - Workflow Selection */}
-              {formData.type === "voice" && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                    Voice Workflow
-                  </label>
-                  <p className="text-sm text-[var(--text-muted)] mb-4">
-                    Kadi AI will use this conversation workflow when calling contacts
-                  </p>
-                  <div className="space-y-2">
-                    {[
-                      { id: "enrollment", name: "Enrollment Inquiry", desc: "Ask about enrollment interest and book appointments" },
-                      { id: "reminder", name: "Appointment Reminder", desc: "Remind about upcoming appointments" },
-                      { id: "followup", name: "Follow-up Call", desc: "Follow up on previous interactions" },
-                    ].map((workflow) => (
-                      <label key={workflow.id} className={cn(
-                        "flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors",
-                        formData.voiceWorkflowId === workflow.id
-                          ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
-                      )}>
-                        <input
-                          type="radio"
-                          name="workflow"
-                          checked={formData.voiceWorkflowId === workflow.id}
-                          onChange={() => setFormData(prev => ({ ...prev, voiceWorkflowId: workflow.id }))}
-                          className="mt-1 w-4 h-4 text-[var(--primary)]"
-                        />
-                        <div>
-                          <span className="text-[var(--text-primary)] font-medium">{workflow.name}</span>
-                          <p className="text-sm text-[var(--text-muted)]">{workflow.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Email Campaign - Subject Line */}
               {formData.type === "email" && (
                 <div>
@@ -1048,7 +997,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
 const CAMPAIGN_VIEWS: { id: CampaignView; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
   { id: "all", label: "All" },
-  { id: "voice", label: "Voice", icon: Phone },
   { id: "whatsapp", label: "WhatsApp", icon: MessageSquare },
   { id: "sms", label: "SMS", icon: Smartphone },
   { id: "email", label: "Email", icon: Mail },
