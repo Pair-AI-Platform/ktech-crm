@@ -119,7 +119,7 @@ function calculateDaysInStage(updatedAt: string): number {
 type NoteType = string
 
 // Filter categories group related activity types for the filter pills
-type FilterCategory = 'all' | 'stage' | 'status' | 'payment' | 'communication' | 'enrollment' | 'system' | 'note'
+type FilterCategory = 'all' | 'stage' | 'status' | 'payment' | 'communication' | 'enrollment' | 'system' | 'note' | 'sources'
 
 const FILTER_CATEGORIES: { key: FilterCategory; label: string; icon: typeof Phone; color: string; types: string[] }[] = [
   { key: 'all', label: 'All', icon: FileText, color: 'text-slate-500', types: [] },
@@ -129,6 +129,7 @@ const FILTER_CATEGORIES: { key: FilterCategory; label: string; icon: typeof Phon
   { key: 'communication', label: 'Communication', icon: Send, color: 'text-blue-500', types: ['call', 'meeting', 'follow-up', 'email', 'sms_sent', 'ai_transfer'] },
   { key: 'enrollment', label: 'Enrollment', icon: GraduationCap, color: 'text-purple-500', types: ['puc_enrollment', 'enrollment_failed', 'gpa_override', 'gpa_update', 'moe_gpa_fetch', 'lms_sync', 'lms_sync_failed'] },
   { key: 'system', label: 'System', icon: RefreshCw, color: 'text-cyan-500', types: ['lead_created', 'campaign_created', 'campaign_updated', 'campaign_deleted'] },
+  { key: 'sources', label: 'Sources', icon: Tag, color: 'text-orange-500', types: ['source_change', 'lead_source_change'] },
   { key: 'note', label: 'Note', icon: StickyNote, color: 'text-amber-500', types: ['note'] },
 ]
 
@@ -180,6 +181,8 @@ const NOTE_TYPE_CONFIG: Record<string, { label: string; icon: typeof Phone; colo
   campaign_updated: { label: "Campaign Updated", icon: RefreshCw, color: "text-cyan-500" },
   campaign_deleted: { label: "Campaign Deleted", icon: XCircle, color: "text-cyan-500" },
   lead_created: { label: "Lead Created", icon: User, color: "text-cyan-500" },
+  source_change: { label: "Source Change", icon: Tag, color: "text-orange-500" },
+  lead_source_change: { label: "Source Change", icon: Tag, color: "text-orange-500" },
 }
 
 function detectNoteType(content: string): NoteType {
