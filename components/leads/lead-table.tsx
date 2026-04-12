@@ -500,6 +500,19 @@ export function LeadTable({
       }
     }
 
+    // Block SF leads in applicant from advancing to further stages without paying 150 KWD
+    // (lost/withdraw already intercepted above, so any remaining stage change requires payment)
+    {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead && lead.funding_type === 'self_funded' && lead.pipeline_stage === 'applicant') {
+        const paid = sfPaymentData[leadId]?.amount_paid ?? 0
+        if (paid < 150) {
+          setPaymentDialogLead(lead)
+          return
+        }
+      }
+    }
+
     // Optimistic update - immediately show the new value
     // Always clear status when changing stage so user must re-select
     const nextCount = getNextCount(leadId)
@@ -1105,6 +1118,7 @@ export function LeadTable({
                 setViewingAppointment={setViewingAppointment}
                 getEffectiveValue={getEffectiveValue}
                 onEditWithdrawReason={setEditWithdrawReasonLead}
+                onPaymentClick={setPaymentDialogLead}
               />
             ))}
           </tbody>

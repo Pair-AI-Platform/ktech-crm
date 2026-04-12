@@ -111,6 +111,7 @@ export interface LeadTableRowProps {
   setViewingAppointment: (apt: import("@/types").Appointment | null) => void
   getEffectiveValue: <K extends keyof Lead>(leadId: string, field: K, originalValue: Lead[K]) => Lead[K]
   onEditWithdrawReason?: (lead: Lead) => void
+  onPaymentClick?: (lead: Lead) => void
 }
 
 export const LeadTableRow = React.memo(function LeadTableRow({
@@ -170,6 +171,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   setViewingAppointment,
   getEffectiveValue,
   onEditWithdrawReason,
+  onPaymentClick,
 }: LeadTableRowProps) {
   // Determine row variant for substage/status tag coloring
   const isInSubmissionFlow = ['application', 'applicant'].includes(lead.pipeline_stage)
@@ -1251,6 +1253,20 @@ export const LeadTableRow = React.memo(function LeadTableRow({
       )}
       <td className="px-3 py-3 min-w-[130px] sticky right-0 z-10 bg-inherit">
         <div className="flex items-center gap-1">
+          {/* SF Applicant Pay button — shown if SF lead is in applicant but hasn't paid 150 KWD */}
+          {lead.funding_type === 'self_funded' && lead.pipeline_stage === 'applicant' && (sfPaymentData[lead.id]?.amount_paid ?? 0) < 150 && onPaymentClick && (
+            <SimpleTooltip content="Payment required (150 KWD)" side="left">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="group/btn hover:bg-amber-50"
+                onClick={(e) => { e.stopPropagation(); onPaymentClick(lead) }}
+                title="Record payment"
+              >
+                <Banknote className="w-4 h-4 text-amber-500 group-hover/btn:!text-amber-600 animate-pulse" />
+              </Button>
+            </SimpleTooltip>
+          )}
           {lead.funding_type === 'puc' && ['puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled', 'withdraw'].includes(lead.pipeline_stage) && (
             <Button
               variant="ghost"
