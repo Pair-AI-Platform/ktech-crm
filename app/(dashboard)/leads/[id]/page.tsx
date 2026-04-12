@@ -314,8 +314,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [showCycleSelector, setShowCycleSelector] = useState(false)
   // Show all pipeline stages in the stepper (excluding 'lost' and 'withdraw' as they're handled separately)
   const activeStageOrder = useMemo(() => {
-    return STAGE_ORDER.filter(s => s !== 'lost' && s !== 'withdraw')
-  }, [])
+    return STAGE_ORDER.filter(s => {
+      if (s === 'lost' || s === 'withdraw') return false
+      // Hide PUC stages for self-funded leads
+      if (lead?.funding_type === 'self_funded' && (s === 'puc_document_submission' || s === 'puc_application_submission')) return false
+      return true
+    })
+  }, [lead?.funding_type])
 
   const [updatingStage, setUpdatingStage] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -1161,16 +1166,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <span>Schedule Callback</span>
               </motion.div>
 
-              {/* PSP Submission button */}
-              <motion.div
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowPSPWizard(true)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 ring-1 ring-purple-200/50 hover:ring-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:hover:bg-purple-950/30 dark:ring-purple-800/30 transition-all duration-200 cursor-pointer font-medium text-sm"
-              >
-                <FileText className="w-4 h-4" />
-                <span>PSP</span>
-              </motion.div>
+              {/* PSP Submission button - only for PUC-funded leads */}
+              {lead.funding_type !== 'self_funded' && (
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowPSPWizard(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 ring-1 ring-purple-200/50 hover:ring-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:hover:bg-purple-950/30 dark:ring-purple-800/30 transition-all duration-200 cursor-pointer font-medium text-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>PSP</span>
+                </motion.div>
+              )}
 
               {/* RSVP button - only for applicants */}
               {lead.pipeline_stage === 'applicant' && (
@@ -1904,16 +1911,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         }}
       />
 
-      {/* PSP Submission Wizard */}
-      <PSPSubmissionWizard
-        isOpen={showPSPWizard}
-        onClose={() => setShowPSPWizard(false)}
-        lead={lead}
-        onSuccess={() => {
-          setShowPSPWizard(false)
-          refetchLead()
-        }}
-      />
+      {/* PSP Submission Wizard - only for PUC-funded leads */}
+      {lead.funding_type !== 'self_funded' && (
+        <PSPSubmissionWizard
+          isOpen={showPSPWizard}
+          onClose={() => setShowPSPWizard(false)}
+          lead={lead}
+          onSuccess={() => {
+            setShowPSPWizard(false)
+            refetchLead()
+          }}
+        />
+      )}
 
       {/* Send RSVP Dialog */}
       {lead && (
