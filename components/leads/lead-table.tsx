@@ -95,6 +95,7 @@ export function LeadTable({
   const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
   const [editWithdrawReasonLead, setEditWithdrawReasonLead] = useState<Lead | null>(null)
   const [paymentDialogLead, setPaymentDialogLead] = useState<Lead | null>(null)
+  const [testFeeDialogLead, setTestFeeDialogLead] = useState<Lead | null>(null)
   const [pspWizardLead, setPspWizardLead] = useState<Lead | null>(null)
   const [pucPaymentLeads, setPucPaymentLeads] = useState<Set<string>>(new Set())
   const [pucDocCounts, setPucDocCounts] = useState<Record<string, { uploaded: number; required: number }>>({})
@@ -475,6 +476,15 @@ export function LeadTable({
         setContactedDialogLead(lead)
       }
       return
+    }
+
+    // Intercept "test" stage change for PUC leads - require test fee payment first
+    if (newStage === 'test') {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead && lead.funding_type === 'puc') {
+        setTestFeeDialogLead(lead)
+        return
+      }
     }
 
     // Intercept "applicant" stage change for non-PUC leads that haven't paid - show payment dialog first
@@ -1151,6 +1161,7 @@ export function LeadTable({
       contactedDialogLead={contactedDialogLead}
       blockedDialogLead={blockedDialogLead}
       withdrawDialogLead={withdrawDialogLead}
+      testFeeDialogLead={testFeeDialogLead}
       paymentDialogLead={paymentDialogLead}
       pspWizardLead={pspWizardLead}
       viewingAppointment={viewingAppointment}
@@ -1163,6 +1174,7 @@ export function LeadTable({
       setContactedDialogLead={setContactedDialogLead}
       setBlockedDialogLead={setBlockedDialogLead}
       setWithdrawDialogLead={setWithdrawDialogLead}
+      setTestFeeDialogLead={setTestFeeDialogLead}
       setPaymentDialogLead={setPaymentDialogLead}
       setPspWizardLead={setPspWizardLead}
       setViewingAppointment={setViewingAppointment}

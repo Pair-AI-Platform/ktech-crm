@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { convertLeadToStudent, promoteSFLeadToApplicant } from '@/lib/enrollment/convert-lead'
 import { getPaymentStatus, verifyWebhookSignature } from '@/lib/myfatoorah/client'
 import { ENROLLMENT_PAYMENT_AMOUNT } from '@/types'
+import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { createLogger } from '@/lib/logger'
 
 // Use service role for webhook (no user session)
@@ -95,6 +96,58 @@ export async function POST(request: NextRequest) {
 
     // Handle based on payment status
     if (statusResult.invoiceStatus === 'Paid') {
+      // Handle test fee payments — move lead to test stage
+      if (transaction.payment_purpose === 'test_fee') {
+        const { error: updateError } = await supabase
+          .from('leads')
+          .update({
+            pipeline_stage: 'test',
+            status: null,
+            last_contacted_at: new Date().toISOString(),
+          })
+          .eq('id', transaction.lead_id)
+
+        await supabase
+          .from('payment_transactions')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', transaction.id)
+
+        await supabase.from('activities').insert({
+          lead_id: transaction.lead_id,
+          activity_type: 'payment_received',
+          title: 'Test Fee Payment Received',
+          description: `Test fee payment of ${TEST_FEE_AMOUNT} KWD received via MyFatoorah`,
+          metadata: {
+            transaction_id: transaction.id,
+            payment_method: 'myfatoorah',
+            payment_purpose: 'test_fee',
+            amount: TEST_FEE_AMOUNT,
+            invoice_id: invoiceId,
+            payment_id: statusResult.paymentId,
+          },
+        })
+
+        if (updateError) {
+          logger.error('Test fee paid but failed to move lead to test stage', {
+            leadId: transaction.lead_id,
+            error: updateError.message,
+          })
+          return NextResponse.json({
+            success: true,
+            message: 'Test fee payment recorded but stage update failed — flagged for review',
+          })
+        }
+
+        logger.info('Test fee paid, lead moved to test stage', { leadId: transaction.lead_id })
+        return NextResponse.json({
+          success: true,
+          message: 'Test fee payment processed — lead moved to Test stage',
+        })
+      }
+
       const { data: lead } = await supabase
         .from('leads')
         .select('funding_type, pipeline_stage')
@@ -235,7 +288,7 @@ export async function POST(request: NextRequest) {
         lead_id: transaction.lead_id,
         activity_type: 'payment_failed',
         title: 'Payment Failed',
-        description: `Online payment of ${ENROLLMENT_PAYMENT_AMOUNT} KWD failed - ${statusResult.invoiceStatus}`,
+        description: `Online payment of ${transaction.payment_purpose === 'test_fee' ? TEST_FEE_AMOUNT : ENROLLMENT_PAYMENT_AMOUNT} KWD failed - ${statusResult.invoiceStatus}`,
         metadata: {
           transaction_id: transaction.id,
           invoice_id: invoiceId,

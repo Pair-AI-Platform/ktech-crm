@@ -11,6 +11,7 @@ import { ContactedStatusDialog } from "@/components/leads/contacted-status-dialo
 import { BlockedReasonDialog } from "@/components/leads/blocked-reason-dialog"
 import { WithdrawReasonDialog } from "@/components/leads/withdraw-reason-dialog"
 import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
+import { TestFeePaymentDialog } from "@/components/leads/test-fee-payment-dialog"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { getLeadDisplayName as _getLeadDisplayName } from "@/lib/lead-utils"
 
@@ -28,6 +29,7 @@ export interface LeadTableDialogsProps {
   contactedDialogLead: Lead | null
   blockedDialogLead: Lead | null
   withdrawDialogLead: Lead | null
+  testFeeDialogLead: Lead | null
   paymentDialogLead: Lead | null
   pspWizardLead: Lead | null
   viewingAppointment: import("@/types").Appointment | null
@@ -40,6 +42,7 @@ export interface LeadTableDialogsProps {
   setContactedDialogLead: (lead: Lead | null) => void
   setBlockedDialogLead: (lead: Lead | null) => void
   setWithdrawDialogLead: (lead: Lead | null) => void
+  setTestFeeDialogLead: (lead: Lead | null) => void
   setPaymentDialogLead: (lead: Lead | null) => void
   setPspWizardLead: (lead: Lead | null) => void
   setViewingAppointment: (apt: import("@/types").Appointment | null) => void
@@ -67,6 +70,7 @@ export function LeadTableDialogs({
   contactedDialogLead,
   blockedDialogLead,
   withdrawDialogLead,
+  testFeeDialogLead,
   paymentDialogLead,
   pspWizardLead,
   viewingAppointment,
@@ -79,6 +83,7 @@ export function LeadTableDialogs({
   setContactedDialogLead,
   setBlockedDialogLead,
   setWithdrawDialogLead,
+  setTestFeeDialogLead,
   setPaymentDialogLead,
   setPspWizardLead,
   setViewingAppointment,
@@ -185,6 +190,16 @@ export function LeadTableDialogs({
         leadName={getLeadDisplayName(blockedDialogLead)}
         onConfirm={handleBlockedConfirm}
       />
+
+      {/* Test Fee Payment Dialog - shown when moving PUC lead to Test stage */}
+      {testFeeDialogLead && (
+        <TestFeePaymentDialog
+          open={!!testFeeDialogLead}
+          onOpenChange={(open) => { if (!open) setTestFeeDialogLead(null) }}
+          lead={testFeeDialogLead}
+          onSuccess={async () => { setTestFeeDialogLead(null) }}
+        />
+      )}
 
       {/* Enrollment Payment Dialog - shown after moving lead to Applicant without paying */}
       {paymentDialogLead && (
