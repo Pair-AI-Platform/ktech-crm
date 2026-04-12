@@ -1080,17 +1080,33 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     </motion.div>
                   </div>
 
-                  {/* Edit button */}
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowEditForm(true)}
-                      className="w-9 h-9 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] shrink-0"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
+                  {/* Top action buttons */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Book Appointment button */}
+                    <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                      <Link href={`/calendar?book=${lead.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 rounded-lg text-xs font-semibold text-[var(--info)] border-[var(--info)]/30 hover:bg-[var(--info)]/10 hover:border-[var(--info)]/50"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          Appointment
+                        </Button>
+                      </Link>
+                    </motion.div>
+                    {/* Edit button */}
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowEditForm(true)}
+                        className="w-9 h-9 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] shrink-0"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  </div>
                 </div>
               </div>
             </div>

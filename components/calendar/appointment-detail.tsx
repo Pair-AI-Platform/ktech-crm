@@ -91,7 +91,7 @@ const ALL_STATUS_CONFIG: Record<string, StatusConfig> = {
 // Statuses shown for regular appointments
 const APPOINTMENT_STATUS_KEYS = ["scheduled", "confirmed", "on_the_way", "postponed", "cancelled"]
 // Statuses shown for callbacks
-const CALLBACK_STATUS_KEYS = ["scheduled", "confirmed", "no_answer", "cant_reach", "will_see", "cancelled"]
+const CALLBACK_STATUS_KEYS = ["scheduled", "confirmed", "no_answer", "cant_reach", "postponed", "will_see", "cancelled"]
 
 export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: AppointmentDetailProps) {
   const [showPostponedForm, setShowPostponedForm] = useState(false)
