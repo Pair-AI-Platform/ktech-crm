@@ -38,6 +38,9 @@ import {
   ChevronLeft,
   ArrowRight,
   Loader2,
+  ImageIcon,
+  Video,
+  Paperclip,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { RoleGuard } from "@/components/auth/role-guard"
@@ -82,6 +85,9 @@ interface CampaignFormData {
   messageContentAr?: string
   useTemplate: boolean
   templateId?: string
+  mediaUrl?: string
+  mediaType?: 'image' | 'video'
+  mediaFileName?: string
 }
 
 // ============================================================================
@@ -356,11 +362,46 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     useTemplate: false,
   })
 
+  const [mediaUploading, setMediaUploading] = useState(false)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+
   const selectedFilter = audienceFilters?.find(f => f.id === formData.audienceFilter)
   const validContacts = formData.uploadedContacts.filter(c => c.valid)
   const invalidContacts = formData.uploadedContacts.filter(c => !c.valid)
 
   const totalSteps = 4
+
+  // Media upload handler
+  const handleMediaUpload = useCallback(async (file: File) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm']
+    if (!allowedTypes.includes(file.type)) {
+      alert('Unsupported file type. Use JPEG, PNG, GIF, WebP, MP4, MOV, or WebM.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size exceeds 10MB limit.')
+      return
+    }
+
+    setMediaUploading(true)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch('/api/campaigns/media', { method: 'POST', body })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setFormData(prev => ({
+        ...prev,
+        mediaUrl: data.url,
+        mediaType: data.mediaType,
+        mediaFileName: data.fileName,
+      }))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to upload media')
+    } finally {
+      setMediaUploading(false)
+    }
+  }, [])
 
   // File handling
   const handleFileSelect = useCallback((file: File) => {
@@ -447,6 +488,8 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         scheduledTime: formData.scheduledTime,
         messageContent: formData.messageContent || undefined,
         messageContentAr: formData.messageContentAr || undefined,
+        mediaUrl: formData.mediaUrl || undefined,
+        mediaType: formData.mediaType || undefined,
       },
       {
         onSuccess: () => {
@@ -875,7 +918,73 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                       <Sparkles className="w-4 h-4" />
                       Improve with AI
                     </Button>
+
+                    {/* Media attach button - WhatsApp only */}
+                    {formData.type === 'whatsapp' && !formData.mediaUrl && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => mediaInputRef.current?.click()}
+                          disabled={mediaUploading}
+                        >
+                          {mediaUploading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Paperclip className="w-4 h-4" />
+                          )}
+                          {mediaUploading ? 'Uploading...' : 'Attach Media'}
+                        </Button>
+                        <input
+                          ref={mediaInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleMediaUpload(file)
+                            e.target.value = ''
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
+
+                  {/* Media preview */}
+                  {formData.mediaUrl && (
+                    <div className="mt-3 relative inline-block">
+                      <div className="rounded-xl border border-[var(--border)] overflow-hidden bg-[var(--bg-sunken)]">
+                        {formData.mediaType === 'image' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={formData.mediaUrl}
+                            alt="Campaign media"
+                            className="max-h-48 max-w-full object-contain"
+                          />
+                        ) : (
+                          <video
+                            src={formData.mediaUrl}
+                            controls
+                            className="max-h-48 max-w-full"
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                          {formData.mediaType === 'image' ? <ImageIcon className="w-3 h-3" /> : <Video className="w-3 h-3" />}
+                          {formData.mediaFileName || 'Media attached'}
+                        </span>
+                        <button
+                          onClick={() => setFormData(prev => ({ ...prev, mediaUrl: undefined, mediaType: undefined, mediaFileName: undefined }))}
+                          className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Character Count for SMS */}
                   {formData.type === 'sms' && (
@@ -892,25 +1001,45 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               )}
 
               {/* Preview */}
-              {formData.messageContent && (
+              {(formData.messageContent || formData.mediaUrl) && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                     Preview
                   </label>
                   <div className={cn(
-                    "p-4 rounded-xl border",
+                    "rounded-xl border overflow-hidden",
                     formData.type === 'whatsapp' ? "bg-[#DCF8C6] border-emerald-200" : "bg-blue-50 border-blue-200"
                   )}>
-                    <p className={cn(
-                      "text-sm whitespace-pre-wrap",
-                      formData.type === 'whatsapp' ? "text-gray-800" : "text-gray-700"
-                    )}>
-                      {formData.messageContent
-                        .replace(/\{\{first_name\}\}/g, 'Ahmed')
-                        .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
-                        .replace(/\{\{phone\}\}/g, '+965 1234 5678')
-                        .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')}
-                    </p>
+                    {formData.mediaUrl && (
+                      <div className="border-b border-emerald-200/50">
+                        {formData.mediaType === 'image' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={formData.mediaUrl}
+                            alt="Campaign media"
+                            className="w-full max-h-48 object-cover"
+                          />
+                        ) : (
+                          <video
+                            src={formData.mediaUrl}
+                            className="w-full max-h-48 object-cover"
+                            muted
+                          />
+                        )}
+                      </div>
+                    )}
+                    {formData.messageContent && (
+                      <p className={cn(
+                        "text-sm whitespace-pre-wrap p-4",
+                        formData.type === 'whatsapp' ? "text-gray-800" : "text-gray-700"
+                      )}>
+                        {formData.messageContent
+                          .replace(/\{\{first_name\}\}/g, 'Ahmed')
+                          .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
+                          .replace(/\{\{phone\}\}/g, '+965 1234 5678')
+                          .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

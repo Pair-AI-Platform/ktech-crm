@@ -26,6 +26,8 @@ interface CreateCampaignRequest {
   messageContentAr?: string
   subject?: string
   voiceWorkflowId?: string
+  mediaUrl?: string
+  mediaType?: 'image' | 'video'
 }
 
 // GET - List campaigns
@@ -118,6 +120,8 @@ export const POST = withApiHandler(
         message_content_ar: body.messageContentAr || null,
         subject: body.subject || null,
         voice_workflow_id: body.voiceWorkflowId || null,
+        media_url: body.mediaUrl || null,
+        media_type: body.mediaType || null,
         audience_source: body.audienceSource,
         audience_filter: body.audienceFilter || null,
         schedule_type: body.scheduleType,
