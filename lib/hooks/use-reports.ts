@@ -136,6 +136,14 @@ export interface TestCenterReportData {
   }
 }
 
+export interface PUCDailySubmission {
+  date: string // YYYY-MM-DD
+  filesOpened: number
+  documentsSubmitted: number
+  applicationSubmitted: number
+  feePaid: number
+}
+
 export interface PUCReportData {
   totalApplied: number
   accepted: number
@@ -151,6 +159,7 @@ export interface PUCReportData {
   accepted2ndChoice: number
   diplomaticCount: number
   specialNeedsCount: number
+  dailySubmissions: PUCDailySubmission[]
 }
 
 export interface EnrollmentReportData {
@@ -1292,6 +1301,35 @@ function calculateReports(
     accepted2ndChoice: pucLeadsAll.filter(l => pucAcceptedStages.includes(l.pipeline_stage) && l.puc_choice && l.puc_choice !== '1').length,
     diplomaticCount: pucLeadsAll.filter(l => l.is_diplomatic).length,
     specialNeedsCount: pucLeadsAll.filter(l => l.is_special_needs).length,
+    dailySubmissions: (() => {
+      // Build day-by-day map from date range
+      const dayMap: Record<string, PUCDailySubmission> = {}
+      const cursor = new Date(startDate)
+      while (cursor <= endDate) {
+        const key = cursor.toISOString().split('T')[0]
+        dayMap[key] = { date: key, filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0, feePaid: 0 }
+        cursor.setDate(cursor.getDate() + 1)
+      }
+
+      // Count leads by the date they were created (all PUC leads)
+      for (const l of pucLeadsAll) {
+        const day = l.created_at ? l.created_at.split('T')[0] : null
+        if (!day || !dayMap[day]) continue
+
+        if (pucFileStages.includes(l.pipeline_stage)) dayMap[day].filesOpened++
+        if (pucDocStages.includes(l.pipeline_stage)) dayMap[day].documentsSubmitted++
+        if (pucAppStages.includes(l.pipeline_stage)) dayMap[day].applicationSubmitted++
+      }
+
+      // Fee paid from students by created_at
+      for (const s of pucStudents) {
+        if (!s.puc_fee_paid) continue
+        const day = s.created_at ? s.created_at.split('T')[0] : null
+        if (day && dayMap[day]) dayMap[day].feePaid++
+      }
+
+      return Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date))
+    })(),
   }
 
   // Enrollment Report
