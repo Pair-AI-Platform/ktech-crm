@@ -401,7 +401,7 @@ export function useLeadMutations() {
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, contact_status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college")
+        .select("pipeline_stage, contact_status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college, source")
         .eq("id", id)
         .single()
 
@@ -644,6 +644,22 @@ export function useLeadMutations() {
             actual_gpa: mergedLeadForPuc.actual_gpa,
             graduation_year: mergedLeadForPuc.graduation_year,
             is_employee: mergedLeadForPuc.is_employee,
+          },
+          created_by: user?.id,
+        })
+      }
+
+      // Log activity for lead source change
+      if (updates.source !== undefined && oldLead && updates.source !== (oldLead as Record<string, unknown>).source) {
+        const oldSource = (oldLead as Record<string, unknown>).source as string | null
+        await supabase.from('activities').insert({
+          lead_id: id,
+          activity_type: 'source_change',
+          title: 'Lead Source Changed',
+          description: `${oldLead.first_name} ${oldLead.last_name}: ${oldSource || 'None'} → ${updates.source || 'None'}`,
+          metadata: {
+            old_source: oldSource || null,
+            new_source: updates.source || null,
           },
           created_by: user?.id,
         })
