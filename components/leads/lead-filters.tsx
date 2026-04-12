@@ -142,8 +142,8 @@ const STAGE_ALLOWED_STATUSES: Record<PipelineStage, LeadStatus[] | 'all' | 'none
 }
 
 function getStatusesForStages(stages: PipelineStage[]) {
-  // When no stages selected, show all statuses EXCEPT applicant-only ones
-  if (stages.length === 0) return LEAD_STATUSES.filter(s => !APPLICANT_ONLY_STATUSES.includes(s.value))
+  // When no stages selected, don't show any statuses — user must pick a stage first
+  if (stages.length === 0) return [] as typeof LEAD_STATUSES
 
   const allowedValues = new Set<LeadStatus>()
   let hasAll = false
@@ -557,7 +557,9 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--text-muted)] py-2">
-                    No statuses available for the selected stage{localFilters.stages.length > 1 ? 's' : ''}
+                    {localFilters.stages.length === 0
+                      ? 'Select a pipeline stage first to filter by status'
+                      : `No statuses available for the selected stage${localFilters.stages.length > 1 ? 's' : ''}`}
                   </p>
                 )}
               </FilterSection>
