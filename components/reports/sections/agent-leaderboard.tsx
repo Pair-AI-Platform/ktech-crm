@@ -14,7 +14,6 @@ import {
   TrendingUp,
   ArrowUpDown,
   Crown,
-  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LeaderboardData } from "@/lib/hooks/use-reports"
@@ -109,7 +108,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                   <Stat label="Conv %" value={`${agent.conversionRate}%`} />
                   <Stat label="PUC Files" value={agent.pucFiles} />
                   <Stat label="SF Files" value={agent.sfFiles} />
-                  <Stat label="Changes" value={agent.statusChanges} />
                 </div>
 
                 {/* Target Progress */}
@@ -216,7 +214,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                     <SortHeader label="550 KD" sortKey="sf550" currentSort={sortBy} onSort={handleSort} className="bg-orange-500/5" />
                     <SortHeader label="Enrolled" sortKey="sfEnrolled" currentSort={sortBy} onSort={handleSort} className="border-r border-[var(--border)] bg-orange-500/5" />
                     {/* Other */}
-                    <SortHeader label="Status Chg" sortKey="statusChanges" currentSort={sortBy} onSort={handleSort} />
                     <SortHeader label="Conv %" sortKey="conversionRate" currentSort={sortBy} onSort={handleSort} />
                     <th className="text-left py-3 px-3 text-sm font-medium text-[var(--text-muted)]">
                       Targets
@@ -259,12 +256,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                         <span className="font-semibold text-[var(--text-primary)]">{agent.sfEnrolled}</span>
                       </td>
                       {/* Other */}
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1">
-                          <RefreshCw className="w-3 h-3 text-[var(--text-muted)]" />
-                          <span className="text-sm text-[var(--text-primary)]">{agent.statusChanges}</span>
-                        </div>
-                      </td>
                       <td className="py-3 px-3">
                         <Badge
                           variant={agent.conversionRate >= 40 ? 'success' : agent.conversionRate >= 20 ? 'warning' : 'secondary'}

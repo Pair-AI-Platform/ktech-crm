@@ -19,7 +19,7 @@ import { Phone, Check, User, CreditCard } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import type { Lead, PipelineStage } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
-import { useAppointmentMutations } from "@/lib/hooks/use-appointments"
+import { useAppointmentMutations, useLeadAppointments } from "@/lib/hooks/use-appointments"
 
 interface CallbackSchedulerProps {
   isOpen: boolean
@@ -61,7 +61,8 @@ export function CallbackScheduler({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
 
-  const { createAppointment } = useAppointmentMutations()
+  const { createAppointment, updateAppointment } = useAppointmentMutations()
+  const { appointments: leadAppointments } = useLeadAppointments(lead?.id || "")
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -119,6 +120,14 @@ export function CallbackScheduler({
     setIsSubmitting(true)
 
     try {
+      // Postpone any existing active callbacks for this lead
+      const activeCallbacks = leadAppointments.filter(
+        apt => apt.is_callback && !["cancelled", "completed", "postponed"].includes(apt.status)
+      )
+      for (const cb of activeCallbacks) {
+        await updateAppointment(cb.id, { status: "postponed" })
+      }
+
       await createAppointment({
         lead_id: lead.id,
         lead_ids: [lead.id],

@@ -86,6 +86,7 @@ const DEMO_ENROLLMENT: EnrollmentReportData = {
 const DEMO_WITHDRAWALS: WithdrawalsByAgentData = {
   totalWithdrawnSF: 14,
   totalWithdrawnPUC: 9,
+  totalWithdrawnPUCSecondChoice: 3,
   byAgent: [
     { agentId: '1', agentName: 'Ahmed Al-Rashidi', avatarUrl: null, sfWithdrawn: 5, pucWithdrawn: 3, total: 8, applicantCount: 20, ratio: 40 },
     { agentId: '2', agentName: 'Sara Al-Mutairi', avatarUrl: null, sfWithdrawn: 4, pucWithdrawn: 2, total: 6, applicantCount: 18, ratio: 33 },
@@ -174,6 +175,14 @@ export function WithdrawalReports({ enrollmentData, withdrawalsByAgent, isAgent 
               </div>
               <p className="text-sm text-[var(--text-secondary)] mb-1">PUC Withdrawals</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{displayWithdrawals.totalWithdrawnPUC}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {displayWithdrawals.totalWithdrawnPUCSecondChoice} 2nd choice
+                {displayWithdrawals.totalWithdrawnPUC > 0 && (
+                  <span className="ml-1 text-[var(--warning)] font-medium">
+                    ({Math.round((displayWithdrawals.totalWithdrawnPUCSecondChoice / displayWithdrawals.totalWithdrawnPUC) * 100)}%)
+                  </span>
+                )}
+              </p>
             </CardContent>
           </Card>
         </motion.div>

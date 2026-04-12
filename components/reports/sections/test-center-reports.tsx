@@ -69,10 +69,19 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   return null
 }
 
+type ViewMode = 'total' | 'sf' | 'puc'
+
+const VIEW_MODES: { value: ViewMode; label: string }[] = [
+  { value: 'total', label: 'Total' },
+  { value: 'sf', label: 'SF' },
+  { value: 'puc', label: 'PUC' },
+]
+
 export function TestCenterReports({ data, onSync }: TestCenterReportsProps) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [lastSynced, setLastSynced] = useState<Date | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('total')
 
   const handleSync = async () => {
     setIsSyncing(true)
@@ -84,14 +93,34 @@ export function TestCenterReports({ data, onSync }: TestCenterReportsProps) {
     }
   }
 
+  const enrolledStats = viewMode === 'sf' ? data.enrolledSF : viewMode === 'puc' ? data.enrolledPUC : data.enrolled
+  const filesStats = viewMode === 'sf' ? data.filesSF : viewMode === 'puc' ? data.filesPUC : data.files
+
   return (
     <div className="space-y-6">
+      {/* View Mode Toggle */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] w-fit">
+        {VIEW_MODES.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setViewMode(value)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              viewMode === value
+                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Enrolled Section */}
       <LevelSection
         title="Enrolled"
-        subtitle="Enrolled students"
+        subtitle={viewMode === 'sf' ? 'Self-funded enrolled students' : viewMode === 'puc' ? 'PUC enrolled students' : 'Enrolled students'}
         icon={<GraduationCap className="w-5 h-5" />}
-        stats={data.enrolled}
+        stats={enrolledStats}
         mounted={mounted}
         delayOffset={0}
       />
@@ -99,9 +128,9 @@ export function TestCenterReports({ data, onSync }: TestCenterReportsProps) {
       {/* Files Section */}
       <LevelSection
         title="Files"
-        subtitle="Students with open files"
+        subtitle={viewMode === 'sf' ? 'Self-funded students with open files' : viewMode === 'puc' ? 'PUC students with open files' : 'Students with open files'}
         icon={<FolderOpen className="w-5 h-5" />}
-        stats={data.files}
+        stats={filesStats}
         mounted={mounted}
         delayOffset={0.3}
       />

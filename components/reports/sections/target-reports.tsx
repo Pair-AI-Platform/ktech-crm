@@ -66,23 +66,28 @@ const PODIUM_COLORS = ["text-yellow-500", "text-gray-400", "text-amber-600"]
 const PODIUM_BGS = ["bg-yellow-500/10", "bg-gray-400/10", "bg-amber-600/10"]
 const RADAR_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
 
+const MOCK_TARGET_DATA: LeaderboardData[] = [
+  { rank: 1, agentId: "mock-1", agentName: "Sara Al-Rashidi", avatarUrl: null, leads: 48, appointments: 32, applications: 27, enrolled: 19, conversionRate: 70, target: 25, progress: 108, pucFiles: 18, pucAppSubmission: 14, applicant: 12, sfFiles: 9, sf150: 7, sf550: 5, sfEnrolled: 4, statusChanges: 61, categories: { puc: { target: 15, applications: 18, progress: 120 }, sf: { target: 10, applications: 9, progress: 90 } } },
+  { rank: 2, agentId: "mock-2", agentName: "Ahmad Khalil", avatarUrl: null, leads: 41, appointments: 28, applications: 22, enrolled: 15, conversionRate: 68, target: 20, progress: 110, pucFiles: 14, pucAppSubmission: 11, applicant: 9, sfFiles: 8, sf150: 6, sf550: 4, sfEnrolled: 3, statusChanges: 54, categories: { puc: { target: 12, applications: 14, progress: 117 }, sf: { target: 8, applications: 8, progress: 100 } } },
+  { rank: 3, agentId: "mock-3", agentName: "Fatima Mansour", avatarUrl: null, leads: 37, appointments: 24, applications: 18, enrolled: 13, conversionRate: 72, target: 20, progress: 90, pucFiles: 11, pucAppSubmission: 9, applicant: 8, sfFiles: 7, sf150: 5, sf550: 3, sfEnrolled: 3, statusChanges: 47, categories: { puc: { target: 12, applications: 11, progress: 92 }, sf: { target: 8, applications: 7, progress: 88 } } },
+  { rank: 4, agentId: "mock-4", agentName: "Yousef Al-Otaibi", avatarUrl: null, leads: 29, appointments: 19, applications: 14, enrolled: 9, conversionRate: 64, target: 18, progress: 78, pucFiles: 9, pucAppSubmission: 7, applicant: 6, sfFiles: 5, sf150: 4, sf550: 2, sfEnrolled: 2, statusChanges: 38, categories: { puc: { target: 10, applications: 9, progress: 90 }, sf: { target: 8, applications: 5, progress: 63 } } },
+  { rank: 5, agentId: "mock-5", agentName: "Nour Al-Hamad", avatarUrl: null, leads: 22, appointments: 14, applications: 9, enrolled: 5, conversionRate: 56, target: 15, progress: 60, pucFiles: 6, pucAppSubmission: 5, applicant: 4, sfFiles: 3, sf150: 2, sf550: 1, sfEnrolled: 1, statusChanges: 29, categories: { puc: { target: 9, applications: 6, progress: 67 }, sf: { target: 6, applications: 3, progress: 50 } } },
+]
+
 export function TargetReports({ data, dateRange }: TargetReportsProps) {
   const agentsWithTargets = data.filter(a => a.target > 0)
-
-  if (agentsWithTargets.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Target className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3" />
-          <p className="text-[var(--text-secondary)] font-medium">No targets set</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">Configure agent targets in Settings to see target reports.</p>
-        </CardContent>
-      </Card>
-    )
-  }
+  const isMock = agentsWithTargets.length === 0
+  const effectiveData = isMock ? MOCK_TARGET_DATA : data
+  const effectiveAgentsWithTargets = isMock ? MOCK_TARGET_DATA : agentsWithTargets
 
   return (
     <Tabs defaultValue="files" className="space-y-6">
+      {isMock && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--warning)]/10 border border-[var(--warning)]/20 text-xs text-[var(--warning)] font-medium w-fit">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Demo data — configure agent targets in Settings to see real results
+        </div>
+      )}
       <TabsList>
         <TabsTrigger value="files" className="gap-1.5">
           <FileText className="w-3.5 h-3.5" />
@@ -95,11 +100,11 @@ export function TargetReports({ data, dateRange }: TargetReportsProps) {
       </TabsList>
 
       <TabsContent value="files" className="mt-0">
-        <FilesTargetTab data={data} agentsWithTargets={agentsWithTargets} dateRange={dateRange} />
+        <FilesTargetTab data={effectiveData} agentsWithTargets={effectiveAgentsWithTargets} dateRange={dateRange} />
       </TabsContent>
 
       <TabsContent value="enrolled" className="mt-0">
-        <EnrolledTargetTab data={data} agentsWithTargets={agentsWithTargets} dateRange={dateRange} />
+        <EnrolledTargetTab data={effectiveData} agentsWithTargets={effectiveAgentsWithTargets} dateRange={dateRange} />
       </TabsContent>
     </Tabs>
   )

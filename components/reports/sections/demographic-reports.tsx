@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Legend,
 } from "recharts"
 import {
   Globe,
@@ -221,7 +222,7 @@ export function DemographicReports({ data }: DemographicReportsProps) {
         </motion.div>
       )}
 
-      {/* Major Demand */}
+      {/* Major Performance — Enrolled vs Files (PUC + SF) */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -231,115 +232,79 @@ export function DemographicReports({ data }: DemographicReportsProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-[var(--info)]" />
-              Major Demand
+              Major Performance
             </CardTitle>
-            <CardDescription>Interest by intended major</CardDescription>
+            <CardDescription>Enrolled vs files per major — PUC and self-funded separated</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]" style={{ minWidth: 0 }}>
-              {mounted && data.byMajor.length > 0 ? (
+            <div className="h-[360px]" style={{ minWidth: 0 }}>
+              {mounted && data.byMajorCombined.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={data.byMajor}
+                    data={data.byMajorCombined}
                     layout="vertical"
-                    margin={{ left: 100 }}
+                    margin={{ left: 110, right: 20, top: 10, bottom: 10 }}
+                    barCategoryGap="20%"
+                    barGap={2}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={true} vertical={false} />
-                    <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                    <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} allowDecimals={false} />
                     <YAxis
                       type="category"
                       dataKey="label"
                       tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
-                      width={95}
+                      width={105}
                     />
                     <Tooltip
-                      content={({ active, payload }) => {
+                      content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
+                          const d = payload[0]?.payload
                           return (
-                            <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
-                              <p className="text-xs text-[var(--text-muted)]">{payload[0].payload.label}</p>
-                              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                                {payload[0].value} leads ({payload[0].payload.percent}%)
-                              </p>
+                            <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl text-xs space-y-1 min-w-[160px]">
+                              <p className="font-semibold text-[var(--text-primary)] mb-1">{label}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-[var(--text-muted)]">Total Leads</span>
+                                <span className="font-medium text-[var(--text-primary)]">{d?.totalLeads}</span>
+                              </div>
+                              <div className="border-t border-[var(--border)] my-1" />
+                              <p className="text-[var(--text-muted)] font-medium uppercase tracking-wide text-[10px]">Files</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-[#445eb7]">PUC</span>
+                                <span className="font-medium">{d?.pucFiles}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-[#8B5CF6]">Self-Funded</span>
+                                <span className="font-medium">{d?.sfFiles}</span>
+                              </div>
+                              <div className="border-t border-[var(--border)] my-1" />
+                              <p className="text-[var(--text-muted)] font-medium uppercase tracking-wide text-[10px]">Enrolled</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-[#1e3a8a]">PUC</span>
+                                <span className="font-medium">{d?.pucEnrolled}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-[#6d28d9]">Self-Funded</span>
+                                <span className="font-medium">{d?.sfEnrolled}</span>
+                              </div>
                             </div>
                           )
                         }
                         return null
                       }}
                     />
-                    <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]}>
-                      {data.byMajor.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={MAJOR_COLORS[index % MAJOR_COLORS.length]} />
-                      ))}
-                    </Bar>
+                    <Legend
+                      verticalAlign="top"
+                      formatter={(value) => <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{value}</span>}
+                    />
+                    <Bar dataKey="pucFiles" name="PUC Files" stackId="files" fill="#445eb7" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="sfFiles" name="SF Files" stackId="files" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="pucEnrolled" name="PUC Enrolled" stackId="enrolled" fill="#1e3a8a" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="sfEnrolled" name="SF Enrolled" stackId="enrolled" fill="#6d28d9" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
                   No major data available
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Major Files */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.62 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-[var(--success)]" />
-              Major Files
-            </CardTitle>
-            <CardDescription>Files opened by intended major</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]" style={{ minWidth: 0 }}>
-              {mounted && data.byMajorFiles.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={data.byMajorFiles}
-                    layout="vertical"
-                    margin={{ left: 100 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={true} vertical={false} />
-                    <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
-                      width={95}
-                    />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-xl">
-                              <p className="text-xs text-[var(--text-muted)]">{payload[0].payload.label}</p>
-                              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                                {payload[0].value} files ({payload[0].payload.percent}%)
-                              </p>
-                            </div>
-                          )
-                        }
-                        return null
-                      }}
-                    />
-                    <Bar dataKey="count" fill="var(--success)" radius={[0, 4, 4, 0]}>
-                      {data.byMajorFiles.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={MAJOR_COLORS[index % MAJOR_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
-                  No files data available
                 </div>
               )}
             </div>
@@ -407,21 +372,44 @@ export function DemographicReports({ data }: DemographicReportsProps) {
                 </div>
               )}
             </div>
-            {/* Governorate Legend/Stats */}
+            {/* Governorate Table */}
             {data.byGovernorate.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 pt-4 border-t border-[var(--border)]">
-                {data.byGovernorate.map((item, index) => (
-                  <div key={item.governorate} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: GOVERNORATE_COLORS[index % GOVERNORATE_COLORS.length] }}
-                    />
-                    <span className="text-sm text-[var(--text-secondary)] truncate">{item.label}</span>
-                    <span className="text-sm font-medium text-[var(--text-primary)] ml-auto">
-                      {item.count} <span className="text-[var(--text-muted)]">({item.percent}%)</span>
-                    </span>
-                  </div>
-                ))}
+              <div className="mt-4 pt-4 border-t border-[var(--border)] overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-[var(--text-muted)] border-b border-[var(--border)]">
+                      <th className="pb-2 pr-4 font-medium">Governorate</th>
+                      <th className="pb-2 pr-4 font-medium text-right">Leads</th>
+                      <th className="pb-2 pr-4 font-medium text-right">Files</th>
+                      <th className="pb-2 pr-4 font-medium text-right">Enrolled</th>
+                      <th className="pb-2 pr-4 font-medium text-right">PUC</th>
+                      <th className="pb-2 font-medium text-right">Self Fund</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.byGovernorate.map((item, index) => (
+                      <tr key={item.governorate} className="border-b border-[var(--border)] last:border-0">
+                        <td className="py-2 pr-4">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: GOVERNORATE_COLORS[index % GOVERNORATE_COLORS.length] }}
+                            />
+                            <span className="text-[var(--text-secondary)]">{item.label}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 pr-4 text-right font-medium text-[var(--text-primary)]">
+                          {item.count}
+                          <span className="text-[var(--text-muted)] font-normal ml-1">({item.percent}%)</span>
+                        </td>
+                        <td className="py-2 pr-4 text-right text-[var(--text-primary)]">{item.files}</td>
+                        <td className="py-2 pr-4 text-right text-[var(--text-primary)]">{item.enrolled}</td>
+                        <td className="py-2 pr-4 text-right text-[var(--text-primary)]">{item.puc}</td>
+                        <td className="py-2 text-right text-[var(--text-primary)]">{item.sf}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>

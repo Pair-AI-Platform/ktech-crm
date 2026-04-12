@@ -19,6 +19,8 @@ import {
   Accessibility,
   Star,
 } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getInitials } from "@/lib/utils"
 import type { PUCReportData } from "@/lib/hooks/use-reports"
 
 interface PUCReportsProps {
@@ -266,35 +268,80 @@ export function PUCReports({ data }: PUCReportsProps) {
         </Card>
       </motion.div>
 
-      {/* Converted to Self-Funded */}
+      {/* Converted to Self-Funded — per agent table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.6 }}
       >
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-[var(--info-bg)]">
-                  <RefreshCw className="w-6 h-6 text-[var(--info)]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                    Converted to Self-Funded
-                  </h3>
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Leads auto-converted to self-funded due to GPA below 70%
-                  </p>
-                </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-[var(--info)]" />
+              Converted to Self-Funded
+            </CardTitle>
+            <CardDescription>
+              Leads auto-converted to self-funded due to GPA below 70% — breakdown per agent
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.convertedToSFByAgent.length > 0 ? (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
+                    <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Agent</th>
+                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Converted</th>
+                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">% of Total</th>
+                    <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-4 w-40">Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.convertedToSFByAgent.map((agent, index) => (
+                    <tr key={agent.agentId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                      <td className="py-3 pr-4">
+                        <span className="text-sm font-bold text-[var(--text-muted)]">{index + 1}</span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="w-7 h-7">
+                            <AvatarImage src={agent.avatarUrl || undefined} />
+                            <AvatarFallback className="text-xs">{getInitials(agent.agentName)}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium text-[var(--text-primary)]">{agent.agentName}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="text-sm font-bold text-[var(--info)]">{agent.count}</span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="text-sm font-semibold text-[var(--text-primary)]">{agent.percent}%</span>
+                      </td>
+                      <td className="py-3 pl-4">
+                        <div className="w-full h-2 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-[var(--info)] transition-all duration-500"
+                            style={{ width: `${agent.percent}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-[var(--border)]">
+                    <td colSpan={2} className="py-3 pr-4 text-sm font-semibold text-[var(--text-secondary)]">Total</td>
+                    <td className="py-3 px-3 text-center text-sm font-bold text-[var(--text-primary)]">{data.convertedToSF}</td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
+              </table>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--text-muted)]">
+                <RefreshCw className="w-8 h-8 opacity-30" />
+                <p className="text-sm">No conversions in selected period</p>
               </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-[var(--text-primary)]">{data.convertedToSF}</p>
-                <p className="text-sm text-[var(--text-muted)]">
-                  {data.totalApplied > 0 ? Math.round((data.convertedToSF / data.totalApplied) * 100) : 0}% of total
-                </p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

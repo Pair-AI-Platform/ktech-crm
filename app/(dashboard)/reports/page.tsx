@@ -1287,7 +1287,6 @@ export default function ReportsPage() {
               <AgentLeaderboard data={data.leaderboard} />
               <AgentComparison data={data.agentComparison} />
               <AgentWorkload data={data.agentPerformance} />
-              <AgentActivity data={data.agentPerformance.activity} />
               <AgentAppointmentRates data={data.agentPerformance.appointmentRates} />
               <AgentSourceBreakdown data={data.agentPerformance.sourcePerformance} />
               <AgentTopSources data={data.agentPerformance.sourcePerformance} />

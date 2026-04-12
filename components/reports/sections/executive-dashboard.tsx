@@ -1,9 +1,10 @@
 "use client"
 
-import { useSyncExternalStore, useRef } from "react"
+import { useRef } from "react"
 import { motion, useInView } from "framer-motion"
 import {
   Layers,
+  GraduationCap,
 } from "lucide-react"
 import type { ExecutiveReportData } from "@/lib/hooks/use-reports"
 import { PipelineFunnelVisual } from "./pipeline-funnel-visual"
@@ -15,10 +16,8 @@ interface ExecutiveDashboardProps {
   onNavigateTab?: (tab: string) => void
 }
 
-const emptySubscribe = () => () => {}
-
-export function ExecutiveDashboard({ data, isAgent, onNavigateTab }: ExecutiveDashboardProps) {
-  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+export function ExecutiveDashboard(props: ExecutiveDashboardProps) {
+  const { data } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(containerRef, { once: true, margin: "-50px" })
 

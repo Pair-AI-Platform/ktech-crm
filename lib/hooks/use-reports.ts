@@ -121,7 +121,11 @@ export interface TestCenterReportData {
   byLevel: Array<{ level: PlacementLevel; count: number; percent: number }>
   passRate: number
   enrolled: LevelStatsData
+  enrolledSF: LevelStatsData
+  enrolledPUC: LevelStatsData
   files: LevelStatsData
+  filesSF: LevelStatsData
+  filesPUC: LevelStatsData
   retest: {
     totalRetests: number
     completed: number
@@ -247,7 +251,8 @@ export interface DemographicReportData {
   byFunding: Array<{ funding: FundingType; label: string; count: number; percent: number }>
   byMajor: Array<{ major: IntendedMajor; label: string; count: number; percent: number }>
   byMajorFiles: Array<{ major: IntendedMajor; label: string; count: number; percent: number }>
-  byGovernorate: Array<{ governorate: Governorate; label: string; count: number; percent: number }>
+  byMajorCombined: Array<{ major: IntendedMajor; label: string; totalLeads: number; files: number; enrolled: number; pucFiles: number; sfFiles: number; pucEnrolled: number; sfEnrolled: number }>
+  byGovernorate: Array<{ governorate: Governorate; label: string; count: number; percent: number; files: number; enrolled: number; puc: number; sf: number }>
   discountAnalysis: Array<{ discountType: DiscountType; label: string; count: number; totalDiscount: number }>
   byLeadType: Array<{ type: string; label: string; count: number; percent: number }>
 }
@@ -1175,7 +1180,11 @@ function calculateReports(
       ? Math.round((testedStudents.filter(s => s.placement_test_passed).length / testedStudents.length) * 100)
       : 0,
     enrolled: computeLevelStats(enrolledStudentsList),
+    enrolledSF: computeLevelStats(enrolledStudentsList.filter(s => s.funding_type === 'self_funded')),
+    enrolledPUC: computeLevelStats(enrolledStudentsList.filter(s => s.funding_type === 'puc')),
     files: computeLevelStats(fileStudentsList),
+    filesSF: computeLevelStats(fileStudentsList.filter(s => s.funding_type === 'self_funded')),
+    filesPUC: computeLevelStats(fileStudentsList.filter(s => s.funding_type === 'puc')),
     retest: (() => {
       // Find all retest appointments
       const retestAppointments = appointments.filter(a => a.appointment_type.includes('retest'))
@@ -1702,7 +1711,31 @@ function calculateReports(
           pucPercent: totalLeads > 0 ? Math.round((pucCount / totalLeads) * 100) : 0,
         }
       })
-      .sort((a, b) => b.leads - a.leads)
+      .sort((a, b) => b.leads - a.leads),
+    bySchoolType: (() => {
+      const fileStages: PipelineStage[] = ['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+      const typeLabels: Record<string, string> = { gov: 'GOV', us: 'US', uk: 'UK', ksa: 'KSA', others: 'Others', unknown: 'Unknown' }
+      const schoolLeads = leads.filter(l => l.school_id)
+      const typeMap: Record<string, typeof leads> = {}
+      schoolLeads.forEach(l => {
+        const t = (l.school as { school_type?: string } | null)?.school_type || 'unknown'
+        if (!typeMap[t]) typeMap[t] = []
+        typeMap[t].push(l)
+      })
+      return Object.entries(typeMap).map(([type, tLeads]) => {
+        const files = tLeads.filter(l => fileStages.includes(l.pipeline_stage)).length
+        const enrolled = tLeads.filter(l => l.pipeline_stage === 'enrolled').length
+        return {
+          type,
+          label: typeLabels[type] || type,
+          leads: tLeads.length,
+          files,
+          enrolled,
+          filesRate: tLeads.length > 0 ? Math.round((files / tLeads.length) * 100) : 0,
+          enrollRate: files > 0 ? Math.round((enrolled / files) * 100) : 0,
+        }
+      }).sort((a, b) => b.leads - a.leads)
+    })(),
   }
 
   // Agent Leaderboard
@@ -1884,25 +1917,58 @@ function calculateReports(
       })
       .filter(m => m.count > 0)
       .sort((a, b) => b.count - a.count),
+    byMajorCombined: (['cyber_security', 'cis', 'marketing', 'accounting', 'mis', 'network_security', 'other'] as IntendedMajor[])
+      .map(major => {
+        const FILE_STAGES = ['application', 'test', 'applicant', 'enrolled', 'puc_document_submission', 'puc_application_submission']
+        const majorLeads = leads.filter(l => l.intended_major === major)
+        const fileLeads = majorLeads.filter(l => FILE_STAGES.includes(l.pipeline_stage))
+        const enrolledLeads = majorLeads.filter(l => l.pipeline_stage === 'enrolled')
+        const pucFileLeads = fileLeads.filter(l => l.funding_type === 'puc')
+        const sfFileLeads = fileLeads.filter(l => l.funding_type === 'self_funded')
+        const pucEnrolledLeads = enrolledLeads.filter(l => l.funding_type === 'puc')
+        const sfEnrolledLeads = enrolledLeads.filter(l => l.funding_type === 'self_funded')
+        return {
+          major,
+          label: majorLabels[major],
+          totalLeads: majorLeads.length,
+          files: fileLeads.length,
+          enrolled: enrolledLeads.length,
+          pucFiles: pucFileLeads.length,
+          sfFiles: sfFileLeads.length,
+          pucEnrolled: pucEnrolledLeads.length,
+          sfEnrolled: sfEnrolledLeads.length,
+        }
+      })
+      .filter(m => m.totalLeads > 0)
+      .sort((a, b) => b.totalLeads - a.totalLeads),
     byGovernorate: GOVERNORATES.map(gov => {
       // Get all school values that belong to this governorate
       const govSchools = SCHOOLS.filter(s => s.governorate === gov.value).map(s => s.value)
-      const count = leads.filter(l => {
-        // Check direct school field (demo mode - string key)
+      const isGovLead = (l: typeof leads[number]) => {
         if (typeof l.school === 'string' && l.school) {
           return govSchools.includes(l.school as School)
         }
-        // Check joined school object (real data) for governorate
         if (l.school && typeof l.school === 'object' && 'governorate' in l.school) {
           return (l.school as { governorate?: Governorate }).governorate === gov.value
         }
         return false
-      }).length
+      }
+      const FILE_STAGES_GOV = ['application', 'test', 'applicant', 'enrolled', 'puc_document_submission', 'puc_application_submission']
+      const govLeads = leads.filter(isGovLead)
+      const count = govLeads.length
+      const files = govLeads.filter(l => FILE_STAGES_GOV.includes(l.pipeline_stage)).length
+      const enrolledGov = govLeads.filter(l => l.pipeline_stage === 'enrolled').length
+      const puc = govLeads.filter(l => l.pipeline_stage === 'enrolled' && l.funding_type === 'puc').length
+      const sf = govLeads.filter(l => l.pipeline_stage === 'enrolled' && l.funding_type === 'self_funded').length
       return {
         governorate: gov.value,
         label: gov.label,
         count,
-        percent: leads.length > 0 ? Math.round((count / leads.length) * 100) : 0
+        percent: leads.length > 0 ? Math.round((count / leads.length) * 100) : 0,
+        files,
+        enrolled: enrolledGov,
+        puc,
+        sf,
       }
     })
       .filter(g => g.count > 0)

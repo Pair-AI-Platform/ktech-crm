@@ -12,7 +12,6 @@ import {
   FileText,
   GraduationCap,
   TrendingUp,
-  Activity,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LeaderboardData } from "@/lib/hooks/use-reports"
@@ -22,7 +21,7 @@ interface AgentDateRangePerformanceProps {
   dateLabel?: string
 }
 
-type SortKey = 'leads' | 'appointments' | 'pucFiles' | 'sfFiles' | 'enrolled' | 'statusChanges' | 'conversionRate'
+type SortKey = 'leads' | 'appointments' | 'pucFiles' | 'sfFiles' | 'enrolled' | 'conversionRate'
 
 const COLUMNS: { key: SortKey; label: string; shortLabel: string; icon: typeof Users; color: string }[] = [
   { key: 'leads', label: 'Leads', shortLabel: 'Leads', icon: Users, color: 'text-indigo-500' },
@@ -30,7 +29,6 @@ const COLUMNS: { key: SortKey; label: string; shortLabel: string; icon: typeof U
   { key: 'pucFiles', label: 'PUC Files', shortLabel: 'PUC', icon: FileText, color: 'text-emerald-500' },
   { key: 'sfFiles', label: 'SF Files', shortLabel: 'SF', icon: FileText, color: 'text-orange-500' },
   { key: 'enrolled', label: 'Enrolled', shortLabel: 'Enrl', icon: GraduationCap, color: 'text-green-500' },
-  { key: 'statusChanges', label: 'Status Changes', shortLabel: 'Changes', icon: Activity, color: 'text-violet-500' },
   { key: 'conversionRate', label: 'Conversion', shortLabel: 'Conv %', icon: TrendingUp, color: 'text-amber-500' },
 ]
 
@@ -228,11 +226,6 @@ export function AgentDateRangePerformance({ data, dateLabel }: AgentDateRangePer
                       )}>
                         {agent.enrolled}
                       </span>
-                    </td>
-
-                    {/* Status Changes */}
-                    <td className="py-3 px-3 text-center">
-                      <span className="text-sm font-medium text-[var(--text-secondary)] tabular-nums">{agent.statusChanges}</span>
                     </td>
 
                     {/* Conversion Rate */}

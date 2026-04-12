@@ -150,6 +150,8 @@ export default function CalendarPage() {
       case "puc_application": return "bg-amber-500"
       case "retest": return "bg-green-500"
       case "sf_appointment": return "bg-cyan-500"
+      case "sf_retest": return "bg-teal-500"
+      case "puc_document_submission": return "bg-purple-500"
       default: return "bg-blue-500"
     }
   }
@@ -161,6 +163,8 @@ export default function CalendarPage() {
       case "puc_application": return "bg-amber-500 text-white shadow-sm border-amber-500"
       case "retest": return "bg-green-500 text-white shadow-sm border-green-500"
       case "sf_appointment": return "bg-cyan-500 text-white shadow-sm border-cyan-500"
+      case "sf_retest": return "bg-teal-500 text-white shadow-sm border-teal-500"
+      case "puc_document_submission": return "bg-purple-500 text-white shadow-sm border-purple-500"
       default: return "bg-blue-500 text-white shadow-sm border-blue-500"
     }
   }

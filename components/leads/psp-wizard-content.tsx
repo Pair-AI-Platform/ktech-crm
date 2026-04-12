@@ -27,6 +27,7 @@ import {
   MessageSquare,
   Phone,
   Upload,
+  ShieldCheck,
 } from "lucide-react"
 import { SCHOOLS, PREFERRED_COLLEGES } from "@/types"
 import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationType } from "@/types"
@@ -140,12 +141,10 @@ export function PSPWizardContent({
   const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
 
   // Form state - Payment
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "knet" | "online_link" | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "knet" | "online_link" | "exempt" | null>(null)
   const [receiptNumber, setReceiptNumber] = useState("")
   const [selectedFees, setSelectedFees] = useState<Record<string, boolean>>({
     puc: true,
-    application: true,
-    test: true,
   })
 
   // Payment status state
@@ -183,8 +182,6 @@ export function PSPWizardContent({
   // Fee amounts
   const FEES = {
     puc: { label: "PUC Fees", amount: 10 },
-    application: { label: "Application Fees", amount: 15 },
-    test: { label: "Test Fees", amount: 20 },
   }
 
   const calculateTotal = () => {
@@ -246,7 +243,7 @@ export function PSPWizardContent({
       setValidationErrors({})
       setPaymentMethod(null)
       setReceiptNumber("")
-      setSelectedFees({ puc: true, application: true, test: true })
+      setSelectedFees({ puc: true })
       setPucFeeAlreadyPaid(false)
       setPucFeeReceiptFile(null)
 
@@ -1507,7 +1504,7 @@ Kuwait Technical College`
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
                     Payment Method
                   </h4>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("cash")}
@@ -1557,6 +1554,23 @@ Kuwait Technical College`
                         paymentMethod === "online_link" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
                       )} />
                       <h4 className="font-medium text-sm text-[var(--text-primary)]">Online Link</h4>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("exempt")}
+                      className={cn(
+                        "p-4 rounded-xl border text-center transition-all",
+                        paymentMethod === "exempt"
+                          ? "border-amber-500 bg-amber-50"
+                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-amber-400/50"
+                      )}
+                    >
+                      <ShieldCheck className={cn(
+                        "w-7 h-7 mx-auto mb-2",
+                        paymentMethod === "exempt" ? "text-amber-600" : "text-[var(--text-muted)]"
+                      )} />
+                      <h4 className="font-medium text-sm text-[var(--text-primary)]">Exempt</h4>
                     </button>
                   </div>
                 </div>
@@ -1690,6 +1704,25 @@ Kuwait Technical College`
                 </div>
               )}
 
+              {/* Exempt Info */}
+              {!paymentStatus?.hasPaid && paymentMethod === "exempt" && (
+                <div className="space-y-4 pt-2">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                        <ShieldCheck className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-amber-800">Payment Exempt</h4>
+                        <p className="text-sm text-amber-700 mt-0.5">
+                          This student is exempt from payment fees. You can proceed to submission.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Error Display */}
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -1805,15 +1838,17 @@ Kuwait Technical College`
                     "text-xs font-semibold uppercase tracking-wide mb-3",
                     paymentStatus?.hasPaid ? "text-green-700" : "text-[var(--text-muted)]"
                   )}>
-                    Payment ({paymentStatus?.hasPaid ? paymentStatus.transaction?.amount : calculateTotal()} KD)
+                    Payment ({paymentMethod === "exempt" ? "Exempt" : `${paymentStatus?.hasPaid ? paymentStatus.transaction?.amount : calculateTotal()} KD`})
                   </h4>
                   <div className="flex items-center gap-2">
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center",
-                      paymentStatus?.hasPaid ? "bg-green-500" : "bg-[var(--primary)]"
+                      paymentStatus?.hasPaid ? "bg-green-500" : paymentMethod === "exempt" ? "bg-amber-500" : "bg-[var(--primary)]"
                     )}>
                       {paymentStatus?.hasPaid ? (
                         <CheckCircle2 className="w-4 h-4 text-white" />
+                      ) : paymentMethod === "exempt" ? (
+                        <ShieldCheck className="w-4 h-4 text-white" />
                       ) : paymentMethod === "cash" ? (
                         <Banknote className="w-4 h-4 text-white" />
                       ) : paymentMethod === "knet" ? (
@@ -1824,9 +1859,11 @@ Kuwait Technical College`
                     </div>
                     <span className={cn(
                       "text-sm",
-                      paymentStatus?.hasPaid ? "text-green-700 font-medium" : "text-[var(--text-primary)]"
+                      paymentStatus?.hasPaid ? "text-green-700 font-medium" : paymentMethod === "exempt" ? "text-amber-700 font-medium" : "text-[var(--text-primary)]"
                     )}>
-                      {paymentStatus?.hasPaid
+                      {paymentMethod === "exempt"
+                        ? "Exempt - No payment required"
+                        : paymentStatus?.hasPaid
                         ? `Payment Confirmed - ${
                             paymentMethod === "cash" ? "Cash" :
                             paymentMethod === "knet" ? "KNET" :

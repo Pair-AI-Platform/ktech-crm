@@ -95,6 +95,13 @@ const APPOINTMENT_COLORS: Record<AppointmentType, { bg: string; border: string; 
     gradient: "from-purple-500/15 to-purple-500/5",
     dot: "bg-purple-500",
   },
+  sf_retest: {
+    bg: "bg-teal-500/10",
+    border: "border-teal-400/40",
+    text: "text-teal-600 dark:text-teal-400",
+    gradient: "from-teal-500/15 to-teal-500/5",
+    dot: "bg-teal-500",
+  },
 }
 
 export function CalendarView({

@@ -284,7 +284,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Leads by School - Bar Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -331,6 +331,61 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* School Type Breakdown */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.45 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5 text-[var(--primary)]" />
+                School Types
+              </CardTitle>
+              <CardDescription>Leads, files & enrollment by school type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.bySchoolType.length > 0 ? (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-2">Type</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-2">Leads</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-2">Files</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-2">Files %</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-2">Enrolled</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-2">Enroll %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.bySchoolType.map((row) => (
+                      <tr key={row.type} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                        <td className="py-2.5">
+                          <Badge variant="secondary" size="sm">{row.label}</Badge>
+                        </td>
+                        <td className="py-2.5 text-center text-sm font-medium text-[var(--text-primary)]">{row.leads}</td>
+                        <td className="py-2.5 text-center text-sm font-medium text-[var(--primary)]">{row.files}</td>
+                        <td className="py-2.5 text-center">
+                          <Badge variant={row.filesRate >= 30 ? 'success' : row.filesRate >= 15 ? 'warning' : 'secondary'} size="sm">{row.filesRate}%</Badge>
+                        </td>
+                        <td className="py-2.5 text-center text-sm font-medium text-[var(--success)]">{row.enrolled}</td>
+                        <td className="py-2.5 text-center">
+                          <Badge variant={row.enrollRate >= 20 ? 'success' : row.enrollRate >= 10 ? 'warning' : 'secondary'} size="sm">{row.enrollRate}%</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-[var(--text-muted)]">
+                  No school type data available
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

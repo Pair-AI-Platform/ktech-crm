@@ -217,15 +217,6 @@ export function AgentTargetRow({
                       onWeeklyChange={(v) => updateWeekly(agent.id, 'weekly_sf_files', v)}
                     />
                   )}
-                  {activeCategories.has('puc_app_submission') && pucAppSubmission > 0 && (
-                    <WeeklyBreakdown
-                      category="puc_app_submission"
-                      label="PUC Enrolled"
-                      total={pucAppSubmission}
-                      weekly={weeklyPucAppSubmission}
-                      onWeeklyChange={(v) => updateWeekly(agent.id, 'weekly_puc_app_submission', v)}
-                    />
-                  )}
                 </div>
               )}
             </div>

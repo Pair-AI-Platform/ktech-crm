@@ -105,26 +105,6 @@ export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
       percent: 100,
     },
     {
-      title: "Pending",
-      value: data.pending,
-      subtext: `${data.totalStudents > 0 ? Math.round((data.pending / data.totalStudents) * 100) : 0}% of total`,
-      icon: Clock,
-      color: "warning" as const,
-      colorClass: "bg-[var(--warning)]",
-      barColor: "bg-[var(--warning)]",
-      percent: data.totalStudents > 0 ? Math.round((data.pending / data.totalStudents) * 100) : 0,
-    },
-    {
-      title: "Seat Reserved",
-      value: data.seatReserved,
-      subtext: `${data.seatReservedPercent}% of files`,
-      icon: CheckCircle2,
-      color: "info" as const,
-      colorClass: "bg-[var(--primary)]",
-      barColor: "bg-[var(--primary)]",
-      percent: data.seatReservedPercent,
-    },
-    {
       title: "Full Payment",
       value: data.fullTuition,
       subtext: `${data.fullTuitionPercent}% of files`,
@@ -139,7 +119,7 @@ export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.title}
@@ -178,75 +158,6 @@ export function PaymentReports({ data, isAgent }: PaymentReportsProps) {
         ))}
       </div>
 
-      {/* Payment Status Distribution — Donut with center label */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.6 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-[var(--primary)]" />
-              Payment Status
-            </CardTitle>
-            <CardDescription>Distribution by payment stage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[280px] relative" style={{ minWidth: 0 }}>
-              {mounted && pieData.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={100}
-                        paddingAngle={3}
-                        dataKey="value"
-                        strokeWidth={0}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Center label */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <p className="text-3xl font-bold text-[var(--text-primary)]">{data.totalStudents}</p>
-                    <p className="text-xs text-[var(--text-muted)]">Total</p>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-2">
-                  <CreditCard className="w-10 h-10 text-[var(--text-muted)] opacity-30" />
-                  <p className="text-sm text-[var(--text-muted)]">No payment data available</p>
-                </div>
-              )}
-            </div>
-            {/* Legend */}
-            {pieData.length > 0 && (
-              <div className="flex items-center justify-center gap-6 mt-4">
-                {pieData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm text-[var(--text-secondary)]">
-                      {item.name} <span className="text-[var(--text-muted)]">({item.value})</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
 
       {/* Enrolled Students by Agent — bar chart (admin only) */}
       {!isAgent && data.byAgent.length > 0 && (

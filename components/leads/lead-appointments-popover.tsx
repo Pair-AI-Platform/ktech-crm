@@ -49,6 +49,7 @@ const TYPE_COLORS: Record<AppointmentType, string> = {
   retest: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20",
   sf_appointment: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20",
   puc_document_submission: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+  sf_retest: "bg-teal-500/10 text-teal-600 border-teal-500/20",
 }
 
 function formatDate(dateStr: string) {

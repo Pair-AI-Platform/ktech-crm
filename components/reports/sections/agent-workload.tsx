@@ -73,7 +73,7 @@ export function AgentWorkload({ data }: AgentWorkloadProps) {
                         animate={{ width: `${barWidth}%` }}
                         transition={{ duration: 0.6, ease: "easeOut" }}
                       />
-                      <span className="absolute inset-0 flex items-center px-2 text-xs font-medium text-[var(--text-primary)]">
+                      <span className="absolute inset-0 flex items-center px-2 text-xs font-medium text-white drop-shadow-sm">
                         {agent.leads} leads ({agent.percent}%)
                       </span>
                     </div>

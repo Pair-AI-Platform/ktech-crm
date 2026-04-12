@@ -15,7 +15,6 @@ import {
   LogOut,
   ArrowUpRight,
   ArrowDownRight,
-  Zap
 } from "lucide-react"
 
 interface PipelineStageData {
@@ -157,20 +156,6 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
               </span>
               <span className="text-xs text-emerald-500/70">conv.</span>
             </motion.div>
-            {totalStageChanges > 0 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={isInView ? { opacity: 1, x: 0 } : {}}
-                transition={{ delay: 0.4, duration: 0.5 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20"
-              >
-                <Zap className="w-4 h-4 text-blue-500" />
-                <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                  {totalStageChanges}
-                </span>
-                <span className="text-xs text-blue-500/70">moves</span>
-              </motion.div>
-            )}
           </div>
         </div>
       </div>

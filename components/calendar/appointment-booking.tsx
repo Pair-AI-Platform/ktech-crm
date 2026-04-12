@@ -223,19 +223,8 @@ export function AppointmentBooking({
     }
   }
 
-  // Filter appointment types based on selected leads' funding type and stages
-  const isSelfFunded = selectedLeads.length > 0 && selectedLeads.every(l => l.funding_type === 'self_funded')
-  const availableAppointmentTypes = APPOINTMENT_TYPES.filter(type => {
-    // Self-funded leads only get: new_appointment, retest, sf_appointment
-    if (isSelfFunded) {
-      return ['new_appointment', 'retest', 'sf_appointment'].includes(type.value)
-    }
-    // PUC leads: sf_appointment is not relevant
-    if (type.value === 'sf_appointment') {
-      return false
-    }
-    return true
-  })
+  // Show all appointment types
+  const availableAppointmentTypes = APPOINTMENT_TYPES
 
   const canProceed = () => {
     switch (currentStep) {

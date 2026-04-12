@@ -448,11 +448,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  // Only the assigned agent or admin can change the stage
+  const canChangeStage = isAdmin || (profile && lead?.assigned_to === profile.id)
+
   const handleStageClick = async (stage: string) => {
     console.log('[Stage Click] Clicked stage:', stage, 'Current stage:', lead?.pipeline_stage)
 
-    if (!lead || updatingStage || lead.pipeline_stage === 'lost') {
-      console.log('[Stage Click] Early return - lead:', !!lead, 'updating:', updatingStage, 'isLost:', lead?.pipeline_stage === 'lost')
+    if (!lead || updatingStage || lead.pipeline_stage === 'lost' || !canChangeStage) {
+      console.log('[Stage Click] Early return - lead:', !!lead, 'updating:', updatingStage, 'isLost:', lead?.pipeline_stage === 'lost', 'canChange:', canChangeStage)
       return
     }
 
@@ -1084,13 +1087,113 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
 
+            {/* Action bar — moved above appointments for prominence */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35 }}
+              className="flex items-center gap-2 mt-5 pt-5 border-t border-[var(--border-subtle)]"
+            >
+              {/* Primary CTA */}
+              {lead.pipeline_stage === 'lost' && canChangeStage ? (
+                <div className="relative flex-1" ref={reactivateMenuRef}>
+                  <motion.button
+                    onClick={() => setShowReactivateMenu(!showReactivateMenu)}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-[var(--text-primary)] text-[var(--text-inverse)] font-medium text-sm shadow-sm hover:opacity-90 transition-all"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Reactivate To</span>
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showReactivateMenu && "rotate-180")} />
+                  </motion.button>
+
+                  <AnimatePresence>
+                    {showReactivateMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-lg shadow-lg ring-1 ring-[var(--border)] overflow-hidden z-50"
+                      >
+                        <div className="p-1">
+                          {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
+                            <button
+                              key={stage.value}
+                              onClick={() => handleReactivateLead(stage.value)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
+                            >
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ background: STAGE_GRADIENT[stage.value].from }}
+                              />
+                              <span className="text-sm font-medium text-[var(--text-primary)]">{stage.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : null}
+
+              {/* Book Appointment button */}
+              <Link href={`/calendar?book=${lead.id}`} className="flex-1">
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--info-bg)] text-[var(--info)] hover:bg-[var(--info)]/15 ring-1 ring-[var(--info)]/20 hover:ring-[var(--info)]/40 transition-all duration-200 font-medium text-sm"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Book Appointment</span>
+                </motion.div>
+              </Link>
+
+              {/* Schedule Callback button */}
+              <motion.div
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowCallbackScheduler(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 ring-1 ring-amber-200/50 hover:ring-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:hover:bg-amber-950/30 dark:ring-amber-800/30 transition-all duration-200 cursor-pointer font-medium text-sm"
+              >
+                <PhoneForwarded className="w-4 h-4" />
+                <span>Schedule Callback</span>
+              </motion.div>
+
+              {/* PSP Submission button */}
+              <motion.div
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowPSPWizard(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 ring-1 ring-purple-200/50 hover:ring-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:hover:bg-purple-950/30 dark:ring-purple-800/30 transition-all duration-200 cursor-pointer font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                <span>PSP</span>
+              </motion.div>
+
+              {/* RSVP button - only for applicants */}
+              {lead.pipeline_stage === 'applicant' && (
+                <SimpleTooltip content="Send RSVP link" side="bottom">
+                  <motion.div
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowRSVPDialog(true)}
+                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-emerald-50 hover:text-emerald-600 ring-1 ring-[var(--border-subtle)] hover:ring-emerald-200 transition-all duration-200 cursor-pointer"
+                  >
+                    <Send className="w-[18px] h-[18px]" />
+                  </motion.div>
+                </SimpleTooltip>
+              )}
+            </motion.div>
+
             {/* Upcoming Appointments */}
             {upcomingAppointments.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 }}
-                className="mt-5 space-y-2"
+                transition={{ delay: 0.4 }}
+                className="mt-3 space-y-2"
               >
                 {upcomingAppointments.map((apt) => (
                   <div key={apt.id}>
@@ -1242,97 +1345,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 ))}
               </motion.div>
             )}
-
-            {/* Action bar — divider separated */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="flex items-center gap-2 mt-5 pt-5 border-t border-[var(--border-subtle)]"
-            >
-              {/* Primary CTA */}
-              {lead.pipeline_stage === 'lost' ? (
-                <div className="relative flex-1" ref={reactivateMenuRef}>
-                  <motion.button
-                    onClick={() => setShowReactivateMenu(!showReactivateMenu)}
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-[var(--text-primary)] text-[var(--text-inverse)] font-medium text-sm shadow-sm hover:opacity-90 transition-all"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Reactivate To</span>
-                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showReactivateMenu && "rotate-180")} />
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {showReactivateMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-lg shadow-lg ring-1 ring-[var(--border)] overflow-hidden z-50"
-                      >
-                        <div className="p-1">
-                          {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
-                            <button
-                              key={stage.value}
-                              onClick={() => handleReactivateLead(stage.value)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
-                            >
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ background: STAGE_GRADIENT[stage.value].from }}
-                              />
-                              <span className="text-sm font-medium text-[var(--text-primary)]">{stage.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : null}
-
-              {/* Calendar button */}
-              <SimpleTooltip content="Book appointment" side="bottom">
-                <Link href={`/calendar?book=${lead.id}`}>
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] ring-1 ring-[var(--border-subtle)] hover:ring-[var(--border)] transition-all duration-200"
-                  >
-                    <Calendar className="w-[18px] h-[18px]" />
-                  </motion.div>
-                </Link>
-              </SimpleTooltip>
-
-              {/* Schedule Callback button */}
-              <SimpleTooltip content="Schedule callback" side="bottom">
-                <motion.div
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowCallbackScheduler(true)}
-                  className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-amber-50 hover:text-amber-600 ring-1 ring-[var(--border-subtle)] hover:ring-amber-200 transition-all duration-200 cursor-pointer"
-                >
-                  <PhoneForwarded className="w-[18px] h-[18px]" />
-                </motion.div>
-              </SimpleTooltip>
-
-              {/* RSVP button - only for applicants */}
-              {lead.pipeline_stage === 'applicant' && (
-                <SimpleTooltip content="Send RSVP link" side="bottom">
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowRSVPDialog(true)}
-                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-emerald-50 hover:text-emerald-600 ring-1 ring-[var(--border-subtle)] hover:ring-emerald-200 transition-all duration-200 cursor-pointer"
-                  >
-                    <Send className="w-[18px] h-[18px]" />
-                  </motion.div>
-                </SimpleTooltip>
-              )}
-            </motion.div>
           </div>
         </motion.div>
 
@@ -1367,7 +1379,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </p>
               </div>
             </div>
-            {lead.pipeline_stage !== 'lost' && (
+            {lead.pipeline_stage !== 'lost' && canChangeStage && (
               <button
                 onClick={handleMarkLost}
                 className="text-xs text-[var(--text-muted)] hover:text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
@@ -1418,15 +1430,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   return (
                     <SimpleTooltip
                       key={stage}
-                      content={isDropOffPoint ? `Dropped off after ${stageLabel}` : isCompleted ? `✓ ${stageLabel} completed` : isCurrentStage ? 'Current stage' : 'Click to advance'}
+                      content={!canChangeStage ? 'Only the assigned agent can change the stage' : isDropOffPoint ? `Dropped off after ${stageLabel}` : isCompleted ? `✓ ${stageLabel} completed` : isCurrentStage ? 'Current stage' : 'Click to advance'}
                       side="top"
                     >
                       <motion.button
                         onClick={() => handleStageClick(stage)}
-                        disabled={updatingStage || lead.pipeline_stage === 'lost'}
-                        className="relative flex flex-col items-center cursor-pointer disabled:cursor-not-allowed"
-                        whileHover={{ scale: updatingStage ? 1 : 1.1 }}
-                        whileTap={{ scale: updatingStage ? 1 : 0.95 }}
+                        disabled={updatingStage || lead.pipeline_stage === 'lost' || !canChangeStage}
+                        className="relative flex flex-col items-center cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                        whileHover={{ scale: (updatingStage || !canChangeStage) ? 1 : 1.1 }}
+                        whileTap={{ scale: (updatingStage || !canChangeStage) ? 1 : 0.95 }}
                       >
                         {/* Node Circle */}
                         <div

@@ -34,6 +34,8 @@ import { useAppointmentMutations, useRescheduleHistory } from "@/lib/hooks/use-a
 import { useAgents } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
+import { AppointmentBooking } from "@/components/calendar/appointment-booking"
+import { CallbackScheduler } from "@/components/leads/callback-scheduler"
 
 interface AppointmentDetailProps {
   appointment: Appointment | null
@@ -89,7 +91,7 @@ const ALL_STATUS_CONFIG: Record<string, StatusConfig> = {
 // Statuses shown for regular appointments
 const APPOINTMENT_STATUS_KEYS = ["scheduled", "confirmed", "on_the_way", "postponed", "cancelled"]
 // Statuses shown for callbacks
-const CALLBACK_STATUS_KEYS = ["scheduled", "no_answer", "cant_reach", "will_see", "cancelled"]
+const CALLBACK_STATUS_KEYS = ["scheduled", "confirmed", "no_answer", "cant_reach", "will_see", "cancelled"]
 
 export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: AppointmentDetailProps) {
   const [showPostponedForm, setShowPostponedForm] = useState(false)
@@ -111,7 +113,9 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const [notesValue, setNotesValue] = useState("")
   const [savedNotes, setSavedNotes] = useState("")
   const [notesSaving, setNotesSaving] = useState(false)
+  const [showBooking, setShowBooking] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [showCallbackScheduler, setShowCallbackScheduler] = useState(false)
 
   const {
     markNA,
@@ -244,6 +248,10 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     setLocalTimestamps(prev => ({ ...prev, will_see_at: new Date().toISOString() }))
     await updateLeadContactStatus("will_see")
     onUpdate?.()
+    // Open callback scheduler to book a follow-up
+    if (hasLeads) {
+      setShowCallbackScheduler(true)
+    }
   }
 
   const handleSaveNotes = async () => {
@@ -1034,6 +1042,22 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           </div>
         </div>
 
+        {/* Footer Actions - Callback: Book Appointment */}
+        {isActionable && appointment.is_callback && !showDeleteConfirm && hasLeads && (
+          <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowBooking(true)}
+                className="rounded-xl border-[var(--success)]/30 text-[var(--success)] hover:bg-[var(--success)]/10"
+              >
+                <Calendar className="w-5 h-5 mr-2" />
+                Book Appointment
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Footer Actions */}
         {isActionable && !appointment.is_callback && !showDeleteConfirm && (
           <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]/30">
@@ -1066,6 +1090,19 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         )}
       </DialogContent>
 
+      {/* Book Appointment from Callback */}
+      {hasLeads && (
+        <AppointmentBooking
+          isOpen={showBooking}
+          onClose={() => setShowBooking(false)}
+          onSuccess={() => {
+            setShowBooking(false)
+            onUpdate?.()
+          }}
+          preselectedLeadId={appointmentLeads[0]?.id}
+        />
+      )}
+
       {/* Lost Reason Dialog */}
       <MarkLostDialog
         open={showLostDialog}
@@ -1075,6 +1112,20 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           await handleChangeStage("lost", reasonId, notes)
         }}
       />
+
+      {/* Callback Scheduler — opened after "Will See" */}
+      {hasLeads && (
+        <CallbackScheduler
+          isOpen={showCallbackScheduler}
+          onClose={() => setShowCallbackScheduler(false)}
+          onSuccess={() => {
+            setShowCallbackScheduler(false)
+            onUpdate?.()
+          }}
+          lead={appointmentLeads[0]!}
+          fromStage={appointmentLeads[0]?.pipeline_stage as PipelineStage | undefined}
+        />
+      )}
     </Dialog>
   )
 }
