@@ -853,7 +853,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                   {/* Variables */}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="text-xs text-[var(--text-muted)]">Insert:</span>
-                    {['{{first_name}}', '{{last_name}}', '{{phone}}'].map(variable => (
+                    {['{{first_name}}', '{{last_name}}', '{{phone}}', '{{school_name}}'].map(variable => (
                       <button
                         key={variable}
                         onClick={() => {
@@ -908,7 +908,8 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                       {formData.messageContent
                         .replace(/\{\{first_name\}\}/g, 'Ahmed')
                         .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
-                        .replace(/\{\{phone\}\}/g, '+965 1234 5678')}
+                        .replace(/\{\{phone\}\}/g, '+965 1234 5678')
+                        .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')}
                     </p>
                   </div>
                 </div>

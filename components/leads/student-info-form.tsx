@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Input, Textarea } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -18,6 +18,7 @@ import {
   User,
   Users,
   Phone,
+  Mail,
   CreditCard,
   GraduationCap,
   Check,
@@ -31,14 +32,51 @@ import {
   ClipboardList,
   RefreshCw,
   ChevronDown,
+  Globe,
+  Trophy,
+  Briefcase,
+  Heart,
+  Megaphone,
+  UserCheck,
+  Sparkles,
+  Percent,
+  Send,
+  FileText,
+  Ban,
 } from "lucide-react"
-import { SCHOOLS, MAJORS, PLACEMENT_LEVELS, type Lead, type School, type IntendedMajor, type SchoolEntity, type PlacementLevel } from "@/types"
+import {
+  SCHOOLS,
+  MAJORS,
+  PLACEMENT_LEVELS,
+  EDUCATION_TYPES,
+  NATIONALITIES,
+  DISCOUNT_TYPES,
+  LEAD_SOURCES,
+  MINISTRY_BLOCK_REASONS,
+  type Lead,
+  type School,
+  type IntendedMajor,
+  type SchoolEntity,
+  type PlacementLevel,
+  type MinistryBlockReason,
+} from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { useSemesters } from "@/lib/hooks/use-semesters"
+import { useActiveSources } from "@/lib/hooks/use-sources"
+import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
 import { createClient } from "@/lib/supabase/client"
 import type { MOEFetchResponse } from "@/lib/moe/types"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
+
+const SOURCE_CATEGORIES = [
+  { value: "direct", label: "Direct", icon: "📞" },
+  { value: "events", label: "Events", icon: "🎪" },
+  { value: "marketing", label: "Marketing", icon: "📱" },
+  { value: "referrals", label: "Referrals", icon: "👥" },
+  { value: "outreach", label: "Outreach", icon: "📣" },
+]
 
 interface StudentInfoFormProps {
   lead: Lead
@@ -47,13 +85,29 @@ interface StudentInfoFormProps {
 
 export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const { updateLead, loading } = useLeadMutations()
+  const { semesters } = useSemesters()
+  const { sources: dbSources } = useActiveSources()
+  const { exhibitions: activeExhibitions } = useActiveExhibitions()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [schoolSearch, setSchoolSearch] = useState("")
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
+  const [nationalitySearch, setNationalitySearch] = useState("")
+  const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const [hasGpaError, setHasGpaError] = useState(false)
   const [moeFetching, setMoeFetching] = useState(false)
   const [moeFetchResult, setMoeFetchResult] = useState<{ success: boolean; message: string } | null>(null)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
+  const [declarationSent, setDeclarationSent] = useState(false)
+
+  // Collapsible sections
+  const [placementOpen, setPlacementOpen] = useState(true)
+  const [personalOpen, setPersonalOpen] = useState(true)
+  const [contactOpen, setContactOpen] = useState(true)
+  const [sourceOpen, setSourceOpen] = useState(true)
+  const [academicOpen, setAcademicOpen] = useState(true)
+  const [discountOpen, setDiscountOpen] = useState(true)
+  const [ministryOpen, setMinistryOpen] = useState(true)
+  const [notesOpen, setNotesOpen] = useState(true)
 
   // Fetch schools from database
   useEffect(() => {
@@ -69,6 +123,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   }, [])
 
   const civilIdFileRef = useRef<HTMLInputElement>(null)
+  const nationalityRef = useRef<HTMLDivElement>(null)
   const [scanning, setScanning] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
   const [showExtractionDialog, setShowExtractionDialog] = useState(false)
@@ -123,24 +178,61 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     })
   }
 
-  const [placementOpen, setPlacementOpen] = useState(true)
   const [formData, setFormData] = useState({
+    // Personal
     first_name: lead.first_name || "",
     last_name: lead.last_name || "",
     gender: lead.gender || "",
+    nationality: lead.nationality || "",
+    address: lead.address || "",
+    // Student profile flags
+    is_transfer_student: lead.is_transfer_student ?? false,
+    is_special_needs: lead.is_special_needs ?? false,
+    is_diplomatic: lead.is_diplomatic ?? false,
+    is_athlete: lead.is_athlete ?? false,
+    is_married: lead.is_married ?? false,
+    is_employee: lead.is_employee ?? false,
+    is_marketing_student: lead.is_marketing_student ?? false,
+    // Contact
     phone: lead.phone || "",
     phone_secondary: lead.phone_secondary || "",
+    email: lead.email || "",
     civil_id: lead.civil_id || "",
-    seat_number: lead.seat_number || "",
+    date_of_birth: lead.date_of_birth || "",
+    // Lead Source
+    source_category: lead.source_category || "",
+    source: lead.source || "",
+    source_detail: lead.source_detail || "",
+    // Academic
     school: lead.school_id || lead.school || "",
-    actual_gpa: lead.actual_gpa?.toString() || lead.gpa_grade_11?.toString() || "",
-    funding_type: "puc", // Fixed to PUC only
+    education_type: lead.education_type || "",
+    education_type_custom: lead.education_type_custom || "",
+    grade_level: lead.grade_level || "",
+    funding_type: lead.funding_type || "",
+    semester_id: lead.semester_id || "",
     intended_major: lead.intended_major || "",
-    // Placement Test fields
+    preferred_major: lead.preferred_major || "",
+    ministry_accepted_major: lead.ministry_accepted_major || "",
+    preferred_college: lead.preferred_college || "",
+    graduation_year: lead.graduation_year?.toString() || "",
+    expected_gpa: lead.expected_gpa?.toString() || "",
+    actual_gpa: lead.actual_gpa?.toString() || lead.gpa_grade_11?.toString() || "",
+    academic_track: lead.academic_track || "",
+    seat_number: lead.seat_number || "",
+    // Placement Test
     has_ielts_toefl: lead.has_ielts_toefl ?? false,
     placement_english_override: lead.placement_english_override ?? false,
     placement_math_override: lead.placement_math_override ?? false,
     placement_computer_override: lead.placement_computer_override ?? false,
+    // Discount (SF only)
+    discount_type: lead.discount_type || "",
+    discount_percentage: lead.discount_percentage?.toString() || "",
+    discount_notes: lead.discount_notes || "",
+    // Ministry blocked
+    ministry_blocked: lead.ministry_blocked ?? false,
+    ministry_block_reasons: lead.ministry_block_reasons || ([] as MinistryBlockReason[]),
+    // Notes
+    notes: "",
   })
 
   // Use database schools if available, fallback to hardcoded SCHOOLS
@@ -148,33 +240,44 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     ? dbSchools
     : SCHOOLS.map(s => ({ id: s.value, name_en: s.labelEn, name_ar: s.labelAr || s.label, gender: s.gender }))
 
-  // Filter schools based on search (supports Arabic, English, and abbreviations)
+  // Filter schools based on search
   const filteredSchools = schoolSource.filter(school => {
-    // Gender filter: male students → boys/male schools, female students → girls/female schools
     if (formData.gender === 'male' && school.gender && school.gender !== 'boys' && school.gender !== 'male' && school.gender !== 'mixed') return false
     if (formData.gender === 'female' && school.gender && school.gender !== 'girls' && school.gender !== 'female' && school.gender !== 'mixed') return false
     if (!schoolSearch) return true
     const term = schoolSearch.toLowerCase()
-    return (
-      school.name_ar.includes(schoolSearch) ||
-      school.name_en.toLowerCase().includes(term)
-    )
+    return school.name_ar.includes(schoolSearch) || school.name_en.toLowerCase().includes(term)
   })
 
-  // Check GPA and set error state
+  // Filter nationalities
+  const filteredNationalities = NATIONALITIES.filter(n => {
+    if (!nationalitySearch) return true
+    const term = nationalitySearch.toLowerCase()
+    return n.label.toLowerCase().includes(term) || n.labelAr.includes(nationalitySearch)
+  })
+
+  // Filter sources by category
+  const filteredSources = dbSources.length > 0
+    ? dbSources.filter(s => !formData.source_category || s.category === formData.source_category)
+    : LEAD_SOURCES.filter(s => !formData.source_category || s.category === formData.source_category)
+
+  // Check GPA and set error state (only for PUC)
   useEffect(() => {
-    const gpaValue = parseFloat(formData.actual_gpa)
-    if (formData.actual_gpa && !isNaN(gpaValue) && gpaValue < 70) {
-      setHasGpaError(true)
+    if (formData.funding_type === 'puc') {
+      const gpaValue = parseFloat(formData.actual_gpa)
+      if (formData.actual_gpa && !isNaN(gpaValue) && gpaValue < 70) {
+        setHasGpaError(true)
+      } else {
+        setHasGpaError(false)
+      }
     } else {
       setHasGpaError(false)
     }
-  }, [formData.actual_gpa])
+  }, [formData.actual_gpa, formData.funding_type])
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    // Name validation
     if (!formData.first_name.trim()) {
       newErrors.first_name = "First name is required"
     } else if (!isArabicText(formData.first_name)) {
@@ -186,40 +289,27 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       newErrors.last_name = "Name must be in Arabic"
     }
 
-    // Mobile validation
     if (!formData.phone.trim()) {
       newErrors.phone = "Mobile number is required"
     } else if (!isValidKuwaitPhone(formData.phone)) {
       newErrors.phone = "Mobile must be 8 digits starting with 5, 6, or 9"
     }
 
-    // Civil ID validation
-    if (!formData.civil_id.trim()) {
-      newErrors.civil_id = "Civil ID is required"
-    } else if (!isValidKuwaitCivilId(formData.civil_id)) {
+    if (formData.civil_id && !isValidKuwaitCivilId(formData.civil_id)) {
       newErrors.civil_id = "Civil ID must be 12 digits starting with 2 or 3"
     }
 
-    // School validation
-    if (!formData.school) {
-      newErrors.school = "School is required"
-    }
-
-    // GPA validation - must be >= 70
-    if (!formData.actual_gpa.trim()) {
-      newErrors.actual_gpa = "GPA is required"
-    } else {
-      const gpaValue = parseFloat(formData.actual_gpa)
-      if (isNaN(gpaValue) || gpaValue < 0 || gpaValue > 100) {
-        newErrors.actual_gpa = "GPA must be between 0 and 100"
-      } else if (gpaValue < 70) {
-        newErrors.actual_gpa = "GPA must be 70% or higher to proceed"
+    if (formData.funding_type === 'puc') {
+      if (!formData.actual_gpa.trim()) {
+        newErrors.actual_gpa = "GPA is required for PUC"
+      } else {
+        const gpaValue = parseFloat(formData.actual_gpa)
+        if (isNaN(gpaValue) || gpaValue < 0 || gpaValue > 100) {
+          newErrors.actual_gpa = "GPA must be between 0 and 100"
+        } else if (gpaValue < 70) {
+          newErrors.actual_gpa = "GPA must be 70% or higher for PUC"
+        }
       }
-    }
-
-    // ktech Intended Major validation
-    if (!formData.intended_major) {
-      newErrors.intended_major = "Intended major is required"
     }
 
     setErrors(newErrors)
@@ -227,33 +317,64 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   }
 
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
-    const leadData = {
+    const leadData: Partial<Lead> = {
+      // Personal
       first_name: formData.first_name,
       last_name: formData.last_name,
       gender: formData.gender || undefined,
+      nationality: formData.nationality || undefined as unknown as string,
+      address: formData.address || undefined,
+      is_transfer_student: formData.is_transfer_student,
+      is_special_needs: formData.is_special_needs,
+      is_diplomatic: formData.is_diplomatic,
+      is_athlete: formData.is_athlete,
+      is_married: formData.is_married,
+      is_employee: formData.is_employee,
+      is_marketing_student: formData.is_marketing_student,
+      // Contact
       phone: formData.phone.replace(/\D/g, ""),
       phone_secondary: formData.phone_secondary.replace(/\D/g, "") || undefined,
-      civil_id: formData.civil_id.replace(/\D/g, ""),
-      seat_number: formData.seat_number.trim(),
+      email: formData.email || undefined,
+      civil_id: formData.civil_id.replace(/\D/g, "") || undefined,
+      date_of_birth: formData.date_of_birth || undefined,
+      // Source
+      source_category: formData.source_category || undefined,
+      source: formData.source || undefined,
+      source_detail: formData.source_detail || undefined,
+      // Academic
       school: dbSchools.length > 0 ? undefined : (formData.school || undefined) as School | undefined,
       school_id: dbSchools.length > 0 && formData.school ? formData.school : undefined,
-      actual_gpa: parseFloat(formData.actual_gpa),
-      gpa_grade_11: parseFloat(formData.actual_gpa),
-      funding_type: "puc" as const,
-      intended_major: formData.intended_major as IntendedMajor,
-      // Placement Test fields
+      education_type: formData.education_type || undefined,
+      education_type_custom: formData.education_type_custom || undefined,
+      grade_level: formData.grade_level || undefined,
+      academic_track: formData.academic_track || undefined,
+      funding_type: formData.funding_type || undefined,
+      semester_id: formData.semester_id || undefined as unknown as string,
+      intended_major: formData.intended_major as IntendedMajor || undefined,
+      preferred_major: formData.preferred_major || undefined,
+      preferred_college: formData.preferred_college || undefined,
+      graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : undefined,
+      expected_gpa: formData.expected_gpa ? parseFloat(formData.expected_gpa) : undefined,
+      actual_gpa: formData.actual_gpa ? parseFloat(formData.actual_gpa) : undefined,
+      gpa_grade_11: formData.actual_gpa ? parseFloat(formData.actual_gpa) : undefined,
+      seat_number: formData.seat_number.trim() || undefined,
+      // Placement
       has_ielts_toefl: formData.has_ielts_toefl,
       placement_english_override: formData.placement_english_override,
       placement_math_override: formData.placement_math_override,
       placement_computer_override: formData.placement_computer_override,
       placement_level: hasAnyPlacementData ? calculatedPlacementLevel : lead.placement_level,
-    }
+      // Discount (SF only)
+      discount_type: formData.funding_type === 'self_funded' ? formData.discount_type || undefined : undefined,
+      discount_notes: formData.funding_type === 'self_funded' ? formData.discount_notes || undefined : undefined,
+      // Ministry
+      ministry_blocked: formData.ministry_blocked,
+      ministry_block_reasons: formData.ministry_blocked ? formData.ministry_block_reasons : [],
+    } as Partial<Lead>
 
-    const result = await updateLead(lead.id, leadData as Partial<Lead>)
+    const result = await updateLead(lead.id, leadData)
 
     if (result.error) {
       setErrors({ submit: result.error })
@@ -263,7 +384,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   }
 
   const handleChange = (field: string, value: string) => {
-    // If changing gender, clear school if it doesn't match the new gender
     if (field === 'gender') {
       setFormData(prev => {
         const currentSchool = schoolSource.find(s => s.id === prev.school)
@@ -272,11 +392,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           ? (value === 'male' && gender !== 'boys' && gender !== 'male' && gender !== 'mixed')
             || (value === 'female' && gender !== 'girls' && gender !== 'female' && gender !== 'mixed')
           : false
-        return {
-          ...prev,
-          gender: value,
-          school: genderMismatch ? "" : prev.school,
-        }
+        return { ...prev, gender: value, school: genderMismatch ? "" : prev.school }
       })
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
@@ -284,14 +400,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
-    // Clear MOE fetch result when credentials change
     if (field === 'civil_id' || field === 'seat_number') {
       setMoeFetchResult(null)
     }
   }
 
   const handleMOEFetch = async () => {
-    // Validate that we have both civil_id and seat_number
     const civilId = formData.civil_id.replace(/\D/g, "")
     const seatNumber = formData.seat_number.trim()
 
@@ -299,7 +413,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       setMoeFetchResult({ success: false, message: "Valid Civil ID is required (12 digits starting with 2 or 3)" })
       return
     }
-
     if (!seatNumber) {
       setMoeFetchResult({ success: false, message: "Seat Number is required to fetch GPA from MOE" })
       return
@@ -312,9 +425,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       const response = await fetch("/api/moe/fetch-gpa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadIds: [lead.id],
-        }),
+        body: JSON.stringify({ leadIds: [lead.id] }),
       })
 
       const data = (await response.json()) as MOEFetchResponse | { error: string }
@@ -327,10 +438,8 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       const result = fetchResponse.results[0]
 
       if (result?.success && result.gpa !== undefined) {
-        // Update the form with the fetched GPA
         setFormData(prev => ({ ...prev, actual_gpa: result.gpa!.toString() }))
         setMoeFetchResult({ success: true, message: `GPA ${result.gpa}% fetched successfully from MOE portal` })
-        // Trigger a refetch of the lead data
         onSuccess?.()
       } else {
         setMoeFetchResult({ success: false, message: result?.error || "Failed to fetch GPA from MOE portal" })
@@ -344,7 +453,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
 
   const canFetchMOE = formData.civil_id.trim() && formData.seat_number.trim()
 
-  // Auto-calculate placement level based on passed subjects
+  // Auto-calculate placement level
   const englishPassed = formData.has_ielts_toefl || formData.placement_english_override || (lead.placement_english_passed ?? false)
   const mathPassed = formData.placement_math_override || (lead.placement_math_passed ?? false)
   const computerPassed = formData.placement_computer_override || (lead.placement_computer_passed ?? false)
@@ -357,7 +466,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   } else {
     calculatedPlacementLevel = 'foundation_1'
   }
-  // Only show level if at least one subject score exists or test was taken
+
   const hasAnyPlacementData = lead.placement_english_passed !== undefined ||
     lead.placement_english_score !== undefined ||
     lead.placement_math_score !== undefined ||
@@ -366,6 +475,39 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     formData.placement_english_override ||
     formData.placement_math_override ||
     formData.placement_computer_override
+
+  // Close nationality dropdown on outside click
+  useEffect(() => {
+    if (!isNationalityDropdownOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (nationalityRef.current && !nationalityRef.current.contains(e.target as Node)) {
+        setIsNationalityDropdownOpen(false)
+        setNationalitySearch("")
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [isNationalityDropdownOpen])
+
+  // Section header component
+  const SectionHeader = ({ icon: Icon, title, open, onToggle, iconBg }: {
+    icon: typeof User, title: string, open: boolean, onToggle: () => void, iconBg?: string
+  }) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex items-center gap-2 w-full text-left cursor-pointer"
+    >
+      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", iconBg || "bg-[var(--primary-muted)]")}>
+        <Icon className={cn("w-4 h-4", iconBg ? "text-white" : "text-[var(--primary)]")} />
+      </div>
+      <h4 className="font-semibold text-[var(--text-primary)]">{title}</h4>
+      <ChevronDown className={cn(
+        "w-4 h-4 text-[var(--text-muted)] transition-transform ml-auto",
+        open && "rotate-180"
+      )} />
+    </button>
+  )
 
   return (
     <div className="space-y-6">
@@ -380,8 +522,8 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         </motion.div>
       )}
 
-      {/* GPA Warning Banner */}
-      {hasGpaError && (
+      {/* GPA Warning Banner (PUC only) */}
+      {hasGpaError && formData.funding_type === 'puc' && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -408,15 +550,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         />
       )}
 
-      {/* Name Fields */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 1: Personal Information */}
+      {/* ═══════════════════════════════════════════ */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-              <User className="w-4 h-4 text-[var(--primary)]" />
-            </div>
-            <h4 className="font-semibold text-[var(--text-primary)]">Student Name</h4>
-          </div>
+        <div className="flex items-center justify-between">
+          <SectionHeader icon={User} title="Personal Information" open={personalOpen} onToggle={() => setPersonalOpen(!personalOpen)} />
           <div>
             <input
               ref={civilIdFileRef}
@@ -448,384 +587,864 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </Button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4 pl-10">
-          <div className="space-y-2">
-            <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
-            <Input
-              id="first_name"
-              value={formData.first_name}
-              onChange={(e) => handleChange("first_name", e.target.value)}
-              placeholder="الاسم الأول"
-              dir="rtl"
-              error={errors.first_name}
-            />
-            {errors.first_name && (
-              <p className="text-xs text-[var(--error)]">{errors.first_name}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="last_name">Last Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
-            <Input
-              id="last_name"
-              value={formData.last_name}
-              onChange={(e) => handleChange("last_name", e.target.value)}
-              placeholder="اسم العائلة"
-              dir="rtl"
-              error={errors.last_name}
-            />
-            {errors.last_name && (
-              <p className="text-xs text-[var(--error)]">{errors.last_name}</p>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Gender */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <Users className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Gender</h4>
-        </div>
-        <div className="flex gap-3 pl-10">
-          {[
-            { value: "male", label: "Male" },
-            { value: "female", label: "Female" },
-          ].map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => handleChange("gender", formData.gender === option.value ? "" : option.value)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
-                formData.gender === option.value
-                  ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                  : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50"
-              )}
-            >
-              <Users className="w-4 h-4" />
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Mobile */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <Phone className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Mobile</h4>
-        </div>
-        <div className="pl-10 grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="phone">Mobile Number *</Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              placeholder="9876 5432"
-              maxLength={8}
-              icon={<Phone className="w-4 h-4" />}
-              error={errors.phone}
-            />
-            {errors.phone && (
-              <p className="text-xs text-[var(--error)]">{errors.phone}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone_secondary">Secondary Number</Label>
-            <Input
-              id="phone_secondary"
-              value={formData.phone_secondary}
-              onChange={(e) => handleChange("phone_secondary", e.target.value)}
-              placeholder="9876 5432"
-              maxLength={8}
-              icon={<Phone className="w-4 h-4" />}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Civil ID & Seat Number */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <CreditCard className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Civil ID & Seat Number</h4>
-        </div>
-        <div className="pl-10 grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="civil_id">Civil ID Number *</Label>
-            <Input
-              id="civil_id"
-              value={formData.civil_id}
-              onChange={(e) => handleChange("civil_id", e.target.value)}
-              placeholder="298765432109"
-              maxLength={12}
-              error={errors.civil_id}
-            />
-            {errors.civil_id && (
-              <p className="text-xs text-[var(--error)]">{errors.civil_id}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="seat_number">Seat Number (for MOE)</Label>
-            <Input
-              id="seat_number"
-              value={formData.seat_number}
-              onChange={(e) => handleChange("seat_number", e.target.value)}
-              placeholder="Enter seat number"
-            />
-            <p className="text-xs text-[var(--text-muted)]">
-              Required to fetch GPA from MOE portal
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* School */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <Building2 className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">School</h4>
-        </div>
-        <div className="pl-10">
-          <div className="space-y-2">
-            <Label>School *</Label>
-            <div className="relative">
-              <div
-                onClick={() => setIsSchoolDropdownOpen(!isSchoolDropdownOpen)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all",
-                  errors.school
-                    ? "border-[var(--error)] ring-1 ring-[var(--error)]/20"
-                    : isSchoolDropdownOpen
-                    ? "border-[var(--primary)] ring-2 ring-[var(--primary)]/20"
-                    : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                )}
-              >
-                <Building2 className="w-4 h-4 text-[var(--text-muted)]" />
-                <span className={formData.school ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}>
-                  {formData.school ? (schoolSource.find(s => s.id === formData.school)?.name_ar || formData.school) : "Select school"}
-                </span>
+        {personalOpen && (
+          <div className="space-y-4 pl-10">
+            {/* Name */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
+                <Input
+                  id="first_name"
+                  value={formData.first_name}
+                  onChange={(e) => handleChange("first_name", e.target.value)}
+                  placeholder="الاسم الأول"
+                  dir="rtl"
+                  error={errors.first_name}
+                />
+                {errors.first_name && <p className="text-xs text-[var(--error)]">{errors.first_name}</p>}
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="last_name">Last Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
+                <Input
+                  id="last_name"
+                  value={formData.last_name}
+                  onChange={(e) => handleChange("last_name", e.target.value)}
+                  placeholder="اسم العائلة"
+                  dir="rtl"
+                  error={errors.last_name}
+                />
+                {errors.last_name && <p className="text-xs text-[var(--error)]">{errors.last_name}</p>}
+              </div>
+            </div>
 
-              {isSchoolDropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
-                  <div className="p-2 border-b border-[var(--border)]">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-                      <input
-                        type="text"
-                        value={schoolSearch}
-                        onChange={(e) => setSchoolSearch(e.target.value)}
-                        placeholder="Search schools..."
-                        className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
-                        autoFocus
-                      />
+            {/* Gender */}
+            <div className="space-y-2">
+              <Label>Gender</Label>
+              <div className="flex gap-3">
+                {[
+                  { value: "male", label: "Male" },
+                  { value: "female", label: "Female" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleChange("gender", formData.gender === option.value ? "" : option.value)}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                      formData.gender === option.value
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                        : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50"
+                    )}
+                  >
+                    <Users className="w-4 h-4" />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Nationality */}
+            <div ref={nationalityRef} className={cn("relative space-y-2", isNationalityDropdownOpen && "z-50")}>
+              <Label>Nationality</Label>
+              <div className="relative">
+                <div
+                  onClick={() => setIsNationalityDropdownOpen(!isNationalityDropdownOpen)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all",
+                    isNationalityDropdownOpen
+                      ? "border-[var(--primary)] ring-2 ring-[var(--primary)]/20"
+                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                  )}
+                >
+                  <Globe className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className={formData.nationality ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}>
+                    {formData.nationality ? NATIONALITIES.find(n => n.value === formData.nationality)?.label || formData.nationality : "Select nationality"}
+                  </span>
+                </div>
+
+                {isNationalityDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
+                    <div className="p-2 border-b border-[var(--border)]">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                        <input
+                          type="text"
+                          value={nationalitySearch}
+                          onChange={(e) => setNationalitySearch(e.target.value)}
+                          placeholder="Search nationalities..."
+                          className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredNationalities.length > 0 ? (
+                        filteredNationalities.map((nationality) => (
+                          <button
+                            key={nationality.value}
+                            type="button"
+                            onClick={() => {
+                              handleChange("nationality", nationality.value)
+                              setIsNationalityDropdownOpen(false)
+                              setNationalitySearch("")
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
+                              formData.nationality === nationality.value && "bg-[var(--primary-muted)] text-[var(--primary)]"
+                            )}
+                          >
+                            {nationality.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-4 text-sm text-center text-[var(--text-muted)]">No nationalities found</div>
+                      )}
                     </div>
                   </div>
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredSchools.length > 0 ? (
-                      filteredSchools.map((school) => (
-                        <button
-                          key={school.id}
-                          type="button"
-                          onClick={() => {
-                            handleChange("school", school.id)
-                            setIsSchoolDropdownOpen(false)
-                            setSchoolSearch("")
-                          }}
-                          className={cn(
-                            "w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
-                            formData.school === school.id && "bg-[var(--primary-muted)] text-[var(--primary)]"
-                          )}
-                        >
-                          <span>{school.name_ar}</span>
-                          <span className="block text-xs text-[var(--text-muted)]">{school.name_en}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-3 py-4 text-sm text-center text-[var(--text-muted)]">
-                        No schools found
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            {errors.school && (
-              <p className="text-xs text-[var(--error)]">{errors.school}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Actual GPA */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <GraduationCap className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Actual GPA</h4>
-        </div>
-        <div className="pl-10">
-          <div className="space-y-3">
-            {/* MOE Fetch Button */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-              <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-blue-700 dark:text-blue-300 text-sm">
-                  Fetch from Ministry of Education
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  {canFetchMOE
-                    ? "Click to automatically retrieve GPA using Civil ID and Seat Number"
-                    : "Enter Civil ID and Seat Number above to enable"}
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={handleMOEFetch}
-                disabled={!canFetchMOE || moeFetching}
-                className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
-                size="sm"
-              >
-                {moeFetching ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Fetching...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Fetch GPA
-                  </>
                 )}
-              </Button>
+              </div>
             </div>
 
-            {/* MOE Fetch Result */}
-            {moeFetchResult && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn(
-                  "flex items-center gap-2 p-3 rounded-lg text-sm",
-                  moeFetchResult.success
-                    ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                    : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                )}
-              >
-                {moeFetchResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                ) : (
-                  <XCircle className="w-4 h-4 shrink-0" />
-                )}
-                {moeFetchResult.message}
-              </motion.div>
-            )}
-
-            {/* Manual GPA Input */}
+            {/* Address */}
             <div className="space-y-2">
-              <Label htmlFor="actual_gpa">GPA Percentage * (must be 70% or higher)</Label>
+              <Label htmlFor="address">Address</Label>
               <Input
-                id="actual_gpa"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                value={formData.actual_gpa}
-                onChange={(e) => handleChange("actual_gpa", e.target.value)}
-                placeholder="e.g. 75"
-                className={cn(
-                  hasGpaError && "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:ring-red-500/20"
-                )}
-                error={errors.actual_gpa}
+                id="address"
+                placeholder="Enter address..."
+                value={formData.address}
+                onChange={(e) => handleChange("address", e.target.value)}
               />
-              {errors.actual_gpa && (
-                <p className="text-xs text-[var(--error)]">{errors.actual_gpa}</p>
-              )}
-              <p className="text-xs text-[var(--text-muted)]">
-                Minimum GPA of 70% is required for PUC scholarship eligibility
-              </p>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Funding Type - Fixed to PUC */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center">
-            <GraduationCap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Funding Type</h4>
-        </div>
-        <div className="pl-10">
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-            <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-amber-700 dark:text-amber-300">PUC Scholarship</p>
-              <p className="text-sm text-amber-600 dark:text-amber-400">Government scholarship program</p>
-            </div>
-            <Check className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-          </div>
-        </div>
-      </div>
-
-      {/* ktech Intended Major */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <GraduationCap className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">ktech Intended Major</h4>
-        </div>
-        <div className="pl-10">
-          <div className="space-y-2">
-            <Label>ktech Intended Major *</Label>
-            <Select
-              value={formData.intended_major}
-              onValueChange={(value) => handleChange("intended_major", value)}
-            >
-              <SelectTrigger className={errors.intended_major ? "border-[var(--error)]" : ""}>
-                <SelectValue placeholder="Select intended major" />
-              </SelectTrigger>
-              <SelectContent>
-                {MAJORS.map((major) => (
-                  <SelectItem key={major.value} value={major.value}>
-                    {major.label}
-                  </SelectItem>
+            {/* Student Profile Checkboxes */}
+            <div className="pt-2">
+              <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-3 block">Student Profile</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  { key: 'is_transfer_student', label: 'Transfer Student', icon: UserCheck, color: 'blue' },
+                  { key: 'is_special_needs', label: 'Special Needs', icon: Heart, color: 'rose' },
+                  { key: 'is_diplomatic', label: 'Diplomatic', icon: Globe, color: 'amber' },
+                  { key: 'is_athlete', label: 'Athlete', icon: Trophy, color: 'orange' },
+                  { key: 'is_married', label: 'Married', icon: Users, color: 'pink' },
+                  { key: 'is_employee', label: 'Employee', icon: Briefcase, color: 'indigo' },
+                  { key: 'is_marketing_student', label: 'Marketing Student', icon: Megaphone, color: 'teal' },
+                ] as const).map(({ key, label, icon: ItemIcon, color }) => (
+                  <div
+                    key={key}
+                    onClick={() => setFormData(prev => ({ ...prev, [key]: !prev[key] }))}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                      formData[key]
+                        ? `border-${color}-500 bg-${color}-50 dark:bg-${color}-950/30`
+                        : `border-[var(--border)] hover:border-${color}-300`
+                    )}
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                      formData[key]
+                        ? `bg-${color}-500 text-white`
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                    )}>
+                      <ItemIcon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
+                    </div>
+                    <Switch
+                      checked={formData[key]}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, [key]: checked }))}
+                    />
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
-            {errors.intended_major && (
-              <p className="text-xs text-[var(--error)]">{errors.intended_major}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 2: Contact Information */}
+      {/* ═══════════════════════════════════════════ */}
+      <div className="space-y-4">
+        <SectionHeader icon={Phone} title="Contact Information" open={contactOpen} onToggle={() => setContactOpen(!contactOpen)} />
+
+        {contactOpen && (
+          <div className="space-y-4 pl-10">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number *</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleChange("phone", e.target.value)}
+                  placeholder="9876 5432"
+                  maxLength={8}
+                  icon={<Phone className="w-4 h-4" />}
+                  error={errors.phone}
+                />
+                {errors.phone && <p className="text-xs text-[var(--error)]">{errors.phone}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone_secondary">Secondary Phone</Label>
+                <Input
+                  id="phone_secondary"
+                  value={formData.phone_secondary}
+                  onChange={(e) => handleChange("phone_secondary", e.target.value)}
+                  placeholder="5555 1234"
+                  maxLength={8}
+                  icon={<Phone className="w-4 h-4" />}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleChange("email", e.target.value)}
+                  placeholder="email@example.com"
+                  icon={<Mail className="w-4 h-4" />}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="civil_id">Civil ID</Label>
+                <Input
+                  id="civil_id"
+                  value={formData.civil_id}
+                  onChange={(e) => handleChange("civil_id", e.target.value)}
+                  placeholder="298765432109"
+                  maxLength={12}
+                  error={errors.civil_id}
+                />
+                {errors.civil_id && <p className="text-xs text-[var(--error)]">{errors.civil_id}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date_of_birth">Date of Birth</Label>
+                <Input
+                  id="date_of_birth"
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => handleChange("date_of_birth", e.target.value)}
+                  disabled={!!formData.civil_id && formData.date_of_birth !== ""}
+                />
+                {formData.civil_id && formData.date_of_birth && (
+                  <p className="text-xs text-[var(--text-muted)]">Auto-extracted from Civil ID</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seat_number">Seat Number (MOE)</Label>
+                <Input
+                  id="seat_number"
+                  value={formData.seat_number}
+                  onChange={(e) => handleChange("seat_number", e.target.value)}
+                  placeholder="Enter seat number"
+                />
+                <p className="text-xs text-[var(--text-muted)]">Required to fetch GPA from MOE portal</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 3: Lead Source */}
+      {/* ═══════════════════════════════════════════ */}
+      <div className="space-y-4">
+        <SectionHeader icon={Sparkles} title="Lead Source" open={sourceOpen} onToggle={() => setSourceOpen(!sourceOpen)} />
+
+        {sourceOpen && (
+          <div className="space-y-4 pl-10">
+            <div className="space-y-2">
+              <Label>Source Category</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {SOURCE_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => {
+                      handleChange("source_category", cat.value)
+                      const categoryMap: Record<string, string> = {
+                        direct: "walk_in",
+                        events: "school_visit",
+                        marketing: "website_form",
+                        referrals: "current_student_referral",
+                        outreach: "old_contacts",
+                      }
+                      handleChange("source", categoryMap[cat.value] || "")
+                    }}
+                    className={cn(
+                      "flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all",
+                      formData.source_category === cat.value
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                    )}
+                  >
+                    <span className="text-lg">{cat.icon}</span>
+                    <span className="text-xs font-medium">{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Source</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {filteredSources.map((source) => (
+                  <button
+                    key={source.value}
+                    type="button"
+                    onClick={() => handleChange("source", source.value)}
+                    className={cn(
+                      "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
+                      formData.source === source.value
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                      formData.source === source.value
+                        ? "border-[var(--primary)] bg-[var(--primary)]"
+                        : "border-[var(--border)]"
+                    )}>
+                      {formData.source === source.value && (
+                        <Check className="w-2.5 h-2.5 text-white" />
+                      )}
+                    </div>
+                    {source.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Exhibition Name */}
+            {formData.source === "exhibitions" && (
+              <div className="space-y-2">
+                <Label>Exhibition Name</Label>
+                <Select
+                  value={formData.source_detail || ""}
+                  onValueChange={(value) => handleChange("source_detail", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select exhibition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeExhibitions.map((exhibition) => (
+                      <SelectItem key={exhibition.id} value={exhibition.name}>
+                        {exhibition.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
-          {lead.ministry_accepted_major && (
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 4: Academic Information */}
+      {/* ═══════════════════════════════════════════ */}
+      <div className="space-y-4">
+        <SectionHeader icon={GraduationCap} title="Academic Information" open={academicOpen} onToggle={() => setAcademicOpen(!academicOpen)} />
+
+        {academicOpen && (
+          <div className="space-y-4 pl-10">
+            {/* School */}
             <div className="space-y-2">
-              <Label>Ministry Accepted Major</Label>
-              <div className="px-3 py-2.5 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] text-sm text-[var(--text-secondary)]">
-                {lead.ministry_accepted_major}
+              <Label>School</Label>
+              <div className="relative">
+                <div
+                  onClick={() => setIsSchoolDropdownOpen(!isSchoolDropdownOpen)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all",
+                    isSchoolDropdownOpen
+                      ? "border-[var(--primary)] ring-2 ring-[var(--primary)]/20"
+                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                  )}
+                >
+                  <Building2 className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className={formData.school ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}>
+                    {formData.school ? (schoolSource.find(s => s.id === formData.school)?.name_ar || formData.school) : "Select school"}
+                  </span>
+                </div>
+
+                {isSchoolDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                    <div className="p-2 border-b border-[var(--border)]">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                        <input
+                          type="text"
+                          value={schoolSearch}
+                          onChange={(e) => setSchoolSearch(e.target.value)}
+                          placeholder="Search schools..."
+                          className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredSchools.length > 0 ? (
+                        filteredSchools.map((school) => (
+                          <button
+                            key={school.id}
+                            type="button"
+                            onClick={() => {
+                              handleChange("school", school.id)
+                              setIsSchoolDropdownOpen(false)
+                              setSchoolSearch("")
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
+                              formData.school === school.id && "bg-[var(--primary-muted)] text-[var(--primary)]"
+                            )}
+                          >
+                            <span>{school.name_ar}</span>
+                            <span className="block text-xs text-[var(--text-muted)]">{school.name_en}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-4 text-sm text-center text-[var(--text-muted)]">No schools found</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Education Type */}
+            <div className="space-y-2">
+              <Label>Education Type</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {EDUCATION_TYPES.map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        education_type: prev.education_type === type.value ? "" : type.value,
+                        education_type_custom: type.value !== 'other' ? "" : prev.education_type_custom,
+                      }))
+                    }}
+                    className={cn(
+                      "flex flex-col items-center gap-1 p-3 rounded-xl border transition-all text-center",
+                      formData.education_type === type.value
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                    )}
+                  >
+                    <span className={cn(
+                      "text-sm font-bold",
+                      formData.education_type === type.value ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
+                    )}>
+                      {type.label}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)] leading-tight">{type.description}</span>
+                  </button>
+                ))}
+              </div>
+              {formData.education_type === 'other' && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-2">
+                  <Input
+                    placeholder="Enter education type..."
+                    value={formData.education_type_custom}
+                    onChange={(e) => setFormData(prev => ({ ...prev, education_type_custom: e.target.value }))}
+                  />
+                </motion.div>
+              )}
+            </div>
+
+            {/* Grade Level */}
+            <div className="space-y-2">
+              <Label>Grade</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: "10th", label: "10" },
+                  { value: "11th", label: "11" },
+                  { value: "12th", label: "12" },
+                ].map((grade) => (
+                  <button
+                    key={grade.value}
+                    type="button"
+                    onClick={() => handleChange("grade_level", formData.grade_level === grade.value ? "" : grade.value)}
+                    className={cn(
+                      "flex items-center justify-center p-3 rounded-xl border transition-all text-sm font-bold",
+                      formData.grade_level === grade.value
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                        : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-primary)]"
+                    )}
+                  >
+                    {grade.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Funding Type */}
+            <div className="space-y-2">
+              <Label>Funding Type</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleChange("funding_type", "self_funded")}
+                  className={cn(
+                    "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                    formData.funding_type === "self_funded"
+                      ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    formData.funding_type === "self_funded"
+                      ? "bg-[var(--primary)] text-white"
+                      : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                  )}>
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-[var(--text-primary)]">Self-Funded</p>
+                    <p className="text-xs text-[var(--text-muted)]">Private payment</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChange("funding_type", "puc")}
+                  className={cn(
+                    "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                    formData.funding_type === "puc"
+                      ? "border-[var(--accent)] bg-[var(--accent)]/10"
+                      : "border-[var(--border)] hover:border-[var(--accent)]/50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    formData.funding_type === "puc"
+                      ? "bg-[var(--accent)] text-white"
+                      : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                  )}>
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-[var(--text-primary)]">PUC</p>
+                    <p className="text-xs text-[var(--text-muted)]">Government scholarship</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Term */}
+            <div className="space-y-2">
+              <Label>Term</Label>
+              <Select
+                value={formData.semester_id}
+                onValueChange={(value) => handleChange("semester_id", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select term" />
+                </SelectTrigger>
+                <SelectContent>
+                  {semesters.filter(s => s.is_active).map((semester) => (
+                    <SelectItem key={semester.id} value={semester.id}>
+                      {semester.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Majors & Graduation */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>ktech Intended Major</Label>
+                <Select
+                  value={formData.intended_major}
+                  onValueChange={(value) => handleChange("intended_major", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select intended major" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAJORS.map((major) => (
+                      <SelectItem key={major.value} value={major.value}>
+                        {major.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Graduation Year</Label>
+                <Select
+                  value={formData.graduation_year}
+                  onValueChange={(value) => handleChange("graduation_year", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select graduation year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 2030 - 1980 + 1 }, (_, i) => 1980 + i).map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="preferred_major">Preferred Major</Label>
+                <Input
+                  id="preferred_major"
+                  value={formData.preferred_major}
+                  onChange={(e) => handleChange("preferred_major", e.target.value)}
+                  placeholder="Enter preferred major"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ministry_accepted_major">ktech Actual Major</Label>
+                <Input
+                  id="ministry_accepted_major"
+                  value={formData.ministry_accepted_major}
+                  placeholder="From ministry file"
+                  disabled
+                />
+              </div>
+            </div>
+
+            {/* GPA Section */}
+            <div className="space-y-3">
+              <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide">GPA Scores (0-100%)</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="expected_gpa" className="text-xs">Expected GPA</Label>
+                  <Input
+                    id="expected_gpa"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.expected_gpa}
+                    onChange={(e) => handleChange("expected_gpa", e.target.value)}
+                    placeholder="e.g. 85"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="actual_gpa" className="text-xs">Actual Cumulative GPA</Label>
+                  <Input
+                    id="actual_gpa"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.actual_gpa}
+                    onChange={(e) => handleChange("actual_gpa", e.target.value)}
+                    placeholder="e.g. 82"
+                    className={cn(
+                      hasGpaError && "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:ring-red-500/20"
+                    )}
+                    error={errors.actual_gpa}
+                  />
+                  {errors.actual_gpa && <p className="text-xs text-[var(--error)]">{errors.actual_gpa}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Type</Label>
+                  <Select
+                    value={formData.academic_track}
+                    onValueChange={(value) => handleChange("academic_track", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="science">Science</SelectItem>
+                      <SelectItem value="arts">Art</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* MOE Fetch Button (for PUC) */}
+            {formData.funding_type === 'puc' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-blue-700 dark:text-blue-300 text-sm">
+                      Fetch from Ministry of Education
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      {canFetchMOE
+                        ? "Click to automatically retrieve GPA using Civil ID and Seat Number"
+                        : "Enter Civil ID and Seat Number above to enable"}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleMOEFetch}
+                    disabled={!canFetchMOE || moeFetching}
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    {moeFetching ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <BookOpen className="w-4 h-4 mr-2" />
+                        Fetch GPA
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {moeFetchResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "flex items-center gap-2 p-3 rounded-lg text-sm",
+                      moeFetchResult.success
+                        ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                        : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                    )}
+                  >
+                    {moeFetchResult.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+                    {moeFetchResult.message}
+                  </motion.div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 5: Discount (Self-Funded only) */}
+      {/* ═══════════════════════════════════════════ */}
+      {formData.funding_type === 'self_funded' && (
+        <div className="space-y-4">
+          <SectionHeader icon={Percent} title="Discount" open={discountOpen} onToggle={() => setDiscountOpen(!discountOpen)} iconBg="bg-emerald-500" />
+
+          {discountOpen && (
+            <div className="space-y-4 pl-10">
+              <div className="space-y-2">
+                <Label>Discount Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DISCOUNT_TYPES.map((type) => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => {
+                        const isSelected = formData.discount_type === type.value
+                        setFormData(prev => ({
+                          ...prev,
+                          discount_type: isSelected ? "" : type.value,
+                          discount_percentage: isSelected ? "" : (type.percentage?.toString() || prev.discount_percentage),
+                        }))
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
+                        formData.discount_type === type.value
+                          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
+                          : "border-[var(--border)] hover:border-emerald-300 text-[var(--text-secondary)]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                        formData.discount_type === type.value
+                          ? "border-emerald-500 bg-emerald-500"
+                          : "border-[var(--border)]"
+                      )}>
+                        {formData.discount_type === type.value && (
+                          <Check className="w-2.5 h-2.5 text-white" />
+                        )}
+                      </div>
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Send Declaration on WhatsApp */}
+              {(['kuwaiti_new_certificate', 'kuwaiti_old_certificate', 'non_kuwaiti'] as string[]).includes(formData.discount_type) && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20"
+                >
+                  <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center shrink-0">
+                    <Send className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Declaration Document Required</p>
+                    <p className="text-xs text-emerald-600/70 dark:text-emerald-500/70">
+                      Send the declaration form to {formData.first_name || 'the student'} on WhatsApp
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const phone = formData.phone.replace(/\D/g, "")
+                      const formattedPhone = phone.startsWith("965") ? phone : `965${phone}`
+                      const discountLabel = DISCOUNT_TYPES.find(t => t.value === formData.discount_type)?.label || formData.discount_type
+                      const studentName = [formData.first_name, formData.last_name].filter(Boolean).join(' ') || 'Student'
+                      const message = `مرحباً ${studentName}،\n\nنود إعلامكم بأنه تم تطبيق خصم (${discountLabel}) على ملفكم في كلية الكويت للتكنولوجيا.\n\nيرجى تعبئة وتوقيع نموذج الإقرار المرفق وإعادته إلينا في أقرب وقت.\n\nشكراً لكم،\nقسم القبول - ktech`
+                      const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+                      window.open(whatsappUrl, "_blank")
+                      setDeclarationSent(true)
+                      setTimeout(() => setDeclarationSent(false), 3000)
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0",
+                      declarationSent
+                        ? "bg-emerald-500 text-white"
+                        : "bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-sm hover:shadow"
+                    )}
+                  >
+                    {declarationSent ? (
+                      <><Check className="w-4 h-4" /> Sent</>
+                    ) : (
+                      <><Send className="w-4 h-4" /> Send Declaration</>
+                    )}
+                  </button>
+                </motion.div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="discount_notes">Discount Notes</Label>
+                <Textarea
+                  id="discount_notes"
+                  value={formData.discount_notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, discount_notes: e.target.value }))}
+                  placeholder="Notes about the discount..."
+                  rows={2}
+                />
               </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Placement Test */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 6: Placement Test */}
+      {/* ═══════════════════════════════════════════ */}
       <div className="space-y-4">
         <button
           type="button"
@@ -836,6 +1455,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             <ClipboardList className="w-4 h-4 text-[var(--primary)]" />
           </div>
           <h4 className="font-semibold text-[var(--text-primary)]">Placement Test</h4>
+          {lead.placement_lms_synced && (
+            <span className="ml-2 flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950/30 px-2 py-1 rounded-full">
+              <RefreshCw className="w-3 h-3" />
+              LMS Synced
+            </span>
+          )}
           <ChevronDown className={cn(
             "w-4 h-4 text-[var(--text-muted)] transition-transform ml-auto",
             placementOpen && "rotate-180"
@@ -1032,11 +1657,108 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         )}
       </div>
 
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 7: Ministry Blocked */}
+      {/* ═══════════════════════════════════════════ */}
+      <div className="space-y-4">
+        <SectionHeader icon={Ban} title="Ministry Blocking" open={ministryOpen} onToggle={() => setMinistryOpen(!ministryOpen)} />
+
+        {ministryOpen && (
+          <div className="space-y-4 pl-10">
+            <div
+              onClick={() => setFormData(prev => ({ ...prev, ministry_blocked: !prev.ministry_blocked }))}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                formData.ministry_blocked
+                  ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                  : "border-[var(--border)] hover:border-red-300"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                formData.ministry_blocked
+                  ? "bg-red-500 text-white"
+                  : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+              )}>
+                <Ban className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">Ministry Blocked</p>
+                <p className="text-xs text-[var(--text-muted)]">Block this lead from ministry submission</p>
+              </div>
+              <Switch
+                checked={formData.ministry_blocked}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ministry_blocked: checked }))}
+              />
+            </div>
+
+            {formData.ministry_blocked && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                <div className="space-y-2">
+                  <Label>Block Reasons</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {MINISTRY_BLOCK_REASONS.map((reason) => {
+                      const isSelected = formData.ministry_block_reasons.includes(reason.value)
+                      return (
+                        <button
+                          key={reason.value}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              ministry_block_reasons: isSelected
+                                ? prev.ministry_block_reasons.filter(r => r !== reason.value)
+                                : [...prev.ministry_block_reasons, reason.value],
+                            }))
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                            isSelected
+                              ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                              : "border-[var(--border)] text-[var(--text-secondary)] hover:border-red-300"
+                          )}
+                        >
+                          {reason.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Section 8: Notes */}
+      {/* ═══════════════════════════════════════════ */}
+      <div className="space-y-4">
+        <SectionHeader icon={FileText} title="Notes" open={notesOpen} onToggle={() => setNotesOpen(!notesOpen)} />
+
+        {notesOpen && (
+          <div className="space-y-4 pl-10">
+            <div className="space-y-2">
+              <Label htmlFor="notes">Additional Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                placeholder="Additional notes about this lead..."
+                rows={4}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════ */}
       {/* Save Button */}
+      {/* ═══════════════════════════════════════════ */}
       <div className="pt-4 border-t border-[var(--border)]">
         <Button
           onClick={handleSubmit}
-          disabled={loading || hasGpaError}
+          disabled={loading || (hasGpaError && formData.funding_type === 'puc')}
           className="w-full"
         >
           {loading ? (
@@ -1047,13 +1769,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           ) : (
             <>
               <Check className="w-4 h-4 mr-2" />
-              Save Student Information
+              Save Changes
             </>
           )}
         </Button>
-        {hasGpaError && (
+        {hasGpaError && formData.funding_type === 'puc' && (
           <p className="text-xs text-center text-red-500 mt-2">
-            Cannot save - GPA must be 70% or higher
+            Cannot save - GPA must be 70% or higher for PUC
           </p>
         )}
       </div>
