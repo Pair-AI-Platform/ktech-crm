@@ -12,6 +12,8 @@ export const BUSINESS_CONFIG = {
   FULL_TUITION_AMOUNT: 550,
   /** PUC (Pre-University Course) fee amount in KWD */
   PUC_FEE_AMOUNT: 10,
+  /** Test fee amount in KWD (required for PUC leads moving to Test stage) */
+  TEST_FEE_AMOUNT: 20,
   /** Default currency */
   CURRENCY: 'KWD' as const,
 
@@ -59,6 +61,7 @@ export const {
   ENROLLMENT_PAYMENT_AMOUNT,
   FULL_TUITION_AMOUNT,
   PUC_FEE_AMOUNT,
+  TEST_FEE_AMOUNT,
   GPA_SELF_FUNDED_THRESHOLD,
   PLACEMENT_TEST_PASSING_THRESHOLD,
   SMS_BATCH_SIZE,
