@@ -276,6 +276,7 @@ export interface Lead {
   last_name: string
   first_name_ar?: string
   last_name_ar?: string
+  full_name_ar?: string
   civil_id?: string
   phone: string
   phone_secondary?: string
@@ -348,6 +349,17 @@ export interface Lead {
   placement_computer_override?: boolean
   has_ielts_toefl?: boolean
   placement_lms_synced?: boolean
+  placement_lms_synced_at?: string
+  // Attempt tracking (max 2 attempts per subject, highest score used)
+  placement_english_attempts?: number
+  placement_english_score_1?: number
+  placement_english_score_2?: number
+  placement_math_attempts?: number
+  placement_math_score_1?: number
+  placement_math_score_2?: number
+  placement_computer_attempts?: number
+  placement_computer_score_1?: number
+  placement_computer_score_2?: number
 
   // Financial Qualification
   funding_type: FundingType
@@ -435,6 +447,14 @@ export interface Lead {
   priority_set_by?: string
   priority_set_at?: string
 
+  // File Stage Fees
+  file_fee_status?: 'none' | 'pending' | 'paid' | 'exempt'
+  file_application_fee?: number
+  file_test_fee?: number
+  file_fee_exempted?: boolean
+  file_fee_exempted_by?: string
+  file_fee_exempted_at?: string
+
   // Joined relations (from queries)
   appointments?: { id: string; appointment_type: AppointmentType[]; status: AppointmentStatus; scheduled_date: string }[]
 }
@@ -502,6 +522,16 @@ export interface LeadFormData {
   placement_computer_override?: boolean
   has_ielts_toefl?: boolean
   placement_lms_synced?: boolean
+  placement_lms_synced_at?: string
+  placement_english_attempts?: number
+  placement_english_score_1?: number
+  placement_english_score_2?: number
+  placement_math_attempts?: number
+  placement_math_score_1?: number
+  placement_math_score_2?: number
+  placement_computer_attempts?: number
+  placement_computer_score_1?: number
+  placement_computer_score_2?: number
   funding_type?: FundingType
   has_weyay_account?: boolean
   has_bank_account?: boolean
@@ -859,6 +889,18 @@ export interface WithdrawalReason {
   reason_en: string
   reason_ar: string
   is_active: boolean
+}
+
+export type PUCPeriodStatus = 'active' | 'archived'
+
+export interface PUCPeriod {
+  id: string
+  name: string
+  start_date: string   // YYYY-MM-DD
+  end_date: string     // YYYY-MM-DD
+  status: PUCPeriodStatus
+  created_at?: string
+  updated_at?: string
 }
 
 export type TermType = 'fall' | 'spring' | 'summer'

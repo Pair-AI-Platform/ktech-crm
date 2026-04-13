@@ -102,6 +102,14 @@ export const queryKeys = {
   exhibitions: {
     all: ['exhibitions'] as const,
   },
+  pucPeriods: {
+    all: ['puc-periods'] as const,
+    active: () => ['puc-periods', 'active'] as const,
+  },
+  pucPreferenceChanges: {
+    all: ['puc-preference-changes'] as const,
+    list: (filters: Record<string, unknown>) => ['puc-preference-changes', 'list', filters] as const,
+  },
   campaigns: {
     all: ['campaigns'] as const,
     lists: () => [...queryKeys.campaigns.all, 'list'] as const,

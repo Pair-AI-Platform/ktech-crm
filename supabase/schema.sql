@@ -136,6 +136,7 @@ CREATE TABLE leads (
   last_name VARCHAR(100) NOT NULL,
   first_name_ar VARCHAR(100),
   last_name_ar VARCHAR(100),
+  full_name_ar VARCHAR(255),
   civil_id VARCHAR(12) UNIQUE,
   phone VARCHAR(8) NOT NULL,
   phone_secondary VARCHAR(8),

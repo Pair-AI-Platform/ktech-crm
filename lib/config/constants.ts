@@ -14,6 +14,10 @@ export const BUSINESS_CONFIG = {
   PUC_FEE_AMOUNT: 10,
   /** Test fee amount in KWD (required for PUC leads moving to Test stage) */
   TEST_FEE_AMOUNT: 20,
+  /** Application fee amount in KWD (required when moving to File stage) */
+  FILE_APPLICATION_FEE_AMOUNT: 20,
+  /** Default test fee amount in KWD for File stage (adjustable per lead) */
+  FILE_TEST_FEE_AMOUNT: 15,
   /** Default currency */
   CURRENCY: 'KWD' as const,
 
@@ -65,4 +69,6 @@ export const {
   GPA_SELF_FUNDED_THRESHOLD,
   PLACEMENT_TEST_PASSING_THRESHOLD,
   SMS_BATCH_SIZE,
+  FILE_APPLICATION_FEE_AMOUNT,
+  FILE_TEST_FEE_AMOUNT,
 } = BUSINESS_CONFIG
