@@ -271,15 +271,10 @@ export function useLeadMutations() {
   const mutatingCount = useIsMutating({ mutationKey: ['lead-mutation'] })
   const loading = mutatingCount > 0
 
-  const getNextPosition = async (stage: PipelineStage): Promise<number> => {
-    const { data } = await supabase
-      .from("leads")
-      .select("position_in_stage")
-      .eq("pipeline_stage", stage)
-      .order("position_in_stage", { ascending: false })
-      .limit(1)
-      .single()
-    return (data?.position_in_stage ?? 0) + 1
+  const getTopPosition = async (stage: PipelineStage): Promise<number> => {
+    // Shift all existing leads in the target stage down by 1
+    await supabase.rpc("shift_stage_positions", { target_stage: stage })
+    return 0
   }
 
   const createLeadMutation = useMutation({
@@ -446,7 +441,7 @@ export function useLeadMutations() {
 
       // Assign next position when moving to a different stage
       if (updates.pipeline_stage && oldLead && updates.pipeline_stage !== oldLead.pipeline_stage) {
-        updates.position_in_stage = await getNextPosition(updates.pipeline_stage)
+        updates.position_in_stage = await getTopPosition(updates.pipeline_stage)
       }
 
       // Map client-side 'status' field to DB column 'contact_status'
@@ -652,6 +647,7 @@ export function useLeadMutations() {
       // Log activity for lead source change
       if (updates.source !== undefined && oldLead && updates.source !== (oldLead as Record<string, unknown>).source) {
         const oldSource = (oldLead as Record<string, unknown>).source as string | null
+        const oldCategory = (oldLead as Record<string, unknown>).source_category as string | null
         await supabase.from('activities').insert({
           lead_id: id,
           activity_type: 'source_change',
@@ -660,6 +656,8 @@ export function useLeadMutations() {
           metadata: {
             old_source: oldSource || null,
             new_source: updates.source || null,
+            old_category: oldCategory || null,
+            new_category: updates.source_category || oldCategory || null,
           },
           created_by: user?.id,
         })
@@ -789,8 +787,8 @@ export function useLeadMutations() {
         return { error: null, count: leadIds.length }
       }
 
-      // Get current max position in target stage
-      let nextPos = await getNextPosition(stage)
+      // Place bulk-moved leads at top of target stage
+      let nextPos = await getTopPosition(stage)
 
       // Update each lead individually with sequential positions
       const errors: string[] = []
