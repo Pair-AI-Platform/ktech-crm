@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 
 export const POST = withApiHandler({ context: 'file-fee-exempt' }, async ({ req, supabase, user, logger }) => {
   const body = await req.json()
@@ -9,14 +10,18 @@ export const POST = withApiHandler({ context: 'file-fee-exempt' }, async ({ req,
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
   }
 
+  // Use service role to bypass RLS for the update
+  const serviceClient = createServiceRoleClient()
+
   // Verify lead exists
-  const { data: lead, error: leadError } = await supabase
+  const { data: lead, error: leadError } = await serviceClient
     .from('leads')
     .select('id, first_name, last_name, pipeline_stage, file_fee_status')
     .eq('id', leadId)
     .single()
 
   if (leadError || !lead) {
+    logger.error('Lead not found for file fee exemption', { leadId, error: leadError?.message })
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
   }
 
@@ -30,11 +35,10 @@ export const POST = withApiHandler({ context: 'file-fee-exempt' }, async ({ req,
 
   // Update lead: exempt from fees and move to file stage
   const now = new Date().toISOString()
-  const { error: updateError } = await supabase
+  const { error: updateError } = await serviceClient
     .from('leads')
     .update({
       pipeline_stage: 'application',
-      status: null,
       last_contacted_at: now,
       file_fee_status: 'exempt',
       file_fee_exempted: true,
@@ -49,7 +53,7 @@ export const POST = withApiHandler({ context: 'file-fee-exempt' }, async ({ req,
   }
 
   // Log activity
-  await supabase.from('activities').insert({
+  await serviceClient.from('activities').insert({
     lead_id: leadId,
     activity_type: 'fee_exemption',
     title: 'File Fee Exemption',
