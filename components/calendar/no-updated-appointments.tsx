@@ -122,7 +122,8 @@ export function NoUpdatedAppointments({
           setLoadingAction(null)
           return
         case "callback":
-          // Mark all leads as Callback
+          // Postpone the appointment + mark all leads as Callback
+          await postponeAppointment(appointment.id, appointment.scheduled_date, appointment.scheduled_time || "")
           const cbLeadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
             (appointment.lead_id ? [appointment.lead_id] : [])
           for (const lid of cbLeadIds) {

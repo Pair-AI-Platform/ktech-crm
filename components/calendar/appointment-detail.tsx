@@ -31,6 +31,7 @@ import type { Appointment, PipelineStage, LeadStatus } from "@/types"
 import { APPOINTMENT_TYPES, PIPELINE_STAGES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES } from "@/types"
 import { stageColors } from "@/lib/utils"
 import { useAppointmentMutations, useRescheduleHistory } from "@/lib/hooks/use-appointments"
+import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useAgents } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
@@ -133,6 +134,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const { reschedules } = useRescheduleHistory(appointment?.id || "")
   const { agents } = useAgents()
   const agentMap = new Map(agents.map(a => [a.id, a.full_name]))
+  const { updateLeadStage } = useLeadMutations()
 
   // Reset local state when appointment changes
   useEffect(() => {
@@ -296,10 +298,17 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     onClose()
   }
 
-  // Mark all leads as Callback (CB)
+  // Mark all leads as Callback (CB) and open callback scheduler
   const handleMarkCB = async () => {
     if (allLeadIds.length === 0) return
     setIsLoading(true)
+    setActionError(null)
+    const result = await postponeAppointment(appointment.id, appointment.scheduled_date, appointment.scheduled_time || "") as { error?: string | null } | undefined
+    if (result?.error) {
+      setIsLoading(false)
+      setActionError(typeof result.error === 'string' ? result.error : 'Failed')
+      return
+    }
     const supabase = createClient()
     for (const lid of allLeadIds) {
       await supabase
@@ -308,8 +317,12 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
         .eq("id", lid)
     }
     setIsLoading(false)
+    setLocalStatusOverride("postponed")
     onUpdate?.()
-    onClose()
+    // Open callback scheduler to book a follow-up
+    if (hasLeads) {
+      setShowCallbackScheduler(true)
+    }
   }
   // Change lead pipeline stage for all leads + auto-confirm appointment
   const handleChangeStage = async (stage: PipelineStage, lostReasonId?: string, lostReasonNotes?: string) => {
@@ -323,17 +336,9 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     setLocalStageOverride(stage)
     const stageLabel = PIPELINE_STAGES.find(s => s.value === stage)?.label || stage
     setStageChangeLog(prev => [...prev, { stage, label: stageLabel, at: new Date().toISOString() }])
-    const supabase = createClient()
+    // Use updateLeadStage to trigger activity logging, notifications, and automation rules
     for (const lid of allLeadIds) {
-      const updates: Record<string, unknown> = { pipeline_stage: stage }
-      if (stage === "lost" && lostReasonId) {
-        updates.lost_reason_id = lostReasonId
-        if (lostReasonNotes) updates.lost_reason_notes = lostReasonNotes
-      }
-      await supabase
-        .from("leads")
-        .update(updates)
-        .eq("id", lid)
+      await updateLeadStage(lid, stage, lostReasonId, lostReasonNotes)
     }
     setStageLoading(false)
     onUpdate?.()
