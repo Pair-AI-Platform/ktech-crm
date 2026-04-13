@@ -30,7 +30,7 @@ export function PSPSubmissionWizard({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[720px] p-0 overflow-hidden rounded-xl max-h-[90vh] flex flex-col">
         <VisuallyHidden.Root>
-          <DialogTitle>PSP Submission</DialogTitle>
+          <DialogTitle>PSP</DialogTitle>
         </VisuallyHidden.Root>
         <PSPWizardContent
           lead={lead}

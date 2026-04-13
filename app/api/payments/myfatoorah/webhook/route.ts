@@ -148,6 +148,59 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // Handle file fee payments — move lead to application (file) stage
+      if (transaction.payment_purpose === 'file_fee') {
+        const { error: updateError } = await supabase
+          .from('leads')
+          .update({
+            pipeline_stage: 'application',
+            status: null,
+            last_contacted_at: new Date().toISOString(),
+            file_fee_status: 'paid',
+          })
+          .eq('id', transaction.lead_id)
+
+        await supabase
+          .from('payment_transactions')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', transaction.id)
+
+        await supabase.from('activities').insert({
+          lead_id: transaction.lead_id,
+          activity_type: 'payment_received',
+          title: 'File Fee Payment Received',
+          description: `File fee payment of ${transaction.amount} KWD received via MyFatoorah`,
+          metadata: {
+            transaction_id: transaction.id,
+            payment_method: 'myfatoorah',
+            payment_purpose: 'file_fee',
+            amount: transaction.amount,
+            invoice_id: invoiceId,
+            payment_id: statusResult.paymentId,
+          },
+        })
+
+        if (updateError) {
+          logger.error('File fee paid but failed to move lead to file stage', {
+            leadId: transaction.lead_id,
+            error: updateError.message,
+          })
+          return NextResponse.json({
+            success: true,
+            message: 'File fee payment recorded but stage update failed — flagged for review',
+          })
+        }
+
+        logger.info('File fee paid, lead moved to file stage', { leadId: transaction.lead_id })
+        return NextResponse.json({
+          success: true,
+          message: 'File fee payment processed — lead moved to File stage',
+        })
+      }
+
       const { data: lead } = await supabase
         .from('leads')
         .select('funding_type, pipeline_stage')

@@ -8,6 +8,16 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Search,
   Download,
   RefreshCw,
@@ -18,9 +28,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Undo2,
 } from "lucide-react"
 import { PIPELINE_STAGES, type PipelineStage, type LostReasonCategory } from "@/types"
-import { useLeads, useLostReasons } from "@/lib/hooks/use-leads"
+import { useLeads, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
 import { cn, formatKuwaitPhone, getInitials } from "@/lib/utils"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
@@ -49,6 +60,10 @@ export default function LostLeadsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<SortField>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
+  const [restoreTarget, setRestoreTarget] = useState<{ ids: string[]; stage: PipelineStage } | null>(null)
+  const [restoring, setRestoring] = useState(false)
   const pageSize = 50
 
   const serverFilters = {
@@ -150,9 +165,76 @@ export default function LostLeadsPage() {
       : <ArrowDown className="w-3 h-3 ml-1 text-[var(--primary)]" />
   }
 
+  const { updateLead } = useLeadMutations()
+
   const handleExport = () => {
     const csvContent = exportLeadsToCSV(sortedLeads)
     downloadCSV(csvContent, `lost_leads_${new Date().toISOString().split("T")[0]}.csv`)
+  }
+
+  // Toggle selection
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedLeads.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedLeads.map(l => l.id)))
+    }
+  }
+
+  // Determine the best stage to restore a lead to
+  const getRestoreStage = (lead: { lost_at_stage?: PipelineStage | null }): PipelineStage => {
+    return lead.lost_at_stage || "contacted"
+  }
+
+  // Initiate restore for a single lead
+  const handleRestoreOne = (leadId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const lead = sortedLeads.find(l => l.id === leadId)
+    if (!lead) return
+    setRestoreTarget({ ids: [leadId], stage: getRestoreStage(lead) })
+    setRestoreDialogOpen(true)
+  }
+
+  // Initiate restore for all selected leads
+  const handleRestoreSelected = () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    // For bulk, we'll restore each to their own lost_at_stage
+    setRestoreTarget({ ids, stage: "contacted" }) // stage is per-lead, this is just a placeholder
+    setRestoreDialogOpen(true)
+  }
+
+  // Execute the restore
+  const handleConfirmRestore = async () => {
+    if (!restoreTarget) return
+    setRestoring(true)
+    try {
+      for (const id of restoreTarget.ids) {
+        const lead = sortedLeads.find(l => l.id === id)
+        const stage = lead ? getRestoreStage(lead) : "contacted"
+        await updateLead(id, {
+          pipeline_stage: stage,
+          lost_reason_id: null,
+          lost_reason_notes: null,
+          lost_at_stage: null,
+        })
+      }
+      setSelectedIds(new Set())
+      refetch()
+    } finally {
+      setRestoring(false)
+      setRestoreDialogOpen(false)
+      setRestoreTarget(null)
+    }
   }
 
   // Active pipeline stages (for lost-at filter pills)
@@ -183,6 +265,18 @@ export default function LostLeadsPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {selectedIds.size > 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleRestoreSelected}
+                disabled={restoring}
+                className="gap-1.5 bg-[var(--success)] hover:bg-[var(--success)]/90 text-white"
+              >
+                <Undo2 className="w-4 h-4" />
+                Restore {selectedIds.size} Lead{selectedIds.size > 1 ? "s" : ""}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -282,6 +376,14 @@ export default function LostLeadsPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-[var(--bg-surface)] border-b border-[var(--border)]">
                   <tr>
+                    <th className="px-3 py-2 w-[40px]">
+                      <input
+                        type="checkbox"
+                        checked={sortedLeads.length > 0 && selectedIds.size === sortedLeads.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-[var(--border)] accent-[var(--primary)] cursor-pointer"
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left w-[220px] min-w-[180px]">
                       <button
                         onClick={() => handleSort("name")}
@@ -329,19 +431,24 @@ export default function LostLeadsPage() {
                         Date {getSortIcon("date")}
                       </button>
                     </th>
+                    <th className="px-3 py-2 text-center w-[80px] min-w-[70px]">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        Action
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-16 text-center">
+                      <td colSpan={9} className="px-3 py-16 text-center">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--text-muted)]" />
                         <span className="text-sm text-[var(--text-muted)]">Loading lost leads...</span>
                       </td>
                     </tr>
                   ) : sortedLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-16 text-center">
+                      <td colSpan={9} className="px-3 py-16 text-center">
                         <Ban className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)] opacity-40" />
                         <p className="text-sm text-[var(--text-muted)]">No lost leads found</p>
                         {(searchQuery || lostAtFilter !== "all" || categoryFilter !== "all") && (
@@ -360,8 +467,20 @@ export default function LostLeadsPage() {
                         <tr
                           key={lead.id}
                           onClick={() => router.push(`/leads/${lead.id}`)}
-                          className="hover:bg-[var(--bg-elevated)] cursor-pointer transition-colors"
+                          className={cn(
+                            "hover:bg-[var(--bg-elevated)] cursor-pointer transition-colors",
+                            selectedIds.has(lead.id) && "bg-[var(--primary-muted)]/30"
+                          )}
                         >
+                          {/* Checkbox */}
+                          <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(lead.id)}
+                              onChange={() => toggleSelect(lead.id)}
+                              className="w-4 h-4 rounded border-[var(--border)] accent-[var(--primary)] cursor-pointer"
+                            />
+                          </td>
                           {/* Lead Name */}
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2.5">
@@ -461,6 +580,19 @@ export default function LostLeadsPage() {
                                 : "\u2014"}
                             </span>
                           </td>
+                          {/* Restore Action */}
+                          <td className="px-3 py-3 text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => handleRestoreOne(lead.id, e)}
+                              disabled={restoring}
+                              className="w-8 h-8 text-[var(--success)] hover:text-[var(--success)] hover:bg-[var(--success)]/10"
+                              title={`Restore to ${PIPELINE_STAGES.find(s => s.value === getRestoreStage(lead))?.label || "Contacted"}`}
+                            >
+                              <Undo2 className="w-4 h-4" />
+                            </Button>
+                          </td>
                         </tr>
                       )
                     })
@@ -503,6 +635,52 @@ export default function LostLeadsPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Restore Confirmation Dialog */}
+      <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore Lead{restoreTarget && restoreTarget.ids.length > 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreTarget && restoreTarget.ids.length === 1 ? (
+                (() => {
+                  const lead = sortedLeads.find(l => l.id === restoreTarget.ids[0])
+                  const stageName = PIPELINE_STAGES.find(s => s.value === (lead ? getRestoreStage(lead) : "contacted"))?.label || "Contacted"
+                  return (
+                    <>
+                      This will move <strong>{lead?.first_name_ar} {lead?.last_name_ar}</strong> back to the <strong>{stageName}</strong> stage and clear all loss information.
+                    </>
+                  )
+                })()
+              ) : (
+                <>
+                  This will restore <strong>{restoreTarget?.ids.length} leads</strong> back to their previous pipeline stages and clear all loss information.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRestore}
+              disabled={restoring}
+              className="bg-[var(--success)] hover:bg-[var(--success)]/90 text-white"
+            >
+              {restoring ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Restoring...
+                </>
+              ) : (
+                <>
+                  <Undo2 className="w-4 h-4 mr-2" />
+                  Restore
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

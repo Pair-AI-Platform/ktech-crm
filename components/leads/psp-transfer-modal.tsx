@@ -114,7 +114,7 @@ export function PSPTransferModal({
           <DialogDescription>
             {result?.success
               ? result.message
-              : "Transfer all PUC leads to the Submission stage (PSP - PUC Submission Pipeline)"}
+              : "Transfer all PUC leads to the Applicant stage via PSP"}
           </DialogDescription>
         </DialogHeader>
 
@@ -122,7 +122,7 @@ export function PSPTransferModal({
           {result?.success ? (
             <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
               <p className="text-sm text-green-800 dark:text-green-200">
-                Successfully transferred <strong>{result.transferred}</strong> PUC leads to the Submission stage.
+                Successfully transferred <strong>{result.transferred}</strong> PUC leads via PSP.
               </p>
             </div>
           ) : (
@@ -160,9 +160,8 @@ export function PSPTransferModal({
                   <div className="p-3 rounded-lg bg-[var(--bg-sunken)]">
                     <p className="text-xs text-[var(--text-muted)]">What happens:</p>
                     <ul className="text-sm text-[var(--text-secondary)] mt-2 space-y-1">
-                      <li>- Pipeline stage changes to &quot;Submission&quot;</li>
+                      <li>- Leads processed through PSP</li>
                       <li>- Activity logged for each lead</li>
-                      <li>- Leads ready for PUC submission process</li>
                     </ul>
                   </div>
                 </>

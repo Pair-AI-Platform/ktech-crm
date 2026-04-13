@@ -198,7 +198,7 @@ export function TargetSection({
         </motion.div>
       )}
 
-      {/* Team Application Targets */}
+      {/* Team Application Targets — Table */}
       {hasTeamTargets && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -220,61 +220,159 @@ export function TargetSection({
             <div className="text-xs text-[var(--text-muted)] mb-3">
               {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </div>
-            <div className="space-y-3">
-              {allAgentsProgress
-                .filter(agent => agent.target > 0)
-                .sort((a, b) => b.progress - a.progress)
-                .slice(0, 5)
-                .map((agent, index) => {
-                  const isCurrentUser = agent.agentId === profileId
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Agent</th>
+                    <th className="text-center py-2 px-2 text-xs font-semibold text-green-500 uppercase tracking-wider">
+                      <span className="flex items-center justify-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        PUC Files
+                      </span>
+                    </th>
+                    <th className="text-center py-2 px-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">
+                      <span className="flex items-center justify-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-orange-500" />
+                        SF Files
+                      </span>
+                    </th>
+                    <th className="text-center py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Total</th>
+                    <th className="text-center py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allAgentsProgress
+                    .filter(agent => agent.target > 0)
+                    .sort((a, b) => b.progress - a.progress)
+                    .map((agent, index) => {
+                      const isCurrentUser = agent.agentId === profileId
+                      const puc = agent.categories?.puc
+                      const sf = agent.categories?.sf
+                      const progressColor = getProgressColor(agent.progress)
+                      return (
+                        <motion.tr
+                          key={agent.agentId}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: index * 0.03 }}
+                          className={cn(
+                            "border-b border-[var(--border)]/50 transition-colors",
+                            isCurrentUser
+                              ? "bg-[var(--primary)]/5"
+                              : "hover:bg-[var(--bg-sunken)]"
+                          )}
+                        >
+                          <td className="py-2.5 px-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-7 h-7">
+                                <AvatarFallback className={cn(
+                                  "text-[10px] font-medium",
+                                  isCurrentUser
+                                    ? "bg-[var(--primary)]/10 text-[var(--primary)]"
+                                    : "bg-[var(--bg-elevated)] text-[var(--text-secondary)]"
+                                )}>
+                                  {agent.agentName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className={cn(
+                                "text-sm font-medium truncate max-w-[120px]",
+                                isCurrentUser ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
+                              )}>
+                                {agent.agentName}
+                                {isCurrentUser && <span className="text-[10px] text-[var(--text-muted)] ml-1">(You)</span>}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
+                            {puc && puc.target > 0 ? (
+                              <div>
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">{puc.applications}</span>
+                                <span className="text-xs text-[var(--text-muted)]"> / {puc.target}</span>
+                                <div className="mt-1 mx-auto w-full max-w-[60px] h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                                  <div
+                                    className={cn("h-full rounded-full", puc.progress >= 100 ? "bg-[var(--success)]" : "bg-green-500")}
+                                    style={{ width: `${Math.min(100, puc.progress)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-[var(--text-muted)]">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
+                            {sf && sf.target > 0 ? (
+                              <div>
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">{sf.applications}</span>
+                                <span className="text-xs text-[var(--text-muted)]"> / {sf.target}</span>
+                                <div className="mt-1 mx-auto w-full max-w-[60px] h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                                  <div
+                                    className={cn("h-full rounded-full", sf.progress >= 100 ? "bg-[var(--success)]" : "bg-orange-500")}
+                                    style={{ width: `${Math.min(100, sf.progress)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-[var(--text-muted)]">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{agent.applications}</span>
+                            <span className="text-xs text-[var(--text-muted)]"> / {agent.target}</span>
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
+                            <span className={cn(
+                              "inline-flex items-center justify-center min-w-[42px] px-1.5 py-0.5 rounded-full text-xs font-bold",
+                              `bg-[var(--${progressColor})]/10 text-[var(--${progressColor})]`
+                            )}>
+                              {agent.progress}%
+                            </span>
+                          </td>
+                        </motion.tr>
+                      )
+                    })}
+                </tbody>
+                {/* Team totals row */}
+                {(() => {
+                  const agents = allAgentsProgress.filter(a => a.target > 0)
+                  const totalPucApps = agents.reduce((s, a) => s + (a.categories?.puc?.applications ?? 0), 0)
+                  const totalPucTarget = agents.reduce((s, a) => s + (a.categories?.puc?.target ?? 0), 0)
+                  const totalSfApps = agents.reduce((s, a) => s + (a.categories?.sf?.applications ?? 0), 0)
+                  const totalSfTarget = agents.reduce((s, a) => s + (a.categories?.sf?.target ?? 0), 0)
+                  const totalApps = agents.reduce((s, a) => s + a.applications, 0)
+                  const totalTarget = agents.reduce((s, a) => s + a.target, 0)
+                  const totalProgress = totalTarget > 0 ? Math.round((totalApps / totalTarget) * 100) : 0
+                  const totalColor = getProgressColor(totalProgress)
                   return (
-                    <motion.div
-                      key={agent.agentId}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className={cn(
-                        "p-3 rounded-xl border",
-                        isCurrentUser
-                          ? "border-[var(--primary)]/30 bg-[var(--primary)]/5"
-                          : "border-[var(--border)] bg-[var(--bg-sunken)]"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className={cn(
-                              "text-xs font-medium",
-                              isCurrentUser
-                                ? "bg-[var(--primary)]/10 text-[var(--primary)]"
-                                : "bg-[var(--bg-elevated)] text-[var(--text-secondary)]"
-                            )}>
-                              {agent.agentName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className={cn(
-                              "text-sm font-medium",
-                              isCurrentUser ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
-                            )}>
-                              {agent.agentName}
-                              {isCurrentUser && <span className="text-xs text-[var(--text-muted)] ml-1">(You)</span>}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Per-category mini bars */}
-                      <div className="space-y-1.5">
-                        {agent.categories?.puc && agent.categories.puc.target > 0 && (
-                          <MiniCategoryBar label="PUC" color="bg-green-500" cat={agent.categories.puc} />
-                        )}
-                        {agent.categories?.sf && agent.categories.sf.target > 0 && (
-                          <MiniCategoryBar label="SF" color="bg-orange-500" cat={agent.categories.sf} />
-                        )}
-                      </div>
-                    </motion.div>
+                    <tfoot>
+                      <tr className="border-t-2 border-[var(--border)] bg-[var(--bg-sunken)]">
+                        <td className="py-2.5 px-2 text-xs font-bold text-[var(--text-secondary)] uppercase">Team Total</td>
+                        <td className="py-2.5 px-2 text-center">
+                          {totalPucTarget > 0 && (
+                            <span className="text-sm font-bold text-[var(--text-primary)]">{totalPucApps}<span className="text-xs text-[var(--text-muted)] font-normal"> / {totalPucTarget}</span></span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          {totalSfTarget > 0 && (
+                            <span className="text-sm font-bold text-[var(--text-primary)]">{totalSfApps}<span className="text-xs text-[var(--text-muted)] font-normal"> / {totalSfTarget}</span></span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <span className="text-sm font-bold text-[var(--text-primary)]">{totalApps}<span className="text-xs text-[var(--text-muted)] font-normal"> / {totalTarget}</span></span>
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <span className={cn(
+                            "inline-flex items-center justify-center min-w-[42px] px-1.5 py-0.5 rounded-full text-xs font-bold",
+                            `bg-[var(--${totalColor})]/10 text-[var(--${totalColor})]`
+                          )}>
+                            {totalProgress}%
+                          </span>
+                        </td>
+                      </tr>
+                    </tfoot>
                   )
-                })}
+                })()}
+              </table>
             </div>
           </StaticBlock>
         </motion.div>
@@ -412,23 +510,3 @@ function CategoryProgressBar({ label, color, cat }: { label: string; color: stri
   )
 }
 
-function MiniCategoryBar({ label, color, cat }: { label: string; color: string; cat: { target: number; applications: number; progress: number } }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", color)} />
-      <span className="text-[10px] text-[var(--text-muted)] w-6">{label}</span>
-      <div className="flex-1 relative h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${Math.min(100, cat.progress)}%` }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className={cn(
-            "absolute inset-y-0 left-0 rounded-full",
-            cat.progress >= 100 ? "bg-[var(--success)]" : color
-          )}
-        />
-      </div>
-      <span className="text-[10px] font-medium text-[var(--text-muted)] w-10 text-right">{cat.applications}/{cat.target}</span>
-    </div>
-  )
-}

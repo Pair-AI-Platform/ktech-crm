@@ -93,7 +93,7 @@ ${transaction.myfatoorah_invoice_url}
 
 Hello ${lead.first_name_ar || ""},
 
-To complete your PSP (PUC Submission Pipeline) application at Kuwait Technical College, please pay the required fees (${transaction.amount} KD) using the following link:
+To complete your PSP application at Kuwait Technical College, please pay the required fees (${transaction.amount} KD) using the following link:
 
 ${transaction.myfatoorah_invoice_url}
 

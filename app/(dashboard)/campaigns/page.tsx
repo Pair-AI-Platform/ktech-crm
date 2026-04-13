@@ -61,7 +61,7 @@ import {
 
 type CampaignView = "all" | "whatsapp" | "sms"
 type AudienceSource = "filter" | "upload"
-type ScheduleType = "immediate" | "scheduled" | "optimal"
+type ScheduleType = "immediate" | "scheduled"
 
 interface UploadedContact {
   firstName: string
@@ -356,7 +356,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     audienceSource: "filter",
     audienceFilter: "",
     uploadedContacts: [],
-    scheduleType: "optimal",
+    scheduleType: "immediate",
     messageContent: "",
     messageContentAr: "",
     useTemplate: false,
@@ -610,7 +610,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                 </label>
                 <div className="space-y-2">
                   {[
-                    { id: "optimal", label: "Optimal times", desc: "AI picks the best time for each contact" },
                     { id: "immediate", label: "Start immediately", desc: "Begin sending as soon as campaign is created" },
                     { id: "scheduled", label: "Schedule for later", desc: "Pick a specific date and time" },
                   ].map((option) => (

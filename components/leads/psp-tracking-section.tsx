@@ -101,10 +101,10 @@ export function PSPTrackingSection({
           </div>
           <div>
             <h3 className="font-semibold text-[var(--text-primary)]">
-              PSP Submission Tracking
+              PSP Tracking
             </h3>
             <p className="text-xs text-[var(--text-muted)]">
-              PUC Submission Pipeline Status
+              PSP Status
             </p>
           </div>
         </div>

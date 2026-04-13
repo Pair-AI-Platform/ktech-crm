@@ -15,8 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Phone, Check, User, CreditCard } from "lucide-react"
-import { Switch } from "@/components/ui/switch"
+import { Phone, Check, User } from "lucide-react"
 import type { Lead, PipelineStage } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
 import { useAppointmentMutations, useLeadAppointments } from "@/lib/hooks/use-appointments"
@@ -57,7 +56,6 @@ export function CallbackScheduler({
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [selectedTime, setSelectedTime] = useState<string>("")
   const [notes, setNotes] = useState("")
-  const [requiresPayment, setRequiresPayment] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
 
@@ -71,7 +69,6 @@ export function CallbackScheduler({
         setSelectedDate("")
         setSelectedTime("")
         setNotes("")
-        setRequiresPayment(false)
         setShowSuccess(false)
         setIsSubmitting(false)
       })
@@ -284,28 +281,6 @@ export function CallbackScheduler({
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                {/* Payment Toggle */}
-                <div className="flex items-center justify-between px-3 py-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                      requiresPayment
-                        ? "bg-[var(--success)] text-white"
-                        : "bg-[var(--bg-sunken)] text-[var(--text-muted)]"
-                    )}>
-                      <CreditCard className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">Payment Required</p>
-                      <p className="text-xs text-[var(--text-muted)]">Payment required upon arrival</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={requiresPayment}
-                    onCheckedChange={setRequiresPayment}
-                  />
                 </div>
 
                 {/* Notes */}

@@ -528,6 +528,27 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 onToggle={() => toggleSection("status")}
                 count={localFilters.statuses.length}
               >
+                {/* Stage selector inside status section */}
+                <div className="mb-3">
+                  <p className="text-xs text-[var(--text-muted)] mb-2">Select a stage to see its statuses</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PIPELINE_STAGES.filter(s => s.value !== 'lost').map((stage) => (
+                      <button
+                        key={stage.value}
+                        onClick={() => toggleStage(stage.value)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                          localFilters.stages.includes(stage.value)
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-muted)]"
+                        )}
+                      >
+                        {stage.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {availableStatuses.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {availableStatuses.map((status) => (
@@ -558,7 +579,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 ) : (
                   <p className="text-xs text-[var(--text-muted)] py-2">
                     {localFilters.stages.length === 0
-                      ? 'Select a pipeline stage first to filter by status'
+                      ? 'Pick a stage above to see available statuses'
                       : `No statuses available for the selected stage${localFilters.stages.length > 1 ? 's' : ''}`}
                   </p>
                 )}
