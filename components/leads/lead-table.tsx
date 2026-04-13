@@ -95,7 +95,7 @@ export function LeadTable({
   const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
   const [editWithdrawReasonLead, setEditWithdrawReasonLead] = useState<Lead | null>(null)
   const [paymentDialogLead, setPaymentDialogLead] = useState<Lead | null>(null)
-  const [testFeeDialogLead, setTestFeeDialogLead] = useState<Lead | null>(null)
+  const [fileFeeDialogLead, setFileFeeDialogLead] = useState<Lead | null>(null)
   const [pspWizardLead, setPspWizardLead] = useState<Lead | null>(null)
   const [pucPaymentLeads, setPucPaymentLeads] = useState<Set<string>>(new Set())
   const [pucDocCounts, setPucDocCounts] = useState<Record<string, { uploaded: number; required: number }>>({})
@@ -478,16 +478,16 @@ export function LeadTable({
       return
     }
 
-    // Intercept "test" stage change for PUC leads - require test fee payment first
-    if (newStage === 'test') {
+    // Intercept "application" (File) stage change - require file fee payment first
+    if (newStage === 'application') {
       const lead = leads.find(l => l.id === leadId)
-      if (lead && lead.funding_type === 'puc') {
-        setTestFeeDialogLead(lead)
+      if (lead && lead.file_fee_status !== 'paid' && lead.file_fee_status !== 'exempt') {
+        setFileFeeDialogLead(lead)
         return
       }
     }
 
-    // Intercept "applicant" stage change for non-PUC leads that haven't paid - show payment dialog first
+// Intercept "applicant" stage change for non-PUC leads that haven't paid - show payment dialog first
     // The stage promotion will happen via RPC after payment, not via direct update
     if (newStage === 'applicant' && !isPucSrjView) {
       const lead = leads.find(l => l.id === leadId)
@@ -1175,7 +1175,7 @@ export function LeadTable({
       contactedDialogLead={contactedDialogLead}
       blockedDialogLead={blockedDialogLead}
       withdrawDialogLead={withdrawDialogLead}
-      testFeeDialogLead={testFeeDialogLead}
+      fileFeeDialogLead={fileFeeDialogLead}
       paymentDialogLead={paymentDialogLead}
       pspWizardLead={pspWizardLead}
       viewingAppointment={viewingAppointment}
@@ -1188,7 +1188,7 @@ export function LeadTable({
       setContactedDialogLead={setContactedDialogLead}
       setBlockedDialogLead={setBlockedDialogLead}
       setWithdrawDialogLead={setWithdrawDialogLead}
-      setTestFeeDialogLead={setTestFeeDialogLead}
+      setFileFeeDialogLead={setFileFeeDialogLead}
       setPaymentDialogLead={setPaymentDialogLead}
       setPspWizardLead={setPspWizardLead}
       setViewingAppointment={setViewingAppointment}
