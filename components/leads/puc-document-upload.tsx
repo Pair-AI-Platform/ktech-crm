@@ -20,7 +20,8 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 import { ScanLine } from "lucide-react"
 import type { Lead, EducationType } from "@/types"
-import { getDocumentsForGraduateType, type GraduateType, type DocumentRule } from "@/lib/psp/document-rules"
+import { getDocumentsForGraduateType, type GraduateType, type DocumentRule, type ConditionalDocumentFlags } from "@/lib/psp/document-rules"
+import { invalidateDocumentCache } from "@/lib/psp/preloader"
 
 // Fallback documents when no education type is set
 const DEFAULT_PROFILE_DOCUMENTS = [
@@ -37,10 +38,10 @@ function educationToGraduateType(educationType?: EducationType): GraduateType | 
   return educationType as GraduateType
 }
 
-function getProfileDocuments(educationType?: EducationType): { id: string; name: string; nameAr: string; required?: boolean }[] {
+function getProfileDocuments(educationType?: EducationType, flags?: ConditionalDocumentFlags): { id: string; name: string; nameAr: string; required?: boolean }[] {
   const graduateType = educationToGraduateType(educationType)
   if (!graduateType) return [...DEFAULT_PROFILE_DOCUMENTS]
-  const docs = getDocumentsForGraduateType(graduateType)
+  const docs = getDocumentsForGraduateType(graduateType, flags)
   return docs.map(d => ({ id: d.id, name: d.name, nameAr: d.nameAr, required: d.required }))
 }
 
@@ -81,7 +82,12 @@ function getFileIcon(type: string) {
 }
 
 export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUCDocumentUploadProps) {
-  const profileDocuments = useMemo(() => getProfileDocuments(lead?.education_type), [lead?.education_type])
+  const conditionalFlags: ConditionalDocumentFlags = useMemo(() => ({
+    isTransfer: lead?.is_transfer_student,
+    isSpecialNeeds: lead?.is_special_needs,
+    isDiplomatic: lead?.is_diplomatic,
+  }), [lead?.is_transfer_student, lead?.is_special_needs, lead?.is_diplomatic])
+  const profileDocuments = useMemo(() => getProfileDocuments(lead?.education_type, conditionalFlags), [lead?.education_type, conditionalFlags])
   const [documents, setDocuments] = useState<Record<string, StoredDocument | null>>({})
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
@@ -178,6 +184,9 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
         [docId]: savedDoc,
       }))
 
+      // Invalidate PSP cache so PSP section reflects the new upload
+      invalidateDocumentCache(leadId)
+
       // Trigger civil ID extraction if this is a civil_id document
       if (docId === "civil_id" && lead && !file.type.includes("pdf")) {
         setExtracting(true)
@@ -236,6 +245,9 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
       if (!response.ok) throw new Error("Failed to delete document")
 
       setDocuments((prev) => ({ ...prev, [docId]: null }))
+
+      // Invalidate PSP cache so PSP section reflects the deletion
+      invalidateDocumentCache(leadId)
     } catch (err) {
       console.error("Delete failed:", err)
       alert("Failed to delete document. Please try again.")
