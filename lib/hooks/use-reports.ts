@@ -142,6 +142,27 @@ export interface PUCDailySubmission {
   documentsSubmitted: number
   applicationSubmitted: number
   feePaid: number
+  maleCount: number
+  femaleCount: number
+  dailyTotal: number
+  majorBreakdown: Record<IntendedMajor, number>
+}
+
+export interface PUCDailySourceRow {
+  date: string
+  sources: Record<string, number>  // LeadSource -> count
+  total: number
+}
+
+export interface PUCAgentDailyRow {
+  date: string
+  agents: Array<{
+    agentId: string
+    agentName: string
+    filesOpened: number
+    documentsSubmitted: number
+    applicationSubmitted: number
+  }>
 }
 
 export interface PUCReportData {
@@ -160,6 +181,8 @@ export interface PUCReportData {
   diplomaticCount: number
   specialNeedsCount: number
   dailySubmissions: PUCDailySubmission[]
+  dailySources: PUCDailySourceRow[]
+  agentDaily: PUCAgentDailyRow[]
 }
 
 export interface EnrollmentReportData {
@@ -1303,11 +1326,17 @@ function calculateReports(
     specialNeedsCount: pucLeadsAll.filter(l => l.is_special_needs).length,
     dailySubmissions: (() => {
       // Build day-by-day map from date range
+      const emptyMajors = (): Record<IntendedMajor, number> => ({
+        cyber_security: 0, cis: 0, marketing: 0, accounting: 0, network_security: 0, other: 0,
+      })
       const dayMap: Record<string, PUCDailySubmission> = {}
       const cursor = new Date(startDate)
       while (cursor <= endDate) {
         const key = cursor.toISOString().split('T')[0]
-        dayMap[key] = { date: key, filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0, feePaid: 0 }
+        dayMap[key] = {
+          date: key, filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0, feePaid: 0,
+          maleCount: 0, femaleCount: 0, dailyTotal: 0, majorBreakdown: emptyMajors(),
+        }
         cursor.setDate(cursor.getDate() + 1)
       }
 
@@ -1319,6 +1348,18 @@ function calculateReports(
         if (pucFileStages.includes(l.pipeline_stage)) dayMap[day].filesOpened++
         if (pucDocStages.includes(l.pipeline_stage)) dayMap[day].documentsSubmitted++
         if (pucAppStages.includes(l.pipeline_stage)) dayMap[day].applicationSubmitted++
+
+        // Gender counts
+        const gender = (l.gender || '').toLowerCase()
+        if (gender === 'male') dayMap[day].maleCount++
+        else if (gender === 'female') dayMap[day].femaleCount++
+        dayMap[day].dailyTotal++
+
+        // Major breakdown
+        const major = l.intended_major as IntendedMajor | undefined
+        if (major && dayMap[day].majorBreakdown[major] !== undefined) {
+          dayMap[day].majorBreakdown[major]++
+        }
       }
 
       // Fee paid from students by created_at
@@ -1329,6 +1370,60 @@ function calculateReports(
       }
 
       return Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date))
+    })(),
+    dailySources: (() => {
+      const dayMap: Record<string, PUCDailySourceRow> = {}
+      const cursor2 = new Date(startDate)
+      while (cursor2 <= endDate) {
+        const key = cursor2.toISOString().split('T')[0]
+        dayMap[key] = { date: key, sources: {}, total: 0 }
+        cursor2.setDate(cursor2.getDate() + 1)
+      }
+
+      for (const l of pucLeadsAll) {
+        const day = l.created_at ? l.created_at.split('T')[0] : null
+        if (!day || !dayMap[day]) continue
+        const src = l.source || 'unknown'
+        dayMap[day].sources[src] = (dayMap[day].sources[src] || 0) + 1
+        dayMap[day].total++
+      }
+
+      return Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date))
+    })(),
+    agentDaily: (() => {
+      const dayMap: Record<string, Record<string, { filesOpened: number; documentsSubmitted: number; applicationSubmitted: number }>> = {}
+      const cursor3 = new Date(startDate)
+      while (cursor3 <= endDate) {
+        const key = cursor3.toISOString().split('T')[0]
+        dayMap[key] = {}
+        cursor3.setDate(cursor3.getDate() + 1)
+      }
+
+      for (const l of pucLeadsAll) {
+        const day = l.created_at ? l.created_at.split('T')[0] : null
+        if (!day || !dayMap[day] || !l.assigned_to) continue
+
+        if (!dayMap[day][l.assigned_to]) {
+          dayMap[day][l.assigned_to] = { filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0 }
+        }
+        const entry = dayMap[day][l.assigned_to]
+        if (pucFileStages.includes(l.pipeline_stage)) entry.filesOpened++
+        if (pucDocStages.includes(l.pipeline_stage)) entry.documentsSubmitted++
+        if (pucAppStages.includes(l.pipeline_stage)) entry.applicationSubmitted++
+      }
+
+      const agentNameMap = new Map(agents.map(a => [a.id, a.full_name]))
+      return Object.entries(dayMap).map(([date, agentMap]) => ({
+        date,
+        agents: Object.entries(agentMap)
+          .map(([agentId, counts]) => ({
+            agentId,
+            agentName: agentNameMap.get(agentId) || 'Unknown',
+            ...counts,
+          }))
+          .filter(a => a.filesOpened > 0 || a.documentsSubmitted > 0 || a.applicationSubmitted > 0)
+          .sort((a, b) => (b.filesOpened + b.documentsSubmitted + b.applicationSubmitted) - (a.filesOpened + a.documentsSubmitted + a.applicationSubmitted)),
+      })).sort((a, b) => a.date.localeCompare(b.date))
     })(),
   }
 

@@ -64,6 +64,7 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReports, useAgents, defaultFilters, type ReportFilters, type ReportData } from "@/lib/hooks/use-reports"
 import { useCycles } from "@/lib/hooks/use-cycles"
+import { useActivePUCPeriod } from "@/lib/hooks/use-puc-periods"
 import { AnimatedNumber } from "@/components/reports/animated-number"
 import { exportToCSV } from "@/lib/export-utils"
 import {
@@ -421,6 +422,7 @@ export default function ReportsPage() {
   const [major, setMajor] = useState<string>("all")
   const [selectedCycleId, setSelectedCycleId] = useState<string>("all")
   const { cycles } = useCycles()
+  const { period: activePUCPeriod, isFrozen: isPUCFrozen } = useActivePUCPeriod()
 
   // UI states
   const [showFilters, setShowFilters] = useState(false)
@@ -443,6 +445,23 @@ export default function ReportsPage() {
       setActiveTab('overview')
     }
   }, [isAgent, activeTab])
+
+  // Override date range when PUC tab is active and a PUC period exists
+  useEffect(() => {
+    if (activeTab === 'puc' && activePUCPeriod) {
+      setFilters(prev => ({
+        ...prev,
+        dateRange: {
+          start: activePUCPeriod.start_date,
+          end: activePUCPeriod.end_date,
+          preset: 'all',
+        },
+      }))
+      setDateFrom(activePUCPeriod.start_date)
+      setDateTo(activePUCPeriod.end_date)
+      setDatePreset('all')
+    }
+  }, [activeTab, activePUCPeriod?.id])
 
   // Compute active date range for target reports
   // Compute active date range (full period end) for target reports time remaining
@@ -1313,7 +1332,17 @@ export default function ReportsPage() {
 
           {/* PUC Tab */}
           {activeTab === 'puc' && (
-            <PUCReports data={data.puc} />
+            <PUCReports
+              data={data.puc}
+              periodInfo={activePUCPeriod ? {
+                periodId: activePUCPeriod.id,
+                periodName: activePUCPeriod.name,
+                startDate: activePUCPeriod.start_date,
+                endDate: activePUCPeriod.end_date,
+                isFrozen: isPUCFrozen,
+                isArchived: activePUCPeriod.status === 'archived',
+              } : null}
+            />
           )}
 
           {/* Demographics Tab */}
