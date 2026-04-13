@@ -1104,7 +1104,8 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
             setShowBooking(false)
             onUpdate?.()
           }}
-          preselectedLeadId={appointmentLeads[0]?.id}
+          preselectedLead={appointmentLeads[0]}
+          singleFormMode
         />
       )}
 
