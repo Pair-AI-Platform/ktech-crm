@@ -62,6 +62,7 @@ import { LeadForm } from "@/components/leads/lead-form"
 import { StudentInfoForm } from "@/components/leads/student-info-form"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
+import { FileFeePaymentDialog } from "@/components/leads/file-fee-payment-dialog"
 import { SFDownPaymentCard } from "@/components/leads/sf-down-payment-card"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { InlineTagSelect } from "@/components/ui/notion-tag-select"
@@ -352,6 +353,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [showReactivateMenu, setShowReactivateMenu] = useState(false)
   const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
+  const [showFileFeeDialog, setShowFileFeeDialog] = useState(false)
   const [noteFilter, setNoteFilter] = useState<FilterCategory>('all')
   const [pinnedNoteIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
@@ -470,6 +472,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (stage === lead.pipeline_stage) {
       console.log('[Stage Click] Same stage, skipping')
       return
+    }
+
+    // Intercept "application" (File) stage - require file fee payment first
+    if (stage === 'application' && lead.pipeline_stage !== 'application') {
+      // Skip if fees already paid or exempted
+      if (lead.file_fee_status !== 'paid' && lead.file_fee_status !== 'exempt') {
+        console.log('[Stage Click] Intercepting file stage click - showing file fee dialog')
+        setShowFileFeeDialog(true)
+        return
+      }
     }
 
     // Intercept "enrolled" stage - require payment first
@@ -831,6 +843,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/25">
                           <Star className="w-3.5 h-3.5 fill-amber-400" />
                           Ministry File
+                        </span>
+                      )}
+                      {lead.source && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold tracking-wide rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 ring-1 ring-teal-500/25">
+                          <Tag className="w-3.5 h-3.5" />
+                          {lead.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                         </span>
                       )}
                       {/* Admin-only priority toggle */}
@@ -1915,6 +1933,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         leadName={getLeadDisplayName(lead)}
         onConfirm={async (reasonId, notes) => {
           await updateLeadStage(lead.id, 'lost', reasonId, notes)
+          await refetchLead()
+        }}
+      />
+
+      {/* File Fee Payment Dialog */}
+      <FileFeePaymentDialog
+        open={showFileFeeDialog}
+        onOpenChange={setShowFileFeeDialog}
+        lead={lead}
+        onSuccess={async () => {
           await refetchLead()
         }}
       />
