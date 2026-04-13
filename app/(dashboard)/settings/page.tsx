@@ -19,6 +19,7 @@ import { DocumentConfigManagement } from "@/components/settings/document-config-
 import { CycleManagement } from "@/components/settings/cycle-management"
 import { SourceManagement } from "@/components/settings/source-management"
 import { ExhibitionsManagement } from "@/components/settings/exhibitions-management"
+import { PUCPeriodManagement } from "@/components/settings/puc-period-management"
 import {
   Select,
   SelectContent,
@@ -53,6 +54,7 @@ import {
   MessageSquare,
   Smartphone,
   CalendarClock,
+  CalendarRange,
   Radio,
   Landmark,
   AlertTriangle,
@@ -66,7 +68,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { createClient } from "@/lib/supabase/client"
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "sources" | "exhibitions" | "schools" | "documents" | "enrollment"
+type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "sources" | "exhibitions" | "schools" | "documents" | "enrollment" | "puc-periods"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -78,6 +80,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boo
   { id: "sources", label: "Sources", icon: Radio, adminOnly: true },
   { id: "exhibitions", label: "Exhibitions", icon: Landmark, adminOnly: true },
   { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
+  { id: "puc-periods", label: "PUC Periods", icon: CalendarRange, adminOnly: true },
   { id: "schools", label: "Schools", icon: School, adminOnly: true },
   { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
   { id: "team", label: "Team", icon: Users, adminOnly: true },
@@ -726,6 +729,19 @@ export default function SettingsPage() {
                     className="space-y-6"
                   >
                     <CycleManagement />
+                  </motion.div>
+                )}
+
+                {/* PUC Periods Tab */}
+                {activeTab === "puc-periods" && isAdmin && (
+                  <motion.div
+                    key="puc-periods"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <PUCPeriodManagement />
                   </motion.div>
                 )}
 
