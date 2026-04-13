@@ -203,6 +203,18 @@ export function LeadFormPersonal({
           </div>
         </div>
 
+        {/* Full Name in Arabic (Optional) */}
+        <div className="space-y-2">
+          <Label htmlFor="full_name_ar">الاسم الكامل <span className="text-xs text-[var(--text-secondary)]">(اختياري)</span></Label>
+          <Input
+            id="full_name_ar"
+            value={formData.full_name_ar}
+            onChange={(e) => handleChange("full_name_ar", e.target.value)}
+            placeholder="الاسم الكامل بالعربي"
+            dir="rtl"
+          />
+        </div>
+
         {/* Gender */}
         <div className="space-y-2">
           <Label>Gender</Label>

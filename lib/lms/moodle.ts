@@ -29,6 +29,14 @@ export interface MoodleGrade {
   lettergrade: string | null
 }
 
+export interface PlacementSubjectResult {
+  best_score: number | null
+  passed: boolean
+  attempts: number
+  score_1: number | null
+  score_2: number | null
+}
+
 export interface MoodlePlacementScores {
   english_score: number | null
   english_passed: boolean
@@ -36,6 +44,10 @@ export interface MoodlePlacementScores {
   math_passed: boolean
   computer_score: number | null
   computer_passed: boolean
+  // Attempt details
+  english: PlacementSubjectResult
+  math: PlacementSubjectResult
+  computer: PlacementSubjectResult
 }
 
 export interface LMSSyncResult {
@@ -201,40 +213,130 @@ async function getUserGrades(userId: number): Promise<MoodleGrade[]> {
 }
 
 /**
- * Get placement test scores for a user
+ * Get quizzes in a course
+ */
+async function getQuizzesInCourse(courseId: number): Promise<Array<{ id: number; name: string }>> {
+  try {
+    const result = await moodleApiCall<{ quizzes: Array<{ id: number; name: string }> }>(
+      'mod_quiz_get_quizzes_by_courses',
+      { 'courseids[0]': courseId }
+    )
+    return result.quizzes || []
+  } catch (error) {
+    console.error(`Error fetching quizzes for course ${courseId}:`, error)
+    return []
+  }
+}
+
+interface MoodleQuizAttempt {
+  id: number
+  attempt: number
+  state: string // 'finished' | 'inprogress' | 'overdue' | 'abandoned'
+  sumgrades: number | null
+}
+
+/**
+ * Get a user's quiz attempts and return individual attempt scores (max 2).
+ * Returns the highest score as the best score.
+ */
+async function getQuizAttemptScores(
+  userId: number,
+  courseId: number
+): Promise<PlacementSubjectResult> {
+  const result: PlacementSubjectResult = {
+    best_score: null,
+    passed: false,
+    attempts: 0,
+    score_1: null,
+    score_2: null,
+  }
+
+  try {
+    // Find quizzes in the placement course
+    const quizzes = await getQuizzesInCourse(courseId)
+    if (quizzes.length === 0) {
+      // Fallback to course grade if no quizzes found
+      const courseGrade = await getCourseGrade(userId, courseId)
+      if (courseGrade && courseGrade.grade !== null) {
+        result.best_score = Math.round(courseGrade.grade)
+        result.passed = courseGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
+        result.attempts = 1
+        result.score_1 = result.best_score
+      }
+      return result
+    }
+
+    // Use the first quiz in the placement course (each placement course has one quiz)
+    const quizId = quizzes[0].id
+
+    const attemptsResult = await moodleApiCall<{ attempts: MoodleQuizAttempt[] }>(
+      'mod_quiz_get_user_attempts',
+      {
+        quizid: quizId,
+        userid: userId,
+        status: 'finished',
+      }
+    )
+
+    const attempts = (attemptsResult.attempts || [])
+      .filter(a => a.state === 'finished' && a.sumgrades !== null)
+      .slice(0, 2) // Max 2 attempts
+
+    result.attempts = attempts.length
+
+    if (attempts.length >= 1) {
+      // Moodle sumgrades is raw - convert to percentage using quiz max grade
+      // For simplicity and since placement quizzes are typically 0-100, use sumgrades directly
+      result.score_1 = Math.round(attempts[0].sumgrades!)
+    }
+
+    if (attempts.length >= 2) {
+      result.score_2 = Math.round(attempts[1].sumgrades!)
+    }
+
+    // Pick the highest score
+    const scores = [result.score_1, result.score_2].filter((s): s is number => s !== null)
+    if (scores.length > 0) {
+      result.best_score = Math.max(...scores)
+      result.passed = result.best_score >= PLACEMENT_TEST_PASSING_THRESHOLD
+    }
+  } catch (error) {
+    console.error(`Error fetching quiz attempts for course ${courseId}:`, error)
+    // Fallback to course grade
+    const courseGrade = await getCourseGrade(userId, courseId)
+    if (courseGrade && courseGrade.grade !== null) {
+      result.best_score = Math.round(courseGrade.grade)
+      result.passed = courseGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
+      result.attempts = 1
+      result.score_1 = result.best_score
+    }
+  }
+
+  return result
+}
+
+/**
+ * Get placement test scores for a user (supports multiple attempts, takes highest)
  */
 async function getPlacementScores(userId: number): Promise<MoodlePlacementScores> {
-  const scores: MoodlePlacementScores = {
-    english_score: null,
-    english_passed: false,
-    math_score: null,
-    math_passed: false,
-    computer_score: null,
-    computer_passed: false,
-  }
+  // Fetch all three subjects in parallel
+  const [english, math, computer] = await Promise.all([
+    getQuizAttemptScores(userId, PLACEMENT_COURSE_IDS.english),
+    getQuizAttemptScores(userId, PLACEMENT_COURSE_IDS.math),
+    getQuizAttemptScores(userId, PLACEMENT_COURSE_IDS.computer),
+  ])
 
-  // Fetch English placement score
-  const englishGrade = await getCourseGrade(userId, PLACEMENT_COURSE_IDS.english)
-  if (englishGrade && englishGrade.grade !== null) {
-    scores.english_score = Math.round(englishGrade.grade)
-    scores.english_passed = englishGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
+  return {
+    english_score: english.best_score,
+    english_passed: english.passed,
+    math_score: math.best_score,
+    math_passed: math.passed,
+    computer_score: computer.best_score,
+    computer_passed: computer.passed,
+    english,
+    math,
+    computer,
   }
-
-  // Fetch Math placement score
-  const mathGrade = await getCourseGrade(userId, PLACEMENT_COURSE_IDS.math)
-  if (mathGrade && mathGrade.grade !== null) {
-    scores.math_score = Math.round(mathGrade.grade)
-    scores.math_passed = mathGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
-  }
-
-  // Fetch Computer placement score
-  const computerGrade = await getCourseGrade(userId, PLACEMENT_COURSE_IDS.computer)
-  if (computerGrade && computerGrade.grade !== null) {
-    scores.computer_score = Math.round(computerGrade.grade)
-    scores.computer_passed = computerGrade.grade >= PLACEMENT_TEST_PASSING_THRESHOLD
-  }
-
-  return scores
 }
 
 /**

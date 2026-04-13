@@ -289,6 +289,11 @@ export function LeadFormPipeline({
                             IELTS/TOEFL
                           </span>
                         )}
+                        {(formData.placement_english_attempts ?? 0) >= 2 && (
+                          <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" /> Retested
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                         <span className="text-sm text-[var(--text-muted)]">Score:</span>
@@ -296,6 +301,13 @@ export function LeadFormPipeline({
                           {formData.placement_english_score || "\u2014"}
                         </span>
                       </div>
+                      {(formData.placement_english_attempts ?? 0) >= 2 && (
+                        <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                          <span>1st: {formData.placement_english_score_1 ?? "\u2014"}</span>
+                          <span>2nd: {formData.placement_english_score_2 ?? "\u2014"}</span>
+                          <span className="text-[var(--text-primary)] font-medium">Best: {formData.placement_english_score ?? "\u2014"}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs text-[var(--text-muted)]">Pass</span>
@@ -324,6 +336,11 @@ export function LeadFormPipeline({
                             <Check className="w-3 h-3" /> Passed
                           </span>
                         )}
+                        {(formData.placement_math_attempts ?? 0) >= 2 && (
+                          <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" /> Retested
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                         <span className="text-sm text-[var(--text-muted)]">Score:</span>
@@ -331,6 +348,13 @@ export function LeadFormPipeline({
                           {formData.placement_math_score || "\u2014"}
                         </span>
                       </div>
+                      {(formData.placement_math_attempts ?? 0) >= 2 && (
+                        <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                          <span>1st: {formData.placement_math_score_1 ?? "\u2014"}</span>
+                          <span>2nd: {formData.placement_math_score_2 ?? "\u2014"}</span>
+                          <span className="text-[var(--text-primary)] font-medium">Best: {formData.placement_math_score ?? "\u2014"}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs text-[var(--text-muted)]">Pass</span>
@@ -358,6 +382,11 @@ export function LeadFormPipeline({
                             <Check className="w-3 h-3" /> Passed
                           </span>
                         )}
+                        {(formData.placement_computer_attempts ?? 0) >= 2 && (
+                          <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" /> Retested
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                         <span className="text-sm text-[var(--text-muted)]">Score:</span>
@@ -365,6 +394,13 @@ export function LeadFormPipeline({
                           {formData.placement_computer_score || "\u2014"}
                         </span>
                       </div>
+                      {(formData.placement_computer_attempts ?? 0) >= 2 && (
+                        <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                          <span>1st: {formData.placement_computer_score_1 ?? "\u2014"}</span>
+                          <span>2nd: {formData.placement_computer_score_2 ?? "\u2014"}</span>
+                          <span className="text-[var(--text-primary)] font-medium">Best: {formData.placement_computer_score ?? "\u2014"}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs text-[var(--text-muted)]">Pass</span>

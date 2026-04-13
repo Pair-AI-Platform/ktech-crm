@@ -90,6 +90,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const [formData, setFormData] = useState<LeadFormData>({
     first_name: lead?.first_name || "",
     last_name: lead?.last_name || "",
+    full_name_ar: lead?.full_name_ar || "",
     gender: lead?.gender || "",
     phone: lead?.phone || "",
     phone_secondary: lead?.phone_secondary || "",
@@ -139,6 +140,15 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     placement_computer_override: lead?.placement_computer_override || false,
     has_ielts_toefl: lead?.has_ielts_toefl || false,
     placement_lms_synced: lead?.placement_lms_synced || false,
+    placement_english_attempts: lead?.placement_english_attempts || 0,
+    placement_english_score_1: lead?.placement_english_score_1?.toString() || "",
+    placement_english_score_2: lead?.placement_english_score_2?.toString() || "",
+    placement_math_attempts: lead?.placement_math_attempts || 0,
+    placement_math_score_1: lead?.placement_math_score_1?.toString() || "",
+    placement_math_score_2: lead?.placement_math_score_2?.toString() || "",
+    placement_computer_attempts: lead?.placement_computer_attempts || 0,
+    placement_computer_score_1: lead?.placement_computer_score_1?.toString() || "",
+    placement_computer_score_2: lead?.placement_computer_score_2?.toString() || "",
     // Ministry blocked
     ministry_blocked: lead?.ministry_blocked || false,
     ministry_block_reasons: lead?.ministry_block_reasons || [],
@@ -324,6 +334,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     const leadData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
+      full_name_ar: formData.full_name_ar.trim() || undefined,
       phone: formData.phone.replace(/\D/g, ""),
       phone_secondary: formData.phone_secondary.trim() ? formData.phone_secondary.replace(/\D/g, "") : undefined,
       email: formData.email,

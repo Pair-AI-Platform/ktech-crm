@@ -70,6 +70,7 @@ export const POST = withApiHandler({ context: 'lms-sync' }, async ({ req, supaba
   // Build update payload with placement scores
   const updateData: Record<string, unknown> = {
     placement_lms_synced: true,
+    placement_lms_synced_at: new Date().toISOString(),
   }
 
   if (syncResult.placement_scores) {
@@ -79,16 +80,28 @@ export const POST = withApiHandler({ context: 'lms-sync' }, async ({ req, supaba
       updateData.placement_english_score = scores.english_score
       updateData.placement_english_passed = scores.english_passed
     }
+    // English attempt data
+    updateData.placement_english_attempts = scores.english.attempts
+    if (scores.english.score_1 !== null) updateData.placement_english_score_1 = scores.english.score_1
+    if (scores.english.score_2 !== null) updateData.placement_english_score_2 = scores.english.score_2
 
     if (scores.math_score !== null) {
       updateData.placement_math_score = scores.math_score
       updateData.placement_math_passed = scores.math_passed
     }
+    // Math attempt data
+    updateData.placement_math_attempts = scores.math.attempts
+    if (scores.math.score_1 !== null) updateData.placement_math_score_1 = scores.math.score_1
+    if (scores.math.score_2 !== null) updateData.placement_math_score_2 = scores.math.score_2
 
     if (scores.computer_score !== null) {
       updateData.placement_computer_score = scores.computer_score
       updateData.placement_computer_passed = scores.computer_passed
     }
+    // Computer attempt data
+    updateData.placement_computer_attempts = scores.computer.attempts
+    if (scores.computer.score_1 !== null) updateData.placement_computer_score_1 = scores.computer.score_1
+    if (scores.computer.score_2 !== null) updateData.placement_computer_score_2 = scores.computer.score_2
   }
 
   if (syncResult.gpa !== null) {

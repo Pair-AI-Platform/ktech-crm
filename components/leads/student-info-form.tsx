@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input, Textarea } from "@/components/ui/input"
@@ -43,6 +43,8 @@ import {
   Send,
   FileText,
   Ban,
+  History,
+  ArrowRight,
 } from "lucide-react"
 import {
   SCHOOLS,
@@ -67,6 +69,8 @@ import { useSemesters } from "@/lib/hooks/use-semesters"
 import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
 import { createClient } from "@/lib/supabase/client"
+import { useLeadActivities } from "@/lib/hooks/use-activities"
+import { formatDate } from "@/lib/utils"
 import type { MOEFetchResponse } from "@/lib/moe/types"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 
@@ -88,6 +92,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const { semesters } = useSemesters()
   const { sources: dbSources } = useActiveSources()
   const { exhibitions: activeExhibitions } = useActiveExhibitions()
+  const { activities } = useLeadActivities(lead.id)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [schoolSearch, setSchoolSearch] = useState("")
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
@@ -108,6 +113,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [discountOpen, setDiscountOpen] = useState(true)
   const [ministryOpen, setMinistryOpen] = useState(true)
   const [notesOpen, setNotesOpen] = useState(true)
+
+  // Source change history from activities
+  const sourceHistory = useMemo(() => {
+    return activities
+      .filter(a => a.activity_type === 'source_change')
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [activities])
 
   // Fetch schools from database
   useEffect(() => {
@@ -945,6 +957,54 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 </Select>
               </div>
             )}
+
+            {/* Source History */}
+            {sourceHistory.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm font-medium text-[var(--text-secondary)]">Source History</span>
+                  <span className="text-xs text-[var(--text-muted)] ml-auto">{sourceHistory.length} change{sourceHistory.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-2">
+                  {sourceHistory.map((activity, index) => {
+                    const meta = activity.metadata as { old_source?: string; new_source?: string } | undefined
+                    const allSources = dbSources.length > 0 ? dbSources : LEAD_SOURCES
+                    const oldLabel = allSources.find(s => s.value === meta?.old_source)?.label || meta?.old_source || 'None'
+                    const newLabel = allSources.find(s => s.value === meta?.new_source)?.label || meta?.new_source || 'None'
+                    const changedBy = (activity as { created_by_profile?: { full_name?: string } }).created_by_profile?.full_name
+                    return (
+                      <div
+                        key={activity.id}
+                        className="flex items-center gap-3 p-2.5 rounded-lg bg-[var(--bg-sunken)] text-sm"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-medium text-[var(--primary)]">{sourceHistory.length - index}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[var(--text-muted)] line-through text-xs">{oldLabel}</span>
+                            <ArrowRight className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
+                            <span className="font-medium text-[var(--text-primary)] text-xs">{newLabel}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-[var(--text-muted)]">
+                              {formatDate(activity.created_at)}
+                            </span>
+                            {changedBy && (
+                              <>
+                                <span className="text-xs text-[var(--text-muted)]">&middot;</span>
+                                <span className="text-xs text-[var(--text-muted)]">{changedBy}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1566,6 +1626,11 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                           IELTS/TOEFL
                         </span>
                       )}
+                      {(lead.placement_english_attempts ?? 0) >= 2 && (
+                        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" /> Retested
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                       <span className="text-sm text-[var(--text-muted)]">Score:</span>
@@ -1573,6 +1638,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         {lead.placement_english_score ?? "\u2014"}
                       </span>
                     </div>
+                    {(lead.placement_english_attempts ?? 0) >= 2 && (
+                      <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                        <span>1st: {lead.placement_english_score_1 ?? "\u2014"}</span>
+                        <span>2nd: {lead.placement_english_score_2 ?? "\u2014"}</span>
+                        <span className="text-[var(--text-primary)] font-medium">Best: {lead.placement_english_score ?? "\u2014"}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-xs text-[var(--text-muted)]">Pass</span>
@@ -1601,6 +1673,11 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                           <Check className="w-3 h-3" /> Passed
                         </span>
                       )}
+                      {(lead.placement_math_attempts ?? 0) >= 2 && (
+                        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" /> Retested
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                       <span className="text-sm text-[var(--text-muted)]">Score:</span>
@@ -1608,6 +1685,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         {lead.placement_math_score ?? "\u2014"}
                       </span>
                     </div>
+                    {(lead.placement_math_attempts ?? 0) >= 2 && (
+                      <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                        <span>1st: {lead.placement_math_score_1 ?? "\u2014"}</span>
+                        <span>2nd: {lead.placement_math_score_2 ?? "\u2014"}</span>
+                        <span className="text-[var(--text-primary)] font-medium">Best: {lead.placement_math_score ?? "\u2014"}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-xs text-[var(--text-muted)]">Pass</span>
@@ -1635,6 +1719,11 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                           <Check className="w-3 h-3" /> Passed
                         </span>
                       )}
+                      {(lead.placement_computer_attempts ?? 0) >= 2 && (
+                        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" /> Retested
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
                       <span className="text-sm text-[var(--text-muted)]">Score:</span>
@@ -1642,6 +1731,13 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         {lead.placement_computer_score ?? "\u2014"}
                       </span>
                     </div>
+                    {(lead.placement_computer_attempts ?? 0) >= 2 && (
+                      <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                        <span>1st: {lead.placement_computer_score_1 ?? "\u2014"}</span>
+                        <span>2nd: {lead.placement_computer_score_2 ?? "\u2014"}</span>
+                        <span className="text-[var(--text-primary)] font-medium">Best: {lead.placement_computer_score ?? "\u2014"}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-xs text-[var(--text-muted)]">Pass</span>

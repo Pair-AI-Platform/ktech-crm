@@ -3,6 +3,7 @@ import type { MinistryBlockReason } from "@/types"
 export interface LeadFormData {
   first_name: string
   last_name: string
+  full_name_ar: string
   gender: string
   phone: string
   phone_secondary: string
@@ -52,6 +53,16 @@ export interface LeadFormData {
   placement_computer_override: boolean
   has_ielts_toefl: boolean
   placement_lms_synced: boolean
+  // Attempt tracking
+  placement_english_attempts: number
+  placement_english_score_1: string
+  placement_english_score_2: string
+  placement_math_attempts: number
+  placement_math_score_1: string
+  placement_math_score_2: string
+  placement_computer_attempts: number
+  placement_computer_score_1: string
+  placement_computer_score_2: string
   // Ministry blocked
   ministry_blocked: boolean
   ministry_block_reasons: MinistryBlockReason[]
