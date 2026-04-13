@@ -27,22 +27,21 @@ import {
   MessageSquare,
   Phone,
   Upload,
-  ShieldCheck,
 } from "lucide-react"
 import { SCHOOLS, PREFERRED_COLLEGES } from "@/types"
-import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationType } from "@/types"
+import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationType, PUCDocumentStatus } from "@/types"
 import { cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { PSPDocumentManager } from "./psp-document-manager"
 import { getCachedSchools, preloadSchools, getCachedPaymentStatus, preloadPaymentStatus } from "@/lib/psp/preloader"
 import { getDocumentsForGraduateType, type GraduateType as GraduateTypeFromRules, type ConditionalDocumentFlags } from "@/lib/psp/document-rules"
+import { computePUCDocumentStatus as computePUCDocumentStatusFn } from "@/lib/psp/document-status"
 
-type PSPStep = "info" | "payments" | "submission" | "success"
+type PSPStep = "info" | "payments" | "success"
 
 const STEPS: { id: PSPStep; label: string; icon: typeof User }[] = [
   { id: "info", label: "Info & Docs", icon: User },
   { id: "payments", label: "Payments", icon: CreditCard },
-  { id: "submission", label: "Submission", icon: Send },
 ]
 
 export interface PSPWizardContentProps {
@@ -141,7 +140,7 @@ export function PSPWizardContent({
   const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
 
   // Form state - Payment
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "knet" | "online_link" | "exempt" | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "knet" | "online_link" | null>(null)
   const [receiptNumber, setReceiptNumber] = useState("")
   const [selectedFees, setSelectedFees] = useState<Record<string, boolean>>({
     puc: true,
@@ -608,18 +607,7 @@ Kuwait Technical College`
       return false
     }
 
-    const requiredDocs = documents.filter(d => d.required)
-    const missingDocs = requiredDocs.filter(d => !d.file && !d.uploaded)
-
-    if (missingDocs.length > 0) {
-      const missingNames = missingDocs.map(d => d.name).join(', ')
-      setError(`Missing required documents: ${missingNames}`)
-      setValidationErrors({
-        documents: `Please upload all required documents. Missing: ${missingNames}`
-      })
-      return false
-    }
-
+    // Documents are tracked for status purposes but don't block progression
     const expiredDocs = documents.filter(d => {
       if (!d.file) return false
       const file = d.file as unknown as { is_expired?: boolean; expiration_date?: string }
@@ -638,6 +626,14 @@ Kuwait Technical College`
     return true
   }
 
+  /** Compute the document status based on uploaded docs and payment */
+  const computeDocumentStatus = (): PUCDocumentStatus => {
+    const requiredDocs = documents.filter(d => d.required)
+    const allDocsComplete = requiredDocs.length > 0 && requiredDocs.every(d => !!d.file || d.uploaded)
+    const paymentComplete = paymentStatus?.hasPaid || pucFeeAlreadyPaid
+    return computePUCDocumentStatusFn(null, allDocsComplete, paymentComplete) || "missing_document"
+  }
+
   const validatePayments = (): boolean => {
     const errors: Record<string, string> = {}
     if (pucFeeAlreadyPaid && !pucFeeReceiptFile) {
@@ -653,8 +649,6 @@ Kuwait Technical College`
         return !!firstName && !!lastName && !!civilId && !!phone
       case "payments":
         return !pucFeeAlreadyPaid || !!pucFeeReceiptFile
-      case "submission":
-        return true
       default:
         return false
     }
@@ -713,6 +707,12 @@ Kuwait Technical College`
 
     if (!isValid) return
 
+    if (currentStep === "payments") {
+      // Payments is the last step — submit directly
+      await handleSubmit()
+      return
+    }
+
     const nextIndex = currentStepIndex + 1
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex].id)
@@ -731,8 +731,13 @@ Kuwait Technical College`
   const handleSubmit = async () => {
     if (!lead) return
 
-    // Re-validate all previous steps before submitting
-    if (!validateInfo() || !validateDocuments()) {
+    // Re-validate info and payments before submitting (documents don't block)
+    if (!validateInfo()) {
+      setCurrentStep("info")
+      return
+    }
+    if (!validateDocuments()) {
+      // Only blocks if graduate type is not selected
       setCurrentStep("info")
       return
     }
@@ -747,6 +752,9 @@ Kuwait Technical College`
     try {
       const newSubstage: SubmissionSubstage = "submissions"
       const newPipelineStage: "applicant" | "lost" = "applicant"
+
+      // Compute document status based on uploaded docs and payment
+      const docStatus = computeDocumentStatus()
 
       const updates: Partial<Lead> = {
         first_name: firstName,
@@ -768,6 +776,7 @@ Kuwait Technical College`
         seat_number: seatNumber || undefined,
         pipeline_stage: newPipelineStage,
         submission_substage: newSubstage,
+        puc_document_status_override: docStatus,
       }
 
       const result = await updateLead(lead.id, updates)
@@ -816,9 +825,9 @@ Kuwait Technical College`
               <ClipboardCheck className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="text-lg font-semibold">PUC Submission</span>
+              <span className="text-lg font-semibold">PSP</span>
               <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
-                {lead ? getLeadDisplayName(lead) : "Submit lead to PSP"}
+                {lead ? getLeadDisplayName(lead) : "Process lead through PSP"}
               </p>
             </div>
           </div>
@@ -850,8 +859,6 @@ Kuwait Technical College`
                   if (targetIdx <= currentStepIndex) return true
                   // Can go to payments if info is filled
                   if (targetIdx === 1) return !!firstName && !!lastName && !!civilId && !!phone
-                  // Cannot click directly to submission - must use Continue button
-                  if (targetIdx === 2) return false
                   return false
                 }
 
@@ -1504,7 +1511,7 @@ Kuwait Technical College`
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
                     Payment Method
                   </h4>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("cash")}
@@ -1554,23 +1561,6 @@ Kuwait Technical College`
                         paymentMethod === "online_link" ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
                       )} />
                       <h4 className="font-medium text-sm text-[var(--text-primary)]">Online Link</h4>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod("exempt")}
-                      className={cn(
-                        "p-4 rounded-xl border text-center transition-all",
-                        paymentMethod === "exempt"
-                          ? "border-amber-500 bg-amber-50"
-                          : "border-[var(--border)] bg-[var(--bg-sunken)] hover:border-amber-400/50"
-                      )}
-                    >
-                      <ShieldCheck className={cn(
-                        "w-7 h-7 mx-auto mb-2",
-                        paymentMethod === "exempt" ? "text-amber-600" : "text-[var(--text-muted)]"
-                      )} />
-                      <h4 className="font-medium text-sm text-[var(--text-primary)]">Exempt</h4>
                     </button>
                   </div>
                 </div>
@@ -1704,207 +1694,7 @@ Kuwait Technical College`
                 </div>
               )}
 
-              {/* Exempt Info */}
-              {!paymentStatus?.hasPaid && paymentMethod === "exempt" && (
-                <div className="space-y-4 pt-2">
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
-                        <ShieldCheck className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-amber-800">Payment Exempt</h4>
-                        <p className="text-sm text-amber-700 mt-0.5">
-                          This student is exempt from payment fees. You can proceed to submission.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Error Display */}
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {error}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Step 3: Submission */}
-          {currentStep === "submission" && (
-            <motion.div
-              key="submission"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-5"
-            >
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Review & Submit
-                </h3>
-                <p className="text-sm text-[var(--text-muted)] mt-1">
-                  Review all information before submitting to PSP
-                </p>
-              </div>
-
-              {/* Summary Cards */}
-              <div className="space-y-4">
-                {/* Student Info Summary */}
-                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
-                    Student Information
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-[var(--text-muted)]">Name:</span>
-                      <span className="ml-2 text-[var(--text-primary)] font-medium">{firstName} {lastName}</span>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-muted)]">Civil ID:</span>
-                      <span className="ml-2 text-[var(--text-primary)] font-mono">{civilId}</span>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-muted)]">Phone:</span>
-                      <span className="ml-2 text-[var(--text-primary)]">{phone}</span>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-muted)]">Email:</span>
-                      <span className="ml-2 text-[var(--text-primary)]">{email || "Not provided"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Academic Info Summary */}
-                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
-                    Academic Information
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-[var(--text-muted)]">School:</span>
-                      <span className="ml-2 text-[var(--text-primary)] font-medium">
-                        {schools.find(s => s.id === schoolId)?.name_en || "Not selected"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-muted)]">Funding:</span>
-                      <Badge variant="info" size="sm" className="ml-2">PUC</Badge>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-muted)]">Actual GPA:</span>
-                      <span className="ml-2 text-[var(--text-primary)] font-medium">
-                        {actualGpa || "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Documents Summary */}
-                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-3">
-                    Documents ({graduateType ? GRADUATE_TYPE_OPTIONS.find(g => g.value === graduateType)?.label : "Not Selected"})
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center",
-                      getUploadedDocumentCount() === getRequiredDocumentCount()
-                        ? "bg-[var(--success)]"
-                        : "bg-amber-500"
-                    )}>
-                      {getUploadedDocumentCount() === getRequiredDocumentCount() ? (
-                        <Check className="w-4 h-4 text-white" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-white" />
-                      )}
-                    </div>
-                    <span className="text-sm text-[var(--text-primary)]">
-                      {getUploadedDocumentCount()} of {getRequiredDocumentCount()} required documents collected
-                    </span>
-                  </div>
-                </div>
-
-                {/* Payment Summary */}
-                <div className={cn(
-                  "p-4 rounded-xl",
-                  paymentStatus?.hasPaid
-                    ? "bg-green-50 border border-green-200"
-                    : "bg-[var(--bg-sunken)]"
-                )}>
-                  <h4 className={cn(
-                    "text-xs font-semibold uppercase tracking-wide mb-3",
-                    paymentStatus?.hasPaid ? "text-green-700" : "text-[var(--text-muted)]"
-                  )}>
-                    Payment ({paymentMethod === "exempt" ? "Exempt" : `${paymentStatus?.hasPaid ? paymentStatus.transaction?.amount : calculateTotal()} KD`})
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center",
-                      paymentStatus?.hasPaid ? "bg-green-500" : paymentMethod === "exempt" ? "bg-amber-500" : "bg-[var(--primary)]"
-                    )}>
-                      {paymentStatus?.hasPaid ? (
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      ) : paymentMethod === "exempt" ? (
-                        <ShieldCheck className="w-4 h-4 text-white" />
-                      ) : paymentMethod === "cash" ? (
-                        <Banknote className="w-4 h-4 text-white" />
-                      ) : paymentMethod === "knet" ? (
-                        <CreditCard className="w-4 h-4 text-white" />
-                      ) : (
-                        <Send className="w-4 h-4 text-white" />
-                      )}
-                    </div>
-                    <span className={cn(
-                      "text-sm",
-                      paymentStatus?.hasPaid ? "text-green-700 font-medium" : paymentMethod === "exempt" ? "text-amber-700 font-medium" : "text-[var(--text-primary)]"
-                    )}>
-                      {paymentMethod === "exempt"
-                        ? "Exempt - No payment required"
-                        : paymentStatus?.hasPaid
-                        ? `Payment Confirmed - ${
-                            paymentMethod === "cash" ? "Cash" :
-                            paymentMethod === "knet" ? "KNET" :
-                            "Online Payment"
-                          }${paymentStatus.transaction?.receiptNumber ? ` - Receipt #${paymentStatus.transaction.receiptNumber}` : ""}`
-                        : paymentMethod === "cash"
-                        ? `Cash payment - Receipt #${receiptNumber}`
-                        : paymentMethod === "knet"
-                        ? `KNET payment - Receipt #${receiptNumber}`
-                        : paymentStatus?.isPending
-                        ? "Payment link sent - Waiting for payment"
-                        : "Online payment link will be sent"}
-                    </span>
-                  </div>
-                  {paymentStatus?.hasPaid && (
-                    <div className="flex items-center justify-between mt-2 ml-10">
-                      <p className="text-xs text-green-600">
-                        Paid on {paymentStatus.transaction?.completedAt
-                          ? new Date(paymentStatus.transaction.completedAt).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "N/A"}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleViewReceipt}
-                        className="flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-800 transition-colors"
-                      >
-                        <Receipt className="w-3 h-3" />
-                        View Receipt
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1952,7 +1742,7 @@ Kuwait Technical College`
                 transition={{ delay: 0.5 }}
                 className="text-[var(--text-muted)] mb-6"
               >
-                {firstName} {lastName} has been moved to the Submission stage
+                {firstName} {lastName} has been submitted successfully
               </motion.p>
 
               <motion.div
@@ -1967,7 +1757,7 @@ Kuwait Technical College`
                   </div>
                   <div className="text-left">
                     <p className="font-semibold text-[var(--text-primary)] text-sm">
-                      PSP Submission
+                      PSP
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">
                       {fundingType === "puc" ? "PUC" : "Self-Funded"} Application
@@ -1975,7 +1765,7 @@ Kuwait Technical College`
                   </div>
                 </div>
                 <div className="text-sm text-center text-[var(--text-secondary)]">
-                  Lead is now in the <strong>Submission</strong> stage
+                  Lead is now in the <strong>Applicant</strong> stage
                 </div>
               </motion.div>
 
@@ -2010,10 +1800,10 @@ Kuwait Technical College`
             {currentStepIndex === 0 ? (variant === "inline" ? "Close" : "Cancel") : "Back"}
           </Button>
 
-          {currentStep === "submission" ? (
+          {currentStep === "payments" ? (
             <Button
-              onClick={handleSubmit}
-              disabled={loading}
+              onClick={goNext}
+              disabled={!canProceed() || loading}
               className="rounded-xl px-6 shadow-sm"
             >
               {loading ? (
