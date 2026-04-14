@@ -5,14 +5,28 @@ import { createServiceRoleClient } from '@/lib/supabase/server'
 export const POST = withApiHandler(
   { context: 'announcements', roles: ['admin'] },
   async ({ req, user, logger }) => {
-    const { title, message } = await req.json()
+    let body
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
+    const { title, message } = body
 
     if (!title?.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
     // Get all active agent profiles
-    const serviceClient = createServiceRoleClient()
+    let serviceClient
+    try {
+      serviceClient = createServiceRoleClient()
+    } catch (err) {
+      logger.error('Service role client failed', { error: err instanceof Error ? err.message : String(err) })
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+
     const { data: agents, error: agentsError } = await serviceClient
       .from('profiles')
       .select('id')
@@ -29,7 +43,7 @@ export const POST = withApiHandler(
 
     const notifications = agents.map((agent) => ({
       user_id: agent.id,
-      type: 'system_alert' as const,
+      type: 'system_alert',
       title: `📢 ${title.trim()}`,
       body: message?.trim() || null,
       is_read: false,
@@ -42,8 +56,8 @@ export const POST = withApiHandler(
       .insert(notifications)
 
     if (insertError) {
-      logger.error('Failed to insert announcements', { error: insertError.message })
-      return NextResponse.json({ error: 'Failed to send announcement' }, { status: 500 })
+      logger.error('Failed to insert announcements', { error: insertError.message, code: insertError.code, details: insertError.details })
+      return NextResponse.json({ error: `Failed to send announcement: ${insertError.message}` }, { status: 500 })
     }
 
     logger.info('Announcement sent', { count: agents.length, title: title.trim() })

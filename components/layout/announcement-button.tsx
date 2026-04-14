@@ -26,12 +26,17 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
 
   if (!isAdmin) return null
 
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+
   const handleSend = async () => {
     if (!title.trim()) {
-      alert("Please enter a title")
+      setError("Please enter a title")
       return
     }
 
+    setError("")
+    setSuccess("")
     setSending(true)
     try {
       const res = await fetch("/api/announcements", {
@@ -46,13 +51,16 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
         throw new Error(data.error || "Failed to send announcement")
       }
 
-      alert(`Announcement sent to ${data.count} team members`)
+      setSuccess(`Announcement sent to ${data.count} team members`)
       setTitle("")
       setMessage("")
-      setOpen(false)
+      setTimeout(() => {
+        setSuccess("")
+        setOpen(false)
+      }, 2000)
     } catch (err) {
       console.error("Failed to send announcement:", err)
-      alert(err instanceof Error ? err.message : "Failed to send announcement")
+      setError(err instanceof Error ? err.message : "Failed to send announcement")
     } finally {
       setSending(false)
     }
@@ -64,7 +72,7 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
         variant="ghost"
         size="icon"
         className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-        onClick={() => setOpen(true)}
+        onClick={() => { setError(""); setSuccess(""); setOpen(true) }}
         title="Send Announcement"
       >
         <Megaphone className="w-5 h-5" />
@@ -80,6 +88,17 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {error && (
+              <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 text-sm text-green-700 dark:text-green-400">
+                {success}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-[var(--text-primary)]">
                 Title <span className="text-[var(--error)]">*</span>
@@ -87,7 +106,7 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
               <Input
                 placeholder="e.g. Team meeting at 2 PM"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); setError("") }}
                 maxLength={200}
               />
             </div>
