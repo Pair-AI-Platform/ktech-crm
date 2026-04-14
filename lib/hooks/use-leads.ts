@@ -666,7 +666,9 @@ export function useLeadMutations() {
       return { data, error: null }
     },
     onSuccess: () => {
-      // Intentionally not invalidating — lead stays in current view until user manually refreshes
+      // Invalidate all lead lists so tab switches show updated stages immediately
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.lists() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.leads.stats() })
     },
   })
 
