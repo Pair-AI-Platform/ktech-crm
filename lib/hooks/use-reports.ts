@@ -162,7 +162,60 @@ export interface PUCAgentDailyRow {
     filesOpened: number
     documentsSubmitted: number
     applicationSubmitted: number
+    feePaid: number
   }>
+}
+
+export interface PUCDocumentStatusBreakdown {
+  ready_to_apply: number
+  pending_payment: number
+  missing_document: number
+  not_set: number
+}
+
+export interface PUCDocumentChecklist {
+  high_school_certificate: number
+  civil_id: number
+  parent_civil_id: number
+  passport: number
+  nationality_document: number
+  payment_receipt: number
+  acceptance_letter: number
+  fee_paid: number
+  total: number
+}
+
+export interface PUCAppliedStudentRow {
+  date: string
+  leadId: string
+  studentName: string
+  source: string
+  major: string
+  gpa: number | null
+  gender: string
+  assignedAgent: string
+  assignedAgentId: string
+  pipelineStage: string
+  pucDocumentStatus: string | null
+}
+
+export interface PUCTargetAgentRow {
+  agentId: string
+  agentName: string
+  avatarUrl: string | null
+  targetPucFiles: number
+  actualPucFiles: number
+  progressPucFiles: number
+  targetPucAppSubmission: number
+  actualPucAppSubmission: number
+  progressPucAppSubmission: number
+}
+
+export interface PUCTargetAchievementData {
+  teamTarget: { pucFiles: number; pucAppSubmission: number }
+  teamActual: { pucFiles: number; pucAppSubmission: number }
+  teamProgress: { pucFiles: number; pucAppSubmission: number }
+  byAgent: PUCTargetAgentRow[]
 }
 
 export interface PUCReportData {
@@ -183,6 +236,10 @@ export interface PUCReportData {
   dailySubmissions: PUCDailySubmission[]
   dailySources: PUCDailySourceRow[]
   agentDaily: PUCAgentDailyRow[]
+  documentStatusBreakdown: PUCDocumentStatusBreakdown
+  documentChecklist: PUCDocumentChecklist
+  dailyAppliedStudents: PUCAppliedStudentRow[]
+  targetAchievement: PUCTargetAchievementData
 }
 
 export interface EnrollmentReportData {
@@ -892,7 +949,13 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
           overallSfApplicantsMap.set(t.agent_id, t.sf_applicants || 0)
         }
       }
-      const agentTargetsMap = new Map<string, { puc_files: number; sf_files: number; sf_applicants: number }>()
+      const overallPucAppSubmissionMap = new Map<string, number>()
+      if (overallTargetsData) {
+        for (const t of overallTargetsData) {
+          overallPucAppSubmissionMap.set(t.agent_id, t.puc_app_submission || 0)
+        }
+      }
+      const agentTargetsMap = new Map<string, { puc_files: number; sf_files: number; sf_applicants: number; puc_app_submission: number }>()
       if (agentTargetsData) {
         for (const t of agentTargetsData) {
           const existing = agentTargetsMap.get(t.agent_id)
@@ -904,6 +967,7 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
               puc_files: t.puc_files || 0,
               sf_files: t.sf_files || 0,
               sf_applicants: overallSfApplicantsMap.get(t.agent_id) || 0,
+              puc_app_submission: overallPucAppSubmissionMap.get(t.agent_id) || 0,
             })
           }
         }
@@ -912,7 +976,7 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
       if (overallTargetsData) {
         for (const t of overallTargetsData) {
           if (!agentTargetsMap.has(t.agent_id)) {
-            agentTargetsMap.set(t.agent_id, { puc_files: 0, sf_files: 0, sf_applicants: t.sf_applicants || 0 })
+            agentTargetsMap.set(t.agent_id, { puc_files: 0, sf_files: 0, sf_applicants: t.sf_applicants || 0, puc_app_submission: t.puc_app_submission || 0 })
           }
         }
       }
@@ -951,7 +1015,8 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
         (stageChangesData || []) as Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }>,
         filters.dateRange.preset,
         allTimeLeadsCount,
-        allTimeLostCount
+        allTimeLostCount,
+        agentTargetsMap
       )
 
       // If DB returned zero leads, fall back to demo data so reports aren't empty
@@ -1073,7 +1138,8 @@ function calculateReports(
   stageChangesRaw: Array<{ lead_id: string | null; created_by: string | null; created_at: string; metadata: Record<string, string> | null }> = [],
   datePreset: ReportFilters['dateRange']['preset'] = 'month',
   allTimeLeadsCount: number | null = null,
-  allTimeLostCount: number | null = null
+  allTimeLostCount: number | null = null,
+  agentTargetsMap: Map<string, { puc_files: number; sf_files: number; sf_applicants: number; puc_app_submission: number }> = new Map()
 ): ReportData {
   // Date range for trend generation
   const trendDates = getDatesBetween(startDate, endDate)
@@ -1391,7 +1457,7 @@ function calculateReports(
       return Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date))
     })(),
     agentDaily: (() => {
-      const dayMap: Record<string, Record<string, { filesOpened: number; documentsSubmitted: number; applicationSubmitted: number }>> = {}
+      const dayMap: Record<string, Record<string, { filesOpened: number; documentsSubmitted: number; applicationSubmitted: number; feePaid: number }>> = {}
       const cursor3 = new Date(startDate)
       while (cursor3 <= endDate) {
         const key = cursor3.toISOString().split('T')[0]
@@ -1404,12 +1470,21 @@ function calculateReports(
         if (!day || !dayMap[day] || !l.assigned_to) continue
 
         if (!dayMap[day][l.assigned_to]) {
-          dayMap[day][l.assigned_to] = { filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0 }
+          dayMap[day][l.assigned_to] = { filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0, feePaid: 0 }
         }
         const entry = dayMap[day][l.assigned_to]
         if (pucFileStages.includes(l.pipeline_stage)) entry.filesOpened++
         if (pucDocStages.includes(l.pipeline_stage)) entry.documentsSubmitted++
         if (pucAppStages.includes(l.pipeline_stage)) entry.applicationSubmitted++
+      }
+
+      // Fee paid from students by assigned_to and created_at
+      for (const s of pucStudents) {
+        if (!s.puc_fee_paid || !s.assigned_to) continue
+        const day = s.created_at ? s.created_at.split('T')[0] : null
+        if (day && dayMap[day] && dayMap[day][s.assigned_to]) {
+          dayMap[day][s.assigned_to].feePaid++
+        }
       }
 
       const agentNameMap = new Map(agents.map(a => [a.id, a.full_name]))
@@ -1421,9 +1496,111 @@ function calculateReports(
             agentName: agentNameMap.get(agentId) || 'Unknown',
             ...counts,
           }))
-          .filter(a => a.filesOpened > 0 || a.documentsSubmitted > 0 || a.applicationSubmitted > 0)
+          .filter(a => a.filesOpened > 0 || a.documentsSubmitted > 0 || a.applicationSubmitted > 0 || a.feePaid > 0)
           .sort((a, b) => (b.filesOpened + b.documentsSubmitted + b.applicationSubmitted) - (a.filesOpened + a.documentsSubmitted + a.applicationSubmitted)),
       })).sort((a, b) => a.date.localeCompare(b.date))
+    })(),
+    // Document Status Breakdown
+    documentStatusBreakdown: (() => {
+      const breakdown: PUCDocumentStatusBreakdown = { ready_to_apply: 0, pending_payment: 0, missing_document: 0, not_set: 0 }
+      for (const l of pucLeadsAll) {
+        if (!pucFileStages.includes(l.pipeline_stage)) continue
+        const status = l.puc_document_status_override
+        if (status === 'ready_to_apply') breakdown.ready_to_apply++
+        else if (status === 'pending_payment') breakdown.pending_payment++
+        else if (status === 'missing_document') breakdown.missing_document++
+        else breakdown.not_set++
+      }
+      return breakdown
+    })(),
+    // Document Checklist
+    documentChecklist: (() => {
+      const checklist: PUCDocumentChecklist = {
+        high_school_certificate: 0, civil_id: 0, parent_civil_id: 0,
+        passport: 0, nationality_document: 0, payment_receipt: 0,
+        acceptance_letter: 0, fee_paid: 0, total: pucStudents.length,
+      }
+      for (const s of pucStudents) {
+        if (s.puc_high_school_certificate_submitted) checklist.high_school_certificate++
+        if (s.puc_civil_id_submitted) checklist.civil_id++
+        if (s.puc_parent_civil_id_submitted) checklist.parent_civil_id++
+        if (s.puc_passport_submitted) checklist.passport++
+        if (s.puc_nationality_document_submitted) checklist.nationality_document++
+        if (s.puc_payment_receipt_submitted) checklist.payment_receipt++
+        if (s.puc_acceptance_letter_submitted) checklist.acceptance_letter++
+        if (s.puc_fee_paid) checklist.fee_paid++
+      }
+      return checklist
+    })(),
+    // Daily Applied Students Detail
+    dailyAppliedStudents: (() => {
+      const agentNameMap = new Map(agents.map(a => [a.id, a.full_name]))
+      const rows: PUCAppliedStudentRow[] = []
+      for (const l of pucLeadsAll) {
+        if (!pucFileStages.includes(l.pipeline_stage)) continue
+        rows.push({
+          date: l.created_at ? l.created_at.split('T')[0] : '',
+          leadId: l.id,
+          studentName: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Unknown',
+          source: l.source || 'unknown',
+          major: l.intended_major || 'other',
+          gpa: l.gpa_grade_12_expected ?? l.actual_gpa ?? null,
+          gender: l.gender || '',
+          assignedAgent: l.assigned_to ? (agentNameMap.get(l.assigned_to) || 'Unknown') : 'Unassigned',
+          assignedAgentId: l.assigned_to || '',
+          pipelineStage: l.pipeline_stage,
+          pucDocumentStatus: l.puc_document_status_override || null,
+        })
+      }
+      return rows.sort((a, b) => b.date.localeCompare(a.date))
+    })(),
+    // PUC Target Achievement
+    targetAchievement: (() => {
+      const agentNameMap = new Map(agents.map(a => [a.id, a.full_name]))
+      const agentAvatarMap = new Map(agents.map(a => [a.id, a.avatar_url || null]))
+      const byAgent: PUCTargetAgentRow[] = []
+      let teamTargetFiles = 0, teamTargetApp = 0
+      let teamActualFiles = 0, teamActualApp = 0
+
+      for (const agent of agents) {
+        const targets = agentTargetsMap.get(agent.id)
+        const targetPucFiles = targets?.puc_files || 0
+        const targetPucApp = targets?.puc_app_submission || 0
+        const agentLeads = pucLeadsAll.filter(l => l.assigned_to === agent.id)
+        const actualFiles = agentLeads.filter(l => pucFileStages.includes(l.pipeline_stage)).length
+        const actualApp = agentLeads.filter(l => pucAppStages.includes(l.pipeline_stage)).length
+
+        teamTargetFiles += targetPucFiles
+        teamTargetApp += targetPucApp
+        teamActualFiles += actualFiles
+        teamActualApp += actualApp
+
+        if (targetPucFiles > 0 || targetPucApp > 0 || actualFiles > 0 || actualApp > 0) {
+          byAgent.push({
+            agentId: agent.id,
+            agentName: agentNameMap.get(agent.id) || 'Unknown',
+            avatarUrl: agentAvatarMap.get(agent.id) || null,
+            targetPucFiles,
+            actualPucFiles: actualFiles,
+            progressPucFiles: targetPucFiles > 0 ? Math.min(100, Math.round((actualFiles / targetPucFiles) * 100)) : 0,
+            targetPucAppSubmission: targetPucApp,
+            actualPucAppSubmission: actualApp,
+            progressPucAppSubmission: targetPucApp > 0 ? Math.min(100, Math.round((actualApp / targetPucApp) * 100)) : 0,
+          })
+        }
+      }
+
+      byAgent.sort((a, b) => b.actualPucFiles - a.actualPucFiles)
+
+      return {
+        teamTarget: { pucFiles: teamTargetFiles, pucAppSubmission: teamTargetApp },
+        teamActual: { pucFiles: teamActualFiles, pucAppSubmission: teamActualApp },
+        teamProgress: {
+          pucFiles: teamTargetFiles > 0 ? Math.min(100, Math.round((teamActualFiles / teamTargetFiles) * 100)) : 0,
+          pucAppSubmission: teamTargetApp > 0 ? Math.min(100, Math.round((teamActualApp / teamTargetApp) * 100)) : 0,
+        },
+        byAgent,
+      }
     })(),
   }
 

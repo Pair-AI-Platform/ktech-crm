@@ -26,16 +26,21 @@ import {
   UserCheck,
   Lock,
   Info,
+  Target,
+  ClipboardList,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getInitials } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 import { queryKeys } from "@/lib/hooks/query-keys"
 import { MAJORS, LEAD_SOURCES } from "@/types"
-import type { PUCReportData, PUCDailySubmission, PUCDailySourceRow, PUCAgentDailyRow } from "@/lib/hooks/use-reports"
+import type { PUCReportData, PUCDailySubmission, PUCDailySourceRow, PUCAgentDailyRow, PUCAppliedStudentRow, PUCTargetAchievementData, PUCDocumentStatusBreakdown, PUCDocumentChecklist } from "@/lib/hooks/use-reports"
 import type { IntendedMajor } from "@/types"
 
-type PUCSubTab = "overview" | "daily" | "preferences" | "sources" | "agent-daily"
+type PUCSubTab = "overview" | "daily" | "applied-students" | "preferences" | "sources" | "agent-daily" | "targets"
 
 interface PUCPeriodInfo {
   periodId: string
@@ -108,9 +113,11 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
   const subTabs: { key: PUCSubTab; label: string; icon: typeof Users }[] = [
     { key: "overview", label: "Overview", icon: Users },
     { key: "daily", label: "Daily Submissions", icon: CalendarDays },
+    { key: "applied-students", label: "Applied Students", icon: ClipboardList },
     { key: "preferences", label: "Change Preferences", icon: RefreshCw },
     { key: "sources", label: "Daily Sources", icon: Radio },
     { key: "agent-daily", label: "Agent Performance", icon: UserCheck },
+    { key: "targets", label: "Target Achievement", icon: Target },
   ]
 
   return (
@@ -171,9 +178,11 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
       </div>
 
       {subTab === "daily" && <PUCDailySubmissions data={data} />}
+      {subTab === "applied-students" && <PUCDailyAppliedStudents data={data.dailyAppliedStudents} />}
       {subTab === "preferences" && <PUCPreferenceChanges periodInfo={periodInfo} />}
       {subTab === "sources" && <PUCDailySources data={data.dailySources} />}
       {subTab === "agent-daily" && <PUCAgentDaily data={data.agentDaily} />}
+      {subTab === "targets" && <PUCTargetAchievement data={data.targetAchievement} />}
 
       {subTab === "overview" && <>
       {/* Stats Grid */}
@@ -198,6 +207,133 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
             </Card>
           </motion.div>
         ))}
+      </div>
+
+      {/* Document Status Breakdown & Checklist */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Document Status Distribution */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[var(--info)]" />
+                Document Status
+              </CardTitle>
+              <CardDescription>Status of PUC documents for file-stage leads</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const ds = data.documentStatusBreakdown
+                const total = ds.ready_to_apply + ds.pending_payment + ds.missing_document + ds.not_set
+                const items = [
+                  { label: 'Ready to Apply', value: ds.ready_to_apply, color: 'var(--success)', bg: 'var(--success-bg)' },
+                  { label: 'Pending Payment', value: ds.pending_payment, color: 'var(--warning)', bg: 'var(--warning-bg)' },
+                  { label: 'Missing Document', value: ds.missing_document, color: 'var(--error)', bg: 'var(--error-bg)' },
+                  { label: 'Not Set', value: ds.not_set, color: 'var(--text-muted)', bg: 'var(--bg-sunken)' },
+                ]
+                return (
+                  <div className="space-y-3">
+                    {/* Horizontal bar */}
+                    {total > 0 && (
+                      <div className="flex h-4 rounded-full overflow-hidden bg-[var(--bg-sunken)]">
+                        {items.filter(i => i.value > 0).map((item) => (
+                          <div
+                            key={item.label}
+                            className="h-full transition-all duration-500"
+                            style={{ width: `${(item.value / total) * 100}%`, backgroundColor: item.color }}
+                            title={`${item.label}: ${item.value}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {/* Legend */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {items.map((item) => (
+                        <div key={item.label} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: item.bg }}>
+                          <span className="text-sm text-[var(--text-secondary)]">{item.label}</span>
+                          <span className="text-lg font-bold" style={{ color: item.color }}>{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Document Checklist Completion */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.38 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-[var(--accent)]" />
+                Document Checklist
+              </CardTitle>
+              <CardDescription>
+                How many PUC students have submitted each document ({data.documentChecklist.total} total)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.documentChecklist.total === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--text-muted)]">
+                  <ClipboardList className="w-8 h-8 opacity-30" />
+                  <p className="text-sm">No PUC students in selected period</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {[
+                    { label: 'High School Certificate', key: 'high_school_certificate' as const },
+                    { label: 'Civil ID', key: 'civil_id' as const },
+                    { label: 'Parent Civil ID', key: 'parent_civil_id' as const },
+                    { label: 'Passport', key: 'passport' as const },
+                    { label: 'Nationality Document', key: 'nationality_document' as const },
+                    { label: 'Payment Receipt', key: 'payment_receipt' as const },
+                    { label: 'Acceptance Letter', key: 'acceptance_letter' as const },
+                    { label: 'PUC Fee Paid', key: 'fee_paid' as const },
+                  ].map((doc) => {
+                    const count = data.documentChecklist[doc.key]
+                    const total = data.documentChecklist.total
+                    const pct = Math.round((count / total) * 100)
+                    return (
+                      <div key={doc.key} className="flex items-center gap-3">
+                        <span className="text-sm text-[var(--text-secondary)] w-40 shrink-0">{doc.label}</span>
+                        <div className="flex-1 h-2 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)',
+                            }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-[var(--text-primary)] w-16 text-right">
+                          {count}/{total}
+                        </span>
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-0.5 rounded-full w-12 text-center",
+                          pct >= 80 ? 'bg-[var(--success-bg)] text-[var(--success)]' :
+                          pct >= 50 ? 'bg-[var(--warning-bg)] text-[var(--warning)]' :
+                          'bg-[var(--error-bg)] text-[var(--error)]'
+                        )}>
+                          {pct}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Conversion Rate & Funnel */}
@@ -897,15 +1033,16 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
   const hasData = data.some(d => d.agents.length > 0)
 
   // Compute agent totals across all days
-  const agentTotals: Record<string, { name: string; filesOpened: number; documentsSubmitted: number; applicationSubmitted: number }> = {}
+  const agentTotals: Record<string, { name: string; filesOpened: number; documentsSubmitted: number; applicationSubmitted: number; feePaid: number }> = {}
   for (const day of data) {
     for (const agent of day.agents) {
       if (!agentTotals[agent.agentId]) {
-        agentTotals[agent.agentId] = { name: agent.agentName, filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0 }
+        agentTotals[agent.agentId] = { name: agent.agentName, filesOpened: 0, documentsSubmitted: 0, applicationSubmitted: 0, feePaid: 0 }
       }
       agentTotals[agent.agentId].filesOpened += agent.filesOpened
       agentTotals[agent.agentId].documentsSubmitted += agent.documentsSubmitted
       agentTotals[agent.agentId].applicationSubmitted += agent.applicationSubmitted
+      agentTotals[agent.agentId].feePaid += agent.feePaid
     }
   }
 
@@ -915,7 +1052,7 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
     .sort((a, b) => (b.filesOpened + b.documentsSubmitted + b.applicationSubmitted) - (a.filesOpened + a.documentsSubmitted + a.applicationSubmitted))
 
   // Build a lookup map: day -> agentId -> counts
-  const dayAgentMap: Record<string, Record<string, { filesOpened: number; documentsSubmitted: number; applicationSubmitted: number }>> = {}
+  const dayAgentMap: Record<string, Record<string, { filesOpened: number; documentsSubmitted: number; applicationSubmitted: number; feePaid: number }>> = {}
   for (const day of data) {
     dayAgentMap[day.date] = {}
     for (const agent of day.agents) {
@@ -923,6 +1060,7 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
         filesOpened: agent.filesOpened,
         documentsSubmitted: agent.documentsSubmitted,
         applicationSubmitted: agent.applicationSubmitted,
+        feePaid: agent.feePaid,
       }
     }
   }
@@ -939,7 +1077,7 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
             <UserCheck className="w-5 h-5 text-[var(--success)]" />
             Agent Performance Daily
           </CardTitle>
-          <CardDescription>Daily agent-level breakdown: Files Opened / Docs Submitted / App Submitted</CardDescription>
+          <CardDescription>Daily agent-level breakdown: Files / Docs / Fee / App</CardDescription>
         </CardHeader>
         <CardContent>
           {!hasData ? (
@@ -954,7 +1092,7 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
                   <tr className="border-b border-[var(--border)]">
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4 sticky left-0 bg-white dark:bg-[var(--bg-primary)] z-10">Date</th>
                     {uniqueAgents.map(agent => (
-                      <th key={agent.agentId} colSpan={3} className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-1.5 px-1 border-l border-[var(--border)]">
+                      <th key={agent.agentId} colSpan={4} className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-1.5 px-1 border-l border-[var(--border)]">
                         {agent.name}
                       </th>
                     ))}
@@ -988,6 +1126,7 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
                               filesOpened={agentData?.filesOpened || 0}
                               documentsSubmitted={agentData?.documentsSubmitted || 0}
                               applicationSubmitted={agentData?.applicationSubmitted || 0}
+                              feePaid={agentData?.feePaid || 0}
                             />
                           )
                         })}
@@ -1004,6 +1143,7 @@ function PUCAgentDaily({ data }: { data: PUCAgentDailyRow[] }) {
                         filesOpened={agent.filesOpened}
                         documentsSubmitted={agent.documentsSubmitted}
                         applicationSubmitted={agent.applicationSubmitted}
+                        feePaid={agent.feePaid}
                         isBold
                       />
                     ))}
@@ -1023,15 +1163,17 @@ function AgentSubHeaders() {
     <>
       <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-1 border-l border-[var(--border)]">Files</th>
       <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-1">Docs</th>
+      <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-1">Fee</th>
       <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-1">App</th>
     </>
   )
 }
 
-function AgentDayCells({ filesOpened, documentsSubmitted, applicationSubmitted, isBold }: {
+function AgentDayCells({ filesOpened, documentsSubmitted, applicationSubmitted, feePaid, isBold }: {
   filesOpened: number
   documentsSubmitted: number
   applicationSubmitted: number
+  feePaid: number
   isBold?: boolean
 }) {
   if (isBold) {
@@ -1039,6 +1181,7 @@ function AgentDayCells({ filesOpened, documentsSubmitted, applicationSubmitted, 
       <>
         <td className="py-3 px-1 text-center text-xs font-bold text-[var(--primary)] border-l border-[var(--border)]">{filesOpened}</td>
         <td className="py-3 px-1 text-center text-xs font-bold text-[var(--info)]">{documentsSubmitted}</td>
+        <td className="py-3 px-1 text-center text-xs font-bold text-[var(--success)]">{feePaid}</td>
         <td className="py-3 px-1 text-center text-xs font-bold text-[var(--accent)]">{applicationSubmitted}</td>
       </>
     )
@@ -1052,8 +1195,434 @@ function AgentDayCells({ filesOpened, documentsSubmitted, applicationSubmitted, 
         <CellValueSmall value={documentsSubmitted} color="var(--info)" />
       </td>
       <td className="py-2.5 px-1 text-center">
+        <CellValueSmall value={feePaid} color="var(--success)" />
+      </td>
+      <td className="py-2.5 px-1 text-center">
         <CellValueSmall value={applicationSubmitted} color="var(--accent)" />
       </td>
     </>
+  )
+}
+
+// =============================
+// DAILY APPLIED STUDENTS
+// =============================
+
+const PAGE_SIZE = 50
+
+const SOURCE_LABELS: Record<string, string> = Object.fromEntries(
+  LEAD_SOURCES.map(s => [s.value, s.label])
+)
+
+function PUCDailyAppliedStudents({ data }: { data: PUCAppliedStudentRow[] }) {
+  const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState<'date' | 'studentName' | 'source' | 'major' | 'gpa' | 'gender' | 'assignedAgent'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(0)
+
+  const filtered = data.filter(row => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return row.studentName.toLowerCase().includes(q) ||
+      row.assignedAgent.toLowerCase().includes(q) ||
+      (SOURCE_LABELS[row.source] || row.source).toLowerCase().includes(q)
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    if (sortKey === 'gpa') {
+      return ((a.gpa ?? -1) - (b.gpa ?? -1)) * dir
+    }
+    const av = a[sortKey] || ''
+    const bv = b[sortKey] || ''
+    return av.localeCompare(bv) * dir
+  })
+
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+  const pageData = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  const handleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+    setPage(0)
+  }
+
+  const SortHeader = ({ label, field }: { label: string; field: typeof sortKey }) => (
+    <th
+      className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3 cursor-pointer hover:text-[var(--text-primary)] transition-colors select-none"
+      onClick={() => handleSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortKey === field && (
+          <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>
+        )}
+      </span>
+    </th>
+  )
+
+  const stageLabel = (stage: string) => {
+    const labels: Record<string, string> = {
+      application: 'File',
+      puc_document_submission: 'Docs',
+      puc_application_submission: 'App Submitted',
+      applicant: 'Applicant',
+      enrolled: 'Enrolled',
+    }
+    return labels[stage] || stage
+  }
+
+  const docStatusLabel = (status: string | null) => {
+    if (!status) return '—'
+    const labels: Record<string, { text: string; color: string }> = {
+      ready_to_apply: { text: 'Ready', color: 'var(--success)' },
+      pending_payment: { text: 'Pending Pay', color: 'var(--warning)' },
+      missing_document: { text: 'Missing', color: 'var(--error)' },
+    }
+    const item = labels[status]
+    if (!item) return status
+    return item
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-[var(--primary)]" />
+            Applied Students — Daily Report
+          </CardTitle>
+          <CardDescription>Detailed list of PUC students who reached file stage or beyond</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--text-muted)]">
+              <ClipboardList className="w-8 h-8 opacity-30" />
+              <p className="text-sm">No applied students in selected period</p>
+            </div>
+          ) : (
+            <>
+              {/* Search */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => { setSearch(e.target.value); setPage(0) }}
+                    placeholder="Search by name, agent, or source..."
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                  />
+                </div>
+                <span className="text-sm text-[var(--text-muted)]">
+                  {filtered.length} student{filtered.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <SortHeader label="Date" field="date" />
+                      <SortHeader label="Student" field="studentName" />
+                      <SortHeader label="Source" field="source" />
+                      <SortHeader label="Major" field="major" />
+                      <SortHeader label="GPA" field="gpa" />
+                      <SortHeader label="Gender" field="gender" />
+                      <SortHeader label="Agent" field="assignedAgent" />
+                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Stage</th>
+                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Doc Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageData.map((row) => {
+                      const ds = docStatusLabel(row.pucDocumentStatus)
+                      const dsObj = typeof ds === 'object' ? ds : null
+                      return (
+                        <tr key={row.leadId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                          <td className="py-2.5 px-3 text-sm text-[var(--text-primary)]">{formatDate(row.date)}</td>
+                          <td className="py-2.5 px-3 text-sm font-medium text-[var(--text-primary)]">{row.studentName}</td>
+                          <td className="py-2.5 px-3 text-sm text-[var(--text-secondary)]">{SOURCE_LABELS[row.source] || row.source}</td>
+                          <td className="py-2.5 px-3 text-sm text-[var(--text-secondary)]">{MAJOR_LABELS[row.major as IntendedMajor] || row.major}</td>
+                          <td className="py-2.5 px-3 text-sm text-[var(--text-primary)] font-medium">
+                            {row.gpa !== null ? row.gpa.toFixed(1) : '—'}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={cn(
+                              "text-xs font-medium px-2 py-0.5 rounded-full",
+                              row.gender === 'male' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                              row.gender === 'female' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400' :
+                              'bg-gray-100 text-gray-600'
+                            )}>
+                              {row.gender === 'male' ? 'M' : row.gender === 'female' ? 'F' : '—'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-sm text-[var(--text-secondary)]">{row.assignedAgent}</td>
+                          <td className="py-2.5 px-3">
+                            <Badge variant="outline" className="text-xs">{stageLabel(row.pipelineStage)}</Badge>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {dsObj ? (
+                              <span className="text-xs font-medium" style={{ color: dsObj.color }}>{dsObj.text}</span>
+                            ) : (
+                              <span className="text-xs text-[var(--text-muted)]">{typeof ds === 'string' ? ds : '—'}</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border)]">
+                  <span className="text-sm text-[var(--text-muted)]">
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" /> Prev
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+// =============================
+// TARGET ACHIEVEMENT
+// =============================
+
+function PUCTargetAchievement({ data }: { data: PUCTargetAchievementData }) {
+  const hasTargets = data.teamTarget.pucFiles > 0 || data.teamTarget.pucAppSubmission > 0
+  const hasActivity = data.byAgent.length > 0
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6"
+    >
+      {/* Team Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* PUC Files Target */}
+        <Card hover glow>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FolderOpen className="w-5 h-5 text-[var(--primary)]" />
+              PUC Files Target
+            </CardTitle>
+            <CardDescription>Team progress on PUC file openings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-4">
+              <ProgressRing
+                value={data.teamProgress.pucFiles}
+                max={100}
+                size={140}
+                strokeWidth={14}
+                showValue
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
+                <p className="text-2xl font-bold text-[var(--primary)]">{data.teamActual.pucFiles}</p>
+                <p className="text-xs text-[var(--text-muted)]">Actual</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
+                <p className="text-2xl font-bold text-[var(--text-primary)]">{data.teamTarget.pucFiles}</p>
+                <p className="text-xs text-[var(--text-muted)]">Target</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* PUC App Submission Target */}
+        <Card hover glow>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Send className="w-5 h-5 text-[var(--accent)]" />
+              PUC App Submission Target
+            </CardTitle>
+            <CardDescription>Team progress on PUC application submissions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-4">
+              <ProgressRing
+                value={data.teamProgress.pucAppSubmission}
+                max={100}
+                size={140}
+                strokeWidth={14}
+                showValue
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
+                <p className="text-2xl font-bold text-[var(--accent)]">{data.teamActual.pucAppSubmission}</p>
+                <p className="text-xs text-[var(--text-muted)]">Actual</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
+                <p className="text-2xl font-bold text-[var(--text-primary)]">{data.teamTarget.pucAppSubmission}</p>
+                <p className="text-xs text-[var(--text-muted)]">Target</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Per-Agent Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-[var(--success)]" />
+            Agent Target Progress
+          </CardTitle>
+          <CardDescription>Individual agent achievement against PUC targets</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!hasActivity && !hasTargets ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--text-muted)]">
+              <Target className="w-8 h-8 opacity-30" />
+              <p className="text-sm">No targets configured or no activity in selected period</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Agent</th>
+                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3" colSpan={3}>
+                      PUC Files
+                    </th>
+                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3 border-l border-[var(--border)]" colSpan={3}>
+                      App Submission
+                    </th>
+                  </tr>
+                  <tr className="border-b border-[var(--border)]">
+                    <th />
+                    <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-2">Actual</th>
+                    <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-2">Target</th>
+                    <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-2 w-24">Progress</th>
+                    <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-2 border-l border-[var(--border)]">Actual</th>
+                    <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-2">Target</th>
+                    <th className="text-center text-[10px] font-medium text-[var(--text-muted)] py-1 px-2 w-24">Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.byAgent.map((agent) => (
+                    <tr key={agent.agentId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-sunken)] transition-colors">
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="w-7 h-7">
+                            <AvatarImage src={agent.avatarUrl || undefined} />
+                            <AvatarFallback className="text-xs">{getInitials(agent.agentName)}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium text-[var(--text-primary)]">{agent.agentName}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center text-sm font-bold text-[var(--primary)]">{agent.actualPucFiles}</td>
+                      <td className="py-3 px-2 text-center text-sm text-[var(--text-muted)]">{agent.targetPucFiles || '—'}</td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${Math.min(100, agent.progressPucFiles)}%`,
+                                backgroundColor: agent.progressPucFiles >= 100 ? 'var(--success)' : agent.progressPucFiles >= 50 ? 'var(--primary)' : 'var(--warning)',
+                              }}
+                            />
+                          </div>
+                          <span className={cn(
+                            "text-xs font-semibold w-10 text-right",
+                            agent.progressPucFiles >= 100 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'
+                          )}>
+                            {agent.progressPucFiles}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center text-sm font-bold text-[var(--accent)] border-l border-[var(--border)]">{agent.actualPucAppSubmission}</td>
+                      <td className="py-3 px-2 text-center text-sm text-[var(--text-muted)]">{agent.targetPucAppSubmission || '—'}</td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${Math.min(100, agent.progressPucAppSubmission)}%`,
+                                backgroundColor: agent.progressPucAppSubmission >= 100 ? 'var(--success)' : agent.progressPucAppSubmission >= 50 ? 'var(--accent)' : 'var(--warning)',
+                              }}
+                            />
+                          </div>
+                          <span className={cn(
+                            "text-xs font-semibold w-10 text-right",
+                            agent.progressPucAppSubmission >= 100 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'
+                          )}>
+                            {agent.progressPucAppSubmission}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-[var(--border)]">
+                    <td className="py-3 pr-4 text-sm font-semibold text-[var(--text-secondary)]">Team Total</td>
+                    <td className="py-3 px-2 text-center text-sm font-bold text-[var(--primary)]">{data.teamActual.pucFiles}</td>
+                    <td className="py-3 px-2 text-center text-sm font-bold text-[var(--text-primary)]">{data.teamTarget.pucFiles}</td>
+                    <td className="py-3 px-2">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        data.teamProgress.pucFiles >= 100 ? 'text-[var(--success)]' : 'text-[var(--text-primary)]'
+                      )}>
+                        {data.teamProgress.pucFiles}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-center text-sm font-bold text-[var(--accent)] border-l border-[var(--border)]">{data.teamActual.pucAppSubmission}</td>
+                    <td className="py-3 px-2 text-center text-sm font-bold text-[var(--text-primary)]">{data.teamTarget.pucAppSubmission}</td>
+                    <td className="py-3 px-2">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        data.teamProgress.pucAppSubmission >= 100 ? 'text-[var(--success)]' : 'text-[var(--text-primary)]'
+                      )}>
+                        {data.teamProgress.pucAppSubmission}%
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }
