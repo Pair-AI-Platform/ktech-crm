@@ -32,6 +32,7 @@ import { LeadTableHeader } from "./lead-table-columns"
 import { LeadTableRow } from "./lead-table-row"
 import { LeadTableDialogs } from "./lead-table-dialogs"
 import { getLeadDisplayName } from "@/lib/lead-utils"
+import { checkStageTransition } from "@/lib/lead-stage-guards"
 
 interface LeadTableProps {
   leads: Lead[]
@@ -451,65 +452,32 @@ export function LeadTable({
   )
 
   const handleStageChange = async (leadId: string, newStage: PipelineStage) => {
-    // Intercept "lost" stage change - show dialog to pick reasons
-    if (newStage === 'lost') {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead) {
-        setLostDialogLead(lead)
-      }
-      return
-    }
-
-    // Intercept "withdraw" stage change - show dialog to pick withdrawal reason
-    if (newStage === 'withdraw') {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead) {
-        setWithdrawDialogLead(lead)
-      }
-      return
-    }
-
-    // Intercept "contacted" stage change - require status selection
-    if (newStage === 'contacted') {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead) {
-        setContactedDialogLead(lead)
-      }
-      return
-    }
-
-    // Intercept "application" (File) stage change - require file fee payment first
-    if (newStage === 'application') {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead && lead.file_fee_status !== 'paid' && lead.file_fee_status !== 'exempt') {
-        setFileFeeDialogLead(lead)
-        return
-      }
-    }
-
-// Intercept "applicant" stage change for non-PUC leads that haven't paid - show payment dialog first
-    // The stage promotion will happen via RPC after payment, not via direct update
-    if (newStage === 'applicant' && !isPucSrjView) {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead && lead.funding_type !== 'puc') {
-        const paid = sfPaymentData[leadId]?.amount_paid ?? 0
-        if (paid < 150) {
-          setPaymentDialogLead(lead)
+    const lead = leads.find(l => l.id === leadId)
+    if (lead) {
+      const guard = checkStageTransition({
+        lead,
+        newStage,
+        amountPaid: sfPaymentData[leadId]?.amount_paid ?? 0,
+        isPucSrjView,
+      })
+      switch (guard.kind) {
+        case "lost":
+          setLostDialogLead(guard.lead)
           return
-        }
-      }
-    }
-
-    // Block SF leads in applicant from advancing to further stages without paying 150 KWD
-    // (lost/withdraw already intercepted above, so any remaining stage change requires payment)
-    {
-      const lead = leads.find(l => l.id === leadId)
-      if (lead && lead.funding_type === 'self_funded' && lead.pipeline_stage === 'applicant') {
-        const paid = sfPaymentData[leadId]?.amount_paid ?? 0
-        if (paid < 150) {
-          setPaymentDialogLead(lead)
+        case "withdraw":
+          setWithdrawDialogLead(guard.lead)
           return
-        }
+        case "contacted":
+          setContactedDialogLead(guard.lead)
+          return
+        case "file_fee":
+          setFileFeeDialogLead(guard.lead)
+          return
+        case "enrollment_payment":
+          setPaymentDialogLead(guard.lead)
+          return
+        case "allow":
+          break
       }
     }
 

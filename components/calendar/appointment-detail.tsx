@@ -37,6 +37,12 @@ import { createClient } from "@/lib/supabase/client"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { CallbackScheduler } from "@/components/leads/callback-scheduler"
+import { FileFeePaymentDialog } from "@/components/leads/file-fee-payment-dialog"
+import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
+import { WithdrawReasonDialog } from "@/components/leads/withdraw-reason-dialog"
+import { ContactedStatusDialog } from "@/components/leads/contacted-status-dialog"
+import { checkStageTransition } from "@/lib/lead-stage-guards"
+import type { Lead } from "@/types"
 
 interface AppointmentDetailProps {
   appointment: Appointment | null
@@ -117,6 +123,11 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const [showBooking, setShowBooking] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [showCallbackScheduler, setShowCallbackScheduler] = useState(false)
+  const [fileFeeDialogLead, setFileFeeDialogLead] = useState<Lead | null>(null)
+  const [paymentDialogLead, setPaymentDialogLead] = useState<Lead | null>(null)
+  const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
+  const [contactedDialogLead, setContactedDialogLead] = useState<Lead | null>(null)
+  const [sfPaidMap, setSfPaidMap] = useState<Record<string, number>>({})
 
   const {
     markNA,
@@ -134,7 +145,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
   const { reschedules } = useRescheduleHistory(appointment?.id || "")
   const { agents } = useAgents()
   const agentMap = new Map(agents.map(a => [a.id, a.full_name]))
-  const { updateLeadStage } = useLeadMutations()
+  const { updateLeadStage, updateLead } = useLeadMutations()
 
   // Reset local state when appointment changes
   useEffect(() => {
@@ -149,6 +160,54 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
       setSavedNotes(appointment?.notes || "")
     })
   }, [appointment?.id, appointment?.notes])
+
+  // Fetch SF payment totals for the appointment's leads (used by stage guards)
+  useEffect(() => {
+    const leadIds = appointment?.appointment_leads?.map(al => al.lead_id) ||
+      (appointment?.lead_id ? [appointment.lead_id] : [])
+    const sfLeadIds = (appointment?.appointment_leads?.map(al => al.lead).filter(Boolean) ||
+      (appointment?.lead ? [appointment.lead] : []))
+      .filter((l): l is NonNullable<typeof l> => !!l && l.funding_type === 'self_funded')
+      .map(l => l.id)
+    if (sfLeadIds.length === 0 || leadIds.length === 0) {
+      setSfPaidMap({})
+      return
+    }
+    let cancelled = false
+    const supabase = createClient()
+    ;(async () => {
+      const paidMap: Record<string, number> = {}
+      const { data: students } = await supabase
+        .from('students')
+        .select('lead_id, amount_paid, sf_enrolled_stage')
+        .in('lead_id', sfLeadIds)
+      const withStudent = new Set<string>()
+      if (students) {
+        for (const s of students) {
+          if (!s.lead_id) continue
+          withStudent.add(s.lead_id)
+          const boosted = s.sf_enrolled_stage === '400' || s.sf_enrolled_stage === 'other' ? 151 : 0
+          paidMap[s.lead_id] = Math.max(s.amount_paid || 0, boosted)
+        }
+      }
+      const missing = sfLeadIds.filter(id => !withStudent.has(id))
+      if (missing.length > 0) {
+        const { data: txs } = await supabase
+          .from('payment_transactions')
+          .select('lead_id, amount')
+          .in('lead_id', missing)
+          .eq('status', 'completed')
+        if (txs) {
+          for (const tx of txs) {
+            if (!tx.lead_id) continue
+            paidMap[tx.lead_id] = (paidMap[tx.lead_id] || 0) + (tx.amount || 0)
+          }
+        }
+      }
+      if (!cancelled) setSfPaidMap(paidMap)
+    })()
+    return () => { cancelled = true }
+  }, [appointment?.id, appointment?.appointment_leads, appointment?.lead, appointment?.lead_id])
 
   if (!appointment) return null
 
@@ -169,6 +228,11 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     : "Unknown"
 
   const personPhone = appointmentLeads[0]?.phone || ""
+  const personFundingType = appointmentLeads[0]?.funding_type
+  const fundingLabel = personFundingType === "puc" ? "PUC" : personFundingType === "self_funded" ? "Self Funded" : null
+  const fundingBadgeClass = personFundingType === "puc"
+    ? "bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/30"
+    : "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30"
 
   // Get all lead IDs for bulk operations
   const allLeadIds = appointment.appointment_leads?.map(al => al.lead_id) ||
@@ -325,20 +389,56 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
     }
   }
   // Change lead pipeline stage for all leads + auto-confirm appointment
-  const handleChangeStage = async (stage: PipelineStage, lostReasonId?: string, lostReasonNotes?: string) => {
+  // If any lead triggers a transition rule (payment popup, withdraw/contacted reason),
+  // the dialog opens for that lead and the rest pause until the user re-triggers.
+  const handleChangeStage = async (
+    stage: PipelineStage,
+    lostReasonId?: string,
+    lostReasonNotes?: string,
+    withdrawalReason?: string,
+    withdrawalNotes?: string,
+  ) => {
     if (allLeadIds.length === 0) return
-    // Intercept "lost" stage to show the reason dialog
-    if (stage === "lost" && !lostReasonId) {
-      setShowLostDialog(true)
-      return
+
+    // Run transition guard for each lead until we find a blocker or all allow
+    if (!lostReasonId && !withdrawalReason) {
+      for (const lead of appointmentLeads) {
+        if (!lead) continue
+        const guard = checkStageTransition({
+          lead,
+          newStage: stage,
+          amountPaid: sfPaidMap[lead.id] ?? 0,
+        })
+        if (guard.kind === "lost") {
+          setShowLostDialog(true)
+          return
+        }
+        if (guard.kind === "withdraw") {
+          setWithdrawDialogLead(guard.lead)
+          return
+        }
+        if (guard.kind === "contacted") {
+          setContactedDialogLead(guard.lead)
+          return
+        }
+        if (guard.kind === "file_fee") {
+          setFileFeeDialogLead(guard.lead)
+          return
+        }
+        if (guard.kind === "enrollment_payment") {
+          setPaymentDialogLead(guard.lead)
+          return
+        }
+      }
     }
+
     setStageLoading(true)
     setLocalStageOverride(stage)
     const stageLabel = PIPELINE_STAGES.find(s => s.value === stage)?.label || stage
     setStageChangeLog(prev => [...prev, { stage, label: stageLabel, at: new Date().toISOString() }])
     // Use updateLeadStage to trigger activity logging, notifications, and automation rules
     for (const lid of allLeadIds) {
-      await updateLeadStage(lid, stage, lostReasonId, lostReasonNotes)
+      await updateLeadStage(lid, stage, lostReasonId, lostReasonNotes, withdrawalReason, withdrawalNotes)
     }
     setStageLoading(false)
     onUpdate?.()
@@ -489,7 +589,14 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[var(--text-primary)] truncate">{personName}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-[var(--text-primary)] truncate">{personName}</p>
+                {fundingLabel && (
+                  <Badge className={cn("border rounded-full px-2 py-0.5 text-[10px] font-semibold", fundingBadgeClass)}>
+                    {fundingLabel}
+                  </Badge>
+                )}
+              </div>
               {personPhone && (
                 <p className="text-sm text-[var(--text-muted)] flex items-center gap-1.5 mt-1">
                   <Phone className="w-3 h-3" />
@@ -1118,6 +1225,63 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           await handleChangeStage("lost", reasonId, notes)
         }}
       />
+
+      {/* Withdraw Reason Dialog */}
+      <WithdrawReasonDialog
+        open={!!withdrawDialogLead}
+        onOpenChange={(open) => { if (!open) setWithdrawDialogLead(null) }}
+        leadName={withdrawDialogLead ? getLeadDisplayName(withdrawDialogLead) : ""}
+        onConfirm={async (reason, notes) => {
+          setWithdrawDialogLead(null)
+          await handleChangeStage("withdraw", undefined, undefined, reason, notes)
+        }}
+      />
+
+      {/* Contacted Status Dialog */}
+      <ContactedStatusDialog
+        open={!!contactedDialogLead}
+        onOpenChange={(open) => { if (!open) setContactedDialogLead(null) }}
+        leadName={contactedDialogLead ? getLeadDisplayName(contactedDialogLead) : ""}
+        currentStatus={contactedDialogLead?.status as LeadStatus | null | undefined}
+        onConfirm={async (status, notes) => {
+          const leadId = contactedDialogLead?.id
+          setContactedDialogLead(null)
+          if (!leadId) return
+          setStageLoading(true)
+          setLocalStageOverride("contacted")
+          const updates: Partial<Lead> = { pipeline_stage: "contacted", status }
+          if (notes) updates.notes = notes
+          await updateLead(leadId, updates)
+          setStageLoading(false)
+          onUpdate?.()
+        }}
+      />
+
+      {/* File Fee Payment Dialog (Test -> File transition) */}
+      {fileFeeDialogLead && (
+        <FileFeePaymentDialog
+          open={!!fileFeeDialogLead}
+          onOpenChange={(open) => { if (!open) setFileFeeDialogLead(null) }}
+          lead={fileFeeDialogLead}
+          onSuccess={async () => {
+            setFileFeeDialogLead(null)
+            onUpdate?.()
+          }}
+        />
+      )}
+
+      {/* Enrollment Payment Dialog (Applicant transition for non-PUC) */}
+      {paymentDialogLead && (
+        <EnrollmentPaymentDialog
+          open={!!paymentDialogLead}
+          onOpenChange={(open) => { if (!open) setPaymentDialogLead(null) }}
+          lead={paymentDialogLead}
+          onSuccess={async () => {
+            setPaymentDialogLead(null)
+            onUpdate?.()
+          }}
+        />
+      )}
 
       {/* Callback Scheduler — opened after "Will See" */}
       {hasLeads && (
