@@ -66,7 +66,24 @@ export default function LoginPage() {
       agent: { email: "demo-agent@ktech.edu.kw", password: "demo-agent-2026!" },
     }
 
-    const { error } = await supabase.auth.signInWithPassword(demoCredentials[role])
+    let { error } = await supabase.auth.signInWithPassword(demoCredentials[role])
+
+    if (error) {
+      // Demo user may not exist yet — provision via service role and retry.
+      const provision = await fetch("/api/demo-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      })
+      if (!provision.ok) {
+        console.error("Demo provisioning failed:", await provision.text())
+        setError("Demo login failed. Please try again.")
+        setDemoLoading(null)
+        return
+      }
+      const retry = await supabase.auth.signInWithPassword(demoCredentials[role])
+      error = retry.error
+    }
 
     if (error) {
       setError("Demo login failed. Please try again.")
