@@ -53,56 +53,18 @@ export default function LoginPage() {
 
   const isDemoAllowed = true
 
-  const handleDemoMode = async (role: "admin" | "agent") => {
+  const handleDemoMode = (role: "admin" | "agent") => {
     setDemoLoading(role)
     setError("")
 
-    // Clear any stale localStorage demo mode
-    localStorage.removeItem("ktech-demo-mode")
-    localStorage.removeItem("ktech-demo-role")
+    // Demo mode is fully client-side: no Supabase auth required. The proxy
+    // checks the ktech-demo-mode cookie to allow access; useUser() and the
+    // data hooks read localStorage to serve mock profiles + demo data.
+    localStorage.setItem("ktech-demo-mode", "true")
+    localStorage.setItem("ktech-demo-role", role)
+    document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; samesite=lax"
 
-    const demoCredentials = {
-      admin: { email: "demo-admin@ktech.edu.kw", password: "demo-admin-2026!" },
-      agent: { email: "demo-agent@ktech.edu.kw", password: "demo-agent-2026!" },
-    }
-
-    let { error } = await supabase.auth.signInWithPassword(demoCredentials[role])
-
-    if (error) {
-      // Demo user may not exist yet — provision via service role and retry.
-      const provision = await fetch("/api/demo-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      })
-      if (!provision.ok) {
-        console.error("Demo provisioning failed:", await provision.text())
-        setError("Demo login failed. Please try again.")
-        setDemoLoading(null)
-        return
-      }
-      const retry = await supabase.auth.signInWithPassword(demoCredentials[role])
-      error = retry.error
-    }
-
-    if (error) {
-      setError("Demo login failed. Please try again.")
-      setDemoLoading(null)
-    } else {
-      // Force correct role and name for demo users via service role
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const res = await fetch("/api/demo-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id, role }),
-        })
-        if (!res.ok) {
-          console.error("Demo profile update failed:", await res.text())
-        }
-      }
-      window.location.href = "/dashboard"
-    }
+    window.location.href = "/dashboard"
   }
 
   const features = [
