@@ -34,6 +34,26 @@ export async function POST(request: Request) {
   const demo = DEMO_USERS[role]
   const supabase = createServiceRoleClient()
 
+  // Diagnostic: confirm service-role can reach the DB at all
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  const urlHost = (() => {
+    try { return new URL(supabaseUrl).host } catch { return "<invalid>" }
+  })()
+  const probe = await supabase.from("profiles").select("id").limit(1)
+  if (probe.error) {
+    return NextResponse.json(
+      {
+        error: "Service role DB probe failed",
+        detail: probe.error.message,
+        urlHost,
+        hasServiceRole,
+        urlLength: supabaseUrl.length,
+      },
+      { status: 500 },
+    )
+  }
+
   if (userId) {
     const { error } = await supabase
       .from("profiles")
