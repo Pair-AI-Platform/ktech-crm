@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 
 import { Suspense } from "react"
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { getUserProfile } from "@/lib/supabase/server"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
@@ -11,7 +12,11 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const profile = await getUserProfile()
+  const cookieStore = await cookies()
+  const isDemoMode = cookieStore.get("ktech-demo-mode")?.value === "true"
+  // In demo mode, skip the Supabase profile fetch entirely — the client-side
+  // useUser() hook serves the demo profile from localStorage.
+  const profile = isDemoMode ? null : await getUserProfile()
 
   // Marketing users should use the marketing portal
   if (profile?.role === "marketing") {

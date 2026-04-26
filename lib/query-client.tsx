@@ -3,18 +3,24 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useState } from "react"
 
+function isDemoMode() {
+  if (typeof window === "undefined") return false
+  return window.localStorage?.getItem("ktech-demo-mode") === "true"
+}
+
 function makeQueryClient() {
+  const demo = isDemoMode()
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // Data is fresh for 30 seconds before refetching
-        staleTime: 30 * 1000,
-        // Cache for 5 minutes
+        staleTime: demo ? Infinity : 30 * 1000,
         gcTime: 5 * 60 * 1000,
-        // Retry once on failure
-        retry: 1,
-        // Don't refetch on window focus in development
-        refetchOnWindowFocus: process.env.NODE_ENV === "production",
+        retry: demo ? false : 1,
+        refetchOnWindowFocus: !demo && process.env.NODE_ENV === "production",
+        refetchOnReconnect: !demo,
+      },
+      mutations: {
+        retry: demo ? false : 0,
       },
     },
   })
