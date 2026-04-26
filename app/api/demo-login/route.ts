@@ -68,7 +68,10 @@ export async function POST(request: Request) {
       msg.includes("duplicate")
     if (!isDuplicate) {
       console.error("[Demo Login] createUser failed:", createErr.message)
-      return NextResponse.json({ error: "Failed to create demo user" }, { status: 500 })
+      return NextResponse.json(
+        { error: "Failed to create demo user", detail: createErr.message },
+        { status: 500 },
+      )
     }
 
     const { data: existingProfile, error: lookupErr } = await supabase
