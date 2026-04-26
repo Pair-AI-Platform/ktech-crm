@@ -46,50 +46,60 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
-  let existingUserId: string | null = null
-  let page = 1
-  while (true) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) {
-      console.error("[Demo Login] listUsers failed:", error.message)
-      return NextResponse.json({ error: "Failed to query users" }, { status: 500 })
-    }
-    const match = data.users.find((u) => u.email?.toLowerCase() === demo.email.toLowerCase())
-    if (match) {
-      existingUserId = match.id
-      break
-    }
-    if (data.users.length < 1000) break
-    page += 1
-  }
+  // Try to create the auth user. If the email already exists, look up the
+  // existing profile by full_name (which is unique for demo users) and reset
+  // its password so signInWithPassword always succeeds.
+  let resolvedUserId = ""
+  const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+    email: demo.email,
+    password: demo.password,
+    email_confirm: true,
+    user_metadata: { full_name: demo.full_name },
+  })
 
-  if (existingUserId) {
-    const { error: updateErr } = await supabase.auth.admin.updateUserById(existingUserId, {
+  if (created?.user) {
+    resolvedUserId = created.user.id
+  } else if (createErr) {
+    const msg = createErr.message?.toLowerCase() ?? ""
+    const isDuplicate =
+      msg.includes("already") ||
+      msg.includes("exists") ||
+      msg.includes("registered") ||
+      msg.includes("duplicate")
+    if (!isDuplicate) {
+      console.error("[Demo Login] createUser failed:", createErr.message)
+      return NextResponse.json({ error: "Failed to create demo user" }, { status: 500 })
+    }
+
+    const { data: existingProfile, error: lookupErr } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("full_name", demo.full_name)
+      .maybeSingle()
+    if (lookupErr || !existingProfile) {
+      console.error("[Demo Login] profile lookup failed:", lookupErr?.message)
+      return NextResponse.json({ error: "Failed to locate demo user" }, { status: 500 })
+    }
+    resolvedUserId = existingProfile.id
+
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(resolvedUserId, {
       password: demo.password,
       email_confirm: true,
     })
     if (updateErr) {
       console.error("[Demo Login] updateUserById failed:", updateErr.message)
-      return NextResponse.json({ error: "Failed to update demo user" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to refresh demo user" }, { status: 500 })
     }
-  } else {
-    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
-      email: demo.email,
-      password: demo.password,
-      email_confirm: true,
-      user_metadata: { full_name: demo.full_name },
-    })
-    if (createErr || !created.user) {
-      console.error("[Demo Login] createUser failed:", createErr?.message)
-      return NextResponse.json({ error: "Failed to create demo user" }, { status: 500 })
-    }
-    existingUserId = created.user.id
+  }
+
+  if (!resolvedUserId) {
+    return NextResponse.json({ error: "Failed to resolve demo user" }, { status: 500 })
   }
 
   const { error: upsertErr } = await supabase
     .from("profiles")
     .upsert(
-      { id: existingUserId, role: demo.role, full_name: demo.full_name, email: demo.email },
+      { id: resolvedUserId, role: demo.role, full_name: demo.full_name },
       { onConflict: "id" },
     )
   if (upsertErr) {
