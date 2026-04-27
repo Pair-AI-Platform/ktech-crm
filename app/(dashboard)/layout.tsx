@@ -18,6 +18,11 @@ export default async function DashboardLayout({
   // useUser() hook serves the demo profile from localStorage.
   const profile = isDemoMode ? null : await getUserProfile()
 
+  // Not signed in (and not in demo mode) → bounce to login.
+  if (!profile && !isDemoMode) {
+    redirect("/login")
+  }
+
   // Marketing users should use the marketing portal
   if (profile?.role === "marketing") {
     redirect("/marketing")
