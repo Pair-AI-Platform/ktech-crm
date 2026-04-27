@@ -33,6 +33,82 @@ interface AuthenticatedOptions {
 interface UnauthenticatedOptions {
   context: string
   requireAuth: false
+  /**
+   * When true, skip the same-origin check. Required for webhook routes
+   * which receive requests from third parties (Twilio, MyFatoorah).
+   */
+  skipOriginCheck?: boolean
+}
+
+/**
+ * Validates that a non-GET request comes from an allowed origin. This is
+ * a CSRF mitigation layered on top of Supabase's SameSite=Lax cookies.
+ *
+ * Allowed origins:
+ *  - The configured NEXT_PUBLIC_APP_URL (production)
+ *  - Vercel preview deployments (*.vercel.app) when running there
+ *  - localhost during development
+ *
+ * Returns null when the request is allowed; an error response otherwise.
+ */
+function validateOrigin(req: NextRequest, logger: Logger): Response | null {
+  // Read methods are safe; webhooks bypass this check via skipOriginCheck.
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return null
+  }
+
+  const origin = req.headers.get('origin')
+  const referer = req.headers.get('referer')
+  const sourceUrl = origin || referer
+
+  // No Origin/Referer at all on a state-changing request from a browser
+  // is suspicious; reject. (Server-to-server calls would set Origin or
+  // hit an unauthenticated webhook route instead.)
+  if (!sourceUrl) {
+    logger.warn('Blocked: missing Origin and Referer on state-changing request', {
+      method: req.method,
+      pathname: req.nextUrl.pathname,
+    })
+    return errorResponse('Forbidden: missing Origin', 403, logger)
+  }
+
+  let sourceHost: string
+  try {
+    sourceHost = new URL(sourceUrl).host
+  } catch {
+    return errorResponse('Forbidden: malformed Origin', 403, logger)
+  }
+
+  const requestHost = req.nextUrl.host
+
+  // Same-host requests are always allowed (covers production + preview).
+  if (sourceHost === requestHost) {
+    return null
+  }
+
+  // Explicit allowlist for the configured app URL (when deployed behind
+  // a custom domain that differs from NEXT_PUBLIC_APP_URL host).
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (appUrl) {
+    try {
+      if (sourceHost === new URL(appUrl).host) return null
+    } catch {
+      // ignore malformed env value
+    }
+  }
+
+  // Allow Vercel preview deployments.
+  if (sourceHost.endsWith('.vercel.app')) {
+    return null
+  }
+
+  logger.warn('Blocked: cross-origin state-changing request', {
+    method: req.method,
+    pathname: req.nextUrl.pathname,
+    sourceHost,
+    requestHost,
+  })
+  return errorResponse('Forbidden: cross-origin', 403, logger)
 }
 
 /**
@@ -75,10 +151,20 @@ export function withApiHandler(
 
     try {
       if (options.requireAuth === false) {
+        // Webhook routes (skipOriginCheck: true) come from third parties and
+        // authenticate via signature verification inside the handler.
+        if (!options.skipOriginCheck) {
+          const originError = validateOrigin(req, logger)
+          if (originError) return originError
+        }
         const response = await handler({ req, logger })
         logger.info('Request completed', { status: response.status, durationMs: Date.now() - startTime })
         return response
       }
+
+      // Authenticated routes: enforce same-origin on state-changing methods.
+      const originError = validateOrigin(req, logger)
+      if (originError) return originError
 
       const supabase = await createServerSupabaseClient()
       const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -114,6 +200,15 @@ export function withApiHandler(
         stack: error instanceof Error ? error.stack : undefined,
         durationMs: Date.now() - startTime,
       })
+      try {
+        const Sentry = await import('@sentry/nextjs')
+        Sentry.captureException(error, {
+          tags: { context: options.context, route: req.nextUrl.pathname },
+          extra: { requestId: logger.requestId, method: req.method },
+        })
+      } catch {
+        // Sentry not configured — no-op
+      }
       return errorResponse('Internal server error', 500, logger)
     }
   }

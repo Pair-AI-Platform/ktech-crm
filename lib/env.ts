@@ -57,6 +57,10 @@ export const env = {
   // Upstash Redis (rate limiting)
   UPSTASH_REDIS_REST_URL: optional('UPSTASH_REDIS_REST_URL'),
   UPSTASH_REDIS_REST_TOKEN: optional('UPSTASH_REDIS_REST_TOKEN'),
+
+  // Sentry (error tracking — optional, no-ops when missing)
+  NEXT_PUBLIC_SENTRY_DSN: optional('NEXT_PUBLIC_SENTRY_DSN'),
+  SENTRY_DSN: optional('SENTRY_DSN'),
 } as const
 
 // In production, enforce critical security secrets
