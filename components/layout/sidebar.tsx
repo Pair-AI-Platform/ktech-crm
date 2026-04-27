@@ -36,7 +36,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import { useSidebar } from "@/components/layout/dashboard-shell"
 import { useAgentStatus } from "@/components/layout/heartbeat-provider"
 import type { ManualStatus } from "@/lib/hooks/use-heartbeat"
@@ -372,7 +371,6 @@ function UserCard({ user, mounted, isCollapsed, onSignOut }: {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const supabase = createClient()
   const { collapsed, setCollapsed, openQuickFind } = useSidebar()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -383,9 +381,17 @@ export function Sidebar({ user }: SidebarProps) {
   const isCollapsed = collapsed && !mobileOpen
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/login")
-    router.refresh()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // ignore — still clear local state and redirect
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("ktech-demo-mode")
+      localStorage.removeItem("ktech-demo-role")
+      document.cookie = "ktech-demo-mode=; path=/; max-age=0"
+      window.location.href = "/login"
+    }
   }
 
   const handleNavigate = () => setMobileOpen(false)
