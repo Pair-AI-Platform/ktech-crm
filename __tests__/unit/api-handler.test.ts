@@ -41,9 +41,14 @@ vi.mock('@/lib/logger', () => ({
 import { withApiHandler } from '@/lib/api-handler'
 
 function createMockRequest(method = 'POST', path = '/api/test'): any {
+  const headers = new Map<string, string>([
+    ['origin', 'http://localhost:3000'],
+    ['host', 'localhost:3000'],
+  ])
   return {
     method,
     nextUrl: { pathname: path },
+    headers: { get: (k: string) => headers.get(k.toLowerCase()) ?? null },
   }
 }
 

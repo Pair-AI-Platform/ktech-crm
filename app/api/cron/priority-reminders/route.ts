@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
+import { tryClaimCronRun } from "@/lib/cron-lock"
 
-// Simple in-memory guard to prevent duplicate runs within 50 seconds
+// In-memory fallback guard — only useful within a single instance.
+// Distributed dedup happens via tryClaimCronRun() (Upstash SETNX EX).
 let lastRunTimestamp = 0
 
 export async function GET(request: NextRequest) {
@@ -21,12 +23,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Duplicate run protection: skip if last run was less than 50 seconds ago
-    // NOTE: This is an in-memory guard and only works within a single instance.
-    // For distributed deployments, consider using a database-based lock.
+    // Cross-instance dedup via Upstash. When Upstash isn't configured,
+    // falls back to allow + in-memory check below.
+    const claimed = await tryClaimCronRun('priority-reminders', 50)
+    if (!claimed) {
+      return NextResponse.json({ ok: true, skipped: true, message: 'Another instance already ran' })
+    }
     const runCheckTime = Date.now()
     if (runCheckTime - lastRunTimestamp < 50_000) {
-      return NextResponse.json({ ok: true, skipped: true, message: 'Already ran recently' })
+      return NextResponse.json({ ok: true, skipped: true, message: 'Already ran recently (in-memory)' })
     }
     lastRunTimestamp = runCheckTime
 

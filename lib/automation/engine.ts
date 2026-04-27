@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { createClientLogger } from "@/lib/client-logger"
+import { tryAcquireAutomationLock, releaseAutomationLock } from "@/lib/automation/lock"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 const logger = createClientLogger("automation-engine")
@@ -205,10 +206,18 @@ export async function executeAutomations(
 ): Promise<AutomationResult[]> {
   const results: AutomationResult[] = []
 
-  // Infinite loop / re-entry protection
+  // Infinite loop / re-entry protection — depth check, in-memory Set, and
+  // (when Upstash is configured) a distributed Redis lock so re-entry is
+  // blocked across serverless instances too.
   const executionKey = `${ctx.leadId}:${ctx.trigger}`
   if (depth >= MAX_AUTOMATION_DEPTH || executingLeads.has(executionKey)) {
     console.warn(`[Automation] Skipping: max depth or re-entry for ${executionKey}`)
+    return results
+  }
+
+  const acquired = await tryAcquireAutomationLock(executionKey)
+  if (!acquired) {
+    console.warn(`[Automation] Skipping: distributed lock held for ${executionKey}`)
     return results
   }
 
@@ -271,6 +280,7 @@ export async function executeAutomations(
     return results
   } finally {
     executingLeads.delete(executionKey)
+    await releaseAutomationLock(executionKey)
   }
 }
 
