@@ -32,16 +32,8 @@ import { AdminAgentHeatmap } from "@/components/dashboard/sections/admin-agent-h
 import { AdminAppointmentsSection } from "@/components/dashboard/sections/admin-appointments-section"
 import { AdminSourcePerformance, SOURCE_LABELS } from "@/components/dashboard/sections/admin-source-performance"
 import { AdminWorkloadSection } from "@/components/dashboard/sections/admin-workload-section"
-import { AdminConversionFunnel } from "@/components/dashboard/sections/admin-conversion-funnel"
 
 const TERMINAL_STAGES = ['lost', 'enrolled', 'withdraw']
-const FUNNEL_STAGES = [
-  { stage: 'new', label: 'New' },
-  { stage: 'contacted', label: 'Contacted' },
-  { stage: 'test', label: 'Test' },
-  { stage: 'application', label: 'Application' },
-  { stage: 'enrolled', label: 'Enrolled' },
-]
 
 export default function DashboardPage() {
   const { profile, isAdmin } = useUser()
@@ -433,31 +425,6 @@ export default function DashboardPage() {
     }).sort((a, b) => b.activeLeads - a.activeLeads)
   }, [agentPresence, allLeads, isAdmin])
 
-  // Conversion funnel data
-  const funnelData = useMemo(() => {
-    if (!isAdmin || allLeads.length === 0) return []
-
-    const stageCounts = new Map<string, number>()
-    allLeads.forEach(l => {
-      stageCounts.set(l.pipeline_stage, (stageCounts.get(l.pipeline_stage) || 0) + 1)
-    })
-
-    const stages = FUNNEL_STAGES.map(s => ({
-      ...s,
-      count: stageCounts.get(s.stage) || 0,
-      dropoffPercent: 0,
-    }))
-
-    // Calculate drop-off between consecutive stages
-    for (let i = 0; i < stages.length - 1; i++) {
-      if (stages[i].count > 0) {
-        stages[i].dropoffPercent = Math.round(((stages[i].count - stages[i + 1].count) / stages[i].count) * 100)
-      }
-    }
-
-    return stages
-  }, [allLeads, isAdmin])
-
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
       <GreetingHeader profile={profile} />
@@ -508,10 +475,9 @@ export default function DashboardPage() {
           refetchNoUpdated={refetchNoUpdated}
         />
 
-        {/* Admin: Conversion Funnel + Source Performance + Workload */}
+        {/* Admin: Source Performance + Workload */}
         {isAdmin && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <AdminConversionFunnel stages={funnelData} loading={leadsLoading} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AdminSourcePerformance sources={sourcePerformanceData} loading={leadsLoading} />
             <AdminWorkloadSection agents={workloadData} loading={presenceLoading || leadsLoading} />
           </div>
