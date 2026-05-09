@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { motion } from "framer-motion"
-import { Users, GraduationCap, Layers, FileText, FolderOpen, Calendar, Clock } from "lucide-react"
+import { Users, FileText, FolderOpen, Calendar, Clock } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { StatGrid } from "@/components/dashboard/notion"
 import type { DashboardLead } from "@/lib/hooks/use-dashboard-stats"
@@ -20,8 +20,6 @@ export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCal
 
   const stats = useMemo(() => {
     const total = allLeads.length
-    const pucCount = allLeads.filter((l) => l.funding_type === "puc").length
-    const sfCount = allLeads.filter((l) => l.funding_type === "self_funded").length
     const totalFiles = allLeads.filter((l) => l.pipeline_stage === "application").length
     const pucFiles = allLeads.filter((l) => l.pipeline_stage === "application" && l.funding_type === "puc").length
     const sfFiles = allLeads.filter((l) => l.pipeline_stage === "application" && l.funding_type === "self_funded").length
@@ -34,20 +32,6 @@ export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCal
         label: "Active Leads",
         icon: <Users className="w-5 h-5 text-[var(--primary)]" />,
         iconBg: "bg-[var(--primary)]/10",
-      },
-      {
-        id: "puc-leads",
-        value: pucCount,
-        label: "PUC",
-        icon: <GraduationCap className="w-5 h-5 text-[var(--success)]" />,
-        iconBg: "bg-[var(--success)]/10",
-      },
-      {
-        id: "sf-leads",
-        value: sfCount,
-        label: "SF",
-        icon: <Layers className="w-5 h-5 text-[var(--info)]" />,
-        iconBg: "bg-[var(--info)]/10",
       },
       // Row 2: files
       {
