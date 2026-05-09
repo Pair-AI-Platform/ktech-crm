@@ -221,8 +221,8 @@ export default function LoginPage() {
                 className="w-12 h-12 rounded-xl shadow-sm"
               />
               <div>
-                <h1 className="text-xl font-bold text-[var(--text-primary)]">ktech CRM</h1>
-                <p className="text-[var(--text-muted)] text-xs">Enrollment Management</p>
+                <h1 className="text-xl font-bold text-[var(--text-primary)]">ktech ADL</h1>
+                <p className="text-[var(--text-muted)] text-xs">Kuwait Technical College</p>
               </div>
             </div>
 

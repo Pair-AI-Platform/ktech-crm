@@ -4,8 +4,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { QueryProvider } from "@/lib/query-client"
 
 export const metadata: Metadata = {
-  title: "ktech CRM - Enrollment Management",
-  description: "Kuwait Technical College Enrollment CRM - Manage leads, students, and appointments",
+  title: "ktech ADL",
+  description: "Kuwait Technical College ADL - Manage leads, students, and appointments",
 }
 
 export default function RootLayout({
