@@ -10,7 +10,7 @@ interface SourceData {
   source: string
   label: string
   total: number
-  enrolled: number
+  files: number
   conversionRate: number
 }
 
@@ -85,7 +85,7 @@ export function AdminSourcePerformance({ sources, loading, mode = "full" }: Admi
           <div className="space-y-2.5">
             {sources.slice(0, 8).map((source, index) => {
               const barWidth = (source.total / maxTotal) * 100
-              const enrolledWidth = maxTotal > 0 ? (source.enrolled / maxTotal) * 100 : 0
+              const filesWidth = maxTotal > 0 ? (source.files / maxTotal) * 100 : 0
               return (
                 <motion.div
                   key={source.source}
@@ -105,9 +105,9 @@ export function AdminSourcePerformance({ sources, loading, mode = "full" }: Admi
                         <span className={cn(
                           "text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full",
                           source.conversionRate >= 20
-                            ? "bg-emerald-100 text-emerald-700"
+                            ? "bg-amber-100 text-amber-800"
                             : source.conversionRate >= 10
-                            ? "bg-amber-100 text-amber-700"
+                            ? "bg-amber-50 text-amber-700"
                             : "bg-gray-100 text-gray-600"
                         )}>
                           {source.conversionRate}%
@@ -123,19 +123,19 @@ export function AdminSourcePerformance({ sources, loading, mode = "full" }: Admi
                       transition={{ duration: 0.6, delay: index * 0.04 }}
                       className="absolute inset-y-0 left-0 bg-blue-200/70 rounded-md"
                     />
-                    {/* Enrolled bar overlay */}
+                    {/* File bar overlay */}
                     {!filesOnly && (
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${enrolledWidth}%` }}
+                        animate={{ width: `${filesWidth}%` }}
                         transition={{ duration: 0.6, delay: index * 0.04 + 0.1 }}
-                        className="absolute inset-y-0 left-0 bg-emerald-400/70 rounded-md"
+                        className="absolute inset-y-0 left-0 bg-amber-400/70 rounded-md"
                       />
                     )}
                     {/* Count label */}
-                    {!filesOnly && source.enrolled > 0 && (
-                      <span className="absolute inset-y-0 left-2 flex items-center text-[10px] font-medium text-emerald-800">
-                        {source.enrolled} enrolled
+                    {!filesOnly && source.files > 0 && (
+                      <span className="absolute inset-y-0 left-2 flex items-center text-[10px] font-medium text-amber-900">
+                        {source.files} files
                       </span>
                     )}
                   </div>
@@ -150,8 +150,8 @@ export function AdminSourcePerformance({ sources, loading, mode = "full" }: Admi
                   <span className="text-[10px] text-[var(--text-tertiary)]">Total Leads</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-2 rounded-sm bg-emerald-400/70" />
-                  <span className="text-[10px] text-[var(--text-tertiary)]">Enrolled</span>
+                  <span className="w-3 h-2 rounded-sm bg-amber-400/70" />
+                  <span className="text-[10px] text-[var(--text-tertiary)]">Files</span>
                 </div>
               </div>
             )}

@@ -367,13 +367,13 @@ export default function DashboardPage() {
     const leads = isAdmin ? allLeads : myLeads
     if (leads.length === 0) return []
 
-    const sourceMap = new Map<string, { total: number; enrolled: number }>()
+    const sourceMap = new Map<string, { total: number; files: number }>()
 
     leads.forEach(l => {
       const src = l.source || 'other'
-      const current = sourceMap.get(src) || { total: 0, enrolled: 0 }
+      const current = sourceMap.get(src) || { total: 0, files: 0 }
       current.total++
-      if (l.pipeline_stage === 'enrolled') current.enrolled++
+      if (l.pipeline_stage === 'application') current.files++
       sourceMap.set(src, current)
     })
 
@@ -382,8 +382,8 @@ export default function DashboardPage() {
         source,
         label: SOURCE_LABELS[source] || source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         total: data.total,
-        enrolled: data.enrolled,
-        conversionRate: data.total > 0 ? Math.round((data.enrolled / data.total) * 100) : 0,
+        files: data.files,
+        conversionRate: data.total > 0 ? Math.round((data.files / data.total) * 100) : 0,
       }))
       .sort((a, b) => b.total - a.total)
   }, [allLeads, myLeads, isAdmin])
