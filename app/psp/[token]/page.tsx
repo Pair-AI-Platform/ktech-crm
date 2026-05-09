@@ -1,0 +1,556 @@
+"use client"
+
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useParams } from "next/navigation"
+import {
+  getDocumentsForGraduateType,
+  type GraduateType,
+  type DocumentRule,
+  type ConditionalDocumentFlags,
+} from "@/lib/psp/document-rules"
+
+type PageState = "loading" | "ready" | "submitted" | "expired" | "error"
+
+interface LeadView {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  first_name_ar: string | null
+  last_name_ar: string | null
+  civil_id: string | null
+  phone: string | null
+  phone_secondary: string | null
+  email: string | null
+  date_of_birth: string | null
+  school_id: string | null
+  graduation_year: number | null
+  gpa_grade_11: number | null
+  education_type: GraduateType | null
+  is_diplomatic: boolean | null
+  is_special_needs: boolean | null
+  funding_type: string | null
+}
+
+interface UploadedDoc {
+  id: string
+  document_type: string
+  graduate_type: string
+  file_name: string
+  public_url: string | null
+  is_verified: boolean
+  uploaded_at: string
+  expiration_date: string | null
+}
+
+const GRAD_TYPES: { id: GraduateType; label: string; labelAr: string }[] = [
+  { id: "GOV", label: "GOV", labelAr: "حكومية" },
+  { id: "US", label: "US", labelAr: "أمريكية" },
+  { id: "UK", label: "UK", labelAr: "بريطانية" },
+  { id: "KSA", label: "KSA", labelAr: "سعودية" },
+  { id: "OTHER", label: "Others", labelAr: "أخرى" },
+]
+
+export default function PspSelfServicePage() {
+  const { token } = useParams<{ token: string }>()
+  const [state, setState] = useState<PageState>("loading")
+  const [errorMsg, setErrorMsg] = useState("")
+  const [lead, setLead] = useState<LeadView | null>(null)
+  const [docs, setDocs] = useState<UploadedDoc[]>([])
+  const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null)
+
+  // Editable form state
+  const [form, setForm] = useState({
+    first_name: "",
+    last_name: "",
+    first_name_ar: "",
+    last_name_ar: "",
+    civil_id: "",
+    phone: "",
+    phone_secondary: "",
+    email: "",
+    date_of_birth: "",
+    graduation_year: "",
+    gpa_grade_11: "",
+    education_type: "GOV" as GraduateType,
+    is_diplomatic: false,
+    is_special_needs: false,
+  })
+
+  useEffect(() => {
+    if (!token) return
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
+
+  async function load() {
+    try {
+      const res = await fetch(`/api/psp/self-service/details?token=${token}`)
+      if (res.status === 410) {
+        setState("expired")
+        return
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setState("error")
+        setErrorMsg(err.error || "Invalid link")
+        return
+      }
+      const json = (await res.json()) as { lead: LeadView; documents: UploadedDoc[]; submitted_at: string | null }
+      setLead(json.lead)
+      setDocs(json.documents || [])
+      setForm({
+        first_name: json.lead.first_name ?? "",
+        last_name: json.lead.last_name ?? "",
+        first_name_ar: json.lead.first_name_ar ?? "",
+        last_name_ar: json.lead.last_name_ar ?? "",
+        civil_id: json.lead.civil_id ?? "",
+        phone: json.lead.phone ?? "",
+        phone_secondary: json.lead.phone_secondary ?? "",
+        email: json.lead.email ?? "",
+        date_of_birth: json.lead.date_of_birth ?? "",
+        graduation_year: json.lead.graduation_year ? String(json.lead.graduation_year) : "",
+        gpa_grade_11: json.lead.gpa_grade_11 != null ? String(json.lead.gpa_grade_11) : "",
+        education_type: (json.lead.education_type as GraduateType) || "GOV",
+        is_diplomatic: !!json.lead.is_diplomatic,
+        is_special_needs: !!json.lead.is_special_needs,
+      })
+      setState(json.submitted_at ? "submitted" : "ready")
+    } catch {
+      setState("error")
+      setErrorMsg("Something went wrong")
+    }
+  }
+
+  const requiredDocs = useMemo<DocumentRule[]>(() => {
+    const flags: ConditionalDocumentFlags = {
+      isSpecialNeeds: form.is_special_needs,
+      isDiplomatic: form.is_diplomatic,
+    }
+    return getDocumentsForGraduateType(form.education_type, flags)
+  }, [form.education_type, form.is_special_needs, form.is_diplomatic])
+
+  const docsByType = useMemo(() => {
+    const map = new Map<string, UploadedDoc>()
+    for (const d of docs) {
+      if (d.graduate_type === form.education_type) {
+        map.set(d.document_type, d)
+      }
+    }
+    return map
+  }, [docs, form.education_type])
+
+  async function saveInfo() {
+    if (!token) return
+    setSaving(true)
+    try {
+      const updates: Record<string, unknown> = {
+        first_name: form.first_name || null,
+        last_name: form.last_name || null,
+        first_name_ar: form.first_name_ar || null,
+        last_name_ar: form.last_name_ar || null,
+        civil_id: form.civil_id || null,
+        phone: form.phone || null,
+        phone_secondary: form.phone_secondary || null,
+        email: form.email || null,
+        date_of_birth: form.date_of_birth || null,
+        graduation_year: form.graduation_year ? Number(form.graduation_year) : null,
+        gpa_grade_11: form.gpa_grade_11 ? Number(form.gpa_grade_11) : null,
+        education_type: form.education_type,
+        is_diplomatic: form.is_diplomatic,
+        is_special_needs: form.is_special_needs,
+      }
+      const res = await fetch("/api/psp/self-service/save-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, updates }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        if (res.status === 410) {
+          setState("expired")
+          return
+        }
+        alert(err.error || "Failed to save")
+        return
+      }
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1500)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function uploadDoc(rule: DocumentRule, file: File) {
+    if (!token) return
+    setUploadingDocId(rule.id)
+    try {
+      const fd = new FormData()
+      fd.append("token", token)
+      fd.append("file", file)
+      fd.append("document_type", rule.id)
+      fd.append("graduate_type", form.education_type)
+      const res = await fetch("/api/psp/self-service/upload-doc", { method: "POST", body: fd })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        if (res.status === 410) {
+          setState("expired")
+          return
+        }
+        alert(err.error || "Failed to upload")
+        return
+      }
+      // Refresh document list after upload
+      await load()
+    } finally {
+      setUploadingDocId(null)
+    }
+  }
+
+  async function submit() {
+    if (!token) return
+    setSubmitting(true)
+    try {
+      // Save edits first so submit reflects current state.
+      await saveInfo()
+      const res = await fetch("/api/psp/self-service/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        if (res.status === 410) {
+          setState("expired")
+          return
+        }
+        alert(err.error || "Failed to submit")
+        return
+      }
+      setState("submitted")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (state === "loading") {
+    return <Shell><Centered><Spinner /><p className="mt-4 text-slate-500">Loading...</p></Centered></Shell>
+  }
+  if (state === "expired") {
+    return (
+      <Shell>
+        <Centered>
+          <IconBubble color="amber">!</IconBubble>
+          <h2 className="text-xl font-semibold text-slate-900 mt-3">Link Expired</h2>
+          <p className="text-slate-500 mt-2 text-center">انتهت صلاحية هذا الرابط. يرجى التواصل مع فريق القبول.</p>
+          <p className="text-slate-500 mt-1 text-center text-sm">This link has expired. Please contact the admissions team.</p>
+        </Centered>
+      </Shell>
+    )
+  }
+  if (state === "error") {
+    return (
+      <Shell>
+        <Centered>
+          <IconBubble color="red">×</IconBubble>
+          <h2 className="text-xl font-semibold text-slate-900 mt-3">Something Went Wrong</h2>
+          <p className="text-slate-500 mt-2 text-center">{errorMsg}</p>
+        </Centered>
+      </Shell>
+    )
+  }
+
+  const submittedBadge = state === "submitted"
+
+  return (
+    <Shell>
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+        <div className="p-6 sm:p-8 border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">PSP Application / تقديم الطلب</h1>
+          <p className="text-sm text-slate-600 mt-1">
+            {lead?.first_name_ar || lead?.first_name
+              ? `Welcome, ${lead.first_name_ar || lead.first_name}`
+              : "Complete your KTECH application below"}
+          </p>
+          {submittedBadge && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+              ✓ Submitted — you can still edit until the link expires
+            </div>
+          )}
+        </div>
+
+        {/* Info section */}
+        <section className="p-6 sm:p-8 space-y-5">
+          <SectionTitle en="Student Information" ar="بيانات الطالب" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="First Name (EN)" labelAr="الاسم الأول (إنجليزي)">
+              <Input value={form.first_name} onChange={(v) => setForm({ ...form, first_name: v })} />
+            </Field>
+            <Field label="Last Name (EN)" labelAr="اسم العائلة (إنجليزي)">
+              <Input value={form.last_name} onChange={(v) => setForm({ ...form, last_name: v })} />
+            </Field>
+            <Field label="First Name (AR)" labelAr="الاسم الأول (عربي)">
+              <Input value={form.first_name_ar} onChange={(v) => setForm({ ...form, first_name_ar: v })} dir="rtl" />
+            </Field>
+            <Field label="Last Name (AR)" labelAr="اسم العائلة (عربي)">
+              <Input value={form.last_name_ar} onChange={(v) => setForm({ ...form, last_name_ar: v })} dir="rtl" />
+            </Field>
+            <Field label="Civil ID" labelAr="الرقم المدني">
+              <Input value={form.civil_id} onChange={(v) => setForm({ ...form, civil_id: v })} inputMode="numeric" />
+            </Field>
+            <Field label="Phone" labelAr="رقم الهاتف">
+              <Input value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} inputMode="tel" />
+            </Field>
+            <Field label="Phone (Secondary)" labelAr="رقم هاتف إضافي">
+              <Input value={form.phone_secondary} onChange={(v) => setForm({ ...form, phone_secondary: v })} inputMode="tel" />
+            </Field>
+            <Field label="Email" labelAr="البريد الإلكتروني">
+              <Input value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" />
+            </Field>
+            <Field label="Date of Birth" labelAr="تاريخ الميلاد">
+              <Input value={form.date_of_birth} onChange={(v) => setForm({ ...form, date_of_birth: v })} type="date" />
+            </Field>
+            <Field label="Graduation Year" labelAr="سنة التخرج">
+              <Input value={form.graduation_year} onChange={(v) => setForm({ ...form, graduation_year: v })} inputMode="numeric" />
+            </Field>
+            <Field label="GPA (Grade 11)" labelAr="المعدل (الصف 11)">
+              <Input value={form.gpa_grade_11} onChange={(v) => setForm({ ...form, gpa_grade_11: v })} inputMode="decimal" />
+            </Field>
+          </div>
+        </section>
+
+        {/* Documents section */}
+        <section className="p-6 sm:p-8 border-t border-slate-200 space-y-5 bg-slate-50/40">
+          <SectionTitle en="Documents" ar="المستندات" />
+
+          <div>
+            <p className="text-xs text-slate-500 mb-2">Graduate Type / نوع الشهادة</p>
+            <div className="flex flex-wrap gap-2">
+              {GRAD_TYPES.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, education_type: g.id })}
+                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                    form.education_type === g.id
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-blue-400"
+                  }`}
+                >
+                  <span className="font-medium">{g.label}</span>
+                  <span className="text-xs opacity-70 ml-1.5">{g.labelAr}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_special_needs}
+                onChange={(e) => setForm({ ...form, is_special_needs: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span>Special Needs / ذوو الاحتياجات الخاصة</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_diplomatic}
+                onChange={(e) => setForm({ ...form, is_diplomatic: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span>Diplomatic / دبلوماسي</span>
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            {requiredDocs.map((rule) => {
+              const uploaded = docsByType.get(rule.id)
+              return (
+                <DocRow
+                  key={rule.id}
+                  rule={rule}
+                  uploaded={uploaded}
+                  uploading={uploadingDocId === rule.id}
+                  onUpload={(file) => uploadDoc(rule, file)}
+                />
+              )
+            })}
+          </div>
+        </section>
+
+        {/* Footer actions */}
+        <div className="p-6 sm:p-8 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white">
+          <div className="text-xs text-slate-500">
+            {savedFlash && <span className="text-emerald-600 font-medium">✓ Saved</span>}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={saveInfo}
+              disabled={saving || submitting}
+              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save / حفظ"}
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={saving || submitting}
+              className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 font-medium"
+            >
+              {submitting ? "Submitting..." : submittedBadge ? "Re-submit / إعادة الإرسال" : "Submit / إرسال"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  )
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8 px-4">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">ktech</h1>
+          <p className="text-xs text-slate-500">Kuwait Technical College</p>
+        </div>
+        {children}
+        <p className="text-center text-[11px] text-slate-400 mt-6">Kuwait Technical College &copy; {new Date().getFullYear()}</p>
+      </div>
+    </div>
+  )
+}
+
+function Centered({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-10 flex flex-col items-center justify-center">
+      {children}
+    </div>
+  )
+}
+
+function Spinner() {
+  return <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full" />
+}
+
+function IconBubble({ color, children }: { color: "amber" | "red"; children: React.ReactNode }) {
+  const palette = color === "amber" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"
+  return <div className={`w-14 h-14 rounded-full ${palette} flex items-center justify-center text-2xl font-bold`}>{children}</div>
+}
+
+function SectionTitle({ en, ar }: { en: string; ar: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-slate-900">{en}</h2>
+      <p className="text-xs text-slate-500" dir="rtl">{ar}</p>
+    </div>
+  )
+}
+
+function Field({ label, labelAr, children }: { label: string; labelAr: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-xs font-medium text-slate-700">{label}</span>
+        <span className="text-[11px] text-slate-400" dir="rtl">{labelAr}</span>
+      </div>
+      {children}
+    </label>
+  )
+}
+
+function Input(props: {
+  value: string
+  onChange: (v: string) => void
+  type?: string
+  inputMode?: "text" | "numeric" | "tel" | "email" | "decimal"
+  dir?: "ltr" | "rtl"
+}) {
+  return (
+    <input
+      type={props.type ?? "text"}
+      inputMode={props.inputMode}
+      dir={props.dir}
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    />
+  )
+}
+
+function DocRow({
+  rule,
+  uploaded,
+  uploading,
+  onUpload,
+}: {
+  rule: DocumentRule
+  uploaded?: UploadedDoc
+  uploading: boolean
+  onUpload: (file: File) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const accept = rule.acceptedFileTypes.join(",")
+
+  return (
+    <div className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-lg p-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-slate-900">{rule.name}</span>
+          <span className="text-xs text-slate-500" dir="rtl">{rule.nameAr}</span>
+          {rule.required ? (
+            <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Required</span>
+          ) : (
+            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>
+          )}
+          {uploaded && (
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+              {uploaded.is_verified ? "Verified" : "Uploaded"}
+            </span>
+          )}
+        </div>
+        {uploaded?.file_name && (
+          <p className="text-xs text-slate-500 mt-1 truncate">{uploaded.file_name}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {uploaded?.public_url && (
+          <a
+            href={uploaded.public_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            View
+          </a>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept={accept}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) onUpload(file)
+            if (inputRef.current) inputRef.current.value = ""
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {uploading ? "Uploading..." : uploaded ? "Replace" : "Upload"}
+        </button>
+      </div>
+    </div>
+  )
+}

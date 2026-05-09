@@ -6,6 +6,11 @@ const PUBLIC_ROUTES = [
   '/login',
   '/payment-success',
   '/payment-error',
+  // Tokenized self-service flows: the page itself is public; the API
+  // routes under /api/psp/self-service/* and /api/rsvp/* are already
+  // exempt because /api/* bypasses the auth middleware below.
+  '/psp/',
+  '/rsvp/',
 ]
 
 // Webhook endpoints that bypass auth (called by external services)

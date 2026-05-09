@@ -74,6 +74,7 @@ import { SFDocumentManager } from "@/components/leads/sf-document-manager"
 import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
+import { SendPspSelfServiceDialog } from "@/components/leads/send-psp-self-service-dialog"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { useSemesters } from "@/lib/hooks/use-semesters"
 import { useCycles } from "@/lib/hooks/use-cycles"
@@ -358,6 +359,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [pinnedNoteIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
   const [showPSPWizard, setShowPSPWizard] = useState(false)
+  const [showPSPSelfService, setShowPSPSelfService] = useState(false)
   const [showRSVPDialog, setShowRSVPDialog] = useState(false)
   const [showCallbackScheduler, setShowCallbackScheduler] = useState(false)
   const [rescheduleAppointmentId, setRescheduleAppointmentId] = useState<string | null>(null)
@@ -1216,6 +1218,21 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </motion.div>
               )}
 
+              {/* PSP self-service link button — admin/agent generates a public link
+                  the student fills out themselves. Only PUC-funded leads. */}
+              {lead.funding_type !== 'self_funded' && (
+                <SimpleTooltip content="Send PSP self-service link" side="bottom">
+                  <motion.div
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowPSPSelfService(true)}
+                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-purple-50 hover:text-purple-600 ring-1 ring-[var(--border-subtle)] hover:ring-purple-200 transition-all duration-200 cursor-pointer"
+                  >
+                    <Send className="w-[18px] h-[18px]" />
+                  </motion.div>
+                </SimpleTooltip>
+              )}
+
               {/* RSVP button - only for applicants */}
               {lead.pipeline_stage === 'applicant' && (
                 <SimpleTooltip content="Send RSVP link" side="bottom">
@@ -1968,6 +1985,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             setShowPSPWizard(false)
             refetchLead()
           }}
+        />
+      )}
+
+      {/* PSP self-service link dialog */}
+      {lead.funding_type !== 'self_funded' && (
+        <SendPspSelfServiceDialog
+          isOpen={showPSPSelfService}
+          onClose={() => setShowPSPSelfService(false)}
+          lead={lead}
         />
       )}
 

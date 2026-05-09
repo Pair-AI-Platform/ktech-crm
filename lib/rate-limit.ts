@@ -76,4 +76,5 @@ export const RATE_LIMITS = {
   'ai-chat': { interval: 60_000, limit: 20 },    // 20 AI chat messages per minute
   api: { interval: 60_000, limit: 60 },          // 60 general API calls per minute
   'civil-id-extract': { interval: 60_000, limit: 10 }, // 10 civil ID extractions per minute
+  'psp-self-service': { interval: 60_000, limit: 30 }, // 30 calls/min from a public PSP self-service token
 } as const
