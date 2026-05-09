@@ -36,7 +36,6 @@ const SOURCE_LABELS: Record<string, string> = {
   referral_staff: "Staff Referral",
   referral_partner: "Partner Referral",
   cold_call: "Cold Call",
-  sms_campaign: "SMS Campaign",
   other: "Other",
 }
 

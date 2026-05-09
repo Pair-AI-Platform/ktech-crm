@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
     if (runCheckTime - lastRunTimestamp < 50_000) {
       return NextResponse.json({ ok: true, skipped: true, message: 'Already ran recently (in-memory)' })
     }
-    lastRunTimestamp = runCheckTime
+    // Don't set lastRunTimestamp until processing completes — otherwise a
+    // failed run blocks the next tick from retrying for 50s.
 
     const supabase = createServiceRoleClient()
 
@@ -98,6 +99,10 @@ export async function GET(request: NextRequest) {
 
       triggered++
     }
+
+    // Mark this run as complete only on success; failed runs leave the
+    // timestamp untouched so the next tick can retry without waiting 50s.
+    lastRunTimestamp = runCheckTime
 
     return NextResponse.json({ ok: true, triggered })
   } catch (err) {

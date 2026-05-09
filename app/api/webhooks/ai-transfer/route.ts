@@ -3,6 +3,8 @@ import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications/create'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
+import crypto from 'crypto'
 
 interface AITransferBody {
   phone: string
@@ -46,9 +48,10 @@ export const POST = withApiHandler(
     }
 
     // 3. Parse and validate body
+    const rawBody = await req.text()
     let body: AITransferBody
     try {
-      body = await req.json()
+      body = JSON.parse(rawBody)
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
@@ -66,6 +69,19 @@ export const POST = withApiHandler(
     }
 
     const supabase = createServiceRoleClient()
+
+    // Idempotency / replay protection. Use conversation_id when provided
+    // (deterministic across retries from the same n8n run); otherwise hash
+    // the body so identical retries dedup but a genuinely new transfer with
+    // the same lead doesn't get blocked.
+    const eventId = body.conversation_id
+      ? `conv:${body.conversation_id}`
+      : `body:${crypto.createHash('sha256').update(rawBody).digest('hex').slice(0, 32)}`
+    const dedup = await recordWebhookEvent(supabase, 'ai_transfer', eventId, hashPayload(rawBody), null)
+    if (!dedup.ok) {
+      logger.info('AI transfer webhook deduplicated', { reason: dedup.reason, eventId })
+      return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })
+    }
 
     // 4. Check for existing lead by phone
     const { data: existingLead } = await supabase
@@ -187,7 +203,10 @@ export const POST = withApiHandler(
       if (error) logger.warn('Failed to log activity', { error: error.message })
     })
 
-    // 9. Return result
+    // 9. Mark webhook event processed (replay protection observability)
+    await markWebhookProcessed(supabase, 'ai_transfer', eventId)
+
+    // 10. Return result
     return NextResponse.json({
       success: true,
       lead_id: leadId,

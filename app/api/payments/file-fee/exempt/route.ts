@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
+import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
-export const POST = withApiHandler({ context: 'file-fee-exempt' }, async ({ req, supabase, user, logger }) => {
+export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'] }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
   const { leadId } = body
 
   if (!leadId) {
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
   }
+
+  const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role }, leadId)
+  if (ownershipBlock) return ownershipBlock
 
   // Use service role to bypass RLS for the update
   const serviceClient = createServiceRoleClient()

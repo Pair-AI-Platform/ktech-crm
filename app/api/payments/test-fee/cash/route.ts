@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
+import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
-export const POST = withApiHandler({ context: 'test-fee-cash' }, async ({ req, supabase, user, logger }) => {
+export const POST = withApiHandler({ context: 'test-fee-cash' }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
   const { leadId, invoiceNumber, notes } = body
 
   if (!leadId) {
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
   }
+
+  const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role }, leadId)
+  if (ownershipBlock) return ownershipBlock
 
   if (!invoiceNumber || typeof invoiceNumber !== 'string' || invoiceNumber.trim() === '') {
     return NextResponse.json({ error: 'Invoice number is required for cash payments' }, { status: 400 })

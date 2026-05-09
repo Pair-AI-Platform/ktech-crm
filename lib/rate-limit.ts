@@ -65,7 +65,6 @@ export async function rateLimit(key: string, config: RateLimitConfig): Promise<{
 
 // Pre-configured rate limiters for different use cases
 export const RATE_LIMITS = {
-  sms: { interval: 60_000, limit: 10 },        // 10 SMS per minute
   whatsapp: { interval: 60_000, limit: 10 },    // 10 WhatsApp per minute
   payment: { interval: 60_000, limit: 5 },      // 5 payment links per minute
   import: { interval: 300_000, limit: 3 },         // 3 bulk imports per 5 min

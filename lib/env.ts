@@ -80,7 +80,7 @@ if (typeof window === 'undefined') {
     warnings.push('MYFATOORAH_WEBHOOK_SECRET not set — payment webhook signature validation disabled')
   }
   if (!env.TWILIO_AUTH_TOKEN) {
-    warnings.push('TWILIO_AUTH_TOKEN not set — SMS and webhook validation disabled')
+    warnings.push('TWILIO_AUTH_TOKEN not set — WhatsApp and webhook validation disabled')
   }
   if (!env.AI_TRANSFER_WEBHOOK_SECRET) {
     warnings.push('AI_TRANSFER_WEBHOOK_SECRET not set — AI transfer webhook will reject all requests')

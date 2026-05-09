@@ -18,10 +18,10 @@ export function useTeamAppointments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('appointments')
-        .select('*, profiles:assigned_to(id, full_name)')
-        .gte('date', today)
-        .lte('date', today)
-        .order('time', { ascending: true })
+        .select('*, profiles:assigned_agent(id, full_name)')
+        .gte('scheduled_date', today)
+        .lte('scheduled_date', today)
+        .order('scheduled_time', { ascending: true })
 
       if (error) throw new Error(error.message)
       return data

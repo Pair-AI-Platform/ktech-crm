@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   MessageSquare,
-  Smartphone,
   ArrowLeft,
   Play,
   Pause,
@@ -47,12 +46,6 @@ const CAMPAIGN_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ classNa
     label: "WhatsApp",
     color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
     iconColor: "text-emerald-500",
-  },
-  sms: {
-    icon: Smartphone,
-    label: "SMS",
-    color: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-    iconColor: "text-purple-500",
   },
 }
 

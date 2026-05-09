@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { convertLeadToStudent, promoteSFLeadToApplicant, canEnrollLead } from '@/lib/enrollment/convert-lead'
 import { ENROLLMENT_PAYMENT_AMOUNT } from '@/types'
+import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
-export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, supabase, user, logger }) => {
+export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
-  const { leadId, invoiceNumber, notes, amount: customAmount } = body
+  const { leadId, invoiceNumber, notes } = body
 
   if (!leadId) {
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
@@ -15,6 +16,9 @@ export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, su
     return NextResponse.json({ error: 'Invoice number is required for cash payments' }, { status: 400 })
   }
 
+  const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role }, leadId)
+  if (ownershipBlock) return ownershipBlock
+
   // Check if lead can be enrolled
   const { canEnroll, reason } = await canEnrollLead(supabase, leadId)
   if (!canEnroll) {
@@ -22,10 +26,8 @@ export const POST = withApiHandler({ context: 'cash-payment' }, async ({ req, su
     return NextResponse.json({ error: reason }, { status: 400 })
   }
 
-  // Determine payment amount (custom or default)
-  const paymentAmount = typeof customAmount === 'number' && customAmount > 0
-    ? customAmount
-    : ENROLLMENT_PAYMENT_AMOUNT
+  // Amount is server-derived. Clients cannot override.
+  const paymentAmount = ENROLLMENT_PAYMENT_AMOUNT
 
   // Create payment transaction record
   logger.info('Creating cash payment transaction', { leadId, invoiceNumber, amount: paymentAmount })

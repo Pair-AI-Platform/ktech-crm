@@ -14,7 +14,6 @@ export const GET = withApiHandler(
       // No preferences yet - return defaults
       return NextResponse.json({
         email_notifications: true,
-        sms_notifications: true,
         push_notifications: true,
         appointment_reminders: true,
         lead_updates: true,
@@ -35,7 +34,7 @@ export const PUT = withApiHandler(
     const body = await req.json()
 
     const allowedFields = [
-      'email_notifications', 'sms_notifications', 'push_notifications',
+      'email_notifications', 'push_notifications',
       'appointment_reminders', 'lead_updates', 'system_alerts',
       'language', 'timezone'
     ]

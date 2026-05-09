@@ -73,10 +73,10 @@ const GUIDES: Guide[] = [
     href: "#appointments",
   },
   {
-    title: "SMS & Communications",
+    title: "WhatsApp & Communications",
     description: "Sending messages and using templates",
     icon: MessageSquare,
-    href: "#sms",
+    href: "#whatsapp",
   },
   {
     title: "Reports & Analytics",
@@ -130,14 +130,9 @@ const FAQS: FAQ[] = [
     answer: "Go to the Calendar page or click 'Book Appointment' from a lead's profile. Select the appointment type, date, time, and add any notes. The system will check for conflicts and send confirmation.",
   },
   {
-    category: "SMS",
-    question: "Can I use templates for SMS messages?",
-    answer: "Yes! Navigate to Settings > SMS to manage templates. You can use variables like {{first_name}} and {{appointment_date}} that will be automatically replaced with actual values when sending.",
-  },
-  {
-    category: "SMS",
-    question: "What is the SMS character limit?",
-    answer: "Standard SMS messages are 160 characters. Messages longer than this will be split into multiple parts. Arabic messages may have a lower limit due to character encoding.",
+    category: "WhatsApp",
+    question: "Can I use templates for WhatsApp messages?",
+    answer: "Yes! Navigate to Settings > WhatsApp to manage templates. You can use variables like {{first_name}} and {{appointment_date}} that will be automatically replaced with actual values when sending.",
   },
   {
     category: "Reports",
@@ -460,7 +455,7 @@ export default function HelpPage() {
                 <CheckCircle2 className="w-5 h-5 text-[var(--success)] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-[var(--text-primary)] mb-1">
-                    Use SMS templates
+                    Use WhatsApp templates
                   </p>
                   <p className="text-sm text-[var(--text-muted)]">
                     Save time with pre-written message templates

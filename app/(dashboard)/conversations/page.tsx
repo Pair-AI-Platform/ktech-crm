@@ -265,7 +265,7 @@ const demoConversations: Conversation[] = [
     customerName: "Fatima H.",
     topic: "Account help",
     time: "9:00 AM",
-    channel: "SMS",
+    channel: "WhatsApp",
     status: "Resolved",
     sentiment: "Positive",
     startedAt: "8:55 AM",
@@ -317,7 +317,6 @@ const getChannelIcon = (channel: Channel) => {
     case "Email":
       return <Mail className="w-4 h-4" />;
     case "WhatsApp":
-    case "SMS":
       return <Smartphone className="w-4 h-4" />;
     default:
       return <MessageSquare className="w-4 h-4" />;
@@ -402,7 +401,6 @@ export default function ConversationsPage() {
               <option>Voice</option>
               <option>Email</option>
               <option>WhatsApp</option>
-              <option>SMS</option>
             </select>
             <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
               <option>Last 7 days</option>

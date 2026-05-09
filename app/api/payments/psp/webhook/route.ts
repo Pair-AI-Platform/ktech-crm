@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 import twilio from "twilio"
 import { getPaymentStatus, verifyWebhookSignature } from "@/lib/myfatoorah/client"
 import { escapeHtml } from "@/lib/utils"
+import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from "@/lib/webhook-events"
 
 // Lazy-initialize Twilio client for sending receipts
 function getTwilioClient() {
@@ -198,6 +199,34 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient()
 
+    // Idempotency / replay protection: record this delivery before doing any work.
+    const eventId = `psp:${invoiceId}`
+    const dedup = await recordWebhookEvent(supabase, "myfatoorah", eventId, hashPayload(rawBody), null)
+    if (!dedup.ok) {
+      console.log("[PSP Payment Webhook] Deduplicated:", { reason: dedup.reason, eventId })
+      return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })
+    }
+
+    let response: NextResponse
+    try {
+      response = await processPspWebhookBody(supabase, body, invoiceId)
+      await markWebhookProcessed(supabase, "myfatoorah", eventId)
+    } catch (procErr) {
+      await markWebhookFailed(supabase, "myfatoorah", eventId, procErr instanceof Error ? procErr.message : String(procErr))
+      throw procErr
+    }
+    return response
+  } catch (error: unknown) {
+    console.error("[PSP Payment Webhook] Error:", error)
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
+  }
+}
+
+async function processPspWebhookBody(
+  supabase: ReturnType<typeof createServiceClient>,
+  body: { InvoiceId?: number | string; Data?: { InvoiceId?: number | string } },
+  invoiceId: number | string,
+): Promise<NextResponse> {
     // Find the payment transaction by invoice ID
     const { data: transaction, error: txError } = await supabase
       .from("payment_transactions")
@@ -453,14 +482,6 @@ Kuwait Technical College`
         status: statusResult.invoiceStatus,
       })
     }
-  } catch (error: unknown) {
-    console.error("[PSP Payment Webhook] Error:", error)
-    const errorMessage = "Webhook processing failed"
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
-  }
 }
 
 // Handle GET for callback redirects

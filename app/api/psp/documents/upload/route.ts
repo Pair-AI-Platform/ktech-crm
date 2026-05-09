@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
+import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
 // POST - Upload file to storage and create document record
 export async function POST(request: NextRequest) {
@@ -24,6 +25,17 @@ export async function POST(request: NextRequest) {
         error: "Missing required fields: file, lead_id, document_type, graduate_type"
       }, { status: 400 })
     }
+
+    // Defense-in-depth: storage upload uses service role (bypasses RLS),
+    // so we must verify the caller owns the lead before letting them write
+    // into that lead's storage namespace.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .single()
+    const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role as 'admin' | 'agent' | undefined }, leadId)
+    if (ownershipBlock) return ownershipBlock
 
     // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {

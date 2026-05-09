@@ -87,16 +87,6 @@ export const paymentWebhookSchema = z.object({
 }).passthrough()
 
 // =============================================
-// SMS Schema
-// =============================================
-
-export const smsSchema = z.object({
-  phone: z.string().min(1, 'Phone number is required').max(20),
-  message: z.string().min(1, 'Message is required').max(1600),
-  leadId: z.string().uuid().optional(),
-})
-
-// =============================================
 // Filter Preset Schema
 // =============================================
 
@@ -113,5 +103,4 @@ export const filterPresetSchema = z.object({
 export type LeadCreateInput = z.infer<typeof leadCreateSchema>
 export type LeadUpdateInput = z.infer<typeof leadUpdateSchema>
 export type PaymentWebhookInput = z.infer<typeof paymentWebhookSchema>
-export type SmsInput = z.infer<typeof smsSchema>
 export type FilterPresetInput = z.infer<typeof filterPresetSchema>

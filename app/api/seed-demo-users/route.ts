@@ -1,34 +1,40 @@
 import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
-
-const DEMO_USERS = [
-  {
-    email: "demo-admin@ktech.edu.kw",
-    password: "demo-admin-2026!",
-    full_name: "Demo Admin",
-    role: "admin" as const,
-  },
-  {
-    email: "demo-agent@ktech.edu.kw",
-    password: "demo-agent-2026!",
-    full_name: "Khalifa",
-    role: "agent" as const,
-  },
-]
+import { requireDemoMode, getDemoCredentials } from "@/lib/demo-mode"
 
 export async function POST(request: Request) {
-  // Protect with a secret
-  const { searchParams } = new URL(request.url)
-  const secret = searchParams.get("secret")
-  if (secret !== process.env.CRON_SECRET) {
+  const gateResponse = requireDemoMode()
+  if (gateResponse) return gateResponse
+
+  // Authenticate via Bearer header rather than query string so the secret
+  // does not end up in CDN/proxy access logs.
+  const authHeader = request.headers.get("authorization") ?? ""
+  const expected = process.env.CRON_SECRET
+  if (!expected) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 })
+  }
+  if (authHeader !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const adminCreds = getDemoCredentials("admin")
+  const agentCreds = getDemoCredentials("agent")
+  if (!adminCreds || !agentCreds) {
+    return NextResponse.json(
+      { error: "Demo credentials not configured (DEMO_ADMIN_PASSWORD / DEMO_AGENT_PASSWORD)" },
+      { status: 503 },
+    )
+  }
+
+  const demoUsers = [
+    { ...adminCreds, role: "admin" as const },
+    { ...agentCreds, role: "agent" as const },
+  ]
 
   const supabase = createServiceRoleClient()
   const results = []
 
-  for (const user of DEMO_USERS) {
-    // Check if user already exists
+  for (const user of demoUsers) {
     const { data: existing } = await supabase
       .from("profiles")
       .select("id")
@@ -36,7 +42,6 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (existing) {
-      // Ensure role and name are correct for existing demo users
       await supabase
         .from("profiles")
         .update({ role: user.role, full_name: user.full_name })
@@ -45,7 +50,6 @@ export async function POST(request: Request) {
       continue
     }
 
-    // Create auth user
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: user.email,
       password: user.password,
@@ -53,11 +57,10 @@ export async function POST(request: Request) {
     })
 
     if (authError) {
-      results.push({ email: user.email, status: "error", error: authError.message })
+      results.push({ email: user.email, status: "error", error: "Failed to create user" })
       continue
     }
 
-    // Create/update profile
     const { error: profileError } = await supabase
       .from("profiles")
       .upsert({
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
       })
 
     if (profileError) {
-      results.push({ email: user.email, status: "auth created, profile error", error: profileError.message })
+      results.push({ email: user.email, status: "auth created, profile error" })
     } else {
       results.push({ email: user.email, status: "created", role: user.role })
     }

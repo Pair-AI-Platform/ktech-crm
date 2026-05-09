@@ -5,7 +5,6 @@ import type { UserPreferences } from '@/types'
 
 const defaultPreferences: UserPreferences = {
   email_notifications: true,
-  sms_notifications: true,
   push_notifications: true,
   appointment_reminders: true,
   lead_updates: true,

@@ -1,13 +1,12 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { ArrowRight, MessageCircle, Mail, Instagram } from "lucide-react"
+import { ArrowRight, MessageCircle, Instagram } from "lucide-react"
 import Link from "next/link"
 
 // Mock data - replace with real data later
 const MOCK_CAMPAIGNS = [
   { channel: 'whatsapp', sent: 2100, leads: 34 },
-  { channel: 'sms', sent: 890, leads: 12 },
   { channel: 'instagram', sent: 450, leads: 8 },
 ]
 
@@ -16,11 +15,6 @@ const channelConfig = {
     label: 'WhatsApp',
     icon: MessageCircle,
     color: '#25D366',
-  },
-  sms: {
-    label: 'SMS',
-    icon: Mail,
-    color: '#6366f1',
   },
   instagram: {
     label: 'Instagram',

@@ -30,7 +30,6 @@ import {
   Users,
   GraduationCap,
   Calendar,
-  MessageSquare,
   CreditCard,
   RefreshCw,
 } from "lucide-react"
@@ -50,7 +49,6 @@ const TABLE_CONFIG: Record<string, { label: string; icon: typeof Users }> = {
   leads: { label: "Lead", icon: Users },
   students: { label: "Student", icon: GraduationCap },
   appointments: { label: "Appointment", icon: Calendar },
-  sms_messages: { label: "SMS", icon: MessageSquare },
   payments: { label: "Payment", icon: CreditCard },
   profiles: { label: "User", icon: User },
 }

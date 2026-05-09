@@ -1,41 +1,41 @@
 import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
-
-const DEMO_USERS = [
-  {
-    email: "demo-admin@ktech.edu.kw",
-    password: "demo-admin-2026!",
-    full_name: "Demo Admin",
-    role: "admin",
-  },
-  {
-    email: "demo-agent@ktech.edu.kw",
-    password: "demo-agent-2026!",
-    full_name: "Khalifa",
-    role: "agent",
-  },
-]
+import { requireDemoMode, getDemoCredentials } from "@/lib/demo-mode"
 
 export async function POST() {
+  const gateResponse = requireDemoMode()
+  if (gateResponse) return gateResponse
+
+  const adminCreds = getDemoCredentials("admin")
+  const agentCreds = getDemoCredentials("agent")
+  if (!adminCreds || !agentCreds) {
+    return NextResponse.json(
+      { error: "Demo credentials not configured (DEMO_ADMIN_PASSWORD / DEMO_AGENT_PASSWORD)" },
+      { status: 503 },
+    )
+  }
+
+  const demoUsers = [
+    { ...adminCreds, role: "admin" as const },
+    { ...agentCreds, role: "agent" as const },
+  ]
+
   const supabase = createServiceRoleClient()
   const results = []
 
-  for (const user of DEMO_USERS) {
-    // Check if user already exists
+  for (const user of demoUsers) {
     const { data: existingUsers } = await supabase.auth.admin.listUsers()
     const existing = existingUsers?.users?.find((u) => u.email === user.email)
 
     let userId: string
 
     if (existing) {
-      // Update password in case it changed
       await supabase.auth.admin.updateUserById(existing.id, {
         password: user.password,
       })
       userId = existing.id
       results.push({ email: user.email, status: "updated" })
     } else {
-      // Create new user
       const { data, error } = await supabase.auth.admin.createUser({
         email: user.email,
         password: user.password,
@@ -51,7 +51,6 @@ export async function POST() {
       results.push({ email: user.email, status: "created" })
     }
 
-    // Upsert profile
     await supabase.from("profiles").upsert({
       id: userId,
       full_name: user.full_name,

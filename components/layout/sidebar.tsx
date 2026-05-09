@@ -428,7 +428,7 @@ export function Sidebar({ user }: SidebarProps) {
           <Link href="/dashboard" className="flex items-center gap-3 ml-3 group">
             <div className="overflow-hidden">
               <h1 className="font-display text-lg font-semibold text-[var(--text-primary)] leading-none tracking-tight group-hover:text-[var(--primary)] transition-colors">ktech</h1>
-              <p className="text-[11px] text-[var(--text-tertiary)] mt-1 font-medium tracking-wide uppercase">Enrollment AI</p>
+              <p className="text-[11px] text-[var(--text-tertiary)] mt-1 font-medium tracking-wide uppercase">ADL</p>
             </div>
           </Link>
         )}

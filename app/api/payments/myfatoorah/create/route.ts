@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createPaymentLink, validateCivilId } from "@/lib/myfatoorah/client"
 import { canEnrollLead } from "@/lib/enrollment/convert-lead"
 import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
+import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { leadId, civilId, amount: customAmount } = body
+    const { leadId, civilId } = body
 
     // Validate required fields
     if (!leadId) {
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .single()
+    const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role as 'admin' | 'agent' | undefined }, leadId)
+    if (ownershipBlock) return ownershipBlock
 
     if (!civilId) {
       return NextResponse.json(
@@ -81,10 +90,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine payment amount (custom or default)
-    const paymentAmount = typeof customAmount === "number" && customAmount > 0
-      ? customAmount
-      : ENROLLMENT_PAYMENT_AMOUNT
+    // Amount is server-derived. Clients cannot override.
+    const paymentAmount = ENROLLMENT_PAYMENT_AMOUNT
 
     // Create MyFatoorah payment link
     const paymentResult = await createPaymentLink({

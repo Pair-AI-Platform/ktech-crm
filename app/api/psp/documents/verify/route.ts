@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
+import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
 // POST - Verify or unverify a document (admin only)
 export const POST = withApiHandler(
@@ -57,13 +58,16 @@ export const POST = withApiHandler(
 // GET - Get verification status for all documents of a lead
 export const GET = withApiHandler(
   { context: 'psp-documents-verify-status' },
-  async ({ req, supabase, logger }) => {
+  async ({ req, supabase, user, profile, logger }) => {
     const searchParams = req.nextUrl.searchParams
     const leadId = searchParams.get("lead_id")
 
     if (!leadId) {
       return NextResponse.json({ error: "lead_id is required" }, { status: 400 })
     }
+
+    const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role }, leadId)
+    if (ownershipBlock) return ownershipBlock
 
     const { data, error } = await supabase
       .from("psp_documents")

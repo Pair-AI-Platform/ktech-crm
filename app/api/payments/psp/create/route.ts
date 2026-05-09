@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createPaymentLink, validateCivilId } from "@/lib/myfatoorah/client"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { PSP_FEE_AMOUNT } from "@/lib/config/constants"
+import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { leadId, amount, fees, civilId } = body
+    const { leadId, amount: requestedAmount, fees, civilId } = body
 
     // Validate required fields
     if (!leadId) {
@@ -35,10 +37,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!amount || amount <= 0) {
+    // Resolve profile once for ownership + admin override checks.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .single()
+
+    const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role as 'admin' | 'agent' | undefined }, leadId)
+    if (ownershipBlock) return ownershipBlock
+
+    // Amount is server-derived. Non-admins always pay the standard PSP fee.
+    // Admins may override via the request body for one-off corrections.
+    const isAdmin = profile?.role === "admin"
+    const amount: number = isAdmin && typeof requestedAmount === "number" && requestedAmount > 0
+      ? requestedAmount
+      : PSP_FEE_AMOUNT
+    if (!isAdmin && typeof requestedAmount === "number" && requestedAmount !== PSP_FEE_AMOUNT) {
+      console.warn("[PSP Payment Create] Non-admin tried to override PSP fee", { leadId, requestedAmount, expected: PSP_FEE_AMOUNT })
       return NextResponse.json(
-        { error: "Valid amount is required" },
-        { status: 400 }
+        { error: "PSP fee amount override is admin-only" },
+        { status: 403 }
       )
     }
 

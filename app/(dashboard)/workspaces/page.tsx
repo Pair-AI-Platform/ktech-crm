@@ -48,9 +48,9 @@ export default function WorkspacesPage() {
     },
     {
       id: 4,
-      name: "fatima/knowledge-update",
+      name: "fatima/templates-update",
       status: "in-progress",
-      description: "Updating shipping documentation",
+      description: "Updating message templates",
       created: "1 day ago",
       author: "Fatima H.",
     },

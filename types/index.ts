@@ -948,47 +948,6 @@ export interface Activity {
 }
 
 // =============================================
-// SMS
-// =============================================
-
-export type SMSStatus = 'pending' | 'sent' | 'delivered' | 'failed'
-
-export type SMSTemplateCategory = 'appointment' | 'payment' | 'follow_up' | 'welcome' | 'reminder' | 'custom'
-
-export interface SMSTemplate {
-  id: string
-  name: string
-  category: SMSTemplateCategory
-  content_en: string
-  content_ar?: string
-  variables: string[] // ['first_name', 'appointment_date', 'agent_name']
-  is_active: boolean
-  created_by?: string
-  created_at: string
-  updated_at: string
-}
-
-export interface SMSMessage {
-  id: string
-  lead_id?: string
-  lead?: Lead
-  student_id?: string
-  student?: Student
-  phone_number: string
-  content: string
-  template_id?: string
-  template?: SMSTemplate
-  status: SMSStatus
-  provider_id?: string // Twilio message SID
-  error_message?: string
-  sent_by?: string
-  sent_by_profile?: Profile
-  sent_at?: string
-  delivered_at?: string
-  created_at: string
-}
-
-// =============================================
 // AUDIT LOG
 // =============================================
 
@@ -1752,7 +1711,6 @@ export const SUBMISSION_BLOCKED_REASONS: { value: SubmissionBlockedReason; label
 
 export interface UserPreferences {
   email_notifications: boolean
-  sms_notifications: boolean
   push_notifications: boolean
   appointment_reminders: boolean
   lead_updates: boolean

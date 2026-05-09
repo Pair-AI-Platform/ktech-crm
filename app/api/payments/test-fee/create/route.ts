@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createPaymentLink, validateCivilId } from '@/lib/myfatoorah/client'
 import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
+import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,14 @@ export async function POST(request: NextRequest) {
     if (!leadId) {
       return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
     }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, role')
+      .eq('id', user.id)
+      .single()
+    const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role as 'admin' | 'agent' | undefined }, leadId)
+    if (ownershipBlock) return ownershipBlock
 
     if (!civilId) {
       return NextResponse.json({ error: 'Civil ID is required for online payment' }, { status: 400 })

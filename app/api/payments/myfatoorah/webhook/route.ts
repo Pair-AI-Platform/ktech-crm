@@ -5,6 +5,7 @@ import { getPaymentStatus, verifyWebhookSignature } from '@/lib/myfatoorah/clien
 import { ENROLLMENT_PAYMENT_AMOUNT } from '@/types'
 import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { createLogger } from '@/lib/logger'
+import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 
 // Use service role for webhook (no user session)
 function createServiceClient() {
@@ -40,6 +41,39 @@ export async function POST(request: NextRequest) {
     logger.info('Webhook received', { invoiceId })
     const supabase = createServiceClient()
 
+    // Idempotency / replay protection: record this delivery before doing any work.
+    const eventId = `enroll:${invoiceId}`
+    const dedup = await recordWebhookEvent(supabase, 'myfatoorah', eventId, hashPayload(rawBody), null)
+    if (!dedup.ok) {
+      logger.info('Webhook deduplicated', { reason: dedup.reason, eventId })
+      return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })
+    }
+
+    let response: NextResponse
+    try {
+      response = await processEnrollmentInvoice(supabase, body, invoiceId, logger)
+      await markWebhookProcessed(supabase, 'myfatoorah', eventId)
+    } catch (procErr) {
+      await markWebhookFailed(supabase, 'myfatoorah', eventId, procErr instanceof Error ? procErr.message : String(procErr))
+      throw procErr
+    }
+    return response
+  } catch (error: unknown) {
+    logger.error('Webhook processing failed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
+  }
+}
+
+type WebhookLogger = ReturnType<typeof createLogger>
+
+async function processEnrollmentInvoice(
+  supabase: ReturnType<typeof createServiceClient>,
+  body: { InvoiceId?: number | string; Data?: { InvoiceId?: number | string } },
+  invoiceId: number | string,
+  logger: WebhookLogger,
+): Promise<NextResponse> {
     // Find the payment transaction by invoice ID with row lock to prevent race conditions
     // Using RPC to get SELECT ... FOR UPDATE (Supabase JS doesn't support FOR UPDATE)
     const { data: transactions, error: txError } = await supabase
@@ -367,13 +401,6 @@ export async function POST(request: NextRequest) {
         status: statusResult.invoiceStatus,
       })
     }
-  } catch (error: unknown) {
-    logger.error('Webhook processing failed', {
-      error: error instanceof Error ? error.message : String(error),
-    })
-    const errorMessage = 'Webhook processing failed'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
-  }
 }
 
 // Also handle GET for callback redirects

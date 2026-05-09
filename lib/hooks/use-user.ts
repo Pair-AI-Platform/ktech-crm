@@ -70,16 +70,6 @@ export function useUser() {
         .eq("id", user.id)
         .single()
 
-      // Override profile for demo accounts to ensure correct role
-      const email = user.email || profile?.email
-      if (profile && email === "demo-agent@ktech.edu.kw") {
-        profile.role = "agent"
-        profile.full_name = "Khalifa"
-      } else if (profile && email === "demo-admin@ktech.edu.kw") {
-        profile.role = "admin"
-        profile.full_name = "Demo Admin"
-      }
-
       return { user, profile }
     },
     staleTime: 5 * 60_000, // User data rarely changes, cache for 5 minutes

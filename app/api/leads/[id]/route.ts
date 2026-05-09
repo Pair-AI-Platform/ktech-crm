@@ -32,6 +32,14 @@ export const GET = withApiHandler(
       )
     }
 
+    // Defense in depth on top of leads_select_policy: agents can only read
+    // their own leads. If RLS regresses for any reason, this guard still
+    // closes the IDOR path.
+    if (profile?.role !== 'admin' && data.assigned_to !== user.id) {
+      logger.warn('Agent attempted to access non-owned lead', { leadId: id, agentId: user.id })
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
     // Auto-assign to active cycle's open term if lead has no semester
     if (!data.semester_id) {
       const { data: openTerm } = await supabase

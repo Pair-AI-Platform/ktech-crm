@@ -78,7 +78,7 @@ export default function IntegrationsPage() {
     {
       id: 7,
       name: "Twilio",
-      category: "SMS/Voice",
+      category: "WhatsApp/Voice",
       icon: Phone,
       iconColor: "bg-red-600",
     },

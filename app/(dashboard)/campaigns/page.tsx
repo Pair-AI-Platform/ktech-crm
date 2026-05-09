@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   MessageSquare,
-  Smartphone,
   Eye,
   Plus,
   Play,
@@ -59,7 +58,7 @@ import {
 // Types
 // ============================================================================
 
-type CampaignView = "all" | "whatsapp" | "sms"
+type CampaignView = "all" | "whatsapp"
 type AudienceSource = "filter" | "upload"
 type ScheduleType = "immediate" | "scheduled"
 
@@ -102,14 +101,6 @@ const CAMPAIGN_TYPE_CONFIG = {
     color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
     iconColor: "text-emerald-500",
     bgColor: "bg-emerald-500",
-  },
-  sms: {
-    icon: Smartphone,
-    label: "SMS",
-    description: "Quick SMS notifications",
-    color: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-    iconColor: "text-purple-500",
-    bgColor: "bg-purple-500",
   },
 }
 
@@ -563,7 +554,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           {/* Step 1: Channel Selection */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-4">
-              {(["whatsapp", "sms"] as CampaignType[]).map((type) => {
+              {(["whatsapp"] as CampaignType[]).map((type) => {
                 const config = CAMPAIGN_TYPE_CONFIG[type]
                 const Icon = config.icon
                 return (
@@ -857,7 +848,7 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           {step === 4 && (
             <div className="space-y-6">
               {/* Message Content */}
-              {(formData.type === "whatsapp" || formData.type === "sms") && (
+              {formData.type === "whatsapp" && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-[var(--text-primary)]">
@@ -985,17 +976,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                     </div>
                   )}
 
-                  {/* Character Count for SMS */}
-                  {formData.type === 'sms' && (
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">
-                      {formData.messageContent.length}/160 characters
-                      {formData.messageContent.length > 160 && (
-                        <span className="text-amber-500 ml-2">
-                          (will be sent as {Math.ceil(formData.messageContent.length / 160)} messages)
-                        </span>
-                      )}
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -1101,7 +1081,6 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 const CAMPAIGN_VIEWS: { id: CampaignView; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
   { id: "all", label: "All" },
   { id: "whatsapp", label: "WhatsApp", icon: MessageSquare },
-  { id: "sms", label: "SMS", icon: Smartphone },
 ]
 
 export default function CampaignsPage() {

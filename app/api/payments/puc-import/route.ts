@@ -8,6 +8,7 @@ import {
   namesMatch,
 } from "@/lib/puc-import"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { PUC_FEE_AMOUNT } from "@/lib/config/constants"
 
 export async function POST(request: NextRequest) {
   try {
@@ -208,12 +209,13 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Create a payment transaction for PUC (no actual payment)
+        // Create a payment transaction for PUC. Use the symbolic PUC fee amount
+        // (matches finance webhook flow). Migration 169 enforces amount > 0.
         const { data: transaction, error: txError } = await supabase
           .from("payment_transactions")
           .insert({
             lead_id: matchedLead.id,
-            amount: 0, // PUC funded - no payment required
+            amount: PUC_FEE_AMOUNT,
             currency: "KWD",
             payment_method: "bank_transfer", // Using bank_transfer for PUC
             status: "completed",
@@ -231,11 +233,11 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Convert lead to student
+        // Convert lead to student. PUC fee is symbolic (matches finance webhook).
         const conversionResult = await convertLeadToStudent(supabase, {
           leadId: matchedLead.id,
           transactionId: transaction.id,
-          amountPaid: 0, // PUC funded
+          amountPaid: PUC_FEE_AMOUNT,
           userId: user.id,
         })
 

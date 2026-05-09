@@ -13,12 +13,10 @@ const WEBHOOK_ROUTES = [
   '/api/payments/myfatoorah/webhook',
   '/api/payments/psp/webhook',
   '/api/payments/puc-fee/webhook',
-  '/api/sms/webhook',
 ]
 
 // CRON / service endpoints that use their own auth (Bearer token)
 const SERVICE_ROUTES = [
-  '/api/sms/reminders',
   '/api/health',
 ]
 

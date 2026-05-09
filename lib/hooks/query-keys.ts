@@ -41,6 +41,13 @@ export const queryKeys = {
     all: ['agent-history'] as const,
     detail: (agentId: string) => [...queryKeys.agentHistory.all, agentId] as const,
   },
+  agentStatusHistory: {
+    all: ['agent-status-history'] as const,
+    today: () => [...queryKeys.agentStatusHistory.all, 'today'] as const,
+  },
+  colleges: {
+    all: ['colleges'] as const,
+  },
   deletedLeads: {
     all: ['deleted-leads'] as const,
     list: (filters: Record<string, unknown>) => [...queryKeys.deletedLeads.all, 'list', filters] as const,

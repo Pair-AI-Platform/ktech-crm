@@ -45,9 +45,9 @@ interface UnauthenticatedOptions {
  * a CSRF mitigation layered on top of Supabase's SameSite=Lax cookies.
  *
  * Allowed origins:
- *  - The configured NEXT_PUBLIC_APP_URL (production)
- *  - Vercel preview deployments (*.vercel.app) when running there
- *  - localhost during development
+ *  - Same-host (covers production + preview when client and API share a host)
+ *  - The configured NEXT_PUBLIC_APP_URL host
+ *  - Hosts in ALLOWED_ORIGIN_HOSTS (comma-separated env var)
  *
  * Returns null when the request is allowed; an error response otherwise.
  */
@@ -97,9 +97,13 @@ function validateOrigin(req: NextRequest, logger: Logger): Response | null {
     }
   }
 
-  // Allow Vercel preview deployments.
-  if (sourceHost.endsWith('.vercel.app')) {
-    return null
+  // Explicit allowlist via env var (comma-separated hostnames).
+  // Use this for preview deployments instead of a blanket *.vercel.app match,
+  // which would let any attacker on a Vercel preview deploy hit our APIs.
+  const allowedHosts = process.env.ALLOWED_ORIGIN_HOSTS
+  if (allowedHosts) {
+    const list = allowedHosts.split(',').map(h => h.trim()).filter(Boolean)
+    if (list.includes(sourceHost)) return null
   }
 
   logger.warn('Blocked: cross-origin state-changing request', {
@@ -119,7 +123,7 @@ function validateOrigin(req: NextRequest, logger: Logger): Response | null {
  *
  * Usage (authenticated):
  *   export const POST = withApiHandler(
- *     { context: 'sms-send' },
+ *     { context: 'whatsapp-send' },
  *     async ({ req, supabase, user, logger }) => { ... }
  *   )
  *

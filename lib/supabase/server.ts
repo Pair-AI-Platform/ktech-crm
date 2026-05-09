@@ -59,15 +59,6 @@ export async function getUserProfile() {
       .eq('id', user.id)
       .single<Profile>()
 
-    // Override profile for demo accounts to ensure correct role
-    if (profile && user.email === "demo-agent@ktech.edu.kw") {
-      profile.role = "agent"
-      profile.full_name = "Khalifa"
-    } else if (profile && user.email === "demo-admin@ktech.edu.kw") {
-      profile.role = "admin"
-      profile.full_name = "Demo Admin"
-    }
-
     return profile
   } catch (error) {
     console.error('Failed to get user profile:', error)

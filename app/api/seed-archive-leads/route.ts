@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
+import { requireDemoMode } from "@/lib/demo-mode"
 
 const FIRST_NAMES = [
   "عبدالله", "مريم", "يوسف", "لطيفة", "فهد", "هيا", "بدر", "دانة", "عمر", "ريم",
@@ -66,6 +67,9 @@ function generateLeads(count: number, semesterIds: string[], phonePrefix: string
 export const POST = withApiHandler(
   { context: "seed-archive-leads", roles: ["admin"] },
   async ({ supabase, user, logger }) => {
+    const gateResponse = requireDemoMode()
+    if (gateResponse) return gateResponse
+
     // Fetch all non-active cycles with their semesters
     const { data: cycles, error: cyclesError } = await supabase
       .from("education_cycles")
@@ -123,6 +127,9 @@ export const POST = withApiHandler(
 export const DELETE = withApiHandler(
   { context: "seed-archive-leads-delete", roles: ["admin"] },
   async ({ supabase, logger }) => {
+    const gateResponse = requireDemoMode()
+    if (gateResponse) return gateResponse
+
     // Delete leads with the generated phone prefixes
     const prefixes = ["623%", "624%", "625%", "626%"]
     let totalDeleted = 0

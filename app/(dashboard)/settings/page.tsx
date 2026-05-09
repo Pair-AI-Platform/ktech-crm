@@ -120,7 +120,6 @@ export default function SettingsPage() {
     try {
       await updatePreferences({
         email_notifications: preferences.email_notifications,
-        sms_notifications: preferences.sms_notifications,
         push_notifications: preferences.push_notifications,
         appointment_reminders: preferences.appointment_reminders,
         lead_updates: preferences.lead_updates,

@@ -36,8 +36,37 @@ export interface AutomationResult {
 }
 
 // --- Infinite loop protection ---
+// In-memory Set is per-instance only; DB-backed window check below catches
+// loops that span instances/tabs.
 const executingLeads = new Set<string>()
 const MAX_AUTOMATION_DEPTH = 3
+const REENTRY_WINDOW_SECONDS = 30
+const MAX_EXECUTIONS_IN_WINDOW = 5
+
+/**
+ * Looks at recent automation_executions for the same (lead_id, trigger) pair.
+ * Returns true if the count exceeds MAX_EXECUTIONS_IN_WINDOW within the
+ * REENTRY_WINDOW_SECONDS window — strong signal of a runaway loop.
+ */
+async function isRunawayLoop(
+  supabase: SupabaseClient,
+  leadId: string,
+  trigger: TriggerType,
+): Promise<boolean> {
+  const since = new Date(Date.now() - REENTRY_WINDOW_SECONDS * 1000).toISOString()
+  const { count, error } = await supabase
+    .from("automation_executions")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", leadId)
+    .gte("created_at", since)
+    .filter("rule_id", "in", `(SELECT id FROM automation_rules WHERE trigger_type = '${trigger}')`)
+
+  if (error) {
+    // Best-effort check — don't block automation if this query errors.
+    return false
+  }
+  return (count ?? 0) >= MAX_EXECUTIONS_IN_WINDOW
+}
 
 // --- URL helper for server-side fetch ---
 function getApiUrl(path: string): string {
@@ -182,12 +211,31 @@ async function executeAction(
           return { success: false, error: "Cannot auto-move to lost stage — lost reason must be selected manually" }
         }
 
+        const oldStage = ctx.leadData.pipeline_stage as string | undefined
+
         const { error } = await supabase
           .from("leads")
           .update({ pipeline_stage: target_stage })
           .eq("id", ctx.leadId)
 
         if (error) return { success: false, error: error.message }
+
+        // Log activity for parity with manual stage changes (which write a
+        // 'stage_change' activity from useLeadMutations.updateLeadMutation).
+        // Without this, automated moves are invisible in the activity feed.
+        await supabase.from("activities").insert({
+          lead_id: ctx.leadId,
+          activity_type: "stage_change",
+          description: `Stage automatically changed${oldStage ? ` from ${oldStage}` : ""} to ${target_stage} by rule "${rule.name}"`,
+          metadata: {
+            old_stage: oldStage,
+            new_stage: target_stage,
+            automation_rule_id: rule.id,
+            automated: true,
+          },
+          created_by: ctx.userId,
+        })
+
         return { success: true, result: { new_stage: target_stage } }
       }
 
@@ -206,9 +254,13 @@ export async function executeAutomations(
 ): Promise<AutomationResult[]> {
   const results: AutomationResult[] = []
 
-  // Infinite loop / re-entry protection — depth check, in-memory Set, and
-  // (when Upstash is configured) a distributed Redis lock so re-entry is
-  // blocked across serverless instances too.
+  // Infinite loop / re-entry protection — five layers, in priority order:
+  //   1) Caller-passed depth (synchronous nested call, rare)
+  //   2) In-memory Set (catches re-entry within a single instance)
+  //   3) Upstash distributed lock (cross-instance, cross-tab)
+  //   4) DB window check (catches loops the lock can't see, e.g. when
+  //      Upstash is unconfigured and the loop spans multiple browsers)
+  //   5) Action-specific guards (e.g. change_stage refuses 'lost')
   const executionKey = `${ctx.leadId}:${ctx.trigger}`
   if (depth >= MAX_AUTOMATION_DEPTH || executingLeads.has(executionKey)) {
     console.warn(`[Automation] Skipping: max depth or re-entry for ${executionKey}`)
@@ -223,6 +275,13 @@ export async function executeAutomations(
 
   executingLeads.add(executionKey)
   const supabase = supabaseClient || createClient()
+
+  if (await isRunawayLoop(supabase, ctx.leadId, ctx.trigger)) {
+    console.warn(`[Automation] Skipping: runaway-loop window exceeded for ${executionKey}`)
+    executingLeads.delete(executionKey)
+    await releaseAutomationLock(executionKey)
+    return results
+  }
 
   try {
     // Fetch active rules matching this trigger

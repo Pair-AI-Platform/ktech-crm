@@ -18,6 +18,8 @@ export const BUSINESS_CONFIG = {
   FILE_APPLICATION_FEE_AMOUNT: 20,
   /** Default test fee amount in KWD for File stage (adjustable per lead) */
   FILE_TEST_FEE_AMOUNT: 15,
+  /** PSP (Pre-Submission Process) application fee total in KWD. Server-derived; clients cannot override. */
+  PSP_FEE_AMOUNT: 50,
   /** Default currency */
   CURRENCY: 'KWD' as const,
 
@@ -26,20 +28,6 @@ export const BUSINESS_CONFIG = {
   GPA_SELF_FUNDED_THRESHOLD: 70,
   /** Passing threshold for Moodle placement tests */
   PLACEMENT_TEST_PASSING_THRESHOLD: 60,
-
-  // -- SMS Reminders --
-  /** Time window for 24-hour reminders (hours before appointment) */
-  REMINDER_24H: {
-    START_HOURS: 23,
-    END_HOURS: 25,
-  },
-  /** Time window for 2-hour reminders (hours before appointment) */
-  REMINDER_2H: {
-    START_HOURS: 1.5,
-    END_HOURS: 2.5,
-  },
-  /** Number of SMS messages to send concurrently */
-  SMS_BATCH_SIZE: 10,
 
   // -- Pipeline --
   /** All pipeline stages in order */
@@ -68,7 +56,7 @@ export const {
   TEST_FEE_AMOUNT,
   GPA_SELF_FUNDED_THRESHOLD,
   PLACEMENT_TEST_PASSING_THRESHOLD,
-  SMS_BATCH_SIZE,
   FILE_APPLICATION_FEE_AMOUNT,
   FILE_TEST_FEE_AMOUNT,
+  PSP_FEE_AMOUNT,
 } = BUSINESS_CONFIG

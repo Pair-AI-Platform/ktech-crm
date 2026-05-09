@@ -3,7 +3,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { resolveFilterAudience } from '@/lib/campaigns/audience-resolver'
 
 // Types
-type CampaignType = 'voice' | 'whatsapp' | 'sms' | 'email'
+type CampaignType = 'voice' | 'whatsapp' | 'email'
 type CampaignStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'completed'
 type AudienceSource = 'filter' | 'upload'
 type ScheduleType = 'immediate' | 'scheduled' | 'optimal'

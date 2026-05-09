@@ -40,7 +40,7 @@ function getInitials(name: string): string {
 
 function getActivityColor(type: string): string {
   if (type.includes("call") || type.includes("phone")) return "bg-[var(--primary)]/10 text-[var(--primary)]"
-  if (type.includes("sms") || type.includes("message")) return "bg-[var(--info)]/10 text-[var(--info)]"
+  if (type.includes("message") || type.includes("whatsapp")) return "bg-[var(--info)]/10 text-[var(--info)]"
   if (type.includes("stage") || type.includes("pipeline")) return "bg-[var(--accent)]/10 text-[var(--accent)]"
   if (type.includes("assign")) return "bg-[var(--warning)]/10 text-[var(--warning)]"
   if (type.includes("create") || type.includes("new")) return "bg-[var(--success)]/10 text-[var(--success)]"

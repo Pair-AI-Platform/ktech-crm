@@ -4,6 +4,7 @@ import { withApiHandler } from "@/lib/api-handler"
 import { escapeHtml } from "@/lib/utils"
 import { PUC_FEE_AMOUNT } from "@/types"
 import crypto from "crypto"
+import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from "@/lib/webhook-events"
 
 /**
  * Finance Department Webhook
@@ -144,19 +145,21 @@ export const POST = withApiHandler(
       )
     }
 
-    const paymentAmount = amount || PUC_FEE_AMOUNT
-    const method = payment_method || "cash"
-    const payDate = payment_date || new Date().toISOString()
-
-    // Validate payment amount against expected fee
-    if (typeof amount === 'number' && amount !== PUC_FEE_AMOUNT) {
-      logger.warn("Payment amount mismatch", {
+    // Amount is server-derived. Reject mismatches rather than silently accepting them.
+    if (typeof amount === "number" && amount !== PUC_FEE_AMOUNT) {
+      logger.error("Payment amount mismatch", {
         civil_id,
         received: amount,
         expected: PUC_FEE_AMOUNT,
       })
-      // Allow processing but log the discrepancy - finance department may have different amounts
+      return NextResponse.json(
+        { error: `Amount mismatch: received ${amount}, expected ${PUC_FEE_AMOUNT}` },
+        { status: 400 }
+      )
     }
+    const paymentAmount = PUC_FEE_AMOUNT
+    const method = payment_method || "cash"
+    const payDate = payment_date || new Date().toISOString()
 
     logger.info("Finance webhook received", {
       civil_id,
@@ -165,6 +168,14 @@ export const POST = withApiHandler(
     })
 
     const supabase = createServiceClient()
+
+    // Idempotency / replay protection: record this delivery before doing any work.
+    const eventId = `finance:${receipt_number}`
+    const dedup = await recordWebhookEvent(supabase, "finance", eventId, hashPayload(rawBody), null)
+    if (!dedup.ok) {
+      logger.info("Finance webhook deduplicated", { reason: dedup.reason, eventId })
+      return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })
+    }
 
     // Look up lead by civil_id
     const { data: lead, error: leadError } = await supabase
@@ -191,6 +202,7 @@ export const POST = withApiHandler(
 
     if (duplicateReceipt && duplicateReceipt.length > 0) {
       logger.info("Duplicate receipt number - already processed", { receipt_number })
+      await markWebhookProcessed(supabase, "finance", eventId)
       return NextResponse.json({
         success: true,
         message: "Payment already recorded (duplicate receipt)",
@@ -210,6 +222,7 @@ export const POST = withApiHandler(
 
     if (existingPayments && existingPayments.length > 0) {
       logger.info("Payment already exists for lead", { leadId: lead.id })
+      await markWebhookProcessed(supabase, "finance", eventId)
       return NextResponse.json({
         success: true,
         message: "Payment already recorded",
@@ -239,6 +252,7 @@ export const POST = withApiHandler(
         leadId: lead.id,
         error: txError.message,
       })
+      await markWebhookFailed(supabase, "finance", eventId, `Insert failed: ${txError.message}`)
       return NextResponse.json(
         { error: "Failed to create payment transaction" },
         { status: 500 }
@@ -375,6 +389,8 @@ export const POST = withApiHandler(
       leadId: lead.id,
       transactionId: transaction.id,
     })
+
+    await markWebhookProcessed(supabase, "finance", eventId)
 
     return NextResponse.json({
       success: true,

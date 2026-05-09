@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 import { escapeHtml } from "@/lib/utils"
+import { PSP_FEE_AMOUNT } from "@/lib/config/constants"
+import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
 function generateCashReceiptHtml(data: {
   receiptNumber: string
@@ -52,13 +54,16 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f8f9fa;padding:20px}
 
 export const POST = withApiHandler(
   { context: "psp-cash-payment" },
-  async ({ req, supabase, user, logger }) => {
+  async ({ req, supabase, user, profile, logger }) => {
     const body = await req.json()
-    const { leadId, receiptNumber, paymentMethod, amount, fees } = body
+    const { leadId, receiptNumber, paymentMethod, amount: requestedAmount, fees } = body
 
     if (!leadId) {
       return NextResponse.json({ error: "Lead ID is required" }, { status: 400 })
     }
+
+    const ownershipBlock = await requireLeadOwnership(supabase, { userId: user.id, role: profile?.role }, leadId)
+    if (ownershipBlock) return ownershipBlock
 
     if (!receiptNumber || typeof receiptNumber !== "string" || receiptNumber.trim() === "") {
       return NextResponse.json({ error: "Receipt number is required" }, { status: 400 })
@@ -68,8 +73,15 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: "Payment method must be cash or knet" }, { status: 400 })
     }
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: "Valid amount is required" }, { status: 400 })
+    // Amount is server-derived. Non-admins always pay the standard PSP fee.
+    // Admins may override via the request body for one-off corrections.
+    const isAdmin = profile?.role === "admin"
+    const amount: number = isAdmin && typeof requestedAmount === "number" && requestedAmount > 0
+      ? requestedAmount
+      : PSP_FEE_AMOUNT
+    if (!isAdmin && typeof requestedAmount === "number" && requestedAmount !== PSP_FEE_AMOUNT) {
+      logger.warn("Non-admin attempted to override PSP fee amount", { leadId, requestedAmount, expected: PSP_FEE_AMOUNT })
+      return NextResponse.json({ error: "PSP fee amount override is admin-only" }, { status: 403 })
     }
 
     // Fetch lead details

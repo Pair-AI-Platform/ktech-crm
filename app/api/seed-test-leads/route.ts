@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
+import { requireDemoMode } from "@/lib/demo-mode"
 
 // Common lead fields
 const baseLead = {
@@ -57,6 +58,9 @@ const TEST_LEADS = [
 export const POST = withApiHandler(
   { context: 'seed-test-leads', roles: ['admin'] },
   async ({ supabase, user, logger }) => {
+    const gateResponse = requireDemoMode()
+    if (gateResponse) return gateResponse
+
     // Fetch active semester
     const { data: activeSemester } = await supabase
       .from("semesters")
@@ -100,6 +104,9 @@ export const POST = withApiHandler(
 export const DELETE = withApiHandler(
   { context: 'seed-test-leads-delete', roles: ['admin'] },
   async ({ supabase, logger }) => {
+    const gateResponse = requireDemoMode()
+    if (gateResponse) return gateResponse
+
     // Delete test leads by their phone numbers
     const testPhones = TEST_LEADS.map((l) => l.phone)
     const { error } = await supabase
