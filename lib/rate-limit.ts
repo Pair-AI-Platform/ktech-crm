@@ -69,8 +69,8 @@ export const RATE_LIMITS = {
   payment: { interval: 60_000, limit: 5 },      // 5 payment links per minute
   import: { interval: 300_000, limit: 3 },         // 3 bulk imports per 5 min
   'moe-gpa': { interval: 300_000, limit: 3 },     // 3 GPA fetches per 5 min
-  'ministry-import': { interval: 300_000, limit: 3 }, // 3 ministry imports per 5 min
-  'puc-import': { interval: 300_000, limit: 3 },      // 3 PUC imports per 5 min
+  'ministry-import': { interval: 300_000, limit: 120 }, // 120 batch calls per 5 min — supports 45K-row imports chunked at 500/batch (~90 batches) plus headroom
+  'enroll-from-list': { interval: 300_000, limit: 3 }, // 3 enroll-from-list runs per 5 min
   export: { interval: 60_000, limit: 5 },        // 5 exports per minute
   'ai-transfer': { interval: 60_000, limit: 30 }, // 30 AI transfer webhooks per minute
   'ai-chat': { interval: 60_000, limit: 20 },    // 20 AI chat messages per minute

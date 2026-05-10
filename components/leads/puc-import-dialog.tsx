@@ -15,37 +15,38 @@ import {
   Upload,
   FileSpreadsheet,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Loader2,
-  GraduationCap,
-  Users,
+  ArrowRight,
+  UserPlus,
+  SkipForward,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
-  type PUCRecord,
-  type PUCImportResult,
-  createPUCHeaderMap,
-  parsePUCRow,
-  validatePUCRecords,
+  type PucImportRecord,
+  type PucImportResult,
+  createPucImportHeaderMap,
+  parsePucImportRow,
+  validatePucImportRecords,
 } from "@/lib/puc-import"
+import { PucImportBadge } from "./puc-import-badge"
 import * as XLSX from "xlsx"
 
-interface PUCImportDialogProps {
+interface PucImportDialogProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: (enrolledCount: number) => void
+  onSuccess: (matchedCount: number, flaggedCount: number, createdCount: number) => void
 }
 
 type ImportStep = "upload" | "preview" | "importing" | "complete"
 
-export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogProps) {
+export function PucImportDialog({ isOpen, onClose, onSuccess }: PucImportDialogProps) {
   const [step, setStep] = useState<ImportStep>("upload")
   const [file, setFile] = useState<File | null>(null)
-  const [records, setRecords] = useState<PUCRecord[]>([])
-  const [invalidRecords, setInvalidRecords] = useState<{ record: PUCRecord; reason: string }[]>([])
+  const [records, setRecords] = useState<PucImportRecord[]>([])
+  const [invalidRecords, setInvalidRecords] = useState<{ record: PucImportRecord; reason: string }[]>([])
   const [, setImporting] = useState(false)
-  const [result, setResult] = useState<PUCImportResult | null>(null)
+  const [result, setResult] = useState<PucImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -54,38 +55,32 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
     setError(null)
 
     try {
-      // Read Excel file
       const data = await selectedFile.arrayBuffer()
       const workbook = XLSX.read(data, { type: "array" })
 
-      // Get first sheet
       const sheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[sheetName]
 
-      // Convert to JSON with headers
-      const jsonData = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })
+      const jsonData = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1 })
 
       if (jsonData.length < 2) {
         setError("File appears to be empty or has no data rows")
         return
       }
 
-      // First row is headers
-      const headers = jsonData[0] as string[]
-      const headerMap = createPUCHeaderMap(headers)
+      const headers = (jsonData[0] as string[]).map(h => String(h || ""))
+      const headerMap = createPucImportHeaderMap(headers)
 
-      // Check if we have minimum required columns
-      if (!headerMap.has("first_name") && !headerMap.has("full_name")) {
-        setError("Could not find name column. Please ensure your file has a 'Name' or 'First Name' column.")
+      if (!headerMap.has("civil_id")) {
+        setError("Could not find Civil ID column. Please ensure your file has a 'Civil ID' / 'الرقم المدني' column.")
         return
       }
 
-      // Parse data rows
-      const parsedRecords: PUCRecord[] = []
+      const parsedRecords: PucImportRecord[] = []
       for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as string[]
-        if (row.some(cell => cell && cell.trim())) { // Skip empty rows
-          const record = parsePUCRow(row, headerMap)
+        const row = jsonData[i] as (string | number)[]
+        if (row.some(cell => cell !== undefined && cell !== null && String(cell).trim())) {
+          const record = parsePucImportRow(row, headerMap)
           if (record) {
             parsedRecords.push(record)
           }
@@ -97,8 +92,7 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
         return
       }
 
-      // Validate records
-      const { valid, invalid } = validatePUCRecords(parsedRecords)
+      const { valid, invalid } = validatePucImportRecords(parsedRecords)
       setRecords(valid)
       setInvalidRecords(invalid)
       setStep("preview")
@@ -126,7 +120,7 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
     setError(null)
 
     try {
-      const response = await fetch("/api/payments/puc-import", {
+      const response = await fetch("/api/puc-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ records }),
@@ -141,8 +135,11 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
       setResult(data.result)
       setStep("complete")
 
-      if (data.result.enrolled.length > 0) {
-        onSuccess(data.result.enrolled.length)
+      const matched = data.result.matchedSubmission.length
+      const flagged = data.result.matchedOtherStages.length
+      const created = data.result.createdNew.length
+      if (matched > 0 || flagged > 0 || created > 0) {
+        onSuccess(matched, flagged, created)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed")
@@ -167,13 +164,13 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
       <DialogContent size="lg">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-purple-600" />
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <PucImportBadge size="md" />
             </div>
             <div>
               <DialogTitle>PUC Import</DialogTitle>
               <DialogDescription>
-                Import accepted students from the Ministry list
+                Cross-reference ministry acceptance list with PUC Submission leads
               </DialogDescription>
             </div>
           </div>
@@ -189,19 +186,19 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
                 onClick={() => fileInputRef.current?.click()}
                 className={cn(
                   "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-                  "hover:border-purple-300 hover:bg-purple-50",
+                  "hover:border-amber-300 hover:bg-amber-50",
                   "border-[var(--border)] bg-[var(--bg-sunken)]"
                 )}
               >
-                <FileSpreadsheet className="w-12 h-12 mx-auto text-purple-500 mb-4" />
+                <FileSpreadsheet className="w-12 h-12 mx-auto text-amber-500 mb-4" />
                 <h3 className="font-medium text-[var(--text-primary)] mb-1">
-                  Upload PUC Acceptance List
+                  Upload PUC List
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
                   Drag & drop or click to select an Excel file (.xlsx)
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  File should contain: Civil ID, Name, and School columns
+                  File must contain a Civil ID column
                 </p>
               </div>
 
@@ -223,11 +220,15 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
                 </div>
               )}
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <strong>Matching Logic:</strong> Students will be matched by Civil ID first.
-                  If no Civil ID, matching uses Name + School combination.
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-800">
+                  <strong>How it works:</strong> Students are matched by Civil ID against PUC Application Submission stage.
                 </p>
+                <ul className="text-sm text-amber-700 mt-2 space-y-1 ml-4 list-disc">
+                  <li>Leads in <strong>PUC Submission</strong> that match → moved to <strong>Applicant</strong></li>
+                  <li className="flex items-center gap-1.5 flex-wrap">Leads in <strong>other stages</strong> that match → moved to <strong>Applicant</strong> + <PucImportBadge size="xs" /></li>
+                  <li className="flex items-center gap-1.5 flex-wrap">Civil IDs <strong>not in system</strong> → created as <strong>Applicant</strong> + <PucImportBadge size="xs" /></li>
+                </ul>
               </div>
             </div>
           )}
@@ -241,7 +242,7 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
                     {file?.name}
                   </h3>
                   <p className="text-sm text-[var(--text-secondary)]">
-                    {records.length} valid records found
+                    {records.length} valid civil IDs found
                   </p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setStep("upload")}>
@@ -255,31 +256,27 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--bg-sunken)] sticky top-0">
                       <tr>
+                        <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)] w-12">#</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Civil ID</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Name</th>
-                        <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">School</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
-                      {records.slice(0, 10).map((record, i) => (
+                      {records.slice(0, 20).map((record, i) => (
                         <tr key={i}>
-                          <td className="px-3 py-2 font-mono text-xs">
-                            {record.civil_id || <span className="text-[var(--text-muted)]">—</span>}
-                          </td>
+                          <td className="px-3 py-2 text-[var(--text-muted)] text-xs">{i + 1}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{record.civil_id}</td>
                           <td className="px-3 py-2">
-                            {record.first_name} {record.last_name}
-                          </td>
-                          <td className="px-3 py-2 text-[var(--text-secondary)]">
-                            {record.school_name || <span className="text-[var(--text-muted)]">—</span>}
+                            {record.student_name || <span className="text-[var(--text-muted)]">-</span>}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                {records.length > 10 && (
+                {records.length > 20 && (
                   <div className="px-3 py-2 bg-[var(--bg-sunken)] text-sm text-[var(--text-secondary)]">
-                    + {records.length - 10} more records
+                    + {records.length - 20} more records
                   </div>
                 )}
               </div>
@@ -288,10 +285,22 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm text-amber-700">
                     <AlertTriangle className="w-4 h-4 inline mr-1" />
-                    {invalidRecords.length} records skipped (missing required data)
+                    {invalidRecords.length} records skipped (missing/invalid Civil ID or duplicates)
                   </p>
                 </div>
               )}
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
+                <p className="text-sm text-blue-700">
+                  <strong>What will happen:</strong>
+                </p>
+                <ul className="text-sm text-blue-700 ml-5 list-disc space-y-0.5">
+                  <li>Civil IDs matching <strong>PUC Submission</strong> leads → moved to <strong>Applicant</strong></li>
+                  <li className="flex items-center gap-1.5 flex-wrap">Civil IDs found in <strong>other stages</strong> → moved to <strong>Applicant</strong> + <PucImportBadge size="xs" /></li>
+                  <li className="flex items-center gap-1.5 flex-wrap">Civil IDs <strong>not in system</strong> → created as new <strong>Applicant</strong> leads + <PucImportBadge size="xs" /></li>
+                  <li>Leads already in <strong>Applicant/Enrolled</strong> → skipped</li>
+                </ul>
+              </div>
 
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -305,12 +314,12 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
           {/* Importing Step */}
           {step === "importing" && (
             <div className="py-8 text-center">
-              <Loader2 className="w-12 h-12 mx-auto text-purple-500 animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 mx-auto text-amber-500 animate-spin mb-4" />
               <h3 className="font-medium text-[var(--text-primary)] mb-2">
-                Processing Import...
+                Processing PUC Import...
               </h3>
               <p className="text-sm text-[var(--text-secondary)]">
-                Matching records and enrolling students
+                Matching civil IDs and updating leads
               </p>
             </div>
           )}
@@ -326,81 +335,146 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                {/* Matched PUC Submission */}
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <ArrowRight className="w-5 h-5 text-emerald-600" />
                     <span className="font-medium text-emerald-700">
-                      {result.enrolled.length} Enrolled
+                      {result.matchedSubmission.length} Matched
                     </span>
                   </div>
+                  <p className="text-xs text-emerald-600 mt-0.5 ml-7">PUC Submission → Applicant</p>
                 </div>
 
+                {/* Type 2 from other stages */}
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <PucImportBadge size="sm" />
                     <span className="font-medium text-amber-700">
-                      {result.notFound.length} Not Found
+                      {result.matchedOtherStages.length} Type 2
                     </span>
                   </div>
+                  <p className="text-xs text-amber-600 mt-0.5 ml-7">Other stages → Applicant</p>
                 </div>
 
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-blue-600" />
-                    <span className="font-medium text-blue-700">
-                      {result.alreadyEnrolled.length} Already Enrolled
-                    </span>
+                {/* Created new */}
+                {result.createdNew.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-blue-600" />
+                      <span className="font-medium text-blue-700">
+                        {result.createdNew.length} Created
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-0.5 ml-7">New leads (Type 2)</p>
                   </div>
-                </div>
+                )}
 
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="w-5 h-5 text-red-600" />
-                    <span className="font-medium text-red-700">
-                      {result.errors.length} Errors
-                    </span>
+                {/* Skipped */}
+                {result.skipped.length > 0 && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <SkipForward className="w-5 h-5 text-gray-500" />
+                      <span className="font-medium text-gray-600">
+                        {result.skipped.length} Skipped
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 ml-7">Already in Applicant/Enrolled</p>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Enrolled List */}
-              {result.enrolled.length > 0 && (
+              {/* Matched PUC Submission List */}
+              {result.matchedSubmission.length > 0 && (
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-200">
                     <span className="text-sm font-medium text-emerald-700">
-                      Successfully Enrolled
+                      Matched PUC Submission → Applicant
                     </span>
                   </div>
                   <div className="max-h-32 overflow-y-auto">
-                    {result.enrolled.map((item, i) => (
-                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0">
+                    {result.matchedSubmission.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
                         <span className="text-[var(--text-primary)]">{item.name}</span>
-                        <span className="text-[var(--text-muted)] ml-2">
-                          (matched by {item.matchedBy})
-                        </span>
+                        <span className="text-[var(--text-muted)] font-mono text-xs">{item.civilId}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Not Found List */}
-              {result.notFound.length > 0 && (
+              {/* Type 2 from Other Stages */}
+              {result.matchedOtherStages.length > 0 && (
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-amber-50 border-b border-amber-200">
+                  <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-1.5">
+                    <PucImportBadge size="sm" />
                     <span className="text-sm font-medium text-amber-700">
-                      Not Found in System
+                      Type 2 - Moved from Other Stages
                     </span>
                   </div>
                   <div className="max-h-32 overflow-y-auto">
-                    {result.notFound.map((item, i) => (
-                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0">
-                        <span className="text-[var(--text-primary)]">
-                          {item.record.first_name} {item.record.last_name}
-                        </span>
-                        <span className="text-[var(--text-muted)] ml-2">
-                          {item.record.civil_id && `(${item.record.civil_id})`}
-                        </span>
+                    {result.matchedOtherStages.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-amber-500 text-xs">from {item.previousStage}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Created New */}
+              {result.createdNew.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 flex items-center gap-1.5">
+                    <PucImportBadge size="sm" />
+                    <span className="text-sm font-medium text-blue-700">
+                      New Leads Created (Type 2)
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {result.createdNew.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-[var(--text-muted)] font-mono text-xs">{item.civilId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Skipped */}
+              {result.skipped.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                    <span className="text-sm font-medium text-gray-600">
+                      Skipped (already in target stage)
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {result.skipped.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-gray-500 text-xs">{item.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Errors */}
+              {result.errors.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-red-50 border-b border-red-200">
+                    <span className="text-sm font-medium text-red-700">
+                      Errors ({result.errors.length})
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {result.errors.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-red-500 text-xs">{item.error}</span>
                       </div>
                     ))}
                   </div>
@@ -422,9 +496,9 @@ export function PUCImportDialog({ isOpen, onClose, onSuccess }: PUCImportDialogP
               <Button variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleImport} disabled={records.length === 0}>
+              <Button onClick={handleImport} disabled={records.length === 0} className="bg-amber-600 hover:bg-amber-700 text-white">
                 <Upload className="w-4 h-4 mr-2" />
-                Import {records.length} Records
+                Process {records.length} Records
               </Button>
             </>
           )}

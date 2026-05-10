@@ -26,8 +26,8 @@ import {
   CreditCard,
   BookOpen,
   XCircle,
-  Star,
 } from "lucide-react"
+import { PucImportBadge } from "./puc-import-badge"
 import { PIPELINE_STAGES, SCHOOLS, LEAD_SOURCES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, APPOINTMENT_TYPES, SUBMISSION_SUBSTAGES, SUBMISSION_STATUSES, SUBMISSION_BLOCKED_REASONS, GOVERNORATES, PUC_DOCUMENT_STATUSES, PLACEMENT_LEVELS, type PipelineStage, type LeadSource, type School, type LeadStatus, type AppointmentType, type SubmissionSubstage, type SubmissionStatus, type SubmissionBlockedReason, type AcademicTrack, type Governorate, type PUCDocumentStatus, type PlacementLevel } from "@/types"
 import { WITHDRAWAL_REASONS, COMPETITOR_OPTIONS, MILITARY_SECURITY_OPTIONS } from "@/lib/config/withdrawal-reasons"
 import { useActiveSources } from "@/lib/hooks/use-sources"
@@ -70,7 +70,7 @@ export interface LeadFilters {
   governorates: Governorate[]
   priority: "all" | "normal" | "important" | "critical"
   ministryAssigned: "all" | "assigned" | "not_assigned"
-  ministryFlagged: "all" | "flagged" | "not_flagged"
+  pucImportFlagged: "all" | "flagged" | "not_flagged"
   docStatuses: PUCDocumentStatus[]
   placementLevels: PlacementLevel[]
   campaignIds: string[]
@@ -116,7 +116,7 @@ const defaultFilters: LeadFilters = {
   governorates: [],
   priority: "all",
   ministryAssigned: "all",
-  ministryFlagged: "all",
+  pucImportFlagged: "all",
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
@@ -348,7 +348,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     (localFilters.paymentAmountMin > 0 || localFilters.paymentAmountMax < 5000 ? 1 : 0) +
     (localFilters.academicTrack !== "all" ? 1 : 0) +
     (localFilters.ministryAssigned !== "all" ? 1 : 0) +
-    (localFilters.ministryFlagged !== "all" ? 1 : 0) +
+    (localFilters.pucImportFlagged !== "all" ? 1 : 0) +
     localFilters.docStatuses.length +
     localFilters.placementLevels.length +
     localFilters.campaignIds.length +
@@ -983,26 +983,26 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                 </div>
               </FilterSection>
 
-              {/* Ministry Flagged Filter */}
+              {/* PUC Import Flagged Filter */}
               <FilterSection
-                title="Ministry File Star"
-                icon={<Star className="w-4 h-4" />}
-                isExpanded={expandedSections.includes("ministryFlagged")}
-                onToggle={() => toggleSection("ministryFlagged")}
-                count={localFilters.ministryFlagged !== "all" ? 1 : 0}
+                title="PUC Import 2"
+                icon={<PucImportBadge size="sm" />}
+                isExpanded={expandedSections.includes("pucImportFlagged")}
+                onToggle={() => toggleSection("pucImportFlagged")}
+                count={localFilters.pucImportFlagged !== "all" ? 1 : 0}
               >
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: "all", label: "All" },
-                    { value: "flagged", label: "Starred" },
-                    { value: "not_flagged", label: "Not Starred" },
+                    { value: "flagged", label: "Type 2" },
+                    { value: "not_flagged", label: "Not Type 2" },
                   ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => setLocalFilters(prev => ({ ...prev, ministryFlagged: option.value as LeadFilters["ministryFlagged"] }))}
+                      onClick={() => setLocalFilters(prev => ({ ...prev, pucImportFlagged: option.value as LeadFilters["pucImportFlagged"] }))}
                       className={cn(
                         "p-2.5 rounded-lg border text-sm text-center transition-all",
-                        localFilters.ministryFlagged === option.value
+                        localFilters.pucImportFlagged === option.value
                           ? option.value === "flagged"
                             ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400"
                             : "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"

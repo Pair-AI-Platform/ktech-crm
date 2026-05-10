@@ -77,7 +77,7 @@ const defaultFilters: LeadFilters = {
   governorates: [],
   priority: "all",
   ministryAssigned: "all",
-  ministryFlagged: "all",
+  pucImportFlagged: "all",
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],

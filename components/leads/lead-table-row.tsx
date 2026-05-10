@@ -20,9 +20,9 @@ import {
   CheckCircle2,
   Wand2,
   GraduationCap,
-  Star,
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
+import { PucImportBadge } from "./puc-import-badge"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import {
   PIPELINE_STAGES,
@@ -340,10 +340,8 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   )
                 })()}
                 <div className="flex items-center gap-1.5">
-                  {lead.ministry_flagged && (
-                    <SimpleTooltip content="Ministry file: not in PUC Submission stage">
-                      <Star className="w-4 h-4 text-amber-500 fill-amber-400 shrink-0" />
-                    </SimpleTooltip>
+                  {lead.puc_import_flagged && (
+                    <PucImportBadge size="sm" />
                   )}
                   {lead.ministry_assigned && (
                     <SimpleTooltip content="Ministry assigned (not 1st choice ktech)">

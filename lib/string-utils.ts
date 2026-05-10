@@ -1,7 +1,7 @@
 /**
  * Shared string utilities for name matching and normalization.
- * Used by ministry-import.ts, puc-import.ts, and other modules
- * that need Arabic-aware name comparison.
+ * Used by ministry-import.ts and other modules that need
+ * Arabic-aware name comparison.
  */
 
 /** Regex matching Arabic characters (Basic + Supplement + Extended-A) and whitespace. */

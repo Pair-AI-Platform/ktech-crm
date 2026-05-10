@@ -14,7 +14,6 @@ import {
   Sparkles,
   GraduationCap,
   BookOpen,
-  Star,
 } from "lucide-react"
 import { type PipelineStage, type Lead, type LeadStatus, PIPELINE_STAGES } from "@/types"
 import { useLeads, useLeadStats, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
@@ -25,7 +24,9 @@ import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/l
 import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { CSVImportModal } from "@/components/leads/csv-import-modal"
 import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
-import { MinistryFileDialog } from "@/components/leads/ministry-file-dialog"
+import { PucImportDialog } from "@/components/leads/puc-import-dialog"
+import { PucImportBadge } from "@/components/leads/puc-import-badge"
+import { EnrollFromListDialog } from "@/components/leads/enroll-from-list-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
 import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
@@ -67,7 +68,7 @@ const defaultFilters: LeadFilters = {
   governorates: [],
   priority: "all",
   ministryAssigned: "all",
-  ministryFlagged: "all",
+  pucImportFlagged: "all",
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
@@ -78,7 +79,7 @@ export default function LeadsPage() {
   const searchParams = useSearchParams()
   const searchParamsString = searchParams.toString()
   const router = useRouter()
-  const { profile } = useUser()
+  const { profile, isAdmin } = useUser()
   const { reasons: lostReasons } = useLostReasons()
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
@@ -95,7 +96,8 @@ export default function LeadsPage() {
 const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const [showRSVPModal, setShowRSVPModal] = useState(false)
   const [showMinistryImportModal, setShowMinistryImportModal] = useState(false)
-  const [showMinistryFileModal, setShowMinistryFileModal] = useState(false)
+  const [showPucImportModal, setShowPucImportModal] = useState(false)
+  const [showEnrollFromListModal, setShowEnrollFromListModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
@@ -247,7 +249,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     genders: filters.genders,
     governorates: filters.governorates,
     ministryAssigned: filters.ministryAssigned,
-    ministryFlagged: filters.ministryFlagged,
+    pucImportFlagged: filters.pucImportFlagged,
     docStatuses: filters.docStatuses,
     placementLevels: filters.placementLevels,
     campaignIds: filters.campaignIds,
@@ -502,12 +504,12 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     refetch()
   }
 
-  const handleMinistryFileSuccess = (matchedCount: number, flaggedCount: number, createdCount: number) => {
+  const handlePucImportSuccess = (matchedCount: number, flaggedCount: number, createdCount: number) => {
     const messages = []
     if (matchedCount > 0) messages.push(`${matchedCount} matched`)
-    if (flaggedCount > 0) messages.push(`${flaggedCount} flagged`)
+    if (flaggedCount > 0) messages.push(`${flaggedCount} Type 2`)
     if (createdCount > 0) messages.push(`${createdCount} created`)
-    setSuccessMessage(`Ministry file: ${messages.join(", ")} → Applicant`)
+    setSuccessMessage(`PUC Import: ${messages.join(", ")} → Applicant`)
     setShowSuccessToast(true)
     refetch()
   }
@@ -593,12 +595,24 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               variant="outline"
               size="sm"
               className="hidden sm:inline-flex items-center gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300"
-              onClick={() => setShowMinistryFileModal(true)}
-              title="Ministry File - Cross-reference with PUC Submission"
+              onClick={() => setShowPucImportModal(true)}
+              title="PUC Import - Cross-reference ministry acceptance list with PUC Submission"
             >
-              <Star className="w-3.5 h-3.5 fill-amber-400" />
-              <span className="text-xs font-medium">Ministry File</span>
+              <PucImportBadge size="xs" />
+              <span className="text-xs font-medium">PUC Import</span>
             </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:inline-flex items-center gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300"
+                onClick={() => setShowEnrollFromListModal(true)}
+                title="Enroll from List - Match civil IDs and move applicants to enrolled"
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Enroll from List</span>
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -812,11 +826,22 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         onSuccess={handleMinistryImportSuccess}
       />
 
-      {/* Ministry File Import Modal */}
-      <MinistryFileDialog
-        isOpen={showMinistryFileModal}
-        onClose={() => setShowMinistryFileModal(false)}
-        onSuccess={handleMinistryFileSuccess}
+      {/* PUC Import Modal */}
+      <PucImportDialog
+        isOpen={showPucImportModal}
+        onClose={() => setShowPucImportModal(false)}
+        onSuccess={handlePucImportSuccess}
+      />
+
+      {/* Enroll from List Modal */}
+      <EnrollFromListDialog
+        isOpen={showEnrollFromListModal}
+        onClose={() => setShowEnrollFromListModal(false)}
+        onSuccess={(count) => {
+          refetch()
+          setSuccessMessage(`Enrolled ${count} ${count === 1 ? "student" : "students"}`)
+          setShowSuccessToast(true)
+        }}
       />
 
       {/* PSP Transfer Modal */}

@@ -15,12 +15,29 @@ export interface MinistryRecord {
   grade_level?: string
 }
 
+export interface MinistryReviewCandidate {
+  id: string
+  full_name: string
+  civil_id?: string | null
+  school_name?: string | null
+  graduation_year?: number | null
+  seat_number?: string | null
+}
+
 export interface MinistryImportResult {
-  updated: { leadId: string; name: string; gpa: number; matchedBy: string }[]
-  created: { leadId: string; name: string; gpa: number }[]
+  updated: { leadId: string; name: string; gpa: number; matchedBy: 'civil_id' | 'fuzzy' }[]
+  created: { leadId: string; name: string; gpa: number; routedTo: 'puc' | 'self_funded' }[]
   notFound: { record: MinistryRecord; reason: string }[]
   alreadyHasGPA: { leadId: string; name: string; existingGPA: number; newGPA: number }[]
-  convertedToSelfFunded: { leadId: string; name: string; civilId: string; gpa: number; previousFundingType: 'puc' | 'self_funded' }[]
+  convertedToSelfFunded: {
+    leadId: string
+    name: string
+    civilId?: string
+    gpa: number
+    previousFundingType: 'puc' | 'self_funded'
+    stageRemapped?: { from: string; to: string }
+  }[]
+  needsReview: { record: MinistryRecord; candidates: MinistryReviewCandidate[] }[]
   errors: { record: MinistryRecord; error: string }[]
 }
 
@@ -277,12 +294,10 @@ export function validateMinistryRecords(records: MinistryRecord[]): {
   for (const record of records) {
     if (!record.first_name) {
       invalid.push({ record, reason: 'Missing name' })
-    } else if (!record.civil_id) {
-      // Civil ID is required for matching
-      invalid.push({ record, reason: 'Missing Civil ID - cannot match' })
     } else if (record.gpa < 0 || record.gpa > 100) {
       invalid.push({ record, reason: `Invalid GPA: ${record.gpa}` })
     } else {
+      // Records without civil_id are still valid — fuzzy matching attempted server-side
       valid.push(record)
     }
   }

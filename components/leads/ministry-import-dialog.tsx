@@ -32,6 +32,18 @@ import {
 } from "@/lib/ministry-import"
 import * as XLSX from "xlsx"
 
+const BATCH_SIZE = 500
+
+const emptyResult = (): MinistryImportResult => ({
+  updated: [],
+  created: [],
+  notFound: [],
+  alreadyHasGPA: [],
+  convertedToSelfFunded: [],
+  needsReview: [],
+  errors: [],
+})
+
 interface MinistryImportDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -46,6 +58,7 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
   const [records, setRecords] = useState<MinistryRecord[]>([])
   const [invalidRecords, setInvalidRecords] = useState<{ record: MinistryRecord; reason: string }[]>([])
   const [, setImporting] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
   const [result, setResult] = useState<MinistryImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [overwriteExisting, setOverwriteExisting] = useState(false)
@@ -76,12 +89,8 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
       const headers = (jsonData[0] as string[]).map(h => String(h || ""))
       const headerMap = createMinistryHeaderMap(headers)
 
-      // Check if we have minimum required columns
-      if (!headerMap.has("civil_id")) {
-        setError("Could not find Civil ID column. Please ensure your file has a 'Civil ID' column.")
-        return
-      }
-
+      // GPA is the only hard-required column. Civil ID is optional — when missing,
+      // server falls back to fuzzy matching by name + school + graduation year.
       if (!headerMap.has("gpa")) {
         setError("Could not find GPA column. Please ensure your file has a 'GPA' column.")
         return
@@ -131,29 +140,64 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
     setImporting(true)
     setStep("importing")
     setError(null)
+    setResult(null)
+
+    const batches: MinistryRecord[][] = []
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      batches.push(records.slice(i, i + BATCH_SIZE))
+    }
+    setBatchProgress({ current: 0, total: batches.length })
+
+    const aggregate = emptyResult()
 
     try {
-      const response = await fetch("/api/ministry-import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records, overwriteExisting }),
-      })
+      for (let i = 0; i < batches.length; i++) {
+        setBatchProgress({ current: i + 1, total: batches.length })
 
-      const data = await response.json()
+        const response = await fetch("/api/ministry-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ records: batches[i], overwriteExisting }),
+        })
 
-      if (!response.ok) {
-        throw new Error(data.error || "Import failed")
+        const data = await response.json()
+
+        if (response.status === 429) {
+          const retryAfter = Number(response.headers.get("Retry-After") || "30")
+          throw new Error(
+            `Rate limit hit on batch ${i + 1}/${batches.length}. Try again in ${retryAfter}s. ` +
+            `${aggregate.updated.length + aggregate.created.length} of ${records.length} records were processed before this batch.`
+          )
+        }
+        if (!response.ok) {
+          throw new Error(data.error || `Batch ${i + 1}/${batches.length} failed`)
+        }
+
+        const batchResult = data.result as MinistryImportResult
+        aggregate.updated.push(...batchResult.updated)
+        aggregate.created.push(...batchResult.created)
+        aggregate.notFound.push(...batchResult.notFound)
+        aggregate.alreadyHasGPA.push(...batchResult.alreadyHasGPA)
+        aggregate.convertedToSelfFunded.push(...batchResult.convertedToSelfFunded)
+        aggregate.needsReview.push(...batchResult.needsReview)
+        aggregate.errors.push(...batchResult.errors)
       }
 
-      setResult(data.result)
+      setResult(aggregate)
       setStep("complete")
 
-      if (data.result.updated.length > 0 || data.result.created.length > 0) {
-        onSuccess(data.result.updated.length, data.result.created.length)
+      if (aggregate.updated.length > 0 || aggregate.created.length > 0) {
+        onSuccess(aggregate.updated.length, aggregate.created.length)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed")
-      setStep("preview")
+      // Preserve any partial results so admin can see what landed
+      if (aggregate.updated.length || aggregate.created.length || aggregate.errors.length) {
+        setResult(aggregate)
+        setStep("complete")
+      } else {
+        setStep("preview")
+      }
     } finally {
       setImporting(false)
     }
@@ -167,6 +211,7 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
     setResult(null)
     setError(null)
     setOverwriteExisting(false)
+    setBatchProgress(null)
     onClose()
   }
 
@@ -209,7 +254,7 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                   Drag & drop or click to select an Excel file (.xlsx)
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Required: Civil ID, GPA. Optional: Name, School, Seat Number, Track, Education Type, Graduation Year
+                  Required: GPA. Recommended: Civil ID, Name, School, Graduation Year, Seat Number, Track, Education Type
                 </p>
               </div>
 
@@ -233,10 +278,11 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
 
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700">
-                  <strong>How it works:</strong> Leads are matched by Civil ID.
-                  Matching leads get their GPA, seat number, school, track, and other fields updated.
-                  Matches with GPA below 70% are automatically moved to Self-Funded.
-                  Unmatched records create new leads in the New stage. Schools are auto-matched from the database.
+                  <strong>How it works:</strong> Leads are matched by Civil ID first, then by name + school + graduation year as a fuzzy fallback.
+                  Existing leads get their GPA, seat number, school, track, and other fields updated.
+                  Existing PUC leads with GPA below 70% are demoted to Self-Funded (PUC-only stages remap to the File stage).
+                  Unmatched records create new leads in the New stage — routed to PUC if GPA ≥ 70, Self-Funded if &lt; 70.
+                  Records that fuzzy-match 2 or more leads are flagged for manual review and not auto-updated.
                 </p>
               </div>
             </div>
@@ -347,7 +393,7 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm text-amber-700">
                     <AlertTriangle className="w-4 h-4 inline mr-1" />
-                    {invalidRecords.length} records skipped (missing Civil ID or invalid GPA)
+                    {invalidRecords.length} records skipped (missing name or invalid GPA)
                   </p>
                 </div>
               )}
@@ -368,9 +414,27 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
               <h3 className="font-medium text-[var(--text-primary)] mb-2">
                 Processing Import...
               </h3>
-              <p className="text-sm text-[var(--text-secondary)]">
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
                 Matching records and updating GPAs
               </p>
+              {batchProgress && batchProgress.total > 1 && (
+                <div className="max-w-sm mx-auto">
+                  <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1">
+                    <span>Batch {batchProgress.current} of {batchProgress.total}</span>
+                    <span>{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 transition-all duration-300"
+                      style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] mt-2">
+                    Processing {records.length.toLocaleString()} records in batches of {BATCH_SIZE}.
+                    This can take a few minutes for large imports.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -392,6 +456,13 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                       {result.updated.length} Updated
                     </span>
                   </div>
+                  {result.updated.some(u => u.matchedBy === 'fuzzy') && (
+                    <div className="text-xs text-emerald-700/80 mt-1 ml-7">
+                      {result.updated.filter(u => u.matchedBy === 'civil_id').length} by Civil ID
+                      {' · '}
+                      {result.updated.filter(u => u.matchedBy === 'fuzzy').length} by name + school
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -401,6 +472,13 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                       {result.created.length} Created
                     </span>
                   </div>
+                  {result.created.length > 0 && (
+                    <div className="text-xs text-blue-700/80 mt-1 ml-7">
+                      {result.created.filter(c => c.routedTo === 'puc').length} → PUC
+                      {' · '}
+                      {result.created.filter(c => c.routedTo === 'self_funded').length} → Self-Funded
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -426,7 +504,23 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-purple-600" />
                       <span className="font-medium text-purple-700">
-                        {result.convertedToSelfFunded.length} Moved to Self-Funded (GPA &lt; 70)
+                        {result.convertedToSelfFunded.length} Demoted to Self-Funded (GPA &lt; 70)
+                      </span>
+                    </div>
+                    {result.convertedToSelfFunded.some(c => c.stageRemapped) && (
+                      <div className="text-xs text-purple-700/80 mt-1 ml-7">
+                        {result.convertedToSelfFunded.filter(c => c.stageRemapped).length} had PUC-only stages remapped to File
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {result.needsReview.length > 0 && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg col-span-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-orange-600" />
+                      <span className="font-medium text-orange-700">
+                        {result.needsReview.length} Needs Manual Review (ambiguous matches)
                       </span>
                     </div>
                   </div>
@@ -443,9 +537,16 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                   </div>
                   <div className="max-h-32 overflow-y-auto">
                     {result.updated.map((item, i) => (
-                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
-                        <span className="text-[var(--text-primary)]">{item.name}</span>
-                        <span className="text-emerald-600 font-medium">{item.gpa}%</span>
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex items-center justify-between gap-2">
+                        <span className="text-[var(--text-primary)] truncate">{item.name}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {item.matchedBy === 'fuzzy' && (
+                            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
+                              fuzzy
+                            </span>
+                          )}
+                          <span className="text-emerald-600 font-medium">{item.gpa}%</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -462,9 +563,21 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                   </div>
                   <div className="max-h-32 overflow-y-auto">
                     {result.created.map((item, i) => (
-                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
-                        <span className="text-[var(--text-primary)]">{item.name}</span>
-                        <span className="text-emerald-600 font-medium">{item.gpa}%</span>
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex items-center justify-between gap-2">
+                        <span className="text-[var(--text-primary)] truncate">{item.name}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={cn(
+                              "text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium",
+                              item.routedTo === 'puc'
+                                ? "bg-indigo-100 text-indigo-700"
+                                : "bg-purple-100 text-purple-700"
+                            )}
+                          >
+                            {item.routedTo === 'puc' ? 'PUC' : 'Self-Funded'}
+                          </span>
+                          <span className="text-emerald-600 font-medium">{item.gpa}%</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -492,19 +605,69 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                 </div>
               )}
 
-              {/* Moved to Self-Funded List */}
+              {/* Demoted to Self-Funded List */}
               {result.convertedToSelfFunded.length > 0 && (
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-purple-50 border-b border-purple-200">
                     <span className="text-sm font-medium text-purple-700">
-                      Moved to Self-Funded
+                      Demoted to Self-Funded
                     </span>
                   </div>
                   <div className="max-h-32 overflow-y-auto">
                     {result.convertedToSelfFunded.map((item, i) => (
-                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
-                        <span className="text-[var(--text-primary)]">{item.name}</span>
-                        <span className="text-purple-600 font-medium">{item.gpa}%</span>
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex items-center justify-between gap-2">
+                        <span className="text-[var(--text-primary)] truncate">{item.name}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {item.stageRemapped && (
+                            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">
+                              {item.stageRemapped.from} → {item.stageRemapped.to}
+                            </span>
+                          )}
+                          <span className="text-purple-600 font-medium">{item.gpa}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Needs Manual Review List */}
+              {result.needsReview.length > 0 && (
+                <div className="border border-orange-200 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-orange-50 border-b border-orange-200">
+                    <span className="text-sm font-medium text-orange-700">
+                      Needs Manual Review
+                    </span>
+                    <p className="text-xs text-orange-700/80 mt-0.5">
+                      These records matched 2 or more existing leads — search and link them by hand.
+                    </p>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-orange-100">
+                    {result.needsReview.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-[var(--text-primary)] truncate">
+                            {item.record.first_name} {item.record.last_name}
+                          </span>
+                          <span className="shrink-0 text-emerald-600 font-medium">
+                            {item.record.gpa}%
+                          </span>
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                          {item.record.school_name && <span>School: {item.record.school_name} · </span>}
+                          {item.record.civil_id && <span>Civil ID: {item.record.civil_id} · </span>}
+                          {item.record.graduation_year && <span>Year: {item.record.graduation_year} · </span>}
+                          {item.candidates.length} candidates
+                        </div>
+                        <div className="mt-1 ml-2 text-xs space-y-0.5">
+                          {item.candidates.map((c) => (
+                            <div key={c.id} className="text-[var(--text-secondary)]">
+                              ↳ <span className="font-medium">{c.full_name}</span>
+                              {c.civil_id && <span className="text-[var(--text-muted)]"> · {c.civil_id}</span>}
+                              {c.graduation_year && <span className="text-[var(--text-muted)]"> · {c.graduation_year}</span>}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>

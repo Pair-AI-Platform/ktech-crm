@@ -404,7 +404,7 @@ export interface Lead {
   // Ministry Submission Block
   ministry_blocked?: boolean
   ministry_block_reasons?: MinistryBlockReason[]
-  ministry_flagged?: boolean
+  puc_import_flagged?: boolean
 
   // PUC Choice (from ministry acceptance import)
   puc_choice?: '1' | '2' | '3' | '4' | null

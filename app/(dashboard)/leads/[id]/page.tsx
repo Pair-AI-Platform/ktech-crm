@@ -73,6 +73,7 @@ import { LeadDocuments } from "@/components/leads/lead-documents"
 import { SFDocumentManager } from "@/components/leads/sf-document-manager"
 import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
+import { PucImportBadge } from "@/components/leads/puc-import-badge"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { SendPspSelfServiceDialog } from "@/components/leads/send-psp-self-service-dialog"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
@@ -841,11 +842,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           Ministry Assigned
                         </span>
                       )}
-                      {lead.ministry_flagged && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/25">
-                          <Star className="w-3.5 h-3.5 fill-amber-400" />
-                          Ministry File
-                        </span>
+                      {lead.puc_import_flagged && (
+                        <PucImportBadge size="md" showLabel />
                       )}
                       {lead.source && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold tracking-wide rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 ring-1 ring-teal-500/25">

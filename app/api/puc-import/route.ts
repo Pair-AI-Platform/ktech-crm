@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { MinistryFileRecord, MinistryFileResult } from "@/lib/ministry-file-import"
+import type { PucImportRecord, PucImportResult } from "@/lib/puc-import"
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { records } = body as { records: MinistryFileRecord[] }
+    const { records } = body as { records: PucImportRecord[] }
 
     const MAX_RECORDS = 2000
     if (!Array.isArray(records) || records.length === 0) {
@@ -43,11 +43,11 @@ export async function POST(request: NextRequest) {
     // Fetch ALL leads with matching civil IDs (any stage)
     const { data: existingLeads, error: leadsError } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, first_name_ar, last_name_ar, civil_id, pipeline_stage, position_in_stage, ministry_flagged")
+      .select("id, first_name, last_name, first_name_ar, last_name_ar, civil_id, pipeline_stage, position_in_stage, puc_import_flagged")
       .in("civil_id", civilIds)
 
     if (leadsError) {
-      console.error("[Ministry File] Failed to fetch leads:", leadsError)
+      console.error("[PUC Import] Failed to fetch leads:", leadsError)
       return NextResponse.json({ error: "Failed to fetch existing leads" }, { status: 500 })
     }
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single()
 
-    const result: MinistryFileResult = {
+    const result: PucImportResult = {
       matchedSubmission: [],
       matchedOtherStages: [],
       createdNew: [],
@@ -116,13 +116,13 @@ export async function POST(request: NextRequest) {
           }
 
           if (lead.pipeline_stage === "puc_application_submission") {
-            // ── MATCHED IN PUC SUBMISSION → move to applicant (NO star) ──
+            // ── MATCHED IN PUC SUBMISSION → move to applicant (no "2" badge) ──
             const { error: updateError } = await supabase
               .from("leads")
               .update({
                 pipeline_stage: "applicant",
                 position_in_stage: nextApplicantPosition,
-                ministry_flagged: false,
+                puc_import_flagged: false,
                 status: null,
               })
               .eq("id", lead.id)
@@ -137,13 +137,13 @@ export async function POST(request: NextRequest) {
             activities.push({
               lead_id: lead.id,
               activity_type: "stage_change",
-              title: "Ministry File → Applicant",
-              description: `Matched ministry file. Moved from PUC Application Submission to Applicant.`,
+              title: "PUC Import → Applicant",
+              description: `Matched PUC import. Moved from PUC Application Submission to Applicant.`,
               metadata: {
                 old_stage: "puc_application_submission",
                 new_stage: "applicant",
-                source: "ministry_file_import",
-                ministry_flagged: false,
+                source: "puc_import",
+                puc_import_flagged: false,
               },
               created_by: user.id,
             })
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
               civilId: record.civil_id,
             })
           } else {
-            // ── IN ANOTHER STAGE → move to applicant + FLAG with star ──
+            // ── IN ANOTHER STAGE → move to applicant + flag with "2" badge ──
             const previousStage = lead.pipeline_stage
 
             const { error: updateError } = await supabase
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
               .update({
                 pipeline_stage: "applicant",
                 position_in_stage: nextApplicantPosition,
-                ministry_flagged: true,
+                puc_import_flagged: true,
                 status: null,
                 // Clear lost fields if moving from lost
                 ...(lead.pipeline_stage === "lost" ? {
@@ -183,13 +183,13 @@ export async function POST(request: NextRequest) {
             activities.push({
               lead_id: lead.id,
               activity_type: "stage_change",
-              title: "Ministry File → Applicant (Flagged)",
-              description: `Found in ministry file but was in "${previousStage}" stage (not PUC Submission). Moved to Applicant and flagged for review.`,
+              title: "PUC Import → Applicant (Type 2)",
+              description: `Found in PUC import list but was in "${previousStage}" stage (not PUC Submission). Moved to Applicant and flagged Type 2.`,
               metadata: {
                 old_stage: previousStage,
                 new_stage: "applicant",
-                source: "ministry_file_import",
-                ministry_flagged: true,
+                source: "puc_import",
+                puc_import_flagged: true,
               },
               created_by: user.id,
             })
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
             })
           }
         } else {
-          // ── NEW STUDENT (not in system at all) → create + FLAG with star ──
+          // ── NEW STUDENT (not in system at all) → create + flag with "2" badge ──
           const nameParts = (record.student_name || "").split(/\s+/)
           const firstName = nameParts[0] || "Unknown"
           const lastName = nameParts.slice(1).join(" ") || ""
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
               phone: "",
               pipeline_stage: "applicant",
               position_in_stage: nextApplicantPosition,
-              ministry_flagged: true,
+              puc_import_flagged: true,
               source: "gpa_lists",
               source_category: "outreach",
               ...(activeSemester && { semester_id: activeSemester.id }),
@@ -238,11 +238,11 @@ export async function POST(request: NextRequest) {
           activities.push({
             lead_id: newLead.id,
             activity_type: "lead_created",
-            title: "New Lead from Ministry File (Flagged)",
-            description: `New lead created from ministry file. Not previously in system. Flagged for review.`,
+            title: "New Lead from PUC Import (Type 2)",
+            description: `New lead created from PUC import. Not previously in system. Flagged Type 2.`,
             metadata: {
-              source: "ministry_file_import",
-              ministry_flagged: true,
+              source: "puc_import",
+              puc_import_flagged: true,
             },
             created_by: user.id,
           })
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: unknown) {
-    console.error("[Ministry File] Error:", error)
-    return NextResponse.json({ error: "Failed to process ministry file import" }, { status: 500 })
+    console.error("[PUC Import] Error:", error)
+    return NextResponse.json({ error: "Failed to process PUC import" }, { status: 500 })
   }
 }

@@ -32,8 +32,6 @@ import {
   GraduationCap,
 } from "lucide-react"
 import { MinistryAcceptanceDialog } from "@/components/leads/ministry-acceptance-dialog"
-import { PUCImportDialog } from "@/components/leads/puc-import-dialog"
-import { Upload } from "lucide-react"
 
 type TopTab = "puc" | "sf_srj" | "self_fund"
 
@@ -89,7 +87,7 @@ const defaultFilters: LeadFilters = {
   governorates: [],
   priority: "all",
   ministryAssigned: "all",
-  ministryFlagged: "all",
+  pucImportFlagged: "all",
   docStatuses: [],
   placementLevels: [],
   campaignIds: [],
@@ -150,7 +148,6 @@ export default function PUCSRJPage() {
   const [showSuccessToast, setShowSuccessToast] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showAcceptanceDialog, setShowAcceptanceDialog] = useState(false)
-  const [showPUCImportModal, setShowPUCImportModal] = useState(false)
 
   const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
 
@@ -631,20 +628,6 @@ export default function PUCSRJPage() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* PUC Import - only on PUC tab, admin only */}
-            {topTab === "puc" && profile?.role === "admin" && (
-              <SimpleTooltip content="Import PUC List" side="bottom">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowPUCImportModal(true)}
-                  className="text-[var(--text-muted)]"
-                >
-                  <Upload className="w-4 h-4 mr-1.5" />
-                  <span className="hidden sm:inline">PUC Import</span>
-                </Button>
-              </SimpleTooltip>
-            )}
             {/* Ministry Acceptance Upload - only on PUC tab */}
             {topTab === "puc" && profile?.role === "admin" && (
               <SimpleTooltip content="Ministry Acceptance Import" side="bottom">
@@ -938,17 +921,6 @@ export default function PUCSRJPage() {
           }}
         />
       )}
-
-      {/* PUC Import Dialog */}
-      <PUCImportDialog
-        isOpen={showPUCImportModal}
-        onClose={() => setShowPUCImportModal(false)}
-        onSuccess={(count) => {
-          setSuccessMessage(`${count} PUC leads imported successfully`)
-          setShowSuccessToast(true)
-          refetch()
-        }}
-      />
 
       {/* Ministry Acceptance Import Dialog */}
       <MinistryAcceptanceDialog
