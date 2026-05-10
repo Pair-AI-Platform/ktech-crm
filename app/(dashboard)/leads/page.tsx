@@ -24,9 +24,7 @@ import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
 import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
 import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { CSVImportModal } from "@/components/leads/csv-import-modal"
-import { PUCImportDialog } from "@/components/leads/puc-import-dialog"
 import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
-import { EnrollFromListDialog } from "@/components/leads/enroll-from-list-dialog"
 import { MinistryFileDialog } from "@/components/leads/ministry-file-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
@@ -93,12 +91,10 @@ export default function LeadsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showLostModal, setShowLostModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [showPUCImportModal, setShowPUCImportModal] = useState(false)
   const [showPSPTransferModal, setShowPSPTransferModal] = useState(false)
 const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const [showRSVPModal, setShowRSVPModal] = useState(false)
   const [showMinistryImportModal, setShowMinistryImportModal] = useState(false)
-  const [showEnrollFromListModal, setShowEnrollFromListModal] = useState(false)
   const [showMinistryFileModal, setShowMinistryFileModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
@@ -489,12 +485,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     refetch()
   }
 
-  const handlePUCImportSuccess = (count: number) => {
-    setSuccessMessage(`${count} PUC student${count !== 1 ? "s" : ""} enrolled successfully`)
-    setShowSuccessToast(true)
-    refetch()
-  }
-
   const handleMOEFetchSuccess = () => {
     setShowMOEFetchModal(false)
     setSelectedLeads([])
@@ -590,15 +580,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               <Upload className="w-4 h-4" />
             </Button>
             <Button
-              variant="ghost"
-              size="icon"
-              className="hidden sm:inline-flex text-[var(--text-muted)]"
-              onClick={() => setShowPUCImportModal(true)}
-              title="Import PUC List"
-            >
-              <GraduationCap className="w-4 h-4" />
-            </Button>
-            <Button
               variant="outline"
               size="sm"
               className="hidden sm:inline-flex items-center gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
@@ -607,16 +588,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             >
               <BookOpen className="w-3.5 h-3.5" />
               <span className="text-xs font-medium">Ministry Import</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden sm:inline-flex items-center gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300"
-              onClick={() => setShowEnrollFromListModal(true)}
-              title="Enroll Applicants from List"
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span className="text-xs font-medium">Enroll from List</span>
             </Button>
             <Button
               variant="outline"
@@ -834,29 +805,11 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
         onSuccess={handleImportSuccess}
       />
 
-      {/* PUC Import Modal */}
-      <PUCImportDialog
-        isOpen={showPUCImportModal}
-        onClose={() => setShowPUCImportModal(false)}
-        onSuccess={handlePUCImportSuccess}
-      />
-
       {/* Ministry GPA Import Modal */}
       <MinistryImportDialog
         isOpen={showMinistryImportModal}
         onClose={() => setShowMinistryImportModal(false)}
         onSuccess={handleMinistryImportSuccess}
-      />
-
-      {/* Enroll from List Modal */}
-      <EnrollFromListDialog
-        isOpen={showEnrollFromListModal}
-        onClose={() => setShowEnrollFromListModal(false)}
-        onSuccess={(count) => {
-          setSuccessMessage(`${count} lead${count !== 1 ? "s" : ""} moved to Enrolled`)
-          setShowSuccessToast(true)
-          refetch()
-        }}
       />
 
       {/* Ministry File Import Modal */}
