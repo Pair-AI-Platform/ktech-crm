@@ -20,6 +20,7 @@ export interface MinistryImportResult {
   created: { leadId: string; name: string; gpa: number }[]
   notFound: { record: MinistryRecord; reason: string }[]
   alreadyHasGPA: { leadId: string; name: string; existingGPA: number; newGPA: number }[]
+  convertedToSelfFunded: { leadId: string; name: string; civilId: string; gpa: number; previousFundingType: 'puc' | 'self_funded' }[]
   errors: { record: MinistryRecord; error: string }[]
 }
 

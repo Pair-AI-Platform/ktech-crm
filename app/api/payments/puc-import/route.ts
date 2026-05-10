@@ -52,7 +52,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch all leads in application stage with PUC funding
+    // Fetch all PUC leads regardless of stage. The ministry acceptance list
+    // overrides any prior stage decision (including lost/withdraw), so we
+    // match across the entire PUC universe and let convert_lead_to_student
+    // skip its application-stage guard via skipStageCheck.
     const { data: eligibleLeads, error: leadsError } = await supabase
       .from("leads")
       .select(`
@@ -68,8 +71,8 @@ export async function POST(request: NextRequest) {
         school_name_custom,
         school:schools(id, name_en, name_ar)
       `)
-      .eq("pipeline_stage", "application")
       .eq("funding_type", "puc")
+      .neq("pipeline_stage", "enrolled")
 
     if (leadsError) {
       console.error("[PUC Import] Failed to fetch leads:", leadsError)
@@ -203,7 +206,7 @@ export async function POST(request: NextRequest) {
           result.notFound.push({
             record,
             reason: record.civil_id
-              ? "No lead found with this civil ID in application stage"
+              ? "No lead found with this civil ID in PUC funding"
               : "No matching lead found by name/school"
           })
           continue
@@ -234,11 +237,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Convert lead to student. PUC fee is symbolic (matches finance webhook).
+        // skipStageCheck=true so ministry acceptance overrides any prior stage
+        // (lost/withdraw/document_submission/etc.) — the existing-student check
+        // inside the RPC still prevents double conversion.
         const conversionResult = await convertLeadToStudent(supabase, {
           leadId: matchedLead.id,
           transactionId: transaction.id,
           amountPaid: PUC_FEE_AMOUNT,
           userId: user.id,
+          skipStageCheck: true,
         })
 
         if (!conversionResult.success) {

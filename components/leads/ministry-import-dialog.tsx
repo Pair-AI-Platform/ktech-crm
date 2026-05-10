@@ -235,7 +235,8 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                 <p className="text-sm text-blue-700">
                   <strong>How it works:</strong> Leads are matched by Civil ID.
                   Matching leads get their GPA, seat number, school, track, and other fields updated.
-                  Unmatched records create new leads. Schools are auto-matched from the database.
+                  Matches with GPA below 70% are automatically moved to Self-Funded.
+                  Unmatched records create new leads in the New stage. Schools are auto-matched from the database.
                 </p>
               </div>
             </div>
@@ -419,6 +420,17 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                     </span>
                   </div>
                 </div>
+
+                {result.convertedToSelfFunded.length > 0 && (
+                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg col-span-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-purple-600" />
+                      <span className="font-medium text-purple-700">
+                        {result.convertedToSelfFunded.length} Moved to Self-Funded (GPA &lt; 70)
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Updated List */}
@@ -474,6 +486,25 @@ export function MinistryImportDialog({ isOpen, onClose, onSuccess }: MinistryImp
                         <span className="text-[var(--text-muted)]">
                           Existing: {item.existingGPA}% | New: {item.newGPA}%
                         </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Moved to Self-Funded List */}
+              {result.convertedToSelfFunded.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-purple-50 border-b border-purple-200">
+                    <span className="text-sm font-medium text-purple-700">
+                      Moved to Self-Funded
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {result.convertedToSelfFunded.map((item, i) => (
+                      <div key={i} className="px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 flex justify-between">
+                        <span className="text-[var(--text-primary)]">{item.name}</span>
+                        <span className="text-purple-600 font-medium">{item.gpa}%</span>
                       </div>
                     ))}
                   </div>

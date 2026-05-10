@@ -15,6 +15,10 @@ export interface ConversionParams {
   transactionId: string
   amountPaid: number
   userId?: string // The user performing the conversion
+  // Bulk PUC import sets this to TRUE so the ministry acceptance list can
+  // enroll a lead from any stage (lost/withdraw/etc.). Cash and online
+  // payment flows leave it FALSE so the application-stage guard still applies.
+  skipStageCheck?: boolean
 }
 
 // Convert a lead to a student after payment (atomic via PostgreSQL RPC)
@@ -22,7 +26,7 @@ export async function convertLeadToStudent(
   supabase: SupabaseClient,
   params: ConversionParams
 ): Promise<ConversionResult> {
-  const { leadId, transactionId, amountPaid, userId } = params
+  const { leadId, transactionId, amountPaid, userId, skipStageCheck } = params
 
   try {
     const { data, error } = await supabase.rpc('convert_lead_to_student', {
@@ -30,6 +34,7 @@ export async function convertLeadToStudent(
       p_transaction_id: transactionId,
       p_amount_paid: amountPaid,
       p_user_id: userId || null,
+      p_skip_stage_check: skipStageCheck ?? false,
     })
 
     if (error) {

@@ -5,6 +5,7 @@ import {
   type MinistryImportResult,
 } from "@/lib/ministry-import"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
         phone,
         actual_gpa,
         gpa_grade_12_expected,
+        funding_type,
         school_id,
         school_name_custom,
         seat_number,
@@ -129,6 +131,7 @@ export async function POST(request: NextRequest) {
       created: [],
       notFound: [],
       alreadyHasGPA: [],
+      convertedToSelfFunded: [],
       errors: [],
     }
 
@@ -229,9 +232,44 @@ export async function POST(request: NextRequest) {
             gpa: record.gpa,
             matchedBy: "civil_id",
           })
+
+          // GPA threshold: auto-move PUC leads to self-funded when GPA < 70
+          if (record.gpa < GPA_SELF_FUNDED_THRESHOLD && existingLead.funding_type === "puc") {
+            const { error: fundingError } = await supabase
+              .from("leads")
+              .update({ funding_type: "self_funded" })
+              .eq("id", existingLead.id)
+
+            if (fundingError) {
+              console.error("[Ministry Import] Failed to convert to self-funded:", fundingError)
+            } else {
+              await supabase.from("activities").insert({
+                lead_id: existingLead.id,
+                activity_type: "funding_change",
+                title: "Converted to Self-Funded",
+                description: `Automatically converted from PUC to Self-Funded due to GPA ${record.gpa}% (below ${GPA_SELF_FUNDED_THRESHOLD}%). Source: Ministry GPA import.`,
+                metadata: {
+                  old_funding_type: "puc",
+                  new_funding_type: "self_funded",
+                  gpa: record.gpa,
+                  source: "ministry_import",
+                },
+                created_by: user.id,
+              })
+
+              result.convertedToSelfFunded.push({
+                leadId: existingLead.id,
+                name: `${existingLead.first_name} ${existingLead.last_name}`,
+                civilId: record.civil_id,
+                gpa: record.gpa,
+                previousFundingType: "puc",
+              })
+            }
+          }
         } else {
           // Lead doesn't exist - create new lead
           const matchedSchoolId = matchSchool(record.school_name)
+          const isLowGpa = record.gpa < GPA_SELF_FUNDED_THRESHOLD
           const { data: newLead, error: createError } = await supabase
             .from("leads")
             .insert({
@@ -249,6 +287,7 @@ export async function POST(request: NextRequest) {
               pipeline_stage: "new",
               grade_level: record.grade_level || "12th",
               phone: "", // Required field - will need to be filled later
+              ...(isLowGpa && { funding_type: "self_funded" }),
               ...(record.seat_number && { seat_number: record.seat_number }),
               ...(record.academic_track && { academic_track: record.academic_track }),
               ...(record.education_type && { education_type: record.education_type }),
@@ -274,6 +313,7 @@ export async function POST(request: NextRequest) {
               gpa: record.gpa,
               source: "ministry_import",
               school_name: record.school_name,
+              ...(isLowGpa && { funding_type: "self_funded", reason: "gpa_below_70" }),
             },
             created_by: user.id,
           })
@@ -283,6 +323,16 @@ export async function POST(request: NextRequest) {
             name: `${record.first_name} ${record.last_name || ""}`.trim(),
             gpa: record.gpa,
           })
+
+          if (isLowGpa) {
+            result.convertedToSelfFunded.push({
+              leadId: newLead.id,
+              name: `${record.first_name} ${record.last_name || ""}`.trim(),
+              civilId: record.civil_id,
+              gpa: record.gpa,
+              previousFundingType: "self_funded",
+            })
+          }
         }
       } catch (error) {
         console.error("[Ministry Import] Error processing record:", error)
@@ -301,6 +351,7 @@ export async function POST(request: NextRequest) {
         updated: result.updated.length,
         created: result.created.length,
         alreadyHasGPA: result.alreadyHasGPA.length,
+        convertedToSelfFunded: result.convertedToSelfFunded.length,
         errors: result.errors.length,
       },
     })
