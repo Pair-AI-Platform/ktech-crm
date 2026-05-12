@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { convertLeadToStudent, promoteSFLeadToApplicant } from '@/lib/enrollment/convert-lead'
 import { getPaymentStatus, verifyWebhookSignature } from '@/lib/myfatoorah/client'
-import { ENROLLMENT_PAYMENT_AMOUNT } from '@/types'
-import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
+import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT, TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { createLogger } from '@/lib/logger'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 
@@ -241,58 +240,131 @@ async function processEnrollmentInvoice(
         .eq('id', transaction.lead_id)
         .single()
 
-      const isSFInApplication =
-        lead?.funding_type === 'self_funded' &&
-        lead?.pipeline_stage === 'application'
+      const isSF = lead?.funding_type === 'self_funded'
 
-      if (isSFInApplication) {
-        const sfResult = await promoteSFLeadToApplicant(supabase, {
-          leadId: transaction.lead_id,
-          transactionId: transaction.id,
-          amountPaid: ENROLLMENT_PAYMENT_AMOUNT,
+      if (isSF) {
+        // Mark the transaction completed first so it's counted in the running
+        // tuition total below.
+        await supabase
+          .from('payment_transactions')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', transaction.id)
+
+        const { data: completedPayments } = await supabase
+          .from('payment_transactions')
+          .select('amount')
+          .eq('lead_id', transaction.lead_id)
+          .eq('status', 'completed')
+        const totalPaid = (completedPayments ?? []).reduce(
+          (sum, row) => sum + Number(row.amount || 0),
+          0,
+        )
+        const txAmount = Number(transaction.amount || 0)
+
+        await supabase.from('activities').insert({
+          lead_id: transaction.lead_id,
+          activity_type: 'payment_received',
+          title: 'Online Payment Received',
+          description: `Online payment of ${txAmount} KWD received via MyFatoorah. Total ${totalPaid}/${FULL_TUITION_AMOUNT} KWD.`,
+          metadata: {
+            transaction_id: transaction.id,
+            payment_method: 'myfatoorah',
+            amount: txAmount,
+            invoice_id: invoiceId,
+            payment_id: statusResult.paymentId,
+            total_paid: totalPaid,
+            remaining: Math.max(0, FULL_TUITION_AMOUNT - totalPaid),
+          },
         })
 
-        if (!sfResult.success) {
-          logger.error('CRITICAL: SF promotion failed after payment', {
+        if (totalPaid >= FULL_TUITION_AMOUNT) {
+          // Full tuition reached → enroll.
+          const result = await convertLeadToStudent(supabase, {
             leadId: transaction.lead_id,
-            error: sfResult.error,
+            transactionId: transaction.id,
+            amountPaid: totalPaid,
           })
 
-          await supabase
-            .from('payment_transactions')
-            .update({
-              status: 'completed',
-              notes: `SF_PROMOTION_FAILED: Payment successful but SF promotion failed: ${sfResult.error}`,
-              completed_at: new Date().toISOString(),
+          if (!result.success) {
+            logger.error('CRITICAL: SF enrollment failed after final payment', {
+              leadId: transaction.lead_id,
+              error: result.error,
             })
-            .eq('id', transaction.id)
+            await supabase.from('activities').insert({
+              lead_id: transaction.lead_id,
+              activity_type: 'enrollment_failed',
+              title: 'SF Enrollment Failed After Final Payment',
+              description: `CRITICAL: SF lead reached ${totalPaid} KWD paid but enrollment conversion failed: ${result.error}. Manual intervention required.`,
+              metadata: {
+                transaction_id: transaction.id,
+                payment_method: 'myfatoorah',
+                amount: txAmount,
+                total_paid: totalPaid,
+                invoice_id: invoiceId,
+                error: result.error,
+                requires_manual_intervention: true,
+              },
+            })
+            return NextResponse.json({
+              success: true,
+              message: 'Payment recorded but SF enrollment failed — flagged for admin review',
+              error: result.error,
+            })
+          }
 
-          await supabase.from('activities').insert({
-            lead_id: transaction.lead_id,
-            activity_type: 'enrollment_failed',
-            title: 'SF Promotion Failed After Payment',
-            description: `CRITICAL: Payment of ${ENROLLMENT_PAYMENT_AMOUNT} KWD succeeded but SF lead promotion failed: ${sfResult.error}. Manual intervention required.`,
-            metadata: {
-              transaction_id: transaction.id,
-              payment_method: 'myfatoorah',
-              amount: ENROLLMENT_PAYMENT_AMOUNT,
-              invoice_id: invoiceId,
-              error: sfResult.error,
-              requires_manual_intervention: true,
-            },
-          })
-
+          logger.info('SF lead fully paid and enrolled', { leadId: transaction.lead_id, totalPaid })
           return NextResponse.json({
             success: true,
-            message: 'Payment recorded but SF promotion failed — flagged for admin review',
-            error: sfResult.error,
+            message: 'Payment processed — SF lead fully paid and enrolled',
+            studentId: result.student?.id,
           })
         }
 
-        logger.info('SF lead promoted to applicant', { leadId: transaction.lead_id })
+        // Not yet fully paid. If this is the first payment and the lead is
+        // still in 'application' stage, promote to 'applicant' (legacy flow).
+        if (lead?.pipeline_stage === 'application') {
+          const sfResult = await promoteSFLeadToApplicant(supabase, {
+            leadId: transaction.lead_id,
+            transactionId: transaction.id,
+            amountPaid: txAmount,
+          })
+
+          if (!sfResult.success) {
+            logger.error('SF promotion failed after partial payment', {
+              leadId: transaction.lead_id,
+              error: sfResult.error,
+            })
+            await supabase.from('activities').insert({
+              lead_id: transaction.lead_id,
+              activity_type: 'enrollment_failed',
+              title: 'SF Promotion Failed After Payment',
+              description: `Payment of ${txAmount} KWD succeeded but SF lead promotion failed: ${sfResult.error}. Manual intervention required.`,
+              metadata: {
+                transaction_id: transaction.id,
+                payment_method: 'myfatoorah',
+                amount: txAmount,
+                invoice_id: invoiceId,
+                error: sfResult.error,
+                requires_manual_intervention: true,
+              },
+            })
+            return NextResponse.json({
+              success: true,
+              message: 'Payment recorded but SF promotion failed — flagged for admin review',
+              error: sfResult.error,
+            })
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: `Payment processed — SF lead moved to Applicant (${totalPaid}/${FULL_TUITION_AMOUNT} KWD)`,
+          })
+        }
+
+        // SF lead already at Applicant, still owes balance — keep stage as-is.
         return NextResponse.json({
           success: true,
-          message: 'Payment processed — SF lead moved to Applicant',
+          message: `Payment processed — SF installment recorded (${totalPaid}/${FULL_TUITION_AMOUNT} KWD).`,
         })
       }
 

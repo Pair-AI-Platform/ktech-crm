@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createPaymentLink, validateCivilId } from "@/lib/myfatoorah/client"
 import { canEnrollLead } from "@/lib/enrollment/convert-lead"
-import { ENROLLMENT_PAYMENT_AMOUNT } from "@/types"
+import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT } from "@/lib/config/constants"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
 export async function POST(request: NextRequest) {
@@ -19,7 +19,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { leadId, civilId } = body
+    const { leadId, civilId, amount: rawAmount } = body as {
+      leadId?: string
+      civilId?: string
+      amount?: number | string
+    }
 
     // Validate required fields
     if (!leadId) {
@@ -52,19 +56,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if lead can be enrolled
-    const { canEnroll, reason } = await canEnrollLead(supabase, leadId)
-    if (!canEnroll) {
-      return NextResponse.json(
-        { error: reason },
-        { status: 400 }
-      )
-    }
-
-    // Fetch lead details for payment link
+    // Fetch lead details for payment link + flow decisions.
     const { data: lead, error: leadError } = await supabase
       .from("leads")
-      .select("first_name, last_name, first_name_ar, last_name_ar, phone, email")
+      .select("first_name, last_name, first_name_ar, last_name_ar, phone, email, funding_type, pipeline_stage")
       .eq("id", leadId)
       .single()
 
@@ -73,6 +68,18 @@ export async function POST(request: NextRequest) {
         { error: "Lead not found" },
         { status: 404 }
       )
+    }
+
+    const isSF = lead.funding_type === "self_funded"
+
+    // For non-SF (PUC) leads, keep the legacy stage gate: must be in
+    // 'application' to create an enrollment invoice. SF leads can pay
+    // tuition from either 'application' or 'applicant'.
+    if (!isSF) {
+      const { canEnroll, reason } = await canEnrollLead(supabase, leadId)
+      if (!canEnroll) {
+        return NextResponse.json({ error: reason }, { status: 400 })
+      }
     }
 
     // Check for existing pending payment (idempotency)
@@ -90,8 +97,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Amount is server-derived. Clients cannot override.
-    const paymentAmount = ENROLLMENT_PAYMENT_AMOUNT
+    // SF: payment can be any installment up to the remaining tuition balance.
+    // PUC: still locked to ENROLLMENT_PAYMENT_AMOUNT.
+    let paymentAmount: number
+    if (isSF) {
+      const { data: priorPayments } = await supabase
+        .from('payment_transactions')
+        .select('amount')
+        .eq('lead_id', leadId)
+        .eq('status', 'completed')
+      const paidSoFar = (priorPayments ?? []).reduce(
+        (sum, row) => sum + Number(row.amount || 0),
+        0,
+      )
+      const remaining = Math.max(0, FULL_TUITION_AMOUNT - paidSoFar)
+      if (remaining <= 0) {
+        return NextResponse.json(
+          { error: 'Tuition already fully paid for this lead.' },
+          { status: 400 },
+        )
+      }
+      const parsed = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount)
+      const desired = Number.isFinite(parsed) && parsed > 0 ? parsed : remaining
+      if (desired > remaining) {
+        return NextResponse.json(
+          { error: `Amount ${desired} KWD exceeds remaining balance of ${remaining} KWD.` },
+          { status: 400 },
+        )
+      }
+      paymentAmount = desired
+    } else {
+      paymentAmount = ENROLLMENT_PAYMENT_AMOUNT
+    }
 
     // Create MyFatoorah payment link
     const paymentResult = await createPaymentLink({
