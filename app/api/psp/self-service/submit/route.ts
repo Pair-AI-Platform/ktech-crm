@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createLogger } from "@/lib/logger"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
-import { validatePspToken } from "@/lib/auth/psp-self-service-token"
+import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
 
 /**
  * Public endpoint: marks the token row as submitted and advances the
@@ -15,14 +15,14 @@ import { validatePspToken } from "@/lib/auth/psp-self-service-token"
 export async function POST(request: NextRequest) {
   const logger = createLogger("psp-self-service-submit")
 
-  let body: { token?: string }
+  let body: { token?: string; phone?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { token } = body
+  const { token, phone } = body
   if (!token) {
     return NextResponse.json({ error: "Token is required" }, { status: 400 })
   }
@@ -35,9 +35,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const result = await validatePspToken(token)
+  const result = await validatePspTokenWithPhone(token, phone)
   if (!result.ok) {
-    const status = result.reason === "expired" ? 410 : 404
+    const status =
+      result.reason === "expired" ? 410 :
+      result.reason === "phone_mismatch" ? 401 :
+      404
     return NextResponse.json({ error: result.reason }, { status })
   }
 

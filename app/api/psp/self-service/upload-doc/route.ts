@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createLogger } from "@/lib/logger"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
-import { validatePspToken } from "@/lib/auth/psp-self-service-token"
+import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
 
 // Mirrors the auth'd uploader at app/api/psp/documents/upload/route.ts:33-50.
 const ALLOWED_TYPES = [
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   const token = formData.get("token") as string | null
+  const phone = formData.get("phone") as string | null
   const file = formData.get("file") as File | null
   const documentType = formData.get("document_type") as string | null
   const graduateType = formData.get("graduate_type") as string | null
@@ -62,9 +63,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const result = await validatePspToken(token)
+  const result = await validatePspTokenWithPhone(token, phone)
   if (!result.ok) {
-    const status = result.reason === "expired" ? 410 : 404
+    const status =
+      result.reason === "expired" ? 410 :
+      result.reason === "phone_mismatch" ? 401 :
+      404
     return NextResponse.json({ error: result.reason }, { status })
   }
 

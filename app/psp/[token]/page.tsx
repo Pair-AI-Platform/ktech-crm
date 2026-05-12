@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import {
   getDocumentsForGraduateType,
@@ -9,7 +9,7 @@ import {
   type ConditionalDocumentFlags,
 } from "@/lib/psp/document-rules"
 
-type PageState = "loading" | "ready" | "submitted" | "expired" | "error"
+type PageState = "verify" | "verifying" | "ready" | "submitted" | "expired" | "error"
 
 interface LeadView {
   id: string
@@ -52,7 +52,7 @@ const GRAD_TYPES: { id: GraduateType; label: string; labelAr: string }[] = [
 
 export default function PspSelfServicePage() {
   const { token } = useParams<{ token: string }>()
-  const [state, setState] = useState<PageState>("loading")
+  const [state, setState] = useState<PageState>("verify")
   const [errorMsg, setErrorMsg] = useState("")
   const [lead, setLead] = useState<LeadView | null>(null)
   const [docs, setDocs] = useState<UploadedDoc[]>([])
@@ -61,14 +61,18 @@ export default function PspSelfServicePage() {
   const [savedFlash, setSavedFlash] = useState(false)
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null)
 
-  // Editable form state
+  // Phone-as-password: held in memory only, never persisted. Sent with every
+  // API call so the server can verify the holder of the link is the lead.
+  const [phone, setPhone] = useState("")
+  const [verifyError, setVerifyError] = useState("")
+
+  // Editable form state (phone intentionally omitted — it is the auth secret)
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
     first_name_ar: "",
     last_name_ar: "",
     civil_id: "",
-    phone: "",
     phone_secondary: "",
     email: "",
     date_of_birth: "",
@@ -79,17 +83,26 @@ export default function PspSelfServicePage() {
     is_special_needs: false,
   })
 
-  useEffect(() => {
+  async function verifyAndLoad(rawPhone: string) {
     if (!token) return
-    void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
-
-  async function load() {
+    const trimmed = rawPhone.trim()
+    if (!trimmed) {
+      setVerifyError("Phone number is required")
+      return
+    }
+    setVerifyError("")
+    setState("verifying")
     try {
-      const res = await fetch(`/api/psp/self-service/details?token=${token}`)
+      const res = await fetch(
+        `/api/psp/self-service/details?token=${token}&phone=${encodeURIComponent(trimmed)}`,
+      )
       if (res.status === 410) {
         setState("expired")
+        return
+      }
+      if (res.status === 401) {
+        setVerifyError("That phone number doesn't match the one on file.")
+        setState("verify")
         return
       }
       if (!res.ok) {
@@ -101,13 +114,13 @@ export default function PspSelfServicePage() {
       const json = (await res.json()) as { lead: LeadView; documents: UploadedDoc[]; submitted_at: string | null }
       setLead(json.lead)
       setDocs(json.documents || [])
+      setPhone(trimmed)
       setForm({
         first_name: json.lead.first_name ?? "",
         last_name: json.lead.last_name ?? "",
         first_name_ar: json.lead.first_name_ar ?? "",
         last_name_ar: json.lead.last_name_ar ?? "",
         civil_id: json.lead.civil_id ?? "",
-        phone: json.lead.phone ?? "",
         phone_secondary: json.lead.phone_secondary ?? "",
         email: json.lead.email ?? "",
         date_of_birth: json.lead.date_of_birth ?? "",
@@ -122,6 +135,16 @@ export default function PspSelfServicePage() {
       setState("error")
       setErrorMsg("Something went wrong")
     }
+  }
+
+  async function reloadDocs() {
+    if (!token || !phone) return
+    const res = await fetch(
+      `/api/psp/self-service/details?token=${token}&phone=${encodeURIComponent(phone)}`,
+    )
+    if (!res.ok) return
+    const json = (await res.json()) as { documents: UploadedDoc[] }
+    setDocs(json.documents || [])
   }
 
   const requiredDocs = useMemo<DocumentRule[]>(() => {
@@ -143,7 +166,7 @@ export default function PspSelfServicePage() {
   }, [docs, form.education_type])
 
   async function saveInfo() {
-    if (!token) return
+    if (!token || !phone) return
     setSaving(true)
     try {
       const updates: Record<string, unknown> = {
@@ -152,7 +175,6 @@ export default function PspSelfServicePage() {
         first_name_ar: form.first_name_ar || null,
         last_name_ar: form.last_name_ar || null,
         civil_id: form.civil_id || null,
-        phone: form.phone || null,
         phone_secondary: form.phone_secondary || null,
         email: form.email || null,
         date_of_birth: form.date_of_birth || null,
@@ -165,12 +187,18 @@ export default function PspSelfServicePage() {
       const res = await fetch("/api/psp/self-service/save-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, updates }),
+        body: JSON.stringify({ token, phone, updates }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         if (res.status === 410) {
           setState("expired")
+          return
+        }
+        if (res.status === 401) {
+          setVerifyError("Session expired — please verify your phone again.")
+          setPhone("")
+          setState("verify")
           return
         }
         alert(err.error || "Failed to save")
@@ -184,11 +212,12 @@ export default function PspSelfServicePage() {
   }
 
   async function uploadDoc(rule: DocumentRule, file: File) {
-    if (!token) return
+    if (!token || !phone) return
     setUploadingDocId(rule.id)
     try {
       const fd = new FormData()
       fd.append("token", token)
+      fd.append("phone", phone)
       fd.append("file", file)
       fd.append("document_type", rule.id)
       fd.append("graduate_type", form.education_type)
@@ -199,18 +228,23 @@ export default function PspSelfServicePage() {
           setState("expired")
           return
         }
+        if (res.status === 401) {
+          setVerifyError("Session expired — please verify your phone again.")
+          setPhone("")
+          setState("verify")
+          return
+        }
         alert(err.error || "Failed to upload")
         return
       }
-      // Refresh document list after upload
-      await load()
+      await reloadDocs()
     } finally {
       setUploadingDocId(null)
     }
   }
 
   async function submit() {
-    if (!token) return
+    if (!token || !phone) return
     setSubmitting(true)
     try {
       // Save edits first so submit reflects current state.
@@ -218,12 +252,18 @@ export default function PspSelfServicePage() {
       const res = await fetch("/api/psp/self-service/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, phone }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         if (res.status === 410) {
           setState("expired")
+          return
+        }
+        if (res.status === 401) {
+          setVerifyError("Session expired — please verify your phone again.")
+          setPhone("")
+          setState("verify")
           return
         }
         alert(err.error || "Failed to submit")
@@ -235,8 +275,16 @@ export default function PspSelfServicePage() {
     }
   }
 
-  if (state === "loading") {
-    return <Shell><Centered><Spinner /><p className="mt-4 text-slate-500">Loading...</p></Centered></Shell>
+  if (state === "verify" || state === "verifying") {
+    return (
+      <Shell>
+        <VerifyForm
+          loading={state === "verifying"}
+          error={verifyError}
+          onSubmit={verifyAndLoad}
+        />
+      </Shell>
+    )
   }
   if (state === "expired") {
     return (
@@ -300,9 +348,6 @@ export default function PspSelfServicePage() {
             </Field>
             <Field label="Civil ID" labelAr="الرقم المدني">
               <Input value={form.civil_id} onChange={(v) => setForm({ ...form, civil_id: v })} inputMode="numeric" />
-            </Field>
-            <Field label="Phone" labelAr="رقم الهاتف">
-              <Input value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} inputMode="tel" />
             </Field>
             <Field label="Phone (Secondary)" labelAr="رقم هاتف إضافي">
               <Input value={form.phone_secondary} onChange={(v) => setForm({ ...form, phone_secondary: v })} inputMode="tel" />
@@ -413,6 +458,56 @@ export default function PspSelfServicePage() {
   )
 }
 
+function VerifyForm({
+  loading,
+  error,
+  onSubmit,
+}: {
+  loading: boolean
+  error: string
+  onSubmit: (phone: string) => void
+}) {
+  const [value, setValue] = useState("")
+  return (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 max-w-md mx-auto">
+      <h2 className="text-xl font-bold text-slate-900 text-center">Verify your identity</h2>
+      <p className="text-sm text-slate-500 text-center mt-1">تأكيد الهوية</p>
+      <p className="text-xs text-slate-500 text-center mt-3">
+        Enter the phone number registered with KTECH to open your application.
+      </p>
+      <p className="text-xs text-slate-500 text-center mt-1" dir="rtl">
+        أدخل رقم الهاتف المسجل لدى KTECH لفتح طلبك.
+      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSubmit(value)
+        }}
+        className="mt-5 space-y-3"
+      >
+        <input
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="e.g. 51234567"
+          className="w-full px-4 py-3 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center tracking-wider"
+          autoFocus
+        />
+        {error && <p className="text-xs text-rose-600 text-center">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 font-medium"
+        >
+          {loading ? "Verifying..." : "Continue / متابعة"}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8 px-4">
@@ -434,10 +529,6 @@ function Centered({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   )
-}
-
-function Spinner() {
-  return <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full" />
 }
 
 function IconBubble({ color, children }: { color: "amber" | "red"; children: React.ReactNode }) {

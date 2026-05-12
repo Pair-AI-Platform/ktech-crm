@@ -2,7 +2,28 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
 
 export type TokenValidationResult =
   | { ok: true; tokenId: string; leadId: string; submittedAt: string | null }
-  | { ok: false; reason: "not_found" | "expired" }
+  | { ok: false; reason: "not_found" | "expired" | "phone_mismatch" }
+
+/** Strip everything that isn't a digit. */
+function normalizePhone(input: string | null | undefined): string {
+  return (input ?? "").replace(/\D+/g, "")
+}
+
+/**
+ * Returns true if `candidate` matches `expected` as a phone number.
+ * Suffix-tolerant: matches when the last 8 digits agree, so a student
+ * typing "12345678" matches a lead row of "+965 1234 5678" and vice
+ * versa. Empty inputs never match.
+ */
+export function phoneMatches(candidate: string | null | undefined, expected: string | null | undefined): boolean {
+  const a = normalizePhone(candidate)
+  const b = normalizePhone(expected)
+  if (!a || !b) return false
+  if (a === b) return true
+  const aTail = a.slice(-8)
+  const bTail = b.slice(-8)
+  return aTail.length === 8 && aTail === bTail
+}
 
 /**
  * Validates a PSP self-service token using service-role privileges.
@@ -49,4 +70,41 @@ export async function validatePspToken(token: string): Promise<TokenValidationRe
     leadId: data.lead_id,
     submittedAt: data.submitted_at,
   }
+}
+
+/**
+ * Same as validatePspToken, but ALSO requires `phone` to match the
+ * lead row's `phone`. Used by the public self-service endpoints so the
+ * token alone is not enough to read or mutate the lead — the student
+ * proves possession of the link AND knowledge of the registered phone
+ * number. The token still expires after 7 days; the phone check is
+ * a per-request gate, not a session.
+ *
+ * Returns `phone_mismatch` (suggested HTTP 401) when phone is missing
+ * or wrong. Falls through to the same `not_found` / `expired`
+ * responses as `validatePspToken` for the token itself.
+ */
+export async function validatePspTokenWithPhone(
+  token: string,
+  phone: string | null | undefined,
+): Promise<TokenValidationResult> {
+  const tokenResult = await validatePspToken(token)
+  if (!tokenResult.ok) return tokenResult
+
+  const supabase = createServiceRoleClient()
+  const { data: lead, error } = await supabase
+    .from("leads")
+    .select("phone")
+    .eq("id", tokenResult.leadId)
+    .single()
+
+  if (error || !lead) {
+    return { ok: false, reason: "not_found" }
+  }
+
+  if (!phoneMatches(phone, lead.phone)) {
+    return { ok: false, reason: "phone_mismatch" }
+  }
+
+  return tokenResult
 }
