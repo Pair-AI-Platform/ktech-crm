@@ -29,9 +29,7 @@ import {
   Download,
   SlidersHorizontal,
   Plus,
-  GraduationCap,
 } from "lucide-react"
-import { MinistryAcceptanceDialog } from "@/components/leads/ministry-acceptance-dialog"
 
 type TopTab = "puc" | "sf_srj" | "self_fund"
 
@@ -147,7 +145,6 @@ export default function PUCSRJPage() {
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [showAcceptanceDialog, setShowAcceptanceDialog] = useState(false)
 
   const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
 
@@ -628,20 +625,6 @@ export default function PUCSRJPage() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Ministry Acceptance Upload - only on PUC tab */}
-            {topTab === "puc" && profile?.role === "admin" && (
-              <SimpleTooltip content="Ministry Acceptance Import" side="bottom">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAcceptanceDialog(true)}
-                  className="text-[var(--text-muted)]"
-                >
-                  <GraduationCap className="w-4 h-4 mr-1.5" />
-                  <span className="hidden sm:inline">Acceptance</span>
-                </Button>
-              </SimpleTooltip>
-            )}
             {/* Filter */}
             <Button
               variant={activeFiltersCount > 0 ? "default" : "ghost"}
@@ -922,16 +905,6 @@ export default function PUCSRJPage() {
         />
       )}
 
-      {/* Ministry Acceptance Import Dialog */}
-      <MinistryAcceptanceDialog
-        isOpen={showAcceptanceDialog}
-        onClose={() => setShowAcceptanceDialog(false)}
-        onSuccess={(accepted, rejected) => {
-          setSuccessMessage(`${accepted} leads accepted, ${rejected} leads rejected`)
-          setShowSuccessToast(true)
-          refetch()
-        }}
-      />
     </div>
   )
 }
