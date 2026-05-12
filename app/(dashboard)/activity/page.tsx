@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -36,6 +36,7 @@ import {
 import { cn, getRelativeTime } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useAuditLogs } from "@/lib/hooks/use-audit-logs"
+import { getMockAuditLogs, filterMockAuditLogs } from "@/lib/demo-activity-logs"
 
 // Action icons
 const ACTION_CONFIG = {
@@ -61,7 +62,7 @@ export default function ActivityPage() {
   const [page, setPage] = useState(1)
   const pageSize = 20
 
-  const { logs, total, loading, refetch } = useAuditLogs({
+  const { logs: realLogs, total: realTotal, loading, refetch } = useAuditLogs({
     isAdmin,
     userId: profile?.id,
     page,
@@ -71,7 +72,25 @@ export default function ActivityPage() {
     filterAction,
   })
 
-  const totalPages = Math.ceil(total / pageSize)
+  // Demo fallback: when the audit_logs table has no records (e.g. fresh prod / demo env),
+  // render a curated set of mock activities so the page stays useful for client demos.
+  // Filters and search apply to the mock dataset too. Pagination is in-memory only here.
+  const usingMockData = !loading && realTotal === 0
+  const mockFiltered = useMemo(() => {
+    if (!usingMockData) return [] as ReturnType<typeof getMockAuditLogs>
+    return filterMockAuditLogs(getMockAuditLogs(), {
+      search: searchQuery,
+      filterTable,
+      filterAction,
+    })
+  }, [usingMockData, searchQuery, filterTable, filterAction])
+
+  const logs = usingMockData
+    ? mockFiltered.slice((page - 1) * pageSize, page * pageSize)
+    : realLogs
+  const total = usingMockData ? mockFiltered.length : realTotal
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   // Group logs by date
   const groupedLogs = logs.reduce((acc, log) => {

@@ -34,6 +34,7 @@ import { PIPELINE_STAGES, type PipelineStage, type LostReasonCategory } from "@/
 import { useLeads, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
 import { cn, formatKuwaitPhone, getInitials } from "@/lib/utils"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 
 const LOST_REASON_CATEGORIES: { value: LostReasonCategory; label: string }[] = [
@@ -487,16 +488,13 @@ export default function LostLeadsPage() {
                               <Avatar className="w-7 h-7 shrink-0">
                                 <AvatarImage src={undefined} />
                                 <AvatarFallback className="text-[10px] bg-[var(--bg-sunken)] text-[var(--text-muted)]">
-                                  {getInitials(`${lead.first_name_ar || ''} ${lead.last_name_ar || ''}`)}
+                                  {getInitials(getLeadDisplayName(lead))}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                                  {lead.first_name_ar} {lead.last_name_ar}
+                                <p className="text-sm font-medium text-[var(--text-primary)] truncate" dir="rtl">
+                                  {getLeadDisplayName(lead)}
                                 </p>
-                                {lead.civil_id && (
-                                  <p className="text-[10px] text-[var(--text-muted)] truncate">{lead.civil_id}</p>
-                                )}
                               </div>
                             </div>
                           </td>
@@ -648,7 +646,7 @@ export default function LostLeadsPage() {
                   const stageName = PIPELINE_STAGES.find(s => s.value === (lead ? getRestoreStage(lead) : "contacted"))?.label || "Contacted"
                   return (
                     <>
-                      This will move <strong>{lead?.first_name_ar} {lead?.last_name_ar}</strong> back to the <strong>{stageName}</strong> stage and clear all loss information.
+                      This will move <strong>{lead ? getLeadDisplayName(lead) : ''}</strong> back to the <strong>{stageName}</strong> stage and clear all loss information.
                     </>
                   )
                 })()
