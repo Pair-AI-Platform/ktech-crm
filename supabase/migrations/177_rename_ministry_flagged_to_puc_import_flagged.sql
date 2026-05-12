@@ -9,5 +9,14 @@
 -- Existing data is preserved verbatim. The partial index is renamed; Postgres
 -- automatically rewrites its predicate to reference the new column name.
 
-ALTER TABLE leads RENAME COLUMN ministry_flagged TO puc_import_flagged;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'leads' AND column_name = 'ministry_flagged'
+  ) THEN
+    ALTER TABLE leads RENAME COLUMN ministry_flagged TO puc_import_flagged;
+  END IF;
+END$$;
+
 ALTER INDEX IF EXISTS idx_leads_ministry_flagged RENAME TO idx_leads_puc_import_flagged;
