@@ -11,6 +11,7 @@ import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
 import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
+import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SearchInput } from "@/components/ui/input"
@@ -846,6 +847,18 @@ export default function PUCSRJPage() {
               onBook={handleBulkBook}
               onDelete={() => setShowDeleteModal(true)}
               onClear={() => setSelectedLeads([])}
+              onCampaign={() => {
+                const selectedSet = new Set(selectedLeads)
+                const contacts = filteredLeads
+                  .filter((l) => selectedSet.has(l.id))
+                  .map(leadToPrefillContact)
+                stashCampaignPrefill({
+                  origin: "puc-srj",
+                  contacts,
+                  createdAt: Date.now(),
+                })
+                router.push("/campaigns?prefill=1")
+              }}
             />
           )}
         </AnimatePresence>

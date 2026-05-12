@@ -19,6 +19,7 @@ import {
   Trash2,
   BookOpen,
   Send,
+  MessageSquare,
 } from "lucide-react"
 import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES, SF_DOCUMENTS, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus, type OrientationStatus, type PUCDocumentStatus } from "@/types"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
@@ -1189,9 +1190,10 @@ interface BulkActionsProps {
   onClear: () => void
   onMOEFetch?: () => void
   onSendRSVP?: () => void
+  onCampaign?: () => void
 }
 
-export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDelete, onClear, onMOEFetch, onSendRSVP }: BulkActionsProps) {
+export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDelete, onClear, onMOEFetch, onSendRSVP, onCampaign }: BulkActionsProps) {
   if (selectedCount === 0) return null
 
   return (
@@ -1236,6 +1238,12 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
             <Button variant="ghost" size="sm" onClick={onSendRSVP} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
               <Send className="w-4 h-4 mr-1.5" />
               RSVP
+            </Button>
+          )}
+          {onCampaign && (
+            <Button variant="ghost" size="sm" onClick={onCampaign} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
+              <MessageSquare className="w-4 h-4 mr-1.5" />
+              Campaign
             </Button>
           )}
         </div>

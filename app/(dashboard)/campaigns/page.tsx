@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useCallback, useRef, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { consumeCampaignPrefill, type CampaignPrefillContact } from "@/lib/campaigns/prefill"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -332,8 +333,19 @@ function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
   )
 }
 
-function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [step, setStep] = useState(1)
+function NewCampaignModal({
+  onClose,
+  onSuccess,
+  initialContacts,
+}: {
+  onClose: () => void
+  onSuccess: () => void
+  initialContacts?: CampaignPrefillContact[]
+}) {
+  // When the wizard is launched from a leads-table selection, skip the channel
+  // step (WhatsApp is the only option) and jump straight to naming.
+  const hasPrefill = !!initialContacts && initialContacts.length > 0
+  const [step, setStep] = useState(hasPrefill ? 2 : 1)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showArabic, setShowArabic] = useState(false)
@@ -341,12 +353,25 @@ function NewCampaignModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
   const { data: audienceFilters, isLoading: filtersLoading } = useAudienceCounts()
 
+  const prefilledContacts: UploadedContact[] = hasPrefill
+    ? initialContacts!.map((c) => ({
+        firstName: c.firstName,
+        lastName: c.lastName,
+        phone: c.phone,
+        email: c.email,
+        // Selected leads come from the CRM where phone is required, so they are
+        // already validated. Mark invalid only if no phone (defensive).
+        valid: !!c.phone,
+        error: c.phone ? undefined : "Missing phone number",
+      }))
+    : []
+
   const [formData, setFormData] = useState<CampaignFormData>({
     name: "",
     type: "whatsapp",
-    audienceSource: "filter",
+    audienceSource: hasPrefill ? "upload" : "filter",
     audienceFilter: "",
-    uploadedContacts: [],
+    uploadedContacts: prefilledContacts,
     scheduleType: "immediate",
     messageContent: "",
     messageContentAr: "",
@@ -1085,9 +1110,27 @@ const CAMPAIGN_VIEWS: { id: CampaignView; label: string; icon?: React.ComponentT
 
 export default function CampaignsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [activeView, setActiveView] = useState<CampaignView>("all")
   const [showNewCampaign, setShowNewCampaign] = useState(false)
+  const [prefillContacts, setPrefillContacts] = useState<CampaignPrefillContact[] | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+
+  // When the user clicked "Campaign" in a leads-table bulk action, they arrive
+  // here with ?prefill=1 and the selected contacts stashed in sessionStorage.
+  // Consume them, open the wizard, and scrub the query param so a refresh
+  // doesn't reopen an empty modal.
+  useEffect(() => {
+    if (searchParams.get("prefill") !== "1") return
+    const payload = consumeCampaignPrefill()
+    if (payload && payload.contacts.length > 0) {
+      setPrefillContacts(payload.contacts)
+      setShowNewCampaign(true)
+    }
+    router.replace("/campaigns")
+    // Run once on mount; intentionally not chasing searchParams identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { campaigns, isLoading, invalidate } = useCampaigns({
     type: activeView !== 'all' ? activeView : undefined,
@@ -1263,8 +1306,12 @@ export default function CampaignsPage() {
       <AnimatePresence>
         {showNewCampaign && (
           <NewCampaignModal
-            onClose={() => setShowNewCampaign(false)}
+            onClose={() => {
+              setShowNewCampaign(false)
+              setPrefillContacts(null)
+            }}
             onSuccess={invalidate}
+            initialContacts={prefillContacts ?? undefined}
           />
         )}
       </AnimatePresence>

@@ -32,6 +32,7 @@ import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
 import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
+import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { ErrorState } from "@/components/ui/error-state"
@@ -752,6 +753,14 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               onClear={() => setSelectedLeads([])}
               onMOEFetch={() => setShowMOEFetchModal(true)}
               onSendRSVP={() => setShowRSVPModal(true)}
+              onCampaign={() => {
+                stashCampaignPrefill({
+                  origin: "leads",
+                  contacts: selectedLeadObjects.map(leadToPrefillContact),
+                  createdAt: Date.now(),
+                })
+                router.push("/campaigns?prefill=1")
+              }}
             />
           )}
         </AnimatePresence>
