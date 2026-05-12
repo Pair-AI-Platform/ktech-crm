@@ -33,6 +33,8 @@ import { AdminAppointmentsSection } from "@/components/dashboard/sections/admin-
 import { AdminSourcePerformance, SOURCE_LABELS } from "@/components/dashboard/sections/admin-source-performance"
 import { AdminWorkloadSection } from "@/components/dashboard/sections/admin-workload-section"
 
+import { SectionBoundary } from "@/components/dashboard/section-boundary"
+
 const TERMINAL_STAGES = ['lost', 'enrolled', 'withdraw']
 
 export default function DashboardPage() {
@@ -427,124 +429,160 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
-      <GreetingHeader profile={profile} />
+      <SectionBoundary name="GreetingHeader">
+        <GreetingHeader profile={profile} />
+      </SectionBoundary>
 
       <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 page-enter">
         {/* Admin KPIs (includes today's appts & callbacks) */}
         {isAdmin && (
-          <AdminKpiSection
-            allLeads={allLeads}
-            loading={leadsLoading}
-            todayAppointments={appointmentStats.today}
-            todayCallbacks={adminTodayCallbacks}
-            appointmentsLoading={appointmentsLoading}
-          />
+          <SectionBoundary name="AdminKpiSection">
+            <AdminKpiSection
+              allLeads={allLeads}
+              loading={leadsLoading}
+              todayAppointments={appointmentStats.today}
+              todayCallbacks={adminTodayCallbacks}
+              appointmentsLoading={appointmentsLoading}
+            />
+          </SectionBoundary>
         )}
 
         {/* Quick Stats (agent only) */}
         {!isAdmin && (
-          <QuickStatsSection
-            appointmentsLoading={appointmentsLoading}
-            leadsLoading={leadsLoading}
-            appointmentStats={appointmentStats}
-            myLeads={myLeads}
-            isLoading={isLoading}
-          />
+          <SectionBoundary name="QuickStatsSection">
+            <QuickStatsSection
+              appointmentsLoading={appointmentsLoading}
+              leadsLoading={leadsLoading}
+              appointmentStats={appointmentStats}
+              myLeads={myLeads}
+              isLoading={isLoading}
+            />
+          </SectionBoundary>
         )}
 
         {/* Agent: Monthly Target (PUC & SF) */}
         {!isAdmin && (
-          <TargetSection
-            myTargetProgress={myTargetProgress}
-            allAgentsProgress={[]}
-            targetHistory={targetHistory}
-            targetHistoryLoading={targetHistoryLoading}
-            profileId={profile?.id}
-          />
+          <SectionBoundary name="TargetSection">
+            <TargetSection
+              myTargetProgress={myTargetProgress}
+              allAgentsProgress={[]}
+              targetHistory={targetHistory}
+              targetHistoryLoading={targetHistoryLoading}
+              profileId={profile?.id}
+            />
+          </SectionBoundary>
         )}
 
         {/* Admin Agent Heatmap */}
         {isAdmin && (
-          <AdminAgentHeatmap agents={agentHeatmapData} loading={presenceLoading} />
+          <SectionBoundary name="AdminAgentHeatmap">
+            <AdminAgentHeatmap agents={agentHeatmapData} loading={presenceLoading} />
+          </SectionBoundary>
         )}
 
         {/* No Updated Appointments */}
-        <NoUpdatedSection
-          noUpdatedAppointments={noUpdatedAppointments}
-          noUpdatedLoading={noUpdatedLoading}
-          refetchNoUpdated={refetchNoUpdated}
-        />
+        <SectionBoundary name="NoUpdatedSection">
+          <NoUpdatedSection
+            noUpdatedAppointments={noUpdatedAppointments}
+            noUpdatedLoading={noUpdatedLoading}
+            refetchNoUpdated={refetchNoUpdated}
+          />
+        </SectionBoundary>
 
         {/* Admin: Source Performance + Workload */}
         {isAdmin && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AdminSourcePerformance sources={sourcePerformanceData} loading={leadsLoading} />
-            <AdminWorkloadSection agents={workloadData} loading={presenceLoading || leadsLoading} />
+            <SectionBoundary name="AdminSourcePerformance">
+              <AdminSourcePerformance sources={sourcePerformanceData} loading={leadsLoading} />
+            </SectionBoundary>
+            <SectionBoundary name="AdminWorkloadSection">
+              <AdminWorkloadSection agents={workloadData} loading={presenceLoading || leadsLoading} />
+            </SectionBoundary>
           </div>
         )}
 
         {/* Agent: Sources + Birthdays & Needs Attention */}
         {!isAdmin && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AdminSourcePerformance sources={sourcePerformanceData} loading={leadsLoading} mode="files" />
+            <SectionBoundary name="AdminSourcePerformance(files)">
+              <AdminSourcePerformance sources={sourcePerformanceData} loading={leadsLoading} mode="files" />
+            </SectionBoundary>
             <div className="flex flex-col gap-6">
-              <BirthdaySection birthdayLeads={birthdayLeads} loading={leadsLoading} />
-              <AttentionSection
-                priorityLeads={priorityLeads}
-                loading={leadsLoading}
-              />
+              <SectionBoundary name="BirthdaySection">
+                <BirthdaySection birthdayLeads={birthdayLeads} loading={leadsLoading} />
+              </SectionBoundary>
+              <SectionBoundary name="AttentionSection">
+                <AttentionSection
+                  priorityLeads={priorityLeads}
+                  loading={leadsLoading}
+                />
+              </SectionBoundary>
             </div>
           </div>
         )}
 
         {/* Agent: Appointments (full width) */}
         {!isAdmin && (
-          <AppointmentsSection
-            todayAppointments={todayAppointments}
-            loading={appointmentsLoading}
-          />
+          <SectionBoundary name="AppointmentsSection">
+            <AppointmentsSection
+              todayAppointments={todayAppointments}
+              loading={appointmentsLoading}
+            />
+          </SectionBoundary>
         )}
 
         {/* Admin Drop-off Chart */}
         {isAdmin && (
-          <AdminDropoffSection dropoffData={dropoffData} loading={dropoffLoading} />
+          <SectionBoundary name="AdminDropoffSection">
+            <AdminDropoffSection dropoffData={dropoffData} loading={dropoffLoading} />
+          </SectionBoundary>
         )}
 
         {/* Pipeline Progress (admin only) */}
         {isAdmin && (
-          <PipelineSection
-            sfLeads={mySfLeads}
-            pucLeads={myPucLeads}
-            loading={leadsLoading}
-          />
+          <SectionBoundary name="PipelineSection">
+            <PipelineSection
+              sfLeads={mySfLeads}
+              pucLeads={myPucLeads}
+              loading={leadsLoading}
+            />
+          </SectionBoundary>
         )}
 
         {/* Admin: Appointments | Needs Attention | Birthdays */}
         {isAdmin && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <AdminAppointmentsSection
-              todayAppointments={todayAppointments}
-              loading={appointmentsLoading}
-            />
+            <SectionBoundary name="AdminAppointmentsSection">
+              <AdminAppointmentsSection
+                todayAppointments={todayAppointments}
+                loading={appointmentsLoading}
+              />
+            </SectionBoundary>
 
-            <AttentionSection
-              priorityLeads={priorityLeads}
-              loading={leadsLoading}
-            />
+            <SectionBoundary name="AttentionSection(admin)">
+              <AttentionSection
+                priorityLeads={priorityLeads}
+                loading={leadsLoading}
+              />
+            </SectionBoundary>
 
-            <BirthdaySection
-              birthdayLeads={birthdayLeads}
-              loading={leadsLoading}
-            />
+            <SectionBoundary name="BirthdaySection(admin)">
+              <BirthdaySection
+                birthdayLeads={birthdayLeads}
+                loading={leadsLoading}
+              />
+            </SectionBoundary>
           </div>
         )}
 
         {/* Agent: History */}
         {!isAdmin && (
-          <HistorySection
-            agentHistory={agentHistory}
-            loading={historyLoading}
-          />
+          <SectionBoundary name="HistorySection">
+            <HistorySection
+              agentHistory={agentHistory}
+              loading={historyLoading}
+            />
+          </SectionBoundary>
         )}
       </div>
     </div>
