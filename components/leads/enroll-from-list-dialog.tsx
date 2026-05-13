@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { createMinistryHeaderMap } from "@/lib/ministry-import"
 import { executeAutomations } from "@/lib/automation/engine"
 import { queryKeys } from "@/lib/hooks/query-keys"
+import { isDemoMode, getDemoLeads, saveDemoLeadUpdate } from "@/lib/demo-data"
 import * as XLSX from "xlsx"
 
 type Step = "upload" | "preview" | "importing" | "complete"
@@ -78,6 +79,50 @@ export function EnrollFromListDialog({
 
   const enrollMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      if (isDemoMode()) {
+        await new Promise((r) => setTimeout(r, 300))
+        const leads = getDemoLeads()
+        const byCivilId = new Map<string, (typeof leads)[number]>()
+        for (const l of leads) {
+          if (l.civil_id) byCivilId.set(normalizeCivilId(l.civil_id), l)
+        }
+        const result: ApiResult = { enrolled: [], reported: [], unmatched: [], errors: [] }
+        for (const id of ids) {
+          const lead = byCivilId.get(id)
+          if (!lead) {
+            result.unmatched.push({ civilId: id })
+            continue
+          }
+          const fullName = `${lead.first_name} ${lead.last_name}`.trim()
+          if (lead.pipeline_stage === "applicant") {
+            saveDemoLeadUpdate(lead.id, { pipeline_stage: "enrolled", position_in_stage: 0 })
+            result.enrolled.push({
+              id: lead.id,
+              name: fullName,
+              civilId: lead.civil_id || "",
+              lead: {
+                id: lead.id,
+                first_name: lead.first_name,
+                last_name: lead.last_name,
+                civil_id: lead.civil_id || null,
+                pipeline_stage: "enrolled",
+                assigned_to: lead.assigned_to || null,
+                source: lead.source || null,
+                funding_type: lead.funding_type || null,
+              },
+            })
+          } else {
+            result.reported.push({
+              id: lead.id,
+              name: fullName,
+              civilId: lead.civil_id || "",
+              currentStage: lead.pipeline_stage,
+            })
+          }
+        }
+        return result
+      }
+
       const response = await fetch("/api/leads/enroll-from-list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,21 +135,24 @@ export function EnrollFromListDialog({
     onSuccess: (data) => {
       setResult(data)
 
-      // Fire stage_change automations for each newly enrolled lead (fire-and-forget)
-      for (const item of data.enrolled) {
-        executeAutomations({
-          trigger: "stage_change",
-          leadId: item.id,
-          leadData: {
-            ...item.lead,
-            pipeline_stage: "enrolled",
-          } as unknown as Record<string, unknown>,
-          metadata: {
-            old_stage: "applicant",
-            new_stage: "enrolled",
-            source: "enroll_from_list",
-          },
-        }).catch(() => {})
+      // Fire stage_change automations for each newly enrolled lead (fire-and-forget).
+      // Skip in demo mode — engine hits real Supabase which has no session.
+      if (!isDemoMode()) {
+        for (const item of data.enrolled) {
+          executeAutomations({
+            trigger: "stage_change",
+            leadId: item.id,
+            leadData: {
+              ...item.lead,
+              pipeline_stage: "enrolled",
+            } as unknown as Record<string, unknown>,
+            metadata: {
+              old_stage: "applicant",
+              new_stage: "enrolled",
+              source: "enroll_from_list",
+            },
+          }).catch(() => {})
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })

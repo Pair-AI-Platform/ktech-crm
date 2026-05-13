@@ -186,7 +186,10 @@ export async function POST(request: NextRequest) {
               action_url: `/leads/${lead.id}`,
               created_by: user.id,
             })
-            .then(() => {})
+            .then(
+              () => {},
+              () => {},
+            )
         }
 
         result.enrolled.push({
