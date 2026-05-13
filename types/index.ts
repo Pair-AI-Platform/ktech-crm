@@ -1104,7 +1104,7 @@ export const PUC_DOCUMENTS = [
 export { PUC_FEE_AMOUNT } from '../lib/config/constants'
 
 // =============================================
-// PUC SRJ DOCUMENTS (Database-backed)
+// PUC PSP DOCUMENTS (Database-backed)
 // =============================================
 
 export type PSPDocumentType =

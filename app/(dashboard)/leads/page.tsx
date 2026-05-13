@@ -145,7 +145,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     }
   }, [searchParamsString])
 
-  // Sync filters from URL params (for sidebar sub-tab navigation like PUC SRJ)
+  // Sync filters from URL params (for sidebar sub-tab navigation like PUC PSP)
   useEffect(() => {
     // Skip if searchParams matches what we last synced to URL (prevents infinite loop)
     if (lastSyncedParams.current !== null && searchParamsString === lastSyncedParams.current) {

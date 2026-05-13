@@ -37,9 +37,9 @@ export const BUSINESS_CONFIG = {
   ] as const,
 } as const
 
-// -- PUC SRJ Auto-Routing --
+// -- PUC PSP Auto-Routing --
 // When ALL conditions are met, automatically set lead to PUC (funding_type = 'puc')
-export const PUC_SRJ_AUTO_ROUTE = {
+export const PUC_PSP_AUTO_ROUTE = {
   /** Minimum actual GPA to qualify */
   MIN_GPA: 70,
   /** Maximum age (exclusive) - must be under this age */

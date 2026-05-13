@@ -9,7 +9,7 @@ import { Building2, Plus, Search, Edit2, Trash2, Check, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
-interface SfSrjEntry {
+interface SelfFundedEntry {
   id: string
   name: string
   code: string
@@ -17,8 +17,8 @@ interface SfSrjEntry {
   created_at: string
 }
 
-export function SfSrjManagement() {
-  const [entries, setEntries] = useState<SfSrjEntry[]>([])
+export function SelfFundedManagement() {
+  const [entries, setEntries] = useState<SelfFundedEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isAdding, setIsAdding] = useState(false)
@@ -46,7 +46,7 @@ export function SfSrjManagement() {
         setEntries(data)
       }
     } catch (err) {
-      console.error("Failed to fetch SF SRJ entries:", err)
+      console.error("Failed to fetch self-funded entries:", err)
     } finally {
       setLoading(false)
     }
@@ -119,10 +119,10 @@ export function SfSrjManagement() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-[var(--primary)]" />
-                SF SRJ Management
+                Self Funded Management
               </CardTitle>
               <CardDescription>
-                Manage SF SRJ entries and configurations
+                Manage self-funded entries and configurations
               </CardDescription>
             </div>
             <Button onClick={() => setIsAdding(true)} disabled={isAdding}>
@@ -183,7 +183,7 @@ export function SfSrjManagement() {
             <div className="text-center py-12">
               <Building2 className="w-12 h-12 mx-auto text-[var(--text-muted)] mb-3" />
               <p className="text-[var(--text-muted)]">
-                {searchQuery ? "No entries match your search" : "No SF SRJ entries yet"}
+                {searchQuery ? "No entries match your search" : "No self-funded entries yet"}
               </p>
             </div>
           ) : (

@@ -621,7 +621,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               })()}
             </td>
           )}
-          {/* Substage column - hidden for PUC SRJ view and when all visible leads are self-funded applicants */}
+          {/* Substage column - hidden for PUC PSP view and when all visible leads are self-funded applicants */}
           {!isPucSrjView && showSubstageColumn && (
             <td className="px-3 py-3 overflow-hidden" onClick={(e) => e.stopPropagation()}>
               {!(lead.funding_type === 'self_funded' && lead.pipeline_stage === 'applicant') && (

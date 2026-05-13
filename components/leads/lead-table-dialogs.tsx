@@ -181,7 +181,7 @@ export function LeadTableDialogs({
         onConfirm={handleEditWithdrawReasonConfirm}
       />
 
-      {/* Blocked Reason Dialog (PUC SRJ) */}
+      {/* Blocked Reason Dialog (PUC PSP) */}
       <BlockedReasonDialog
         open={!!blockedDialogLead}
         onOpenChange={(open) => {

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads, getDemoLeadStats, saveDemoLeadUpdate, getDemoLeadById } from "@/lib/demo-data"
 import type { Lead, PipelineStage, FundingType, LeadStatus, LostReason } from "@/types"
 import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
-import { GPA_SELF_FUNDED_THRESHOLD, PUC_SRJ_AUTO_ROUTE } from "@/lib/config/constants"
+import { GPA_SELF_FUNDED_THRESHOLD, PUC_PSP_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
 import { isArabicText } from "@/lib/string-utils"
 import { queryKeys } from "./query-keys"
@@ -242,24 +242,24 @@ function calculateAge(dateOfBirth: string): number {
   return age
 }
 
-// Helper: check if a lead qualifies for automatic PUC SRJ routing
+// Helper: check if a lead qualifies for automatic PUC PSP routing
 // Conditions: Kuwaiti, actual_gpa >= 70, graduation within 2 years, age < 23, not an employee
-function shouldAutoRouteToPucSrj(leadData: Partial<Lead>): boolean {
+function shouldAutoRouteToPucPsp(leadData: Partial<Lead>): boolean {
   // Must be Kuwaiti
   const isKuwaiti = leadData.is_kuwaiti === true || leadData.nationality === 'Kuwaiti'
   if (!isKuwaiti) return false
 
   // Must have actual_gpa >= 70
-  if (leadData.actual_gpa === undefined || leadData.actual_gpa === null || leadData.actual_gpa < PUC_SRJ_AUTO_ROUTE.MIN_GPA) return false
+  if (leadData.actual_gpa === undefined || leadData.actual_gpa === null || leadData.actual_gpa < PUC_PSP_AUTO_ROUTE.MIN_GPA) return false
 
   // Graduation year must be within the last 2 years
   const currentYear = new Date().getFullYear()
-  if (!leadData.graduation_year || leadData.graduation_year < currentYear - PUC_SRJ_AUTO_ROUTE.MAX_GRADUATION_GAP_YEARS) return false
+  if (!leadData.graduation_year || leadData.graduation_year < currentYear - PUC_PSP_AUTO_ROUTE.MAX_GRADUATION_GAP_YEARS) return false
 
   // Must be under 23 years old
   if (!leadData.date_of_birth) return false
   const age = calculateAge(leadData.date_of_birth)
-  if (age >= PUC_SRJ_AUTO_ROUTE.MAX_AGE) return false
+  if (age >= PUC_PSP_AUTO_ROUTE.MAX_AGE) return false
 
   // Must NOT be an employee
   if (leadData.is_employee === true) return false
@@ -304,8 +304,8 @@ export function useLeadMutations() {
         finalLeadData.funding_type = 'self_funded'
       }
 
-      // Auto-route to PUC SRJ if all conditions are met
-      const shouldRouteToPuc = shouldAutoRouteToPucSrj(finalLeadData)
+      // Auto-route to PUC PSP if all conditions are met
+      const shouldRouteToPuc = shouldAutoRouteToPucPsp(finalLeadData)
       if (shouldRouteToPuc && finalLeadData.funding_type !== 'puc') {
         finalLeadData.funding_type = 'puc'
       }
@@ -337,17 +337,17 @@ export function useLeadMutations() {
 
       if (error) throw new Error(error.message)
 
-      // Log activity for auto PUC SRJ routing
+      // Log activity for auto PUC PSP routing
       if (shouldRouteToPuc && data) {
         await supabase.from('activities').insert({
           lead_id: data.id,
           activity_type: 'funding_type_change',
-          title: 'Auto-Routed to PUC SRJ',
-          description: `${data.first_name} ${data.last_name} automatically routed to PUC SRJ (Kuwaiti, GPA: ${data.actual_gpa}, Age: under ${PUC_SRJ_AUTO_ROUTE.MAX_AGE}, Grad Year: ${data.graduation_year}, Not Employee)`,
+          title: 'Auto-Routed to PUC PSP',
+          description: `${data.first_name} ${data.last_name} automatically routed to PUC PSP (Kuwaiti, GPA: ${data.actual_gpa}, Age: under ${PUC_PSP_AUTO_ROUTE.MAX_AGE}, Grad Year: ${data.graduation_year}, Not Employee)`,
           metadata: {
             old_funding_type: leadData.funding_type || null,
             new_funding_type: 'puc',
-            reason: 'puc_srj_auto_route',
+            reason: 'puc_psp_auto_route',
             actual_gpa: data.actual_gpa,
             graduation_year: data.graduation_year,
             is_employee: data.is_employee,
@@ -413,7 +413,7 @@ export function useLeadMutations() {
         updates.funding_type = 'self_funded'
       }
 
-      // Auto-route to PUC SRJ if all conditions are met (merge updates with old lead data)
+      // Auto-route to PUC PSP if all conditions are met (merge updates with old lead data)
       const mergedLeadForPuc = {
         nationality: updates.nationality ?? oldLead?.nationality,
         is_kuwaiti: updates.is_kuwaiti ?? oldLead?.is_kuwaiti,
@@ -423,7 +423,7 @@ export function useLeadMutations() {
         is_employee: updates.is_employee ?? oldLead?.is_employee,
       }
       const currentFundingType = updates.funding_type ?? oldLead?.funding_type
-      const wasAutoRoutedToPuc = shouldAutoRouteToPucSrj(mergedLeadForPuc) && currentFundingType !== 'puc'
+      const wasAutoRoutedToPuc = shouldAutoRouteToPucPsp(mergedLeadForPuc) && currentFundingType !== 'puc'
       if (wasAutoRoutedToPuc) {
         updates.funding_type = 'puc'
       }
@@ -627,17 +627,17 @@ export function useLeadMutations() {
         }
       }
 
-      // Log activity for auto PUC SRJ routing
+      // Log activity for auto PUC PSP routing
       if (wasAutoRoutedToPuc && oldLead) {
         await supabase.from('activities').insert({
           lead_id: id,
           activity_type: 'funding_type_change',
-          title: 'Auto-Routed to PUC SRJ',
-          description: `${oldLead.first_name} ${oldLead.last_name} automatically routed to PUC SRJ (Kuwaiti, GPA: ${mergedLeadForPuc.actual_gpa}, Grad Year: ${mergedLeadForPuc.graduation_year}, Not Employee)`,
+          title: 'Auto-Routed to PUC PSP',
+          description: `${oldLead.first_name} ${oldLead.last_name} automatically routed to PUC PSP (Kuwaiti, GPA: ${mergedLeadForPuc.actual_gpa}, Grad Year: ${mergedLeadForPuc.graduation_year}, Not Employee)`,
           metadata: {
             old_funding_type: oldLead.funding_type,
             new_funding_type: 'puc',
-            reason: 'puc_srj_auto_route',
+            reason: 'puc_psp_auto_route',
             actual_gpa: mergedLeadForPuc.actual_gpa,
             graduation_year: mergedLeadForPuc.graduation_year,
             is_employee: mergedLeadForPuc.is_employee,
