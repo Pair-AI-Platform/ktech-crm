@@ -129,8 +129,29 @@ describe('withApiHandler — Origin / Referer enforcement', () => {
     expect(response.status).toBe(200)
   })
 
-  it('allows Vercel preview deployments (*.vercel.app)', async () => {
+  it('blocks Vercel preview deployments unless explicitly allowlisted', async () => {
+    // The previous build allowed any *.vercel.app origin. That was removed
+    // because any attacker on a Vercel preview could hit our APIs. Preview
+    // hosts must now be enumerated in ALLOWED_ORIGIN_HOSTS.
     setupAuthed()
+    delete process.env.ALLOWED_ORIGIN_HOSTS
+
+    const handler = withApiHandler({ context: 'test' }, async () => new Response('OK'))
+    const response = await handler(
+      makeRequest({
+        method: 'POST',
+        origin: 'https://crm-pr-42-foo.vercel.app',
+        host: 'crm.example.test',
+      })
+    )
+
+    expect(response.status).toBe(403)
+  })
+
+  it('allows preview hosts explicitly listed in ALLOWED_ORIGIN_HOSTS', async () => {
+    setupAuthed()
+    process.env.ALLOWED_ORIGIN_HOSTS = 'crm-pr-42-foo.vercel.app,other-preview.vercel.app'
+
     const handlerFn = vi.fn().mockResolvedValue(new Response('OK'))
     const handler = withApiHandler({ context: 'test' }, handlerFn)
 
@@ -143,6 +164,7 @@ describe('withApiHandler — Origin / Referer enforcement', () => {
     )
 
     expect(response.status).toBe(200)
+    delete process.env.ALLOWED_ORIGIN_HOSTS
   })
 
   it('allows configured NEXT_PUBLIC_APP_URL even when host differs', async () => {

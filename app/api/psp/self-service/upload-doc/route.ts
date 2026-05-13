@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createLogger } from "@/lib/logger"
+import { createLogger, errorResponse } from "@/lib/logger"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
+import { validateUpload, sanitizeFilename } from "@/lib/upload-validation"
 
-// Mirrors the auth'd uploader at app/api/psp/documents/upload/route.ts:33-50.
-const ALLOWED_TYPES = [
-  "application/pdf",
+// Public, token-gated student uploader. Validation is strict because this
+// route accepts uploads without an authenticated session.
+//
+// Allowlist intentionally narrower than the staff-side uploader: we accept
+// scans (PDF) and photos of documents (JPEG/PNG/WEBP) only. DOC/DOCX are
+// excluded here because there is no legitimate reason for a student to
+// submit an Office document for verification, and Office files are a common
+// macro-malware vector.
+const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/pdf",
 ]
-const ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"]
-const MAX_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 export async function POST(request: NextRequest) {
   const logger = createLogger("psp-self-service-upload-doc")
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     formData = await request.formData()
   } catch {
-    return NextResponse.json({ error: "Invalid form data" }, { status: 400 })
+    return errorResponse("Invalid form data", 400, logger)
   }
 
   const token = formData.get("token") as string | null
@@ -34,33 +39,36 @@ export async function POST(request: NextRequest) {
   const expirationDate = formData.get("expiration_date") as string | null
 
   if (!token) {
-    return NextResponse.json({ error: "Token is required" }, { status: 400 })
+    return errorResponse("Token is required", 400, logger)
   }
   if (!file || !documentType || !graduateType) {
-    return NextResponse.json(
-      { error: "file, document_type, and graduate_type are required" },
-      { status: 400 },
+    return errorResponse(
+      "file, document_type, and graduate_type are required",
+      400,
+      logger,
     )
   }
 
   const rl = await rateLimit(`psp-self-service:${token}`, RATE_LIMITS["psp-self-service"])
   if (!rl.success) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: "Too many requests", requestId: logger.requestId },
       { status: 429, headers: { "Retry-After": String(Math.ceil(rl.resetIn / 1000)) } },
     )
   }
 
-  if (file.size > MAX_SIZE_BYTES) {
-    return NextResponse.json({ error: "File is too large. Maximum size is 10MB." }, { status: 400 })
-  }
-
-  const fileExt = "." + (file.name.split(".").pop()?.toLowerCase() ?? "")
-  if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(fileExt)) {
-    return NextResponse.json(
-      { error: "File type not allowed. Accepted types: PDF, JPG, PNG, WEBP, DOC, DOCX" },
-      { status: 400 },
-    )
+  const validation = validateUpload(file, {
+    allowedMimeTypes: ALLOWED_MIME_TYPES,
+    maxBytes: MAX_SIZE_BYTES,
+  })
+  if (!validation.ok) {
+    logger.warn("Upload rejected", {
+      reason: validation.reason,
+      status: validation.status,
+      mime: file.type,
+      size: file.size,
+    })
+    return errorResponse(validation.reason, validation.status, logger)
   }
 
   const result = await validatePspTokenWithPhone(token, phone)
@@ -69,14 +77,19 @@ export async function POST(request: NextRequest) {
       result.reason === "expired" ? 410 :
       result.reason === "phone_mismatch" ? 401 :
       404
-    return NextResponse.json({ error: result.reason }, { status })
+    return errorResponse(result.reason, status, logger)
   }
 
   const service = createServiceRoleClient()
 
   const timestamp = Date.now()
-  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-  const storagePath = `leads/${result.leadId}/psp/${graduateType}/${documentType}/${timestamp}-${safeName}`
+  const safeName = sanitizeFilename(file.name)
+  // Sanitize graduate_type / document_type before they hit the storage path
+  // (they're free-text from the client). Limit to a conservative slug to
+  // prevent path traversal via these segments.
+  const safeGraduate = String(graduateType).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "unknown"
+  const safeDoc = String(documentType).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "unknown"
+  const storagePath = `leads/${result.leadId}/psp/${safeGraduate}/${safeDoc}/${timestamp}-${safeName}`
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
@@ -91,7 +104,7 @@ export async function POST(request: NextRequest) {
 
   if (uploadErr) {
     logger.error("Storage upload failed", { leadId: result.leadId, error: uploadErr.message })
-    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 })
+    return errorResponse("Failed to upload file", 500, logger)
   }
 
   const { data: urlData, error: urlErr } = await service.storage
@@ -100,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   if (urlErr) {
     logger.error("Failed to create signed URL", { leadId: result.leadId, error: urlErr.message })
-    return NextResponse.json({ error: "Failed to generate document URL" }, { status: 500 })
+    return errorResponse("Failed to generate document URL", 500, logger)
   }
 
   // Upsert document record. uploaded_by stays NULL to mark this as
@@ -113,7 +126,7 @@ export async function POST(request: NextRequest) {
         lead_id: result.leadId,
         document_type: documentType,
         graduate_type: graduateType,
-        file_name: file.name,
+        file_name: safeName,
         file_type: file.type,
         file_size: file.size,
         storage_path: storagePath,
@@ -133,7 +146,7 @@ export async function POST(request: NextRequest) {
 
   if (insertErr) {
     logger.error("Failed to upsert psp_documents", { leadId: result.leadId, error: insertErr.message })
-    return NextResponse.json({ error: "Failed to save document record" }, { status: 500 })
+    return errorResponse("Failed to save document record", 500, logger)
   }
 
   return NextResponse.json({

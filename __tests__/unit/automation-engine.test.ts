@@ -18,10 +18,28 @@ vi.mock('@/lib/supabase/client', () => ({
 // We test matchesConditions and the protection logic by testing executeAutomations
 // with a mocked supabase client
 
-function createMockSupabase(rules: AutomationRule[] = []) {
+function createMockSupabase(rules: AutomationRule[] = [], runawayCount = 0) {
   const insertFn = vi.fn().mockResolvedValue({ error: null })
   const updateEqFn = vi.fn().mockResolvedValue({ error: null })
   const updateFn = vi.fn().mockReturnValue({ eq: updateEqFn })
+
+  // Mutable count cell so individual tests can adjust runaway-loop behavior
+  // via the returned `setRunawayCount` helper after construction.
+  const runawayState = { count: runawayCount }
+
+  // Chain for isRunawayLoop: .select('id', { count, head }).eq().gte().filter()
+  // The terminal .filter() call awaits to { count, error }.
+  const runawayCountChain = () => {
+    const terminal = {
+      // .filter() is awaited — return a thenable-like object via Promise resolve
+      filter: vi.fn().mockImplementation(() =>
+        Promise.resolve({ count: runawayState.count, error: null })
+      ),
+    }
+    const gteChain = { gte: vi.fn().mockReturnValue(terminal) }
+    const eqChain = { eq: vi.fn().mockReturnValue(gteChain) }
+    return { select: vi.fn().mockReturnValue(eqChain) }
+  }
 
   return {
     client: {
@@ -41,7 +59,14 @@ function createMockSupabase(rules: AutomationRule[] = []) {
           }
         }
         if (table === 'automation_executions') {
-          return { insert: insertFn }
+          // This table is used for two distinct operations:
+          //   1) isRunawayLoop count query: select().eq().gte().filter()
+          //   2) Execution log insert: insert()
+          // Returning an object that supports both keeps the mock single-shot.
+          return {
+            ...runawayCountChain(),
+            insert: insertFn,
+          }
         }
         if (table === 'notifications' || table === 'follow_up_reminders') {
           return { insert: insertFn }
@@ -49,12 +74,19 @@ function createMockSupabase(rules: AutomationRule[] = []) {
         if (table === 'leads') {
           return { update: updateFn }
         }
+        if (table === 'activities') {
+          return { insert: insertFn }
+        }
         return { insert: insertFn }
       }),
     },
     insertFn,
     updateFn,
     updateEqFn,
+    /** Override the count returned by the runaway-loop guard (>=5 blocks). */
+    setRunawayCount: (n: number) => {
+      runawayState.count = n
+    },
   }
 }
 

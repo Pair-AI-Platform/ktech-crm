@@ -1,42 +1,5 @@
 import type { ErrorEvent } from '@sentry/nextjs'
-
-const SENSITIVE_KEYS = new Set([
-  'phone',
-  'phone_number',
-  'mobile',
-  'email',
-  'civil_id',
-  'national_id',
-  'passport',
-  'card_number',
-  'card_cvv',
-  'cvv',
-  'password',
-  'token',
-  'access_token',
-  'refresh_token',
-  'authorization',
-  'cookie',
-  'set-cookie',
-  'api_key',
-  'secret',
-])
-
-const REDACTED = '[REDACTED]'
-
-function redactValue(key: string, value: unknown): unknown {
-  if (SENSITIVE_KEYS.has(key.toLowerCase())) return REDACTED
-  if (value && typeof value === 'object') return redactObject(value as Record<string, unknown>)
-  return value
-}
-
-function redactObject(obj: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(obj)) {
-    out[k] = redactValue(k, v)
-  }
-  return out
-}
+import { REDACTED, redactObject } from '@/lib/redact'
 
 export function redactSentryEvent(event: ErrorEvent): ErrorEvent {
   if (event.request?.headers) {

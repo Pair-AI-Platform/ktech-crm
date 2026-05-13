@@ -1,38 +1,51 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { createLogger, errorResponse } from "@/lib/logger"
+import { validateUpload, sanitizeFilename } from "@/lib/upload-validation"
 
-const MAX_SIZE = 2 * 1024 * 1024 // 2MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif"]
+const MAX_SIZE = 2 * 1024 * 1024 // 2 MB
+// Avatars: photo formats only. GIF dropped intentionally — Supabase Storage
+// will render it, but animated GIFs in profile chrome are a poor UX and a
+// known vector for visual spam.
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
-  "image/gif": "gif",
+  "image/webp": "webp",
 }
 const BUCKET = "avatars"
 
 export async function POST(request: NextRequest) {
+  const logger = createLogger("profile-avatar-upload")
   const supabase = await createServerSupabaseClient()
 
   try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return errorResponse("Unauthorized", 401, logger)
     }
 
     const formData = await request.formData()
     const file = formData.get("file") as File | null
 
     if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
+      return errorResponse("No file provided", 400, logger)
     }
 
-    if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: "File too large. Max 2MB." }, { status: 400 })
-    }
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json({ error: "Invalid file type. Use JPG, PNG, or GIF." }, { status: 400 })
+    const validation = validateUpload(file, {
+      allowedMimeTypes: ALLOWED_TYPES,
+      maxBytes: MAX_SIZE,
+    })
+    if (!validation.ok) {
+      logger.warn("Avatar upload rejected", {
+        userId: user.id,
+        reason: validation.reason,
+        status: validation.status,
+        mime: file.type,
+        size: file.size,
+      })
+      return errorResponse(validation.reason, validation.status, logger)
     }
 
     const serviceClient = createServiceRoleClient()
@@ -40,8 +53,8 @@ export async function POST(request: NextRequest) {
     // Ensure bucket exists
     const { data: buckets, error: listError } = await serviceClient.storage.listBuckets()
     if (listError) {
-      console.error("Failed to list buckets:", listError)
-      return NextResponse.json({ error: "Storage not available" }, { status: 500 })
+      logger.error("Failed to list buckets", { error: listError.message })
+      return errorResponse("Storage not available", 500, logger)
     }
     const bucketExists = buckets?.some(b => b.name === BUCKET)
     if (!bucketExists) {
@@ -50,8 +63,8 @@ export async function POST(request: NextRequest) {
         fileSizeLimit: MAX_SIZE,
       })
       if (createBucketError) {
-        console.error("Failed to create avatars bucket:", createBucketError)
-        return NextResponse.json({ error: "Storage not available" }, { status: 500 })
+        logger.error("Failed to create avatars bucket", { error: createBucketError.message })
+        return errorResponse("Storage not available", 500, logger)
       }
     }
 
@@ -67,11 +80,17 @@ export async function POST(request: NextRequest) {
           .remove(oldFiles.map(f => `${user.id}/${f.name}`))
       }
     } catch (cleanupErr) {
-      console.error("Old avatar cleanup failed:", cleanupErr)
+      logger.warn("Old avatar cleanup failed", {
+        error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+      })
     }
 
     const ext = MIME_TO_EXT[file.type] || "jpg"
-    const storagePath = `${user.id}/${Date.now()}.${ext}`
+    // Sanitize defensively even though we own the path components.
+    // user.id is a Supabase UUID, but we still strip slashes to make sure no
+    // malformed value can ever traverse out of the user's directory.
+    const safeUserId = sanitizeFilename(user.id)
+    const storagePath = `${safeUserId}/${Date.now()}.${ext}`
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
@@ -85,8 +104,8 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error("Avatar upload error:", uploadError)
-      return NextResponse.json({ error: "Failed to upload avatar" }, { status: 500 })
+      logger.error("Avatar upload error", { error: uploadError.message })
+      return errorResponse("Failed to upload avatar", 500, logger)
     }
 
     const { data: urlData } = serviceClient.storage
@@ -100,13 +119,15 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
 
     if (updateError) {
-      console.error("Profile update error:", updateError)
-      return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
+      logger.error("Profile update error", { error: updateError.message })
+      return errorResponse("Failed to update profile", 500, logger)
     }
 
     return NextResponse.json({ avatar_url: urlData.publicUrl })
   } catch (err) {
-    console.error("Avatar upload error:", err)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    logger.error("Avatar upload error", {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return errorResponse("Internal server error", 500, logger)
   }
 }

@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { redactLogData } from '@/lib/redact'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -39,7 +40,7 @@ export function createLogger(context: string, requestId?: string): Logger {
       context,
       message,
       requestId: id,
-      data,
+      data: redactLogData(data),
       timestamp: new Date().toISOString(),
     }
 
