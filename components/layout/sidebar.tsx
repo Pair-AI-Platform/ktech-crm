@@ -15,7 +15,6 @@ import {
   X,
   BarChart3,
   Activity,
-  HelpCircle,
   Phone,
   Sparkles,
   Trash2,
@@ -257,7 +256,6 @@ const navigation: NavItem[] = [
 
 const secondaryNavigation = [
   { name: "Settings", href: "/settings", icon: Settings, description: "Preferences" },
-  { name: "Help", href: "/help", icon: HelpCircle, description: "Support & docs" },
 ]
 
 const emptySubscribe = () => () => {}
