@@ -2,6 +2,12 @@ import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { requireDemoMode, getDemoCredentials } from "@/lib/demo-mode"
 
+type SetupDemoResult = {
+  email: string
+  status: string
+  error?: string
+}
+
 export async function POST() {
   const gateResponse = requireDemoMode()
   if (gateResponse) return gateResponse
@@ -21,7 +27,7 @@ export async function POST() {
   ]
 
   const supabase = createServiceRoleClient()
-  const results = []
+  const results: SetupDemoResult[] = []
 
   for (const user of demoUsers) {
     const { data: existingUsers } = await supabase.auth.admin.listUsers()

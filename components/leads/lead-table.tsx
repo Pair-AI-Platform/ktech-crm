@@ -492,8 +492,7 @@ export function LeadTable({
     setEditingStage(leadId)
 
     // Update stage and clear status
-    let result
-    result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
+    const result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
 
     setEditingStage(null)
     // Clear pending update after API call (whether success or failure)

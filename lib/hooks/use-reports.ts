@@ -3323,11 +3323,24 @@ export function useAgentTargetProgress(agentId?: string) {
       if (leadsError) throw new Error(leadsError.message)
 
       // SF enrolled targets come from the 'overall' row
-      const overallSfAppMap = new Map((overallTargets || []).map(t => [t.agent_id, t.sf_applicants || 0]))
-      const targetsMap = new Map((targets || []).map(t => [t.agent_id, {
+      type AgentTargetRow = {
+        agent_id: string
+        puc_files?: number | null
+        sf_files?: number | null
+        sf_applicants?: number | null
+      }
+
+      const overallSfAppMap = new Map<string, number>(
+        ((overallTargets || []) as AgentTargetRow[]).map(t => [t.agent_id, t.sf_applicants || 0])
+      )
+      const targetsMap = new Map<string, Required<Omit<AgentTargetRow, "agent_id">>>(
+        ((targets || []) as AgentTargetRow[]).map(t => [t.agent_id, {
         ...t,
+        puc_files: t.puc_files || 0,
+        sf_files: t.sf_files || 0,
         sf_applicants: overallSfAppMap.get(t.agent_id) || 0,
-      }]))
+      }])
+      )
 
       const allProgress: AgentTargetProgress[] = (agents || []).map(agent => {
         const agentTarget = targetsMap.get(agent.id)

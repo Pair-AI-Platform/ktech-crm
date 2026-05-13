@@ -2,6 +2,13 @@ import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { requireDemoMode, getDemoCredentials } from "@/lib/demo-mode"
 
+type SeedDemoUserResult = {
+  email: string
+  status: string
+  error?: string
+  role?: "admin" | "agent"
+}
+
 export async function POST(request: Request) {
   const gateResponse = requireDemoMode()
   if (gateResponse) return gateResponse
@@ -32,7 +39,7 @@ export async function POST(request: Request) {
   ]
 
   const supabase = createServiceRoleClient()
-  const results = []
+  const results: SeedDemoUserResult[] = []
 
   for (const user of demoUsers) {
     const { data: existing } = await supabase

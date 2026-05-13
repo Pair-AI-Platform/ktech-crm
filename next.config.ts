@@ -2,13 +2,6 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  typescript: {
-    // Skip type checking during build — pre-existing type errors in
-    // use-reports.ts / dashboard/page.tsx are blocking deploys but the
-    // code runs correctly at runtime. Type errors are still surfaced
-    // by `tsc --noEmit` / IDE.
-    ignoreBuildErrors: true,
-  },
   async headers() {
     return [
       {

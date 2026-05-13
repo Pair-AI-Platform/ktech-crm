@@ -38,6 +38,10 @@ vi.mock('@/lib/logger', () => ({
   ),
 }))
 
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+}))
+
 import { withApiHandler } from '@/lib/api-handler'
 
 function createMockRequest(method = 'POST', path = '/api/test'): any {

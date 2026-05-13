@@ -234,7 +234,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
       .map(r => r.data?.phone)
       .filter((p): p is string => !!p)
 
-    let existingLeadsMap = new Map<string, { id: string; source: string | null }>()
+    const existingLeadsMap = new Map<string, { id: string; source: string | null }>()
 
     if (!isDemoMode() && phones.length > 0) {
       const supabase = createClient()

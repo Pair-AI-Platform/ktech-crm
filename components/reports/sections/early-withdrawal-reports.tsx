@@ -16,7 +16,28 @@ import {
   Cell,
 } from "recharts"
 import { AlertTriangle, Clock, TrendingDown, Users, Info } from "lucide-react"
-import type { EarlyWithdrawalData } from "@/lib/hooks/use-reports"
+
+interface EarlyWithdrawalData {
+  total: number
+  percentOfEnrolled: number
+  totalEnrolledWithAnchor: number
+  avgWeek: number
+  excludedMissingAnchor: number
+  byWeek: { week: number; count: number }[]
+  byAgent: { agentId: string; agentName: string; avatarUrl?: string | null; count: number; percent: number }[]
+  byReason: { reasonId: string; reason: string; count: number; percent: number }[]
+  rows: {
+    studentId: string
+    studentName: string
+    fundingType: string
+    agentName: string
+    semesterName: string
+    courseStartDate: string
+    withdrawalDate: string
+    week: number
+    reason: string
+  }[]
+}
 
 export interface EarlyWithdrawalReportsProps {
   data: EarlyWithdrawalData

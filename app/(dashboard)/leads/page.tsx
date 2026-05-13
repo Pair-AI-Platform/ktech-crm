@@ -497,7 +497,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   }
 
   const handleMinistryImportSuccess = (updatedCount: number, createdCount: number) => {
-    const messages = []
+    const messages: string[] = []
     if (updatedCount > 0) messages.push(`${updatedCount} lead${updatedCount !== 1 ? "s" : ""} updated`)
     if (createdCount > 0) messages.push(`${createdCount} lead${createdCount !== 1 ? "s" : ""} created`)
     setSuccessMessage(`Ministry import: ${messages.join(", ")}`)
@@ -506,7 +506,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   }
 
   const handlePucImportSuccess = (matchedCount: number, flaggedCount: number, createdCount: number) => {
-    const messages = []
+    const messages: string[] = []
     if (matchedCount > 0) messages.push(`${matchedCount} matched`)
     if (flaggedCount > 0) messages.push(`${flaggedCount} Type 2`)
     if (createdCount > 0) messages.push(`${createdCount} created`)

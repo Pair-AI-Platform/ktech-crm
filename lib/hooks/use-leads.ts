@@ -4,7 +4,7 @@ import { useEffect, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient, useIsMutating } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads, getDemoLeadStats, saveDemoLeadUpdate, getDemoLeadById } from "@/lib/demo-data"
-import type { Lead, PipelineStage, FundingType, LeadStatus } from "@/types"
+import type { Lead, PipelineStage, FundingType, LeadStatus, LostReason } from "@/types"
 import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
 import { GPA_SELF_FUNDED_THRESHOLD, PUC_SRJ_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
@@ -1073,7 +1073,7 @@ export function useLeadStats() {
 }
 
 export function useLostReasons() {
-  const { data: reasons = [], isLoading } = useQuery({
+  const { data: reasons = [], isLoading } = useQuery<LostReason[]>({
     queryKey: queryKeys.leads.lostReasons(),
     queryFn: async () => {
       if (isDemoMode()) {

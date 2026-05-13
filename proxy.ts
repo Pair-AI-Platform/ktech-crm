@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import type { User } from '@supabase/supabase-js'
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
@@ -69,7 +70,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Check Supabase auth
-  let user = null
+  let user: User | null = null
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

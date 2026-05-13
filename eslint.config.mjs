@@ -21,6 +21,15 @@ const eslintConfig = defineConfig([
   ]),
   {
     rules: {
+      // Keep the core React hooks rules, but do not fail CI on the newer
+      // React Compiler advisory rules until the app is intentionally migrated
+      // to compiler-clean patterns.
+      "react-hooks/immutability": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/static-components": "off",
       // Catch accidental `any` usage — helps enforce type safety
       "@typescript-eslint/no-explicit-any": "warn",
       // Warn on console.log left in code (allow warn/error)

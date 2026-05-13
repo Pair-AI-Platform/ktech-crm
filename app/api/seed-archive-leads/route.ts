@@ -30,8 +30,35 @@ const PIPELINE_STAGES = [
   "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw",
 ] as const
 
+type ArchiveSeedLead = {
+  first_name: string
+  last_name: string
+  phone: string
+  civil_id: string
+  nationality: string
+  is_kuwaiti: boolean
+  funding_type: string
+  education_type: string
+  source: string
+  source_category: string
+  pipeline_stage: string
+  contact_status: string
+  semester_id: string
+  gpa_grade_11: number
+  submission_substage?: string
+  withdrawal_reason?: string
+}
+
+type ArchiveSeedResult = {
+  cycle: string
+  status: string
+  reason?: string
+  error?: string
+  count?: number
+}
+
 function generateLeads(count: number, semesterIds: string[], phonePrefix: string) {
-  const leads = []
+  const leads: ArchiveSeedLead[] = []
   for (let i = 0; i < count; i++) {
     const firstName = FIRST_NAMES[i % FIRST_NAMES.length]
     const lastName = LAST_NAMES[i % LAST_NAMES.length]
@@ -86,7 +113,7 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: "No inactive (archive) cycles found. Create cycles first." }, { status: 400 })
     }
 
-    const results = []
+    const results: ArchiveSeedResult[] = []
 
     for (const cycle of cycles) {
       const semesters = (cycle as any).terms as { id: string; name: string; term_type: string }[]

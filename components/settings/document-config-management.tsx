@@ -92,7 +92,7 @@ export function DocumentConfigManagement() {
     setLoading(true)
     setError("")
 
-    const useFallback = () => {
+    const applyFallbackConfigs = () => {
       try {
         setConfigs(buildFallbackConfigs())
         setUsingFallback(true)
@@ -112,7 +112,7 @@ export function DocumentConfigManagement() {
 
       if (!res.ok) {
         console.warn("Failed to fetch from API, using fallback")
-        useFallback()
+        applyFallbackConfigs()
         return
       }
 
@@ -148,9 +148,9 @@ export function DocumentConfigManagement() {
       } catch {
         // Seed failed — continue with fallback
       }
-      useFallback()
+      applyFallbackConfigs()
     } catch {
-      useFallback()
+      applyFallbackConfigs()
     } finally {
       setLoading(false)
     }

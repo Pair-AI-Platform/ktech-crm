@@ -40,29 +40,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Lint is informational for now: there are ~40 pre-existing errors,
-      # mostly React Compiler strictness on large components flagged for
-      # rewrite (P1-8) and a handful of stale `.mjs` scripts at the repo
-      # root (P2-1). Flip this to required once they're resolved.
+      - name: Validate env contract
+        run: npm run env:check -- --allow-placeholder
+
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
-      # Typecheck is informational: known type errors in
-      # lib/hooks/use-reports.ts and app/(dashboard) which next.config.ts
-      # currently silences with `ignoreBuildErrors`. See P1-5. Flip to
-      # required once those files are split.
-      - name: Typecheck (informational)
-        run: npx tsc --noEmit
-        continue-on-error: true
+      - name: Typecheck
+        run: npm run typecheck
 
-      # Tests are informational while the automation-engine.test.ts mocks
-      # are updated to chain the new `isRunawayLoop` query added in
-      # lib/automation/engine.ts. All other test files are green; this
-      # gate flips to required once those 5 tests are fixed.
       - name: Unit & integration tests
         run: npm test
-        continue-on-error: true
 
       - name: Build
         run: npm run build

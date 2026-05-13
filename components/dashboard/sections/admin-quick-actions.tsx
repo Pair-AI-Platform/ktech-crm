@@ -6,9 +6,7 @@ import { useRouter } from "next/navigation"
 import { QuickActionsBlock } from "@/components/dashboard/notion"
 import { StaticBlock } from "@/components/dashboard/notion"
 
-interface AdminQuickActionsProps {}
-
-export function AdminQuickActions({}: AdminQuickActionsProps) {
+export function AdminQuickActions() {
   const router = useRouter()
 
   const actions = [
@@ -51,5 +49,3 @@ export function AdminQuickActions({}: AdminQuickActionsProps) {
     </motion.div>
   )
 }
-
-export type { AdminQuickActionsProps }

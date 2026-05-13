@@ -38,7 +38,7 @@ export function useMarketingLeads() {
   const supabase = createClient()
   const queryClient = useQueryClient()
 
-  const leadsQuery = useQuery({
+  const leadsQuery = useQuery<MarketingLead[]>({
     queryKey: queryKeys.marketingLeads.all,
     queryFn: async () => {
       const { data, error } = await supabase

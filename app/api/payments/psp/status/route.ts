@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
+type ReceiptDocument = {
+  id: string
+  public_url: string
+  file_name: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()
@@ -44,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if there's a payment receipt document (puc_receipt or payment_receipt)
-    let receiptDoc = null
+    let receiptDoc: ReceiptDocument | null = null
     const { data: pucReceipt } = await supabase
       .from("psp_documents")
       .select("id, public_url, file_name")
@@ -54,7 +60,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (pucReceipt) {
-      receiptDoc = pucReceipt
+      receiptDoc = pucReceipt as ReceiptDocument
     } else {
       const { data: paymentReceipt } = await supabase
         .from("psp_documents")
@@ -63,7 +69,7 @@ export async function GET(request: NextRequest) {
         .eq("document_type", "payment_receipt")
         .limit(1)
         .single()
-      receiptDoc = paymentReceipt
+      receiptDoc = paymentReceipt as ReceiptDocument | null
     }
 
     if (!transaction) {
