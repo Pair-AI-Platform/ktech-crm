@@ -103,16 +103,26 @@ export function GreetingHeader({ profile }: { profile: Profile | null }) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  const [messageStyle, setMessageStyle] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('dashboard-message-style') || 'funny'
-    }
-    return 'funny'
-  })
+  // Deterministic initial state: server and first client render must match
+  // to avoid React #310 hydration error. localStorage is read post-mount.
+  const [messageStyle, setMessageStyle] = useState<string>('funny')
   const [showStylePicker, setShowStylePicker] = useState(false)
+  const [sayingIndex, setSayingIndex] = useState(0)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('dashboard-message-style')
+      if (stored && stored in messageStyles && stored !== 'funny') {
+        setMessageStyle(stored)
+        setSayingIndex(0)
+      }
+    } catch {
+      // Private mode / disabled storage — keep default
+    }
+  }, [])
+
   const currentMessages = messageStyles[messageStyle]?.messages || messageStyles.funny.messages
 
-  const [sayingIndex, setSayingIndex] = useState(0)
   useEffect(() => {
     const interval = setInterval(() => {
       setSayingIndex(prev => (prev + 1) % currentMessages.length)
