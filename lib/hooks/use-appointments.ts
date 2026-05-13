@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { toDateString } from "@/lib/utils"
 import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, saveDemoAppointmentUpdate, getDemoLeadById, DEMO_AGENTS } from "@/lib/demo-data"
-import type { Appointment, AppointmentType, AppointmentStatus } from "@/types"
+import type { Appointment, AppointmentType, AppointmentStatus, AuditLog } from "@/types"
 import { queryKeys } from "@/lib/hooks/query-keys"
 
 // ---------------------------------------------------------------------------
@@ -32,6 +32,11 @@ interface UseAppointmentsOptions {
   noUpdated?: boolean // Filter for past appointments with no status update (same as needsAttention, clearer name)
   limit?: number
 }
+
+type AppointmentIdRow = { appointment_id: string }
+type AppointmentStatsRow = Pick<Appointment, "scheduled_date" | "status">
+type NeedsAttentionAppointmentRow = Pick<Appointment, "scheduled_date" | "scheduled_time">
+type AppointmentAuditRow = Pick<AuditLog, "id" | "old_values" | "new_values" | "changed_fields" | "created_at" | "user_email">
 
 // Helper to check if an appointment needs attention (past + still scheduled)
 export function isAppointmentNeedsAttention(apt: Appointment): boolean {
@@ -134,7 +139,8 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
           .from("appointment_leads")
           .select("appointment_id")
           .eq("lead_id", leadId)
-        const appointmentIds = junctionData?.map(j => j.appointment_id) || []
+        const junctionRows = (junctionData ?? []) as AppointmentIdRow[]
+        const appointmentIds = junctionRows.map(j => j.appointment_id)
         if (appointmentIds.length === 0) {
           // Fallback: also check legacy lead_id column
           query = query.eq("lead_id", leadId)
@@ -647,7 +653,8 @@ export function useAppointmentStats() {
       if (needsAttentionError) throw new Error(needsAttentionError.message)
 
       // Filter needs attention by checking if the time has also passed
-      const needsAttentionCount = (needsAttentionData || []).filter(apt => {
+      const needsAttentionRows = (needsAttentionData ?? []) as NeedsAttentionAppointmentRow[]
+      const needsAttentionCount = needsAttentionRows.filter(apt => {
         const now = new Date()
         const aptDateTime = new Date(`${apt.scheduled_date}T${apt.scheduled_time || "23:59:59"}`)
         return aptDateTime < now
@@ -662,7 +669,8 @@ export function useAppointmentStats() {
       let cancelled = 0
       let willSee = 0
 
-      appointments?.forEach(apt => {
+      const appointmentRows = (appointments ?? []) as AppointmentStatsRow[]
+      appointmentRows.forEach(apt => {
         if (apt.scheduled_date === today) todayCount++
 
         switch (apt.status) {
@@ -772,7 +780,8 @@ export function useRescheduleHistory(appointmentId: string) {
       // Filter for entries where date or time changed
       const rescheduleEntries: RescheduleEntry[] = []
 
-      data?.forEach((log) => {
+      const auditRows = (data ?? []) as AppointmentAuditRow[]
+      auditRows.forEach((log) => {
         const oldVals = log.old_values as Record<string, unknown> | null
         const newVals = log.new_values as Record<string, unknown> | null
         const changedFields = log.changed_fields as string[] | null

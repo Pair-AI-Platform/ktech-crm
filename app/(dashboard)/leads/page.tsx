@@ -37,6 +37,11 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { ErrorState } from "@/components/ui/error-state"
 
+type StudentPaymentRow = {
+  lead_id: string | null
+  payment_status: string | null
+}
+
 const defaultFilters: LeadFilters = {
   searchQuery: "",
   stages: [],
@@ -311,7 +316,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
       .from("students")
       .select("lead_id, payment_status")
       .in("lead_id", sfLeadIds)
-      .then(({ data }) => {
+      .then(({ data }: { data: StudentPaymentRow[] | null }) => {
         const map = new Map<string, string>()
         if (data) {
           for (const row of data) {

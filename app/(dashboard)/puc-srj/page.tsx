@@ -34,6 +34,11 @@ import {
 
 type TopTab = "puc" | "sf_srj" | "self_fund"
 
+type PucPaymentLeadRow = { lead_id: string }
+type PucPaymentAmountRow = { lead_id: string; amount: number | null }
+type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: string | null }
+type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
+
 // PUC pipeline stage pills (the stages a PUC lead progresses through)
 const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
   new: { label: "New" },
@@ -214,7 +219,7 @@ export default function PUCSRJPage() {
       .in("lead_id", ids)
       .eq("notes", "PSP Fee Payment")
       .in("status", ["pending", "processing"])
-      .then(({ data }) => {
+      .then(({ data }: { data: PucPaymentLeadRow[] | null }) => {
         if (data) {
           setLinkSentLeadIds(new Set(data.map((r) => r.lead_id)))
         }
@@ -243,7 +248,7 @@ export default function PUCSRJPage() {
       .in("lead_id", ids)
       .eq("status", "completed")
       .eq("notes", "PSP Fee Payment")
-      .then(({ data }) => {
+      .then(({ data }: { data: PucPaymentAmountRow[] | null }) => {
         if (!data) return
         const leadTotals = new Map<string, number>()
         for (const tx of data) {
@@ -280,7 +285,7 @@ export default function PUCSRJPage() {
       .in('lead_id', pucLeadIds)
       .eq('status', 'completed')
       .eq('notes', 'PSP Fee Payment')
-      .then(({ data }) => {
+      .then(({ data }: { data: PucPaymentLeadRow[] | null }) => {
         if (data) setPucPaymentLeadIds(new Set(data.map(t => t.lead_id)))
       })
 
@@ -294,16 +299,19 @@ export default function PUCSRJPage() {
         .from('psp_document_configs')
         .select('graduate_type, document_id, required')
         .eq('is_active', true),
-    ]).then(([docsResult, configsResult]) => {
+    ]).then(([docsResult, configsResult]: [
+      { data: PspDocumentRow[] | null },
+      { data: PspDocumentConfigRow[] | null },
+    ]) => {
       const uploadedByLead: Record<string, Set<string>> = {}
-      for (const doc of docsResult.data || []) {
+      for (const doc of docsResult.data ?? []) {
         if (!uploadedByLead[doc.lead_id]) uploadedByLead[doc.lead_id] = new Set()
         uploadedByLead[doc.lead_id].add(doc.document_type)
       }
 
       const dbRequiredCounts: Record<string, number> = {}
-      const hasDbConfigs = (configsResult.data || []).length > 0
-      for (const cfg of configsResult.data || []) {
+      const hasDbConfigs = (configsResult.data ?? []).length > 0
+      for (const cfg of configsResult.data ?? []) {
         if (cfg.required) {
           dbRequiredCounts[cfg.graduate_type] = (dbRequiredCounts[cfg.graduate_type] || 0) + 1
         }

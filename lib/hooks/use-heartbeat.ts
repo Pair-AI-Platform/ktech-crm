@@ -8,6 +8,7 @@ import { queryKeys } from './query-keys'
 const HEARTBEAT_INTERVAL_MS = 60_000
 
 export type ManualStatus = 'meeting' | 'break' | null
+type ManualStatusRow = { manual_status: ManualStatus }
 
 /**
  * Fire-and-forget heartbeat that keeps `profiles.last_activity_at` up to date
@@ -27,7 +28,7 @@ export function useHeartbeat(userId: string | undefined) {
       .select('manual_status')
       .eq('id', userId)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: { data: ManualStatusRow | null }) => {
         if (data?.manual_status) {
           setManualStatusState(data.manual_status as ManualStatus)
         }

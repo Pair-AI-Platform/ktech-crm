@@ -32,6 +32,15 @@ const EMPTY_HISTORY: AgentHistory = {
   byStage: {},
 }
 
+type AgentHistoryLeadRow = {
+  pipeline_stage: PipelineStage | null
+  last_contacted_at: string | null
+}
+
+type AgentHistoryAppointmentRow = {
+  status: string | null
+}
+
 export function useAgentHistory(agentId?: string) {
   const { data: history = EMPTY_HISTORY, isLoading: loading } = useQuery({
     queryKey: agentId ? queryKeys.agentHistory.detail(agentId) : queryKeys.agentHistory.all,
@@ -85,7 +94,7 @@ export function useAgentHistory(agentId?: string) {
       ])
 
       // Count leads by stage
-      const leads = leadsRes.data || []
+      const leads = (leadsRes.data ?? []) as AgentHistoryLeadRow[]
       const byStage: Record<string, number> = {}
       leads.forEach((l) => {
         const stage = l.pipeline_stage as string
@@ -93,7 +102,7 @@ export function useAgentHistory(agentId?: string) {
       })
 
       // Count appointments by status
-      const appointments = appointmentsRes.data || []
+      const appointments = (appointmentsRes.data ?? []) as AgentHistoryAppointmentRow[]
       const completedAppointments = appointments.filter(
         (a) => a.status === "completed"
       ).length

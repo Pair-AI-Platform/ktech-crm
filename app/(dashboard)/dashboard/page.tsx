@@ -37,6 +37,10 @@ import { SectionBoundary } from "@/components/dashboard/section-boundary"
 
 const TERMINAL_STAGES = ['lost', 'enrolled', 'withdraw']
 
+type ActivityCreatedByRow = { created_by: string | null }
+type AppointmentAgentRow = { assigned_agent: string | null }
+type LeadAssignedToRow = { assigned_to: string | null }
+
 export default function DashboardPage() {
   const { profile, isAdmin } = useUser()
   const {
@@ -77,7 +81,8 @@ export default function DashboardPage() {
       if (error) throw error
 
       const counts = new Map<string, number>()
-      data?.forEach(row => {
+      const rows = (data ?? []) as ActivityCreatedByRow[]
+      rows.forEach(row => {
         if (row.created_by) {
           counts.set(row.created_by, (counts.get(row.created_by) || 0) + 1)
         }
@@ -106,7 +111,8 @@ export default function DashboardPage() {
       if (error) throw error
 
       const counts = new Map<string, number>()
-      data?.forEach(row => {
+      const rows = (data ?? []) as AppointmentAgentRow[]
+      rows.forEach(row => {
         if (row.assigned_agent) {
           counts.set(row.assigned_agent, (counts.get(row.assigned_agent) || 0) + 1)
         }
@@ -137,7 +143,8 @@ export default function DashboardPage() {
       if (error) throw error
 
       const counts = new Map<string, number>()
-      data?.forEach(row => {
+      const rows = (data ?? []) as LeadAssignedToRow[]
+      rows.forEach(row => {
         if (row.assigned_to) {
           counts.set(row.assigned_to, (counts.get(row.assigned_to) || 0) + 1)
         }

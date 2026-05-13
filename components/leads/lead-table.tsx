@@ -52,6 +52,8 @@ interface LeadTableProps {
   onPageChange?: (page: number) => void
 }
 
+type PaymentLeadRow = { lead_id: string }
+
 export function LeadTable({
   leads,
   loading,
@@ -267,7 +269,8 @@ export function LeadTable({
         return
       }
       if (transactions) {
-        setPucPaymentLeads(new Set(transactions.map(t => t.lead_id)))
+        const rows = transactions as PaymentLeadRow[]
+        setPucPaymentLeads(new Set(rows.map(t => t.lead_id)))
       }
     } catch (error) {
       console.warn('[LeadTable] Unexpected error refreshing PUC payment status:', error)

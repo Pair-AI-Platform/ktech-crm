@@ -545,12 +545,13 @@ export default function ArchivePage() {
         .eq("is_active", false)
         .order("start_year", { ascending: false })
 
-      const hasCycles = cyclesData && cyclesData.length > 0
+      const cycles = (cyclesData ?? []) as EducationCycle[]
+      const hasCycles = cycles.length > 0
 
       // Fetch semesters belonging to those inactive cycles (not by is_active flag,
       // because a semester's is_active means "currently in session" and may not be
       // toggled when its parent cycle becomes inactive)
-      const inactiveCycleIds = hasCycles ? cyclesData.map((c) => c.id) : []
+      const inactiveCycleIds = hasCycles ? cycles.map((c) => c.id) : []
       const { data: termsData } = inactiveCycleIds.length > 0
         ? await supabase
             .from("semesters")
@@ -571,16 +572,17 @@ export default function ArchivePage() {
       }
 
       // Group terms under their cycles
-      const cyclesWithTerms = cyclesData.map((c) => ({
+      const terms = (termsData ?? []) as Semester[]
+      const cyclesWithTerms = cycles.map((c) => ({
         ...c,
-        terms: (termsData || []).filter((t) => t.cycle_id === c.id),
+        terms: terms.filter((t) => t.cycle_id === c.id),
       }))
 
       const years = cyclesToAcademicYears(cyclesWithTerms)
       setAcademicYears(years)
 
       // Fetch leads for all inactive semesters
-      const semesterIds = (termsData || []).map((s) => s.id)
+      const semesterIds = terms.map((s) => s.id)
       if (semesterIds.length === 0) {
         setLeadsBySemester({})
         setLoading(false)
@@ -630,10 +632,11 @@ export default function ArchivePage() {
         }
       }
 
-      if (leadsData) {
-        for (const lead of leadsData) {
+      const archivedLeads = (leadsData ?? []) as Lead[]
+      if (archivedLeads.length > 0) {
+        for (const lead of archivedLeads) {
           if (lead.semester_id && grouped[lead.semester_id]) {
-            grouped[lead.semester_id].push(lead as unknown as Lead)
+            grouped[lead.semester_id].push(lead)
           }
         }
       }
@@ -644,14 +647,15 @@ export default function ArchivePage() {
       setExpandedYears(new Set(years.map((y) => y.id)))
 
       // Check which archived leads have already been re-registered
-      const allLeadIds = leadsData?.map((l) => l.id) || []
+      const allLeadIds = archivedLeads.map((l) => l.id)
       if (allLeadIds.length > 0) {
         const { data: reRegistered } = await supabase
           .from("leads")
           .select("re_registered_from")
           .in("re_registered_from", allLeadIds)
         if (reRegistered) {
-          setReRegisteredIds(new Set(reRegistered.map((r) => r.re_registered_from).filter(Boolean)))
+          const rows = reRegistered as Array<{ re_registered_from: string | null }>
+          setReRegisteredIds(new Set(rows.map((r) => r.re_registered_from).filter((id): id is string => Boolean(id))))
         }
       }
 

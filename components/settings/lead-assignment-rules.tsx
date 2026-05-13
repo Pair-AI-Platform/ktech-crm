@@ -126,8 +126,9 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
         .eq("is_active", true)
         .order("full_name")
 
-      if (agentData) {
-        setAgents(agentData)
+      const activeAgents = (agentData ?? []) as Profile[]
+      if (activeAgents.length > 0) {
+        setAgents(activeAgents)
       }
 
       // For now, use demo rules - would be replaced with real API
@@ -138,7 +139,7 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
           description: "Distribute new leads evenly among all active agents",
           rule_type: "round_robin",
           conditions: [],
-          assigned_agents: agentData?.slice(0, 3).map((a) => a.id) || [],
+          assigned_agents: activeAgents.slice(0, 3).map((a) => a.id),
           priority: 100,
           is_active: true,
           created_at: new Date().toISOString(),
@@ -151,7 +152,7 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
           conditions: [
             { field: "source", operator: "in", value: ["instagram"] },
           ],
-          assigned_agents: agentData?.slice(0, 2).map((a) => a.id) || [],
+          assigned_agents: activeAgents.slice(0, 2).map((a) => a.id),
           priority: 90,
           is_active: true,
           created_at: new Date().toISOString(),
@@ -164,7 +165,7 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
           conditions: [
             { field: "school", operator: "equals", value: "american_international" },
           ],
-          assigned_agents: agentData?.slice(1, 3).map((a) => a.id) || [],
+          assigned_agents: activeAgents.slice(1, 3).map((a) => a.id),
           priority: 80,
           is_active: false,
           created_at: new Date().toISOString(),

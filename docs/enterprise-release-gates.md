@@ -23,7 +23,15 @@ CI fails on any command failure. TypeScript is also enforced during `next build`
 
 ## Current TypeScript Policy
 
-`strict` is enabled, but `noImplicitAny` is temporarily disabled. This keeps the release gate enforceable today while preserving the rest of strict mode. Before calling the backend fully enterprise-certified, remove this exception and pay down the remaining implicit-any debt.
+`strict` is enabled with `noImplicitAny` enforced. Query-boundary rows that come back from Supabase should be typed with narrow local row shapes or generated database types before entering application logic.
+
+## External Integration Readiness
+
+The core backend can pass release gates without optional integrations, but production enterprise readiness requires the real provider secrets to be configured and monitored for every enabled integration:
+
+- MyFatoorah: payment API key and webhook secret.
+- Twilio/WhatsApp: account SID, auth token, sender configuration, and webhook delivery monitoring.
+- Sentry: DSN and alert routing.
 
 ## Go/No-Go
 

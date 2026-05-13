@@ -47,6 +47,8 @@ interface UseLeadsOptions {
   enabled?: boolean
 }
 
+type LeadStatsRow = Pick<Lead, "created_at" | "pipeline_stage" | "funding_type">
+
 export function useLeads(options: UseLeadsOptions = {}) {
   const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25, filters: advancedFilters, enabled = true } = options
   const usePagination = page !== undefined
@@ -1036,7 +1038,8 @@ export function useLeadStats() {
       let thisMonth = 0
       let enrolled = 0
 
-      leads?.forEach(lead => {
+      const rows = (leads ?? []) as LeadStatsRow[]
+      rows.forEach(lead => {
         if (lead.pipeline_stage) {
           byStage[lead.pipeline_stage] = (byStage[lead.pipeline_stage] || 0) + 1
         }

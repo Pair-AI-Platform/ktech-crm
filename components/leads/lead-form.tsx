@@ -32,6 +32,9 @@ interface LeadFormProps {
   onSuccess?: () => void
 }
 
+type LeadFormAgent = { id: string; full_name: string; email: string; avatar_url: string | null }
+type LeadFormSemester = { id: string; name: string; is_active: boolean; is_open: boolean; cycle_id?: string }
+
 export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const { createLead, updateLead, loading } = useLeadMutations()
   const { profile, isAgent } = useUser()
@@ -45,8 +48,8 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const [nationalitySearch, setNationalitySearch] = useState("")
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
-  const [agents, setAgents] = useState<{ id: string; full_name: string; email: string; avatar_url: string | null }[]>([])
-  const [semesters, setSemesters] = useState<{ id: string; name: string; is_active: boolean; is_open: boolean; cycle_id?: string }[]>([])
+  const [agents, setAgents] = useState<LeadFormAgent[]>([])
+  const [semesters, setSemesters] = useState<LeadFormSemester[]>([])
   const formScrollRef = useRef<HTMLDivElement>(null)
   const isEditing = !!lead
 
@@ -58,7 +61,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       .select("*")
       .eq("is_active", true)
       .order("name_ar", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data }: { data: SchoolEntity[] | null }) => {
         if (data) setDbSchools(data)
       })
     supabase
@@ -66,14 +69,14 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       .select("id, full_name, email, avatar_url")
       .eq("is_active", true)
       .order("full_name")
-      .then(({ data }) => {
+      .then(({ data }: { data: LeadFormAgent[] | null }) => {
         if (data) setAgents(data)
       })
     supabase
       .from("semesters")
       .select("id, name, is_active, is_open, cycle_id")
       .order("start_date", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data }: { data: LeadFormSemester[] | null }) => {
         if (data) {
           setSemesters(data)
           // Auto-select first open term in active cycle for new leads

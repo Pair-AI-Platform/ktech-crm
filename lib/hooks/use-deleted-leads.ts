@@ -7,6 +7,11 @@ import { isDemoMode } from "@/lib/demo-data"
 import { queryKeys } from "./query-keys"
 import type { Profile, PipelineStage, ContactStatus, LeadSource, LeadSourceCategory, FundingType } from "@/types"
 
+type DeletedLeadStatsRow = {
+  deleted_at: string
+  is_restored: boolean | null
+}
+
 export interface DeletedLead {
   id: string
   original_lead_id: string
@@ -344,7 +349,8 @@ export function useDeletedLeadsStats() {
       let thisMonth = 0
       let restoredCount = 0
 
-      deletedLeads?.forEach(lead => {
+      const rows = (deletedLeads ?? []) as DeletedLeadStatsRow[]
+      rows.forEach(lead => {
         if (lead.is_restored) {
           restoredCount++
         }
@@ -353,7 +359,7 @@ export function useDeletedLeadsStats() {
         }
       })
 
-      const total = deletedLeads?.filter(l => !l.is_restored).length || 0
+      const total = rows.filter(l => !l.is_restored).length
 
       return { total, restoredCount, thisMonth }
     },

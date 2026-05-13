@@ -24,6 +24,8 @@ interface AuditLogsResult {
   refetch: () => void
 }
 
+type LeadIdRow = { id: string }
+
 export function useAuditLogs(options: UseAuditLogsOptions): AuditLogsResult {
   const { isAdmin, userId, page, pageSize, search, filterTable, filterAction } = options
   const queryClient = useQueryClient()
@@ -46,7 +48,8 @@ export function useAuditLogs(options: UseAuditLogsOptions): AuditLogsResult {
           .from("leads")
           .select("id")
           .eq("assigned_to", userId)
-        assignedLeadIds = leads?.map((l) => l.id) || []
+        const rows = (leads ?? []) as LeadIdRow[]
+        assignedLeadIds = rows.map((l) => l.id)
       }
 
       // Build count query

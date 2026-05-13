@@ -62,7 +62,7 @@ export function SFDownPaymentCard({ lead, onSuccess }: SFDownPaymentCardProps) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data }: { data: PaymentTransaction | null }) => {
         if (!cancelled) {
           setTransaction(data)
           if (data) {

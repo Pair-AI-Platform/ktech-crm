@@ -129,7 +129,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       .select("*")
       .eq("is_active", true)
       .order("name_ar", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data }: { data: SchoolEntity[] | null }) => {
         if (data) setDbSchools(data)
       })
   }, [])

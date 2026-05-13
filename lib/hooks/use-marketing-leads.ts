@@ -34,6 +34,10 @@ interface CreateMarketingLeadData {
   created_by: string
 }
 
+type MarketingLeadRow = Omit<MarketingLead, "assigned_agent"> & {
+  assigned_agent: { full_name: string } | { full_name: string }[] | null
+}
+
 export function useMarketingLeads() {
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -48,7 +52,8 @@ export function useMarketingLeads() {
 
       if (error) throw new Error(error.message)
       // Supabase returns the join as array; normalize to single object or null
-      return (data ?? []).map((row): MarketingLead => ({
+      const rows = (data ?? []) as MarketingLeadRow[]
+      return rows.map((row): MarketingLead => ({
         id: row.id,
         first_name: row.first_name,
         last_name: row.last_name,

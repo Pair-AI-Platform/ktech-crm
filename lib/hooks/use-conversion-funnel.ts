@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoLeads } from "@/lib/demo-data"
 import { queryKeys } from "./query-keys"
-import type { PipelineStage } from "@/types"
+import type { FundingType, PipelineStage } from "@/types"
 
 export interface FunnelStage {
   stage: PipelineStage
@@ -27,7 +27,12 @@ const FUNNEL_STAGES: { stage: PipelineStage; label: string }[] = [
   { stage: "enrolled", label: "Enrolled" },
 ]
 
-function buildFunnel(leads: { pipeline_stage: string }[]): FunnelStage[] {
+type FunnelLeadRow = {
+  pipeline_stage: PipelineStage
+  funding_type: FundingType
+}
+
+function buildFunnel(leads: { pipeline_stage: PipelineStage }[]): FunnelStage[] {
   const stageCounts: Record<string, number> = {}
 
   // Count leads that have reached each stage (cumulative - leads at later stages count for earlier ones)
@@ -112,7 +117,7 @@ export function useConversionFunnel(
       const { data: leads, error } = await query
       if (error) throw new Error(error.message)
 
-      const allLeads = leads || []
+      const allLeads = (leads ?? []) as FunnelLeadRow[]
       const pucLeads = allLeads.filter((l) => l.funding_type === "puc")
       const sfLeads = allLeads.filter((l) => l.funding_type === "self_funded")
 

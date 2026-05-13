@@ -125,7 +125,8 @@ export function WhatsAppHistory({ leadId, studentId, limit = 20 }: WhatsAppHisto
         setIsDemoMode(true)
         setMessages(DEMO_MESSAGES)
       } else {
-        const processedMessages = (data || []).map(msg => ({
+        const rows = (data ?? []) as WhatsAppMessage[]
+        const processedMessages = rows.map((msg) => ({
           ...msg,
           direction: msg.direction || "outgoing"
         }))
