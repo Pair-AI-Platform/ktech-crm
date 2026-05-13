@@ -23,11 +23,10 @@ export function AnnouncementButton({ isAdmin }: AnnouncementButtonProps) {
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
-
-  if (!isAdmin) return null
-
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+
+  if (!isAdmin) return null
 
   const handleSend = async () => {
     if (!title.trim()) {
