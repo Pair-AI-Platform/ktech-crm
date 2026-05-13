@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "__tests__/**",
+    "thekstocks-automation/venv/**",
+    ".claude/**",
+    ".playwright-mcp/**",
+    ".review-slices/**",
   ]),
   {
     rules: {

@@ -1,6 +1,6 @@
 # ktech Enrollment CRM
 
-A comprehensive enrollment CRM for Kuwait Technical College (ktech) built with Next.js 14 and Supabase.
+A comprehensive enrollment CRM for Kuwait Technical College (ktech) built with Next.js 16 and Supabase.
 
 ## Features
 
@@ -20,7 +20,7 @@ A comprehensive enrollment CRM for Kuwait Technical College (ktech) built with N
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS
 - **UI Components**: Radix UI primitives with custom styling
 - **Backend**: Supabase (PostgreSQL + Auth + Realtime)
 - **Validation**: Zod
@@ -28,7 +28,7 @@ A comprehensive enrollment CRM for Kuwait Technical College (ktech) built with N
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20+
 - npm or yarn
 - Supabase account
 

@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     // Fetch student
     const { data: student, error: studentError } = await supabase
       .from("students")
-      .select("id, first_name, last_name, funding_type, puc_fee_paid")
+      .select("id, lead_id, first_name, last_name, funding_type, puc_fee_paid")
       .eq("id", studentId)
       .single()
 
@@ -63,14 +63,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!student.lead_id) {
+      return NextResponse.json(
+        { error: "Student is not linked to a lead; cannot record PUC fee payment" },
+        { status: 409 }
+      )
+    }
+
     // Create payment transaction record for cash payment
     const { data: transaction, error: txError } = await supabase
       .from("payment_transactions")
       .insert({
+        lead_id: student.lead_id,
         student_id: studentId,
         amount: PUC_FEE_AMOUNT,
         currency: "KWD",
         payment_method: "cash",
+        payment_purpose: "puc_fee",
         status: "completed",
         cash_invoice_number: receiptNumber,
         cash_received_by: user.id,
@@ -109,6 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Log activity
     await supabase.from("activities").insert({
+      lead_id: student.lead_id,
       student_id: studentId,
       activity_type: "puc_fee_paid",
       title: "PUC Fee Paid (Cash)",

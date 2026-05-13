@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/thekstocks-automation/venv/
 /.pnp
 .pnp.*
 .yarn/*
@@ -23,6 +24,9 @@
 # misc
 .DS_Store
 *.pem
+.claude/
+.playwright-mcp/
+.review-slices/
 
 # debug
 npm-debug.log*

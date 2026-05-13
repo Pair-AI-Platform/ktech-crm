@@ -25,7 +25,7 @@ function normalizePhone(phone: string): string {
 }
 
 export const POST = withApiHandler(
-  { context: 'ai-transfer-webhook', requireAuth: false },
+  { context: 'ai-transfer-webhook', requireAuth: false, skipOriginCheck: true },
   async ({ req, logger }) => {
     // 1. Validate API key
     const apiKey = req.headers.get('x-api-key')

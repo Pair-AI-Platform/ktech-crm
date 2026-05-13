@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Fetch student details
     const { data: student, error: studentError } = await supabase
       .from("students")
-      .select("id, first_name, last_name, phone, email, civil_id, funding_type, puc_fee_paid")
+      .select("id, lead_id, first_name, last_name, phone, email, civil_id, funding_type, puc_fee_paid")
       .eq("id", studentId)
       .single()
 
@@ -63,6 +63,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "PUC fee has already been paid" },
         { status: 400 }
+      )
+    }
+
+    if (!student.lead_id) {
+      return NextResponse.json(
+        { error: "Student is not linked to a lead; cannot record PUC fee payment" },
+        { status: 409 }
       )
     }
 
@@ -94,6 +101,8 @@ export async function POST(request: NextRequest) {
       displayCurrencyIso: "KWD",
       language: "en",
       customerReference: `PUC-${studentId}`,
+      callBackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/myfatoorah/webhook`,
+      errorUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/myfatoorah/webhook?error=true`,
     })
 
     if (!paymentResult.success) {
@@ -107,10 +116,12 @@ export async function POST(request: NextRequest) {
     const { data: transaction, error: txError } = await supabase
       .from("payment_transactions")
       .insert({
+        lead_id: student.lead_id,
         student_id: studentId,
         amount: PUC_FEE_AMOUNT,
         currency: "KWD",
         payment_method: "myfatoorah",
+        payment_purpose: "puc_fee",
         status: "pending",
         civil_id: studentCivilId,
         myfatoorah_invoice_id: paymentResult.invoiceId,
@@ -131,6 +142,7 @@ export async function POST(request: NextRequest) {
 
     // Log activity
     await supabase.from("activities").insert({
+      lead_id: student.lead_id,
       student_id: studentId,
       activity_type: "puc_fee_link_created",
       title: "PUC Fee Payment Link Created",

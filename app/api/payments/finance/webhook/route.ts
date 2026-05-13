@@ -104,7 +104,7 @@ ${data.financeRef ? `<div><div class="info-label">Finance Ref</div><div class="i
 }
 
 export const POST = withApiHandler(
-  { context: "finance-webhook", requireAuth: false },
+  { context: "finance-webhook", requireAuth: false, skipOriginCheck: true },
   async ({ req, logger }) => {
     const rawBody = await req.text()
 

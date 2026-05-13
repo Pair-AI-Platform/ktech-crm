@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { convertLeadToStudent, promoteSFLeadToApplicant } from '@/lib/enrollment/convert-lead'
 import { getPaymentStatus, verifyWebhookSignature } from '@/lib/myfatoorah/client'
-import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT, TEST_FEE_AMOUNT } from '@/lib/config/constants'
+import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT, PUC_FEE_AMOUNT, TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { createLogger } from '@/lib/logger'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 
@@ -231,6 +231,58 @@ async function processEnrollmentInvoice(
         return NextResponse.json({
           success: true,
           message: 'File fee payment processed — lead moved to File stage',
+        })
+      }
+
+      // Handle PUC fee payments — mark the linked student fee as paid
+      if (transaction.payment_purpose === 'puc_fee') {
+        await supabase
+          .from('payment_transactions')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', transaction.id)
+
+        const { error: studentUpdateError } = await supabase
+          .from('students')
+          .update({
+            puc_fee_paid: true,
+            puc_payment_receipt_submitted: true,
+          })
+          .eq('id', transaction.student_id)
+
+        await supabase.from('activities').insert({
+          lead_id: transaction.lead_id,
+          student_id: transaction.student_id,
+          activity_type: 'puc_fee_paid',
+          title: 'PUC Fee Payment Received',
+          description: `PUC fee payment of ${PUC_FEE_AMOUNT} KWD received via MyFatoorah`,
+          metadata: {
+            transaction_id: transaction.id,
+            payment_method: 'myfatoorah',
+            payment_purpose: 'puc_fee',
+            amount: PUC_FEE_AMOUNT,
+            invoice_id: invoiceId,
+            payment_id: statusResult.paymentId,
+          },
+        })
+
+        if (studentUpdateError) {
+          logger.error('PUC fee paid but failed to update student', {
+            studentId: transaction.student_id,
+            error: studentUpdateError.message,
+          })
+          return NextResponse.json({
+            success: true,
+            message: 'PUC fee payment recorded but student update failed — flagged for review',
+          })
+        }
+
+        logger.info('PUC fee paid, student marked as paid', { studentId: transaction.student_id })
+        return NextResponse.json({
+          success: true,
+          message: 'PUC fee payment processed',
         })
       }
 

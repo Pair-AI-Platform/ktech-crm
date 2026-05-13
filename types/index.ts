@@ -646,6 +646,7 @@ export interface Student {
 // =============================================
 
 export type PaymentMethod = 'myfatoorah' | 'cash' | 'bank_transfer'
+export type PaymentPurpose = 'enrollment' | 'test_fee' | 'file_fee' | 'puc_fee' | 'psp_fee'
 
 export type EnrollmentPaymentStatus =
   | 'pending'      // Payment link sent, waiting
@@ -666,6 +667,7 @@ export interface PaymentTransaction {
   amount: number
   currency: string
   payment_method: PaymentMethod
+  payment_purpose?: PaymentPurpose
   status: EnrollmentPaymentStatus
 
   // MyFatoorah Fields
