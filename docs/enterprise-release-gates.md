@@ -5,7 +5,7 @@ This project should not be treated as enterprise-ready unless every gate below i
 ## Required CI Gates
 
 - `npm run env:check -- --allow-placeholder`
-- `npm run lint`
+- `npm run lint -- --quiet`
 - `npm run typecheck`
 - `npm test`
 - `npm run build`
