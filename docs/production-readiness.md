@@ -143,8 +143,14 @@ Snapshot at 2026-05-23. Run `npm audit --production` for a current view.
 
 ## Closed since last snapshot
 
-- `/api/cron/priority-reminders` declared in `vercel.json` `crons`
-  at `* * * * *` (matches the 50 s in-route lock TTL).
+- `/api/cron/priority-reminders` invoked from
+  `.github/workflows/cron-priority-reminders.yml` on a 5-minute
+  schedule. Vercel Hobby only supports daily crons, so we drive the
+  schedule from GitHub Actions instead. The endpoint is gated by
+  `Authorization: Bearer ${CRON_SECRET}` and dedupes cross-instance
+  via Upstash, so overlapping firings are safe.
+  Required repo secrets: `CRON_SECRET` (same value as the Vercel env)
+  and `PRODUCTION_APP_URL` (e.g. `https://ktech-adl.vercel.app`).
 - `change_stage` automation now performs position recompute via the
   shared `shift_stage_positions` RPC and posts the same assignee
   notification as the manual path. The only intentional divergence

@@ -1,0 +1,37 @@
+name: Cron — priority reminders
+
+# Trigger /api/cron/priority-reminders on a schedule.
+# Vercel Hobby only supports daily cron, so we run this from GitHub Actions
+# instead. The endpoint is gated by Bearer CRON_SECRET and deduped via
+# Upstash tryClaimCronRun, so multiple/overlapping firings are safe.
+#
+# Required repo secrets:
+#   CRON_SECRET         — same value as Vercel env CRON_SECRET
+#   PRODUCTION_APP_URL  — e.g. https://ktech-adl.vercel.app
+
+on:
+  schedule:
+    # Every 5 minutes. The in-route lock TTL is 50 s, so per-minute firing
+    # would be safe but wastes Actions minutes. 5-minute cadence keeps
+    # reminders timely without burning the free-tier budget.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Invoke priority-reminders endpoint
+        run: |
+          set -euo pipefail
+          response=$(curl --silent --show-error --max-time 60 \
+            --write-out "\nHTTP_STATUS:%{http_code}\n" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.PRODUCTION_APP_URL }}/api/cron/priority-reminders")
+          echo "$response"
+          status=$(echo "$response" | grep -o 'HTTP_STATUS:[0-9]*' | cut -d: -f2)
+          if [ "$status" != "200" ]; then
+            echo "::error::Cron endpoint returned non-200 status: $status"
+            exit 1
+          fi
