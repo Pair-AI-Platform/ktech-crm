@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================
-   KTECH CRM Design System
+   ADL CRM Design System
    Navy & Blue, Enterprise Professional
    Clarity-First, Brand-Aligned
    ============================================ */
@@ -82,7 +82,7 @@
 }
 
 /* ============================================
-   Light Theme - KTECH Cool-Blue Palette
+   Light Theme - ADL Cool-Blue Palette
    ============================================ */
 :root {
   /* Backgrounds - Cool off-whites */
@@ -94,7 +94,7 @@
   --bg-active: #CBD5E1;
   --bg-canvas: #F8FAFC;
 
-  /* Primary - KTECH Navy */
+  /* Primary - ADL Navy */
   --primary: #2d3a6d;
   --primary-hover: #3a4a80;
   --primary-muted: rgba(45, 58, 109, 0.08);
@@ -102,7 +102,7 @@
   --primary-foreground: #FFFFFF;
   --primary-gradient: linear-gradient(135deg, #2d3a6d 0%, #3a4a80 100%);
 
-  /* Accent - KTECH Light Blue */
+  /* Accent - ADL Light Blue */
   --accent: #5b73a8;
   --accent-hover: #4a5f96;
   --accent-muted: rgba(91, 115, 168, 0.08);
@@ -147,7 +147,7 @@
   --info-muted: rgba(91, 115, 168, 0.08);
   --info-bg: rgba(91, 115, 168, 0.04);
 
-  /* Pipeline Stages - KTECH blue-inspired tones */
+  /* Pipeline Stages - ADL blue-inspired tones */
   --stage-new: #64748B;
   --stage-contacted: #8b9dc3;
   --stage-appointed: #5b73a8;
@@ -223,7 +223,7 @@ html.light, .light {
 }
 
 /* ============================================
-   Dark Theme - KTECH Premium Dark
+   Dark Theme - ADL Premium Dark
    True-black base, brand indigo, clear elevation
    ============================================ */
 html.dark, .dark {
@@ -236,7 +236,7 @@ html.dark, .dark {
   --bg-active: #232c48;
   --bg-canvas: #07080f;
 
-  /* Primary - KTECH brand indigo */
+  /* Primary - ADL brand indigo */
   --primary: #5a72d4;
   --primary-hover: #6b83e5;
   --primary-muted: rgba(90, 114, 212, 0.15);

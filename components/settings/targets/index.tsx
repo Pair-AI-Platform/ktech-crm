@@ -52,7 +52,7 @@ function AdminTargetSettings() {
     saveAll,
   } = useTargetSettings()
 
-  const directionRef = { current: 1 as 1 | -1 }
+  const [direction, setDirection] = useState<1 | -1>(1)
 
   const currentMonth = (() => {
     const now = new Date()
@@ -61,14 +61,14 @@ function AdminTargetSettings() {
   const canGoNext = month < currentMonth
 
   const handlePrevMonth = () => {
-    directionRef.current = -1
+    setDirection(-1)
     const [y, m] = month.split('-').map(Number)
     const d = new Date(y, m - 2, 1)
     changeMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
   const handleNextMonth = () => {
-    directionRef.current = 1
+    setDirection(1)
     const [y, m] = month.split('-').map(Number)
     const d = new Date(y, m, 1)
     changeMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
@@ -148,13 +148,14 @@ function AdminTargetSettings() {
         seasons={seasons}
         selectedSeason={selectedSeason}
         onChangeSeason={changeSeason}
+        direction={direction}
       />
 
       <div className="overflow-hidden">
-        <AnimatePresence mode="wait" custom={directionRef.current}>
+        <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={`${month}-${selectedSeason?.id ?? 'none'}`}
-            custom={directionRef.current}
+            custom={direction}
             variants={slideVariants}
             initial="enter"
             animate="center"

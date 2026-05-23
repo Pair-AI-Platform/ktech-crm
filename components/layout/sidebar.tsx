@@ -425,7 +425,7 @@ export function Sidebar({ user }: SidebarProps) {
         {!isCollapsed && (
           <Link href="/dashboard" className="flex items-center gap-3 ml-3 group">
             <h1 className="font-display text-lg font-semibold text-[var(--text-primary)] leading-none tracking-tight group-hover:text-[var(--primary)] transition-colors">
-              ktech <span className="text-[var(--text-tertiary)] group-hover:text-[var(--primary)]">ADL</span>
+              <span className="text-[var(--text-tertiary)] group-hover:text-[var(--primary)]">ADL</span>
             </h1>
           </Link>
         )}

@@ -1,0 +1,151 @@
+# ADL — Production readiness summary
+
+Snapshot of the system's posture against the 2026-05-09 adversarial review
+(`REVIEW.md`, 48 BLOCKER / 71 WARNING / 4 INFO across 6 slices).
+
+## Verification gates
+
+```bash
+npm run verify          # typecheck + lint + test + build
+npm run verify:release  # also runs scripts/verify-production-env.mjs
+```
+
+Current status on `fix/greeting-header-hydration`:
+
+| Gate       | Status |
+| ---------- | ------ |
+| typecheck  | ✅ 0 errors |
+| lint       | ✅ 0 warnings (`--quiet`) |
+| unit/integ | ✅ 181 / 181 passing across 16 files |
+| build      | ✅ green |
+
+## Attack-chain remediation status
+
+### CHAIN A — Unauthenticated admin takeover — **CLOSED**
+
+- `requireDemoMode()` gates `/api/setup-demo`, `/api/demo-login`,
+  `/api/seed-demo-users`, `/api/seed-archive-leads`.
+  Without `DEMO_MODE_ENABLED=true` each route returns 404.
+- `/api/seed-demo-users` requires `Bearer ${CRON_SECRET}` in the
+  `Authorization` header — no secret in query string anymore.
+- `getUserProfile()` no longer special-cases any email — role comes from
+  `profiles` only.
+- `validateOrigin()` in `lib/api-handler.ts` reads explicit
+  `ALLOWED_ORIGIN_HOSTS`; the previous `*.vercel.app` wildcard is gone.
+- `/api/admin/run-migration` is triple-gated: `ENABLE_MIGRATION_API=true`
+  env, `MIGRATION_TOKEN` header/body match, and DB-side admin role check.
+  SQL is hardcoded; no caller-supplied SQL.
+
+### CHAIN B — Payment integrity — **CLOSED**
+
+- All four webhook handlers (`myfatoorah`, `psp`, `finance`,
+  `ai-transfer`) now call `recordWebhookEvent()` / `markWebhookProcessed`
+  / `markWebhookFailed` for replay protection.
+- `payment_transactions` immutability trigger (migration 173) checks
+  `auth.role() = 'service_role'`. Migration 169's earlier
+  `auth.uid() IS NULL` test, which also matched the `anon` role, is replaced.
+- PSP create/cash amounts default to `PSP_FEE_AMOUNT`; client overrides
+  require admin role. Same pattern for PUC fees (`PUC_FEE_AMOUNT`).
+- SF cash route caps `paymentAmount` to remaining balance computed
+  server-side from prior `payment_transactions` rows.
+- `webhook_events` has `(source, event_id)` UNIQUE and a CHECK on source.
+
+### CHAIN C — RBAC / RLS drift — **CLOSED**
+
+- Migration 174 adds `WITH CHECK` to `leads_update_policy` —
+  agents cannot reassign leads they don't own.
+- `round_robin_state` has RLS with admin-only writes.
+- `audit_log` direct INSERT/UPDATE/DELETE blocked by RLS; legitimate
+  writes flow through the SECURITY DEFINER trigger.
+- `RoleGuard` fails closed — returns null on loading, missing profile,
+  or unauthorized role.
+- PSP self-service upload validates MIME, size, and sanitises filename
+  (`lib/upload-validation.ts`).
+
+### CHAIN D — Cron / automation idempotency — **CLOSED**
+
+- The only remaining cron route, `/api/cron/priority-reminders`,
+  requires `Authorization: Bearer ${CRON_SECRET}` and acquires a
+  cross-instance lock via `tryClaimCronRun()` (Upstash SETNX EX).
+  `lastRunTimestamp` only updates after successful processing.
+- SMS reminder/birthday crons were removed in the SMS retirement
+  (migrations 172/176); no SMS code paths remain.
+- Automation engine still uses `MAX_AUTOMATION_DEPTH=3` with
+  `tryAcquireAutomationLock` and an in-memory re-entry guard. Upstash
+  is the cross-instance dedup. **Operational requirement:** Upstash
+  must be configured in production.
+
+### CHAIN E — Live production bugs — **CLOSED**
+
+- `useAgentStatusHistoryToday` now resolves to a valid
+  `queryKeys.agentStatusHistory.today()` defined in `lib/hooks/query-keys.ts`.
+- `useTeamAppointments` queries `scheduled_date`, `scheduled_time`,
+  `assigned_agent` (the actual column names).
+- `/api/puc-import` is a lead-creation route; no longer inserts
+  `payment_transactions` with `amount: 0`.
+
+## Required production environment variables
+
+Verified by `scripts/verify-production-env.mjs`:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CRON_SECRET`
+- `MYFATOORAH_WEBHOOK_SECRET`
+- `AI_TRANSFER_WEBHOOK_SECRET`
+- `TWILIO_AUTH_TOKEN`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `NEXT_PUBLIC_SENTRY_DSN`
+
+Forbidden in production: `DEMO_MODE_ENABLED=true`, `ENABLE_MIGRATION_API=true`.
+
+See `.env.local.example` for the full template, including optional
+`ALLOWED_ORIGIN_HOSTS` and `HEALTH_TOKEN`.
+
+## Operating documents
+
+- `docs/enterprise-release-gates.md` — gate definition.
+- `docs/enterprise-operations-runbook.md` — release checklist,
+  migration apply/rollback, payment incident response, webhook
+  investigation, access review, monitoring baseline.
+- `docs/staging-setup.md` — staging Supabase setup for risky migrations.
+- `REVIEW.md` + `.review-slices/` — adversarial review used as the
+  remediation backlog (intentionally git-ignored).
+
+## Dependency vulnerabilities (`npm audit --production`)
+
+Snapshot at 2026-05-23. Run `npm audit --production` for a current view.
+
+| Package | Severity | Direct? | Runtime impact | Action |
+| --- | --- | --- | --- | --- |
+| `xlsx` | high | yes | client-side Excel parsing in 4 admin-only dialogs (PUC import, ministry acceptance, enroll-from-list, ministry import) | No fix on npm registry. SheetJS recommends installing from `https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz`. Mitigated today by admin-only RBAC; an attacker needs admin to upload a malicious workbook. |
+| `axios` | high | no (via `twilio`) | server-side only, called with known twilio.com URLs | Wait for upstream twilio fix. |
+| `fast-uri` | high | no (via `@sentry/nextjs` → webpack → ajv) | build/dev tooling | Not in runtime. |
+| `rollup` | high | no (via `@sentry/nextjs`, vitest) | build/dev tooling | Not in runtime. |
+
+`next` was high (DoS via Image Optimizer remotePatterns); patched in
+`next@16.2.6` and pinned to `^16.2.6`.
+
+## Open follow-ups (not blockers)
+
+- Migration 169 status in production should be visually confirmed
+  before the next payment correction is attempted.
+- `change_stage` automation action still bypasses `updateLeadMutation`;
+  consider funneling it through the shared mutation helper if the
+  parity matters for activity logs / position recompute.
+- AI tools (`lib/ai/tools/*`) should be re-verified to query-filter on
+  `assigned_to`/`assigned_agent` rather than JS post-filter, even after
+  the round-2 RLS lockdown.
+- `/api/cron/priority-reminders` is not declared in `vercel.json`'s
+  `crons` array. It is protected by `CRON_SECRET` and ready to be
+  triggered by Vercel Cron, GitHub Actions, or an external scheduler;
+  confirm with operations which scheduler should fire it and how
+  often (suggested: every 60 s, matching the in-route lock TTL).
+- `incrementContactCount` in `lib/hooks/use-leads.ts` is a documented
+  read-then-write race on a cosmetic counter; safe in current usage,
+  fix via Postgres RPC when the counter becomes load-bearing.
+- Ad-hoc `console.log` calls in 4 payment routes (`psp/webhook`,
+  `psp/send-link`, `send-link`, `puc-fee/send-link`) bypass the
+  redacting logger. Payloads logged are IDs/SIDs (low PII risk) but
+  should be routed through `lib/logger.ts` for consistency.

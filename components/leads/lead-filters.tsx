@@ -33,6 +33,7 @@ import { WITHDRAWAL_REASONS, COMPETITOR_OPTIONS, MILITARY_SECURITY_OPTIONS } fro
 import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useCycles } from "@/lib/hooks/use-cycles"
 import { useLostReasons } from "@/lib/hooks/use-leads"
+import type { LostReason } from "@/types"
 import { useCampaigns, type Campaign } from "@/lib/hooks/use-campaigns"
 import { useUser, useAgents } from "@/lib/hooks/use-user"
 import { cn } from "@/lib/utils"
@@ -237,7 +238,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
     }))
   }
 
-  const lostReasonsByCategory = lostReasons.reduce<Record<string, typeof lostReasons>>((acc, reason) => {
+  const lostReasonsByCategory = lostReasons.reduce((acc: Record<string, LostReason[]>, reason) => {
     if (!acc[reason.category]) acc[reason.category] = []
     acc[reason.category].push(reason)
     return acc

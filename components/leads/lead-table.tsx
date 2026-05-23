@@ -390,11 +390,14 @@ export function LeadTable({
   }, [leads])
 
   useEffect(() => {
-    refreshRegistrationStatus()
+    const refreshTimer = window.setTimeout(refreshRegistrationStatus, 0)
     // Listen for storage events (from sf-document-manager dispatching)
     const handler = () => refreshRegistrationStatus()
     window.addEventListener('storage', handler)
-    return () => window.removeEventListener('storage', handler)
+    return () => {
+      window.clearTimeout(refreshTimer)
+      window.removeEventListener('storage', handler)
+    }
   }, [refreshRegistrationStatus])
 
   // Optimistic updates - store pending changes locally

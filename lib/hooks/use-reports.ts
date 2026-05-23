@@ -55,6 +55,28 @@ export interface ReportFilters {
   sourceCategory: LeadSourceCategory | 'all'
 }
 
+export interface EarlyWithdrawalData {
+  total: number
+  percentOfEnrolled: number
+  totalEnrolledWithAnchor: number
+  avgWeek: number
+  excludedMissingAnchor: number
+  byWeek: Array<{ week: number; count: number }>
+  byAgent: Array<{ agentId: string; agentName: string; avatarUrl?: string | null; count: number; percent: number }>
+  byReason: Array<{ reasonId: string; reason: string; count: number; percent: number }>
+  rows: Array<{
+    studentId: string
+    studentName: string
+    fundingType: FundingType
+    agentName: string
+    semesterName: string
+    courseStartDate: string
+    withdrawalDate: string
+    week: number
+    reason: string
+  }>
+}
+
 export const defaultFilters: ReportFilters = {
   dateRange: { start: null, end: null, preset: 'month' },
   cycleId: null,
@@ -66,8 +88,6 @@ export const defaultFilters: ReportFilters = {
   source: 'all',
   sourceCategory: 'all',
 }
-
-type TermIdRow = { id: string }
 
 // =============================================
 // REPORT DATA TYPES
@@ -818,9 +838,8 @@ export function useReports(filters: ReportFilters = defaultFilters, options?: { 
           .from('semesters')
           .select('id')
           .eq('cycle_id', filters.cycleId)
-        const cycleTermRows = (cycleTerms ?? []) as TermIdRow[]
-        if (cycleTermRows.length > 0) {
-          leadsQuery = leadsQuery.in('semester_id', cycleTermRows.map(t => t.id))
+        if (cycleTerms && cycleTerms.length > 0) {
+          leadsQuery = leadsQuery.in('semester_id', cycleTerms.map(t => t.id))
         }
       }
 
@@ -3186,43 +3205,11 @@ export interface AgentTargetProgress {
 
 export type TargetMode = 'simple' | 'custom' | 'funding'
 
-type AgentTargetRow = {
+interface AgentTargetRow {
   agent_id: string
-  month: string
   puc_files?: number | null
   sf_files?: number | null
   sf_applicants?: number | null
-}
-
-type AgentTargetValues = {
-  puc_files: number
-  sf_files: number
-  sf_applicants: number
-}
-
-type AgentTargetAgentRow = {
-  id: string
-  full_name: string
-}
-
-type AgentTargetLeadRow = {
-  id: string
-  assigned_to: string | null
-  pipeline_stage: PipelineStage
-  created_at: string
-  gender: string | null
-  funding_type: FundingType | null
-}
-
-type AgentTargetHistoryLeadRow = {
-  id: string
-  created_at: string
-  pipeline_stage: PipelineStage
-  funding_type: FundingType | null
-}
-
-type OverallTargetRow = {
-  sf_applicants: number | null
 }
 
 // Helper: get weekly breakdown for a given month
@@ -3365,22 +3352,15 @@ export function useAgentTargetProgress(agentId?: string) {
       if (leadsError) throw new Error(leadsError.message)
 
       // SF enrolled targets come from the 'overall' row
-      const overallSfAppMap = new Map<string, number>(
-        ((overallTargets || []) as AgentTargetRow[]).map(t => [t.agent_id, t.sf_applicants || 0])
-      )
-      const targetsMap = new Map<string, AgentTargetValues>(
-        ((targets || []) as AgentTargetRow[]).map(t => [t.agent_id, {
-        puc_files: t.puc_files || 0,
-        sf_files: t.sf_files || 0,
+      const overallSfAppMap = new Map((overallTargets || []).map((t: AgentTargetRow) => [t.agent_id, t.sf_applicants || 0]))
+      const targetsMap = new Map<string, AgentTargetRow>((targets || []).map((t: AgentTargetRow) => [t.agent_id, {
+        ...t,
         sf_applicants: overallSfAppMap.get(t.agent_id) || 0,
-      }])
-      )
+      }]))
 
-      const agentRows = (agents ?? []) as AgentTargetAgentRow[]
-      const leadRows = (leads ?? []) as AgentTargetLeadRow[]
-      const allProgress: AgentTargetProgress[] = agentRows.map(agent => {
+      const allProgress: AgentTargetProgress[] = (agents || []).map(agent => {
         const agentTarget = targetsMap.get(agent.id)
-        const agentLeads = leadRows.filter(l => l.assigned_to === agent.id)
+        const agentLeads = (leads || []).filter(l => l.assigned_to === agent.id)
 
         // PUC Files: funding_type=puc AND pipeline_stage=application
         const pucLeads = agentLeads.filter(l => l.funding_type === 'puc' && l.pipeline_stage === 'application')
@@ -3509,7 +3489,7 @@ export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) 
       ])
 
       if (!pastTargets || pastTargets.length === 0) return []
-      const overallSfApplicants = ((overallRow as OverallTargetRow | null)?.sf_applicants) || 0
+      const overallSfApplicants = overallRow?.sf_applicants || 0
 
       // Fetch leads for historical months
       const oldestDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1)
@@ -3523,21 +3503,19 @@ export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) 
         .gte("created_at", oldestDate.toISOString().split('T')[0])
         .lt("created_at", currentMonthStart.toISOString().split('T')[0])
 
-      const targetRows = pastTargets as AgentTargetRow[]
-      const leadRows = (leads ?? []) as AgentTargetHistoryLeadRow[]
-      const monthlyHistory: MonthlyTargetHistory[] = targetRows.map(t => {
+      const monthlyHistory: MonthlyTargetHistory[] = pastTargets.map(t => {
         const [y, m] = t.month.split('-').map(Number)
         const monthStart = new Date(y, m - 1, 1)
         const monthEnd = new Date(y, m, 0)
         const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
-        const monthLeads = leadRows.filter(l => {
+        const monthLeads = (leads || []).filter(l => {
           const ld = new Date(l.created_at)
           return ld >= monthStart && ld <= monthEnd
         })
 
         // Use overall sf_enrolled target (monthly row sf_applicants is 0 for new data)
-        const sfAppTarget = (t.sf_applicants || 0) > 0 ? (t.sf_applicants ?? 0) : overallSfApplicants
+        const sfAppTarget = (t.sf_applicants || 0) > 0 ? t.sf_applicants : overallSfApplicants
         const monthlyTarget = (t.puc_files || 0) + (t.sf_files || 0) + sfAppTarget
 
         const weeklyTargets = computeWeeklyTargets(

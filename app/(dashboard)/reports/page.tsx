@@ -434,32 +434,41 @@ export default function ReportsPage() {
   // Lock agent filter when profile loads
   useEffect(() => {
     if (isAgent && profile?.id && filters.agentId !== profile.id) {
-      setSelectedAgent(profile.id)
-      setFilters(prev => ({ ...prev, agentId: profile.id }))
+      const profileId = profile.id
+      const timer = window.setTimeout(() => {
+        setSelectedAgent(profileId)
+        setFilters(prev => ({ ...prev, agentId: profileId }))
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
-  }, [isAgent, profile?.id])
+  }, [isAgent, profile?.id, filters.agentId])
 
   // Redirect agents away from hidden tabs
   useEffect(() => {
     if (isAgent && AGENT_HIDDEN_TABS.includes(activeTab)) {
-      setActiveTab('overview')
+      const timer = window.setTimeout(() => setActiveTab('overview'), 0)
+      return () => window.clearTimeout(timer)
     }
   }, [isAgent, activeTab])
 
   // Override date range when PUC tab is active and a PUC period exists
   useEffect(() => {
     if (activeTab === 'puc' && activePUCPeriod) {
-      setFilters(prev => ({
-        ...prev,
-        dateRange: {
-          start: activePUCPeriod.start_date,
-          end: activePUCPeriod.end_date,
-          preset: 'all',
-        },
-      }))
-      setDateFrom(activePUCPeriod.start_date)
-      setDateTo(activePUCPeriod.end_date)
-      setDatePreset('all')
+      const period = activePUCPeriod
+      const timer = window.setTimeout(() => {
+        setFilters(prev => ({
+          ...prev,
+          dateRange: {
+            start: period.start_date,
+            end: period.end_date,
+            preset: 'all',
+          },
+        }))
+        setDateFrom(period.start_date)
+        setDateTo(period.end_date)
+        setDatePreset('all')
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
   }, [activeTab, activePUCPeriod?.id])
 
@@ -557,7 +566,7 @@ export default function ReportsPage() {
     }
     setFilters(newFilters)
     setLastUpdated(new Date())
-  }, [datePreset, dateFrom, dateTo, sourceCategory, fundingType, selectedAgent, gender, selectedCycleId, isAgent, profile?.id])
+  }, [datePreset, dateFrom, dateTo, sourceCategory, fundingType, selectedAgent, gender, selectedCycleId, isAgent, profile])
 
   // Handle date preset change
   const handleDatePresetChange = (preset: string) => {
@@ -719,8 +728,11 @@ export default function ReportsPage() {
       const diff = Date.now() - lastUpdated.getTime()
       setIsStale(diff > 5 * 60 * 1000)
     }, 30_000)
-    setIsStale(false)
-    return () => clearInterval(timer)
+    const resetTimer = window.setTimeout(() => setIsStale(false), 0)
+    return () => {
+      clearInterval(timer)
+      window.clearTimeout(resetTimer)
+    }
   }, [lastUpdated])
 
   // Determine content state

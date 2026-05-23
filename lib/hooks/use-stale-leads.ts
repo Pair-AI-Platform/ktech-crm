@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DashboardLead } from './use-dashboard-stats'
 
 const TERMINAL_STAGES = ['lost', 'enrolled', 'withdraw']
@@ -27,13 +27,23 @@ export function useStaleLeads(
   allLeads: DashboardLead[],
   agents: Array<{ id: string; full_name: string }>
 ) {
+  const [now, setNow] = useState(0)
+
+  useEffect(() => {
+    const initialTimer = window.setTimeout(() => setNow(Date.now()), 0)
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => {
+      window.clearTimeout(initialTimer)
+      window.clearInterval(interval)
+    }
+  }, [])
+
   const agentMap = useMemo(
     () => new Map(agents.map((a) => [a.id, a.full_name])),
     [agents]
   )
 
   const staleByAgent = useMemo(() => {
-    const now = Date.now()
     const threshold = now - 5 * DAY_MS
 
     const grouped = new Map<string, DashboardLead[]>()
@@ -62,16 +72,15 @@ export function useStaleLeads(
     }
 
     return result.sort((a, b) => b.count - a.count)
-  }, [allLeads, agentMap])
+  }, [allLeads, agentMap, now])
 
   const unassignedCount = useMemo(() => {
     return allLeads.filter(
       (l) => !l.assigned_to && !TERMINAL_STAGES.includes(l.pipeline_stage)
     ).length
-  }, [allLeads])
+  }, [allLeads, now])
 
   const stuckLeads = useMemo(() => {
-    const now = Date.now()
     const threshold = now - 7 * DAY_MS
 
     return allLeads.filter((l) => {

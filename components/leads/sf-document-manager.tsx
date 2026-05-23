@@ -49,6 +49,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
   const [sentToRegistration, setSentToRegistration] = useState(false)
   const [sendingRegistration, setSendingRegistration] = useState(false)
+  const [includePreferences, setIncludePreferences] = useState(false)
   const [isTransfer, setIsTransfer] = useState(false)
   const [isSpecialNeeds, setIsSpecialNeeds] = useState(false)
   const { updateLead } = useLeadMutations()
@@ -80,7 +81,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
       const res = await fetch('/api/leads/send-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId: lead.id }),
+        body: JSON.stringify({ leadId: lead.id, includePreferences }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -95,6 +96,22 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
       toast.error('Failed to send registration email')
     } finally {
       setSendingRegistration(false)
+    }
+  }
+
+  const openFormPreview = async (name: 'Application.pdf' | 'Preferences.pdf') => {
+    try {
+      const res = await fetch(
+        `/api/forms/registration/preview?name=${encodeURIComponent(name)}`
+      )
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        toast.error(data.error || 'Form unavailable')
+        return
+      }
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch {
+      toast.error('Failed to load form preview')
     }
   }
 
@@ -546,6 +563,68 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
           <p className="text-sm text-[var(--text-muted)]">
             Select a graduate type to view required documents
           </p>
+        </div>
+      )}
+
+      {/* Registration Email Attachments */}
+      {!sentToRegistration && (
+        <div className="pt-4 border-t border-[var(--border)] space-y-2">
+          <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+            Email Attachments
+          </div>
+          <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)]">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+              <span className="text-sm text-[var(--text)] truncate">Application.pdf</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 shrink-0">
+                Always
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void openFormPreview('Application.pdf')}
+              className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Preview
+            </button>
+          </div>
+          <label className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)] cursor-pointer hover:border-[var(--border-strong)] transition-colors">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  setIncludePreferences((v) => !v)
+                }}
+                className="shrink-0"
+                aria-label="Toggle Preferences attachment"
+              >
+                {includePreferences ? (
+                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Square className="w-4 h-4 text-[var(--text-muted)]" />
+                )}
+              </button>
+              <FileText className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+              <span className="text-sm text-[var(--text)] truncate">Preferences.pdf</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] shrink-0">
+                Manual
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                void openFormPreview('Preferences.pdf')
+              }}
+              className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Preview
+            </button>
+          </label>
         </div>
       )}
 

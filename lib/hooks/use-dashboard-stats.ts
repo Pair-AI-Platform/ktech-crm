@@ -114,19 +114,19 @@ export function useDashboardStats() {
     if (!profile?.id) return allLeads
     if (isAdmin) return allLeads
     return allLeads.filter(l => l.assigned_to === profile.id)
-  }, [allLeads, profile?.id, isAdmin])
+  }, [allLeads, profile, isAdmin])
 
   const sfLeads = useMemo(() => {
     const base = allLeads.filter(l => l.funding_type === 'self_funded')
     if (isAdmin || !profile?.id) return base
     return base.filter(l => l.assigned_to === profile.id)
-  }, [allLeads, profile?.id, isAdmin])
+  }, [allLeads, profile, isAdmin])
 
   const pucLeads = useMemo(() => {
     const base = allLeads.filter(l => l.funding_type === 'puc')
     if (isAdmin || !profile?.id) return base
     return base.filter(l => l.assigned_to === profile.id)
-  }, [allLeads, profile?.id, isAdmin])
+  }, [allLeads, profile, isAdmin])
 
   const attentionPool = useMemo(() => {
     return isAdmin ? allLeads : myLeads

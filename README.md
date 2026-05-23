@@ -1,4 +1,4 @@
-# ktech Enrollment CRM
+# ADL
 
 A comprehensive enrollment CRM for Kuwait Technical College (ktech) built with Next.js 16 and Supabase.
 
@@ -66,7 +66,7 @@ npm run dev
 ## Project Structure
 
 ```
-ktech-crm/
+adl/
 ├── app/
 │   ├── (auth)/login/         # Authentication pages
 │   ├── (dashboard)/          # Protected dashboard pages

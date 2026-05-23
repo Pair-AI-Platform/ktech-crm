@@ -52,25 +52,26 @@ type TimeRange = "day" | "week" | "month"
 type DisplayMode = "calendar" | "table"
 type CalendarMode = "all" | "appointments" | "callbacks"
 
+function parseUrlDate(dateParam: string | null): Date | null {
+  if (!dateParam) return null
+  const parsed = new Date(dateParam + 'T00:00:00')
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 export default function CalendarPage() {
   const { profile } = useUser()
   const { agents } = useAgents()
   const searchParams = useSearchParams()
   const [timeRange, setTimeRange] = useState<TimeRange>("week")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar")
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
+  const [currentDate, setCurrentDate] = useState<Date>(() => parseUrlDate(searchParams.get('date')) ?? new Date())
 
-  // Ensure the date is set to today on mount (handles SSR hydration)
+  // Keep the calendar in sync when the date query param changes.
   useEffect(() => {
-    const dateParam = searchParams.get('date')
-    if (dateParam) {
-      const parsed = new Date(dateParam + 'T00:00:00')
-      if (!isNaN(parsed.getTime())) {
-        setCurrentDate(parsed)
-        return
-      }
-    }
-    setCurrentDate(new Date())
+    const nextDate = parseUrlDate(searchParams.get('date'))
+    if (!nextDate) return
+    const timer = window.setTimeout(() => setCurrentDate(nextDate), 0)
+    return () => window.clearTimeout(timer)
   }, [searchParams])
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("appointments")
   const [selectedTypes, setSelectedTypes] = useState<AppointmentType[]>([])
@@ -125,7 +126,8 @@ export default function CalendarPage() {
     if (appointmentId && !loading && appointments.length > 0) {
       const apt = appointments.find(a => a.id === appointmentId)
       if (apt) {
-        setSelectedAppointment(apt)
+        const timer = window.setTimeout(() => setSelectedAppointment(apt), 0)
+        return () => window.clearTimeout(timer)
       }
     }
   }, [searchParams, loading, appointments])

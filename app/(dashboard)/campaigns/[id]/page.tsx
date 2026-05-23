@@ -143,12 +143,25 @@ function ConversationDrawer({
 
   useEffect(() => {
     if (!contact) return
-    setLoading(true)
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setLoading(true)
+    }, 0)
     fetch(`/api/campaigns/contacts/${contact.id}/messages`)
       .then(r => r.json())
-      .then(data => setMessages(data.messages || []))
-      .catch(() => setMessages([]))
-      .finally(() => setLoading(false))
+      .then(data => {
+        if (!cancelled) setMessages(data.messages || [])
+      })
+      .catch(() => {
+        if (!cancelled) setMessages([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [contact])
 
   if (!contact || !campaign) return null

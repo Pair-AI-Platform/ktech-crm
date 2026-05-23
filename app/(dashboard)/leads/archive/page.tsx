@@ -251,25 +251,33 @@ function TransferDialog({
   const [result, setResult] = useState<{ count: number; skipped?: number; skippedNames?: string[] } | null>(null)
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return
+    let cancelled = false
+    const resetTimer = window.setTimeout(() => {
+      if (cancelled) return
       setSelectedAgent(null)
       setSelectedSemester(activeSemesters[0]?.id || "")
       setSuccess(false)
       setError(null)
       setResult(null)
       setLoadingAgents(true)
+    }, 0)
 
-      async function fetchAgents() {
-        const supabase = createClient()
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("is_active", true)
-          .order("full_name")
-        setAgents(data || [])
-        setLoadingAgents(false)
-      }
-      fetchAgents()
+    async function fetchAgents() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("is_active", true)
+        .order("full_name")
+      if (cancelled) return
+      setAgents(data || [])
+      setLoadingAgents(false)
+    }
+    fetchAgents()
+    return () => {
+      cancelled = true
+      window.clearTimeout(resetTimer)
     }
   }, [isOpen, activeSemesters])
 

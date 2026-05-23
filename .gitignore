@@ -28,6 +28,9 @@
 .playwright-mcp/
 .review-slices/
 
+# supabase CLI cache (do not commit)
+supabase/.temp/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -36,6 +39,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!.env.local.example
 
 # vercel
 .vercel

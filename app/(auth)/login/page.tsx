@@ -132,7 +132,7 @@ export default function LoginPage() {
                   </motion.div>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">ktech</h1>
+                  <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">ADL</h1>
                   <p className="text-[var(--text-secondary)] text-sm">Kuwait Technical College</p>
                 </div>
               </div>
@@ -221,7 +221,7 @@ export default function LoginPage() {
                 className="w-12 h-12 rounded-xl shadow-sm"
               />
               <div>
-                <h1 className="text-xl font-bold text-[var(--text-primary)]">ktech ADL</h1>
+                <h1 className="text-xl font-bold text-[var(--text-primary)]">ADL</h1>
                 <p className="text-[var(--text-muted)] text-xs">Kuwait Technical College</p>
               </div>
             </div>

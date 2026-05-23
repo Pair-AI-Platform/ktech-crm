@@ -1251,8 +1251,9 @@ function PUCDailyAppliedStudents({ data }: { data: PUCAppliedStudentRow[] }) {
     setPage(0)
   }
 
-  const SortHeader = ({ label, field }: { label: string; field: typeof sortKey }) => (
+  const renderSortHeader = (label: string, field: typeof sortKey) => (
     <th
+      key={field}
       className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3 cursor-pointer hover:text-[var(--text-primary)] transition-colors select-none"
       onClick={() => handleSort(field)}
     >
@@ -1332,13 +1333,13 @@ function PUCDailyAppliedStudents({ data }: { data: PUCAppliedStudentRow[] }) {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-[var(--border)]">
-                      <SortHeader label="Date" field="date" />
-                      <SortHeader label="Student" field="studentName" />
-                      <SortHeader label="Source" field="source" />
-                      <SortHeader label="Major" field="major" />
-                      <SortHeader label="GPA" field="gpa" />
-                      <SortHeader label="Gender" field="gender" />
-                      <SortHeader label="Agent" field="assignedAgent" />
+                      {renderSortHeader("Date", "date")}
+                      {renderSortHeader("Student", "studentName")}
+                      {renderSortHeader("Source", "source")}
+                      {renderSortHeader("Major", "major")}
+                      {renderSortHeader("GPA", "gpa")}
+                      {renderSortHeader("Gender", "gender")}
+                      {renderSortHeader("Agent", "assignedAgent")}
                       <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Stage</th>
                       <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Doc Status</th>
                     </tr>

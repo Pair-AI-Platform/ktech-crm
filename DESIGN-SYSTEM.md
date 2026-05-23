@@ -1,4 +1,4 @@
-# KTECH Design System — Master Style Guide
+# ADL Design System — Master Style Guide
 
 > **Codename:** Harvey AI Design System
 > **Philosophy:** Warm-Neutral, Enterprise Professional, Clarity-First, Intentionally Restrained

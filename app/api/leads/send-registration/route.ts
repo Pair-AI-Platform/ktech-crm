@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import * as nodemailer from 'nodemailer'
 import { withApiHandler } from '@/lib/api-handler'
+import { createServiceRoleClient } from '@/lib/supabase/server'
+
+const FORMS_BUCKET = 'registration-forms'
 
 export const POST = withApiHandler(
   { context: 'send-registration' },
   async ({ req, supabase, user, logger }) => {
-    const { leadId } = await req.json()
+    const { leadId, includePreferences } = await req.json()
 
     if (!leadId) {
       return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
@@ -82,7 +85,7 @@ export const POST = withApiHandler(
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: #059669; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
           <h2 style="margin: 0;">New Student Registration</h2>
-          <p style="margin: 5px 0 0; opacity: 0.9;">KTECH Enrollment System</p>
+          <p style="margin: 5px 0 0; opacity: 0.9;">ADL Enrollment System</p>
         </div>
 
         <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
@@ -128,32 +131,66 @@ export const POST = withApiHandler(
         </div>
 
         <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">
-          Sent from KTECH CRM &mdash; ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+          Sent from ADL &mdash; ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
     `
 
+    const storageClient = createServiceRoleClient()
+    const formNames = ['Application.pdf', ...(includePreferences ? ['Preferences.pdf'] : [])]
+    const attachments: { filename: string; content: Buffer }[] = []
+    for (const filename of formNames) {
+      const { data, error } = await storageClient.storage
+        .from(FORMS_BUCKET)
+        .download(filename)
+      if (error || !data) {
+        logger.error('Failed to download registration form', {
+          filename,
+          error: error?.message,
+        })
+        return NextResponse.json(
+          { error: `Registration form "${filename}" is not configured. Please contact an administrator.` },
+          { status: 500 }
+        )
+      }
+      attachments.push({
+        filename,
+        content: Buffer.from(await data.arrayBuffer()),
+      })
+    }
+
     try {
       await transporter.sendMail({
-        from: `"KTECH CRM" <${smtpFrom}>`,
+        from: `"ADL" <${smtpFrom}>`,
         to: registrationEmail,
         subject: `New Registration: ${studentName} — Civil ID: ${lead.civil_id}`,
         html: emailHtml,
+        attachments,
       })
 
-      logger.info('Registration email sent', { leadId, to: registrationEmail, civilId: lead.civil_id })
+      logger.info('Registration email sent', {
+        leadId,
+        to: registrationEmail,
+        civilId: lead.civil_id,
+        attachments: attachments.map((a) => a.filename),
+      })
 
       // Log activity
+      const attachedList = attachments.map((a) => a.filename).join(', ')
       await supabase.from('activities').insert({
         lead_id: leadId,
         activity_type: 'registration_sent',
         title: 'Sent to Registration',
-        description: `Registration email sent to ${registrationEmail} for ${studentName} (Civil ID: ${lead.civil_id})`,
+        description: `Registration email sent to ${registrationEmail} for ${studentName} (Civil ID: ${lead.civil_id}). Attached: ${attachedList}`,
         created_by: user.id,
-        metadata: { recipient: registrationEmail, civil_id: lead.civil_id },
+        metadata: {
+          recipient: registrationEmail,
+          civil_id: lead.civil_id,
+          attachments: attachments.map((a) => a.filename),
+        },
       })
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, attachments: attachments.map((a) => a.filename) })
     } catch (err: any) {
       logger.error('Failed to send registration email', { error: err.message })
       return NextResponse.json(

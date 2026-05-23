@@ -1,4 +1,4 @@
-# Staging setup runbook — KTECH CRM
+# Staging setup runbook — ADL
 
 Goal: have a Supabase database that is **not** production but has the same
 schema as production, so we can apply risky migrations there first and

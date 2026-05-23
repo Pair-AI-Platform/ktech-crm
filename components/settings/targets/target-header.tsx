@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Target, Save, Check, Calendar, ChevronLeft, ChevronRight } from "lucide-react"
@@ -29,6 +29,7 @@ interface TargetHeaderProps {
   seasons: Semester[]
   selectedSeason: Semester | null
   onChangeSeason: (id: string) => void
+  direction?: 1 | -1
 }
 
 const categoryConfig: { key: TargetCategory; label: string; shortLabel: string; color: string; dotColor: string }[] = [
@@ -52,6 +53,7 @@ export function TargetHeader({
   seasons,
   selectedSeason,
   onChangeSeason,
+  direction: externalDirection,
 }: TargetHeaderProps) {
   const [year, m] = month.split('-')
   const monthLabel = new Date(parseInt(year), parseInt(m) - 1, 1).toLocaleDateString('en-US', {
@@ -59,15 +61,16 @@ export function TargetHeader({
     year: 'numeric',
   })
 
-  const directionRef = useRef<1 | -1>(1)
+  const [localDirection, setLocalDirection] = useState<1 | -1>(1)
+  const direction = externalDirection ?? localDirection
 
   const handlePrev = () => {
-    directionRef.current = -1
+    setLocalDirection(-1)
     onPrevMonth?.()
   }
 
   const handleNext = () => {
-    directionRef.current = 1
+    setLocalDirection(1)
     onNextMonth?.()
   }
 
@@ -149,10 +152,10 @@ export function TargetHeader({
             )}
             <Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />
             <div className="overflow-hidden h-5 flex items-center min-w-[120px]">
-              <AnimatePresence mode="wait" custom={directionRef.current}>
+              <AnimatePresence mode="wait" custom={direction}>
                 <motion.span
                   key={month}
-                  custom={directionRef.current}
+                  custom={direction}
                   variants={{
                     initial: (dir: number) => ({ y: dir * 10, opacity: 0 }),
                     animate: { y: 0, opacity: 1 },

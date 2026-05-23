@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { QueryProvider } from "@/lib/query-client"
 
 export const metadata: Metadata = {
-  title: "ktech ADL",
+  title: "ADL",
   description: "Kuwait Technical College ADL - Manage leads, students, and appointments",
 }
 

@@ -53,43 +53,6 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const formScrollRef = useRef<HTMLDivElement>(null)
   const isEditing = !!lead
 
-  // Fetch schools, agents, and semesters from database
-  useEffect(() => {
-    const supabase = createClient()
-    supabase
-      .from("schools")
-      .select("*")
-      .eq("is_active", true)
-      .order("name_ar", { ascending: true })
-      .then(({ data }: { data: SchoolEntity[] | null }) => {
-        if (data) setDbSchools(data)
-      })
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, avatar_url")
-      .eq("is_active", true)
-      .order("full_name")
-      .then(({ data }: { data: LeadFormAgent[] | null }) => {
-        if (data) setAgents(data)
-      })
-    supabase
-      .from("semesters")
-      .select("id, name, is_active, is_open, cycle_id")
-      .order("start_date", { ascending: false })
-      .then(({ data }: { data: LeadFormSemester[] | null }) => {
-        if (data) {
-          setSemesters(data)
-          // Auto-select first open term in active cycle for new leads
-          if (!lead) {
-            const openTerm = data.find((s) => s.is_active && s.is_open)
-            if (openTerm) {
-              setFormData((prev) => ({ ...prev, semester_id: openTerm.id }))
-            }
-          }
-        }
-      })
-  }, [])
-
   const [formData, setFormData] = useState<LeadFormData>({
     first_name: lead?.first_name || "",
     last_name: lead?.last_name || "",
@@ -163,6 +126,43 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     assigned_to: lead?.assigned_to || "",
     campaign_id: "",
   })
+
+  // Fetch schools, agents, and semesters from database
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from("schools")
+      .select("*")
+      .eq("is_active", true)
+      .order("name_ar", { ascending: true })
+      .then(({ data }) => {
+        if (data) setDbSchools(data)
+      })
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, avatar_url")
+      .eq("is_active", true)
+      .order("full_name")
+      .then(({ data }) => {
+        if (data) setAgents(data)
+      })
+    supabase
+      .from("semesters")
+      .select("id, name, is_active, is_open, cycle_id")
+      .order("start_date", { ascending: false })
+      .then(({ data }) => {
+        if (data) {
+          setSemesters(data)
+          // Auto-select first open term in active cycle for new leads
+          if (!lead) {
+            const openTerm = data.find((s) => s.is_active && s.is_open)
+            if (openTerm) {
+              setFormData((prev) => ({ ...prev, semester_id: openTerm.id }))
+            }
+          }
+        }
+      })
+  }, [lead])
 
   // Use database schools if available, fallback to hardcoded SCHOOLS
   const schoolSource: { id: string; name_en: string; name_ar: string; gender?: string }[] = dbSchools.length > 0

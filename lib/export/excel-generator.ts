@@ -67,7 +67,7 @@ export function generateExcelXML(data: ExportData): string {
  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
   <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
     <Title>${title}</Title>
-    <Author>ktech CRM</Author>
+    <Author>ADL</Author>
     <Created>${new Date().toISOString()}</Created>
   </DocumentProperties>
   <Styles>

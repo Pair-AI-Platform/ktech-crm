@@ -4,6 +4,7 @@ import { useMarketingLeads } from "@/lib/hooks/use-marketing-leads"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Inbox } from "lucide-react"
 import type { PipelineStage } from "@/types"
+import type { MarketingLead } from "@/lib/hooks/use-marketing-leads"
 
 const STAGE_COLORS: Record<string, string> = {
   new: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -35,7 +36,7 @@ export function MarketingLeadsTable() {
   const { leads, isLoading, error } = useMarketingLeads()
 
   // Stage summary
-  const stageCounts = leads.reduce<Record<string, number>>((acc, lead) => {
+  const stageCounts = leads.reduce((acc: Record<string, number>, lead: MarketingLead) => {
     acc[lead.pipeline_stage] = (acc[lead.pipeline_stage] || 0) + 1
     return acc
   }, {})
