@@ -4,6 +4,9 @@ import twilio from "twilio"
 import { getPaymentStatus, verifyWebhookSignature } from "@/lib/myfatoorah/client"
 import { escapeHtml } from "@/lib/utils"
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from "@/lib/webhook-events"
+import { createLogger } from "@/lib/logger"
+
+const logger = createLogger("PSP Payment Webhook")
 
 // Lazy-initialize Twilio client for sending receipts
 function getTwilioClient() {
@@ -184,7 +187,7 @@ export async function POST(request: NextRequest) {
 
     const body = JSON.parse(rawBody)
 
-    console.log("[PSP Payment Webhook] Received:", { transactionId: body?.transactionId, status: body?.status })
+    logger.info("Received", { transactionId: body?.transactionId, status: body?.status })
 
     // MyFatoorah typically sends InvoiceId in the webhook
     const invoiceId = body.InvoiceId || body.Data?.InvoiceId
@@ -203,7 +206,7 @@ export async function POST(request: NextRequest) {
     const eventId = `psp:${invoiceId}`
     const dedup = await recordWebhookEvent(supabase, "myfatoorah", eventId, hashPayload(rawBody), null)
     if (!dedup.ok) {
-      console.log("[PSP Payment Webhook] Deduplicated:", { reason: dedup.reason, eventId })
+      logger.info("Deduplicated", { reason: dedup.reason, eventId })
       return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })
     }
 
@@ -245,7 +248,7 @@ async function processPspWebhookBody(
 
     // Check if already processed
     if (transaction.status === "completed") {
-      console.log("[PSP Payment Webhook] Transaction already completed:", transaction.id)
+      logger.info("Transaction already completed", { transactionId: transaction.id })
       return NextResponse.json({
         success: true,
         message: "Already processed",
@@ -429,13 +432,13 @@ Kuwait Technical College`
           sent_at: new Date().toISOString(),
         })
 
-        console.log("[PSP Payment Webhook] Receipt sent via WhatsApp, SID:", twilioMessage.sid)
+        logger.info("Receipt sent via WhatsApp", { sid: twilioMessage.sid })
       } catch (whatsappError) {
         // Don't fail the webhook if WhatsApp sending fails
         console.error("[PSP Payment Webhook] Failed to send receipt via WhatsApp:", whatsappError)
       }
 
-      console.log("[PSP Payment Webhook] Successfully processed payment for lead:", lead.id)
+      logger.info("Successfully processed payment", { leadId: lead.id })
 
       return NextResponse.json({
         success: true,
