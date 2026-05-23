@@ -22,6 +22,10 @@ if (process.env.DEMO_MODE_ENABLED === "true") {
   errors.push("DEMO_MODE_ENABLED must not be true for production releases")
 }
 
+if (process.env.ENABLE_MIGRATION_API === "true") {
+  errors.push("ENABLE_MIGRATION_API must not be true for production releases")
+}
+
 if (!process.env.SENTRY_ORG || !process.env.SENTRY_PROJECT) {
   warnings.push("SENTRY_ORG/SENTRY_PROJECT are not both set; source-map upload may be disabled")
 }

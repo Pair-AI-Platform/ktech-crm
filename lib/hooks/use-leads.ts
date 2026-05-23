@@ -966,26 +966,12 @@ export function useLeadMutations() {
     }
   }
 
-  // TODO: This uses read-then-write which has a race condition under concurrent calls.
-  // Ideally, replace with a Supabase RPC like: supabase.rpc('increment_contact_count', { lead_id: leadId })
-  // For now, the read-then-write approach is acceptable for typical usage patterns.
+  // Atomic increment via Postgres RPC (migration 179). RLS on leads still
+  // gates which rows can be updated, matching the read-then-write predecessor.
   const incrementContactCount = async (leadId: string) => {
     try {
-      const { data: lead } = await supabase
-        .from("leads")
-        .select("contact_count")
-        .eq("id", leadId)
-        .single()
-
-      await supabase
-        .from("leads")
-        .update({
-          contact_count: ((lead as unknown as Record<string, number>)?.contact_count || 0) + 1,
-          last_contacted_at: new Date().toISOString(),
-        })
-        .eq("id", leadId)
-
-      // Invalidate to reflect updated contact count
+      const { error } = await supabase.rpc("increment_contact_count", { lead_id: leadId })
+      if (error) throw new Error(error.message)
       queryClient.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })
     } catch (err) {
       console.error("Error incrementing contact count:", err)
