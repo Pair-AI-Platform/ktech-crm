@@ -155,7 +155,7 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
   {
     keywords: ['agent', 'performance', 'compare', 'top', 'leaderboard', 'ranking'],
-    response: `Here's the **agent performance** leaderboard for this month:\n\n| Rank | Agent | Leads | Enrolled | Conv. Rate | Contact Rate |\n|------|-------|-------|----------|------------|-------------|\n| 🥇 | Adel | 87 | 14 | 16% | 94% |\n| 🥈 | Fatima | 76 | 11 | 14% | 91% |\n| 🥉 | Nasser | 68 | 9 | 13% | 88% |\n| 4 | Sara | 72 | 8 | 11% | 85% |\n| 5 | Ahmad | 61 | 7 | 11% | 82% |\n\n**Adel** is leading in both volume and conversion. **Fatima** has the most consistent contact rate. Want me to compare specific agents?`,
+    response: `Here's the **agent performance** leaderboard for this month:\n\n| Rank | Agent | Leads | Enrolled | Conv. Rate | Contact Rate |\n|------|-------|-------|----------|------------|-------------|\n| 🥇 | Aldana | 87 | 14 | 16% | 94% |\n| 🥈 | Fatima | 76 | 11 | 14% | 91% |\n| 🥉 | Nasser | 68 | 9 | 13% | 88% |\n| 4 | Sara | 72 | 8 | 11% | 85% |\n| 5 | Ahmad | 61 | 7 | 11% | 82% |\n\n**Aldana** is leading in both volume and conversion. **Fatima** has the most consistent contact rate. Want me to compare specific agents?`,
   },
   {
     keywords: ['conversion', 'funnel', 'rate', 'drop'],
@@ -163,7 +163,7 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
   {
     keywords: ['enrol', 'student', 'enrollment'],
-    response: `We have **63 enrolled students** this cycle:\n\n| Funding Type | Count | % |\n|-------------|-------|---|\n| Self-funded | 41 | 65% |\n| PUC | 22 | 35% |\n\n| Gender | Count | % |\n|--------|-------|---|\n| Male | 36 | 57% |\n| Female | 27 | 43% |\n\n**Top enrolling agents:**\n1. Adel — 14 students\n2. Fatima — 11 students\n3. Nasser — 9 students\n\nEnrollment is up **18%** compared to the same period last cycle. Want a breakdown by major or placement level?`,
+    response: `We have **63 enrolled students** this cycle:\n\n| Funding Type | Count | % |\n|-------------|-------|---|\n| Self-funded | 41 | 65% |\n| PUC | 22 | 35% |\n\n| Gender | Count | % |\n|--------|-------|---|\n| Male | 36 | 57% |\n| Female | 27 | 43% |\n\n**Top enrolling agents:**\n1. Aldana — 14 students\n2. Fatima — 11 students\n3. Nasser — 9 students\n\nEnrollment is up **18%** compared to the same period last cycle. Want a breakdown by major or placement level?`,
   },
   {
     keywords: ['payment', 'revenue', 'money', 'income', 'paid'],
@@ -171,7 +171,7 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
   {
     keywords: ['recent', 'activity', 'today', 'latest', 'update', 'happened'],
-    response: `Here's the latest CRM activity:\n\n| Time | Lead | Action | Agent |\n|------|------|--------|-------|\n| 10 min ago | Mohammed A. | Moved to **Test** | Adel |\n| 25 min ago | Noura K. | Marked **Interested** | Fatima |\n| 1 hr ago | Abdullah S. | Scheduled visit for Mar 18 | Nasser |\n| 1 hr ago | Dana M. | **Enrolled** 🎉 | Sara |\n| 2 hrs ago | Khaled R. | Payment received (250 KWD) | Ahmad |\n| 2 hrs ago | Reem H. | Moved to **Application** | Fatima |\n| 3 hrs ago | Yousef B. | First contact — Interested | Adel |\n\n**Today's highlights**: 3 stage changes, 1 enrollment, 1 payment, 12 calls made.\n\nWant me to filter by a specific agent or stage?`,
+    response: `Here's the latest CRM activity:\n\n| Time | Lead | Action | Agent |\n|------|------|--------|-------|\n| 10 min ago | Mohammed A. | Moved to **Test** | Aldana |\n| 25 min ago | Noura K. | Marked **Interested** | Fatima |\n| 1 hr ago | Abdullah S. | Scheduled visit for Mar 18 | Nasser |\n| 1 hr ago | Dana M. | **Enrolled** 🎉 | Sara |\n| 2 hrs ago | Khaled R. | Payment received (250 KWD) | Ahmad |\n| 2 hrs ago | Reem H. | Moved to **Application** | Fatima |\n| 3 hrs ago | Yousef B. | First contact — Interested | Aldana |\n\n**Today's highlights**: 3 stage changes, 1 enrollment, 1 payment, 12 calls made.\n\nWant me to filter by a specific agent or stage?`,
   },
   {
     keywords: ['source', 'where', 'marketing', 'channel', 'campaign'],

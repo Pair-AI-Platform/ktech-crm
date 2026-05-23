@@ -33,7 +33,7 @@ export function useActivityFeed(options: {
             metadata: { old_stage: "new", new_stage: "contacted" },
             created_by: "demo-user-id",
             created_at: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
-            created_by_profile: { id: "demo-user-id", full_name: "Adel", email: "adel@ktech.edu.kw" } as Activity["created_by_profile"],
+            created_by_profile: { id: "demo-user-id", full_name: "Aldana Ali", email: "aldana@ktech.edu.kw" } as Activity["created_by_profile"],
           },
           {
             id: "act-2",
@@ -44,7 +44,7 @@ export function useActivityFeed(options: {
             metadata: { old_status: null, new_status: "interested" },
             created_by: "demo-user-id",
             created_at: new Date(now.getTime() - 45 * 60 * 1000).toISOString(),
-            created_by_profile: { id: "demo-user-id", full_name: "Adel", email: "adel@ktech.edu.kw" } as Activity["created_by_profile"],
+            created_by_profile: { id: "demo-user-id", full_name: "Aldana Ali", email: "aldana@ktech.edu.kw" } as Activity["created_by_profile"],
           },
           {
             id: "act-3",
@@ -77,7 +77,7 @@ export function useActivityFeed(options: {
             metadata: { reason: "gpa_below_70" },
             created_by: "demo-user-id",
             created_at: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString(),
-            created_by_profile: { id: "demo-user-id", full_name: "Adel", email: "adel@ktech.edu.kw" } as Activity["created_by_profile"],
+            created_by_profile: { id: "demo-user-id", full_name: "Aldana Ali", email: "aldana@ktech.edu.kw" } as Activity["created_by_profile"],
           },
         ]
 

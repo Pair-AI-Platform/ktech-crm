@@ -21,7 +21,7 @@ export default function LeadDetailJobs() {
     intendedMajor: 'Marketing',
     gpa: { grade10: 99.1, grade11: 91.5, average: 95.3 },
     source: 'Facebook',
-    assignedTo: 'Adel Ghazal',
+    assignedTo: 'Aldana Ali',
     progress: 10,
     stage: 'New',
     created: 'Nov 17, 2025',

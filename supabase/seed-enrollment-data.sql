@@ -10,7 +10,7 @@ DECLARE
   _first_names_m TEXT[] := ARRAY[
     'Mohammed','Ahmed','Omar','Khalid','Yousef','Fahad','Abdullah','Ali','Hassan','Faisal',
     'Nasser','Salem','Turki','Bader','Hamad','Rashed','Mansour','Jaber','Saud','Talal',
-    'Mishari','Abdulaziz','Ibrahim','Nawaf','Bandar','Mubarak','Adel','Saleh','Khaled','Waleed'
+    'Mishari','Abdulaziz','Ibrahim','Nawaf','Bandar','Mubarak','Tariq','Saleh','Khaled','Waleed'
   ];
   _first_names_f TEXT[] := ARRAY[
     'Fatima','Noura','Sara','Dana','Reem','Lina','Haya','Maryam','Aisha','Latifa',

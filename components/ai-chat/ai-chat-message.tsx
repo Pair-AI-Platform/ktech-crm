@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Sparkles, User } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface AIChatMessageProps {
@@ -12,43 +12,41 @@ interface AIChatMessageProps {
 export function AIChatMessage({ role, content }: AIChatMessageProps) {
   const isUser = role === "user"
 
+  if (isUser) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18 }}
+        className="flex justify-end px-4 py-2"
+      >
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[var(--bg-sunken)] border border-[var(--border)] px-3.5 py-2 text-sm text-[var(--text-primary)] leading-relaxed">
+          <p className="whitespace-pre-wrap">{content}</p>
+        </div>
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className={cn("flex gap-2.5 px-4 py-1.5", isUser ? "flex-row-reverse" : "flex-row")}
+      transition={{ duration: 0.18 }}
+      className="flex gap-2.5 px-4 py-2"
     >
-      {/* Avatar */}
+      <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mt-0.5 shadow-sm">
+        <Sparkles className="w-3 h-3 text-white" />
+      </div>
       <div
         className={cn(
-          "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center mt-0.5",
-          isUser
-            ? "bg-[var(--primary)] text-white"
-            : "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm"
+          "flex-1 min-w-0 text-sm leading-relaxed text-[var(--text-primary)]",
+          "prose prose-sm dark:prose-invert max-w-none",
+          "[&_p]:my-1.5 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+          "[&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5",
+          "[&_table]:text-xs [&_th]:px-2 [&_td]:px-2",
         )}
-      >
-        {isUser ? <User className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-      </div>
-
-      {/* Message bubble */}
-      <div
-        className={cn(
-          "max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
-          isUser
-            ? "bg-[var(--primary)] text-white rounded-tr-md"
-            : "bg-[var(--bg-sunken)] text-[var(--text-primary)] rounded-tl-md"
-        )}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{content}</p>
-        ) : (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5"
-            dangerouslySetInnerHTML={{ __html: formatMarkdown(content) }}
-          />
-        )}
-      </div>
+        dangerouslySetInnerHTML={{ __html: formatMarkdown(content) }}
+      />
     </motion.div>
   )
 }

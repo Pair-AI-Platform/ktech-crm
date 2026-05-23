@@ -93,7 +93,7 @@ export function getMockAuditLogs(): AuditLog[] {
       new_values: { assigned_to: "demo-agent-4" },
       changed_fields: ["assigned_to"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(4 * HOUR),
     },
     {
@@ -109,7 +109,7 @@ export function getMockAuditLogs(): AuditLog[] {
       },
       changed_fields: ["first_name_ar", "last_name_ar", "program", "cohort"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(5 * HOUR),
     },
     {
@@ -133,7 +133,7 @@ export function getMockAuditLogs(): AuditLog[] {
       new_values: { priority: "critical" },
       changed_fields: ["priority"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(8 * HOUR),
     },
     {
@@ -176,7 +176,7 @@ export function getMockAuditLogs(): AuditLog[] {
       },
       changed_fields: [],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(1 * DAY + 3 * HOUR),
     },
     {
@@ -224,7 +224,7 @@ export function getMockAuditLogs(): AuditLog[] {
       new_values: { gpa: 81 },
       changed_fields: ["gpa"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(2 * DAY + 2 * HOUR),
     },
     {
@@ -282,7 +282,7 @@ export function getMockAuditLogs(): AuditLog[] {
       },
       changed_fields: ["amount", "currency", "status", "method"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(3 * DAY + 1 * HOUR),
     },
     {
@@ -305,7 +305,7 @@ export function getMockAuditLogs(): AuditLog[] {
       new_values: { full_name: "Aldana Ali", role: "agent", email: "aldana.ali@ktech.edu.kw" },
       changed_fields: ["full_name", "role", "email"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(3 * DAY + 7 * HOUR),
     },
     {
@@ -317,7 +317,7 @@ export function getMockAuditLogs(): AuditLog[] {
       new_values: { placement_level: "L3" },
       changed_fields: ["placement_level"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(4 * DAY + 2 * HOUR),
     },
     {
@@ -329,7 +329,7 @@ export function getMockAuditLogs(): AuditLog[] {
       new_values: { source: "referral" },
       changed_fields: ["source"],
       user_id: "demo-admin-1",
-      user_email: "adel@ktech.edu.kw",
+      user_email: "aldana@ktech.edu.kw",
       created_at: ts(4 * DAY + 6 * HOUR),
     },
     {

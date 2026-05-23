@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { MessageSquarePlus, Send, Trash2, Sparkles } from "lucide-react"
+import { SquarePen, Send, Trash2, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAiChat } from "@/lib/hooks/use-ai-chat"
 import { AIChatMessage } from "./ai-chat-message"
@@ -63,10 +63,10 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
   }
 
   const suggestions = [
-    { text: "How many leads this month?", icon: "📊" },
-    { text: "Show pipeline breakdown", icon: "🔄" },
-    { text: "Compare agent performance", icon: "👥" },
-    { text: "What's our conversion rate?", icon: "📈" },
+    "How many leads this month?",
+    "Show pipeline breakdown",
+    "Compare agent performance",
+    "What's our conversion rate?",
   ]
 
   return (
@@ -87,15 +87,16 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
               <h2 className="text-sm font-semibold text-[var(--text-primary)] leading-tight">
                 Kadi
               </h2>
-              <p className="text-[10px] text-emerald-500 font-medium leading-tight">Online</p>
+              <p className="text-[11px] text-[var(--text-muted)] leading-tight">AI Assistant</p>
             </div>
           </div>
           <button
             onClick={newConversation}
             className="p-2 rounded-lg hover:bg-[var(--bg-sunken)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             title="New conversation"
+            aria-label="New conversation"
           >
-            <MessageSquarePlus className="w-4 h-4" />
+            <SquarePen className="w-4 h-4" />
           </button>
         </div>
 
@@ -134,32 +135,29 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
         <ScrollArea className="flex-1 min-h-0">
           <div ref={scrollRef} className="py-4 space-y-1">
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                {/* Avatar */}
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
-                  <Sparkles className="w-7 h-7 text-white" />
+              <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-3 shadow-md shadow-emerald-500/15">
+                  <Sparkles className="w-5 h-5 text-white" />
                 </div>
 
-                <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
-                  Hey, I&apos;m Kadi
+                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-1 tracking-tight">
+                  How can I help?
                 </h3>
-                <p className="text-xs text-[var(--text-muted)] mb-8 max-w-[260px] leading-relaxed">
-                  Your CRM assistant. Ask me about leads, performance, enrollments, or anything in your data.
+                <p className="text-xs text-[var(--text-muted)] mb-6 max-w-[240px] leading-relaxed">
+                  Ask about leads, performance, enrollments, or anything in your data.
                 </p>
 
-                {/* Suggestion chips */}
-                <div className="grid grid-cols-2 gap-2 w-full max-w-[320px]">
+                <div className="flex flex-col gap-1.5 w-full max-w-[300px]">
                   {suggestions.map((s) => (
                     <button
-                      key={s.text}
+                      key={s}
                       onClick={() => {
-                        setInput(s.text)
-                        setTimeout(() => sendMessage(s.text), 50)
+                        setInput(s)
+                        setTimeout(() => sendMessage(s), 50)
                       }}
-                      className="flex items-start gap-2 text-xs text-left px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] hover:text-[var(--text-primary)] hover:border-[var(--primary)]/30 transition-all group"
+                      className="text-xs text-left px-3 py-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] hover:text-[var(--text-primary)] transition-colors"
                     >
-                      <span className="text-sm mt-px">{s.icon}</span>
-                      <span className="leading-snug">{s.text}</span>
+                      {s}
                     </button>
                   ))}
                 </div>
@@ -211,8 +209,8 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
               <Send className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">
-            Kadi can make mistakes. Verify important data.
+          <p className="text-[10px] text-[var(--text-muted)]/70 text-center mt-2 leading-tight">
+            Kadi can make mistakes — verify important data.
           </p>
         </form>
       </SheetContent>

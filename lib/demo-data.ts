@@ -79,17 +79,6 @@ export function clearDemoDataUpdates(): void {
 export const DEMO_AGENTS: Profile[] = [
   // Admins
   {
-    id: "admin-1",
-    email: "demo.admin1@example.com",
-    full_name: "Adel Ghazal",
-    role: "admin",
-    avatar_url: undefined,
-    is_active: true,
-    monthly_target: 50,
-    created_at: "2024-01-01T08:00:00Z",
-    updated_at: "2024-01-01T08:00:00Z",
-  },
-  {
     id: "admin-2",
     email: "demo.admin2@example.com",
     full_name: "Aldana Ali",

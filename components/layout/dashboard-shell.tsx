@@ -13,8 +13,8 @@ import type { Profile } from "@/types"
 // Demo user profile for testing
 const DEMO_USER: Profile = {
   id: "demo-user-id",
-  email: "adel@ktech.edu.kw",
-  full_name: "Adel",
+  email: "aldana@ktech.edu.kw",
+  full_name: "Aldana Ali",
   role: "admin",
   avatar_url: undefined,
   is_active: true,

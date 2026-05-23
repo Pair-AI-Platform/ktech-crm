@@ -23,8 +23,8 @@ export interface Profile {
 // Demo user profiles
 const DEMO_ADMIN_PROFILE: Profile = {
   id: "demo-admin-id",
-  email: "adel@ktech.edu.kw",
-  full_name: "Adel",
+  email: "aldana@ktech.edu.kw",
+  full_name: "Aldana Ali",
   role: "admin",
   is_active: true,
   monthly_target: 50,
