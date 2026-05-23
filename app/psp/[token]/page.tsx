@@ -92,6 +92,51 @@ export default function PspSelfServicePage() {
     }
     setVerifyError("")
     setState("verifying")
+
+    // Demo-preview short-circuit: lets agents see the student-facing form
+    // without minting a real token. Any phone is accepted.
+    if (token === "demo-preview") {
+      const demoLead: LeadView = {
+        id: "demo",
+        first_name: "Aldana",
+        last_name: "Ali",
+        first_name_ar: "الدانة",
+        last_name_ar: "علي",
+        civil_id: "300010100123",
+        phone: trimmed,
+        phone_secondary: null,
+        email: "aldana@example.com",
+        date_of_birth: "2006-03-14",
+        school_id: null,
+        graduation_year: 2025,
+        gpa_grade_11: 3.6,
+        education_type: "GOV",
+        is_diplomatic: false,
+        is_special_needs: false,
+        funding_type: "psp",
+      }
+      setLead(demoLead)
+      setDocs([])
+      setPhone(trimmed)
+      setForm({
+        first_name: demoLead.first_name ?? "",
+        last_name: demoLead.last_name ?? "",
+        first_name_ar: demoLead.first_name_ar ?? "",
+        last_name_ar: demoLead.last_name_ar ?? "",
+        civil_id: demoLead.civil_id ?? "",
+        phone_secondary: "",
+        email: demoLead.email ?? "",
+        date_of_birth: demoLead.date_of_birth ?? "",
+        graduation_year: String(demoLead.graduation_year ?? ""),
+        gpa_grade_11: String(demoLead.gpa_grade_11 ?? ""),
+        education_type: "GOV",
+        is_diplomatic: false,
+        is_special_needs: false,
+      })
+      setState("ready")
+      return
+    }
+
     try {
       const res = await fetch(
         `/api/psp/self-service/details?token=${token}&phone=${encodeURIComponent(trimmed)}`,
@@ -167,6 +212,14 @@ export default function PspSelfServicePage() {
 
   async function saveInfo() {
     if (!token || !phone) return
+    if (token === "demo-preview") {
+      setSaving(true)
+      await new Promise(r => setTimeout(r, 300))
+      setSaving(false)
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1500)
+      return
+    }
     setSaving(true)
     try {
       const updates: Record<string, unknown> = {
@@ -213,6 +266,25 @@ export default function PspSelfServicePage() {
 
   async function uploadDoc(rule: DocumentRule, file: File) {
     if (!token || !phone) return
+    if (token === "demo-preview") {
+      setUploadingDocId(rule.id)
+      await new Promise(r => setTimeout(r, 400))
+      setDocs(prev => [
+        ...prev.filter(d => !(d.document_type === rule.id && d.graduate_type === form.education_type)),
+        {
+          id: `demo-${rule.id}-${Date.now()}`,
+          document_type: rule.id,
+          graduate_type: form.education_type,
+          file_name: file.name,
+          public_url: null,
+          is_verified: false,
+          uploaded_at: new Date().toISOString(),
+          expiration_date: null,
+        },
+      ])
+      setUploadingDocId(null)
+      return
+    }
     setUploadingDocId(rule.id)
     try {
       const fd = new FormData()
@@ -245,6 +317,13 @@ export default function PspSelfServicePage() {
 
   async function submit() {
     if (!token || !phone) return
+    if (token === "demo-preview") {
+      setSubmitting(true)
+      await new Promise(r => setTimeout(r, 500))
+      setSubmitting(false)
+      setState("submitted")
+      return
+    }
     setSubmitting(true)
     try {
       // Save edits first so submit reflects current state.

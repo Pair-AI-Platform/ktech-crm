@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, ReactNode } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, ChevronDown, ChevronRight, MoreHorizontal, Trash2, Copy } from "lucide-react"
@@ -191,17 +191,20 @@ export function DashboardBlock({
       </div>
 
       {/* Block Content */}
-      <motion.div
-        initial={false}
-        animate={{
-          height: isCollapsed ? 0 : "auto",
-          opacity: isCollapsed ? 0 : 1,
-        }}
-        transition={{ duration: 0.2 }}
-        className="overflow-hidden"
-      >
-        <div className="p-4">{children}</div>
-      </motion.div>
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
@@ -246,17 +249,20 @@ export function StaticBlock({
       </div>
 
       {/* Content */}
-      <motion.div
-        initial={false}
-        animate={{
-          height: isCollapsed ? 0 : "auto",
-          opacity: isCollapsed ? 0 : 1,
-        }}
-        transition={{ duration: 0.2 }}
-        className="overflow-hidden flex-1"
-      >
-        <div className="p-4 h-full">{children}</div>
-      </motion.div>
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden flex-1"
+          >
+            <div className="p-4 h-full">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
