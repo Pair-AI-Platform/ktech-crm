@@ -11,7 +11,8 @@ import {
   DialogFooter,
 } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, MessageSquare } from "lucide-react"
+import { Check, ExternalLink, Loader2, MessageSquare } from "lucide-react"
+import { isDemoMode } from "@/lib/demo-data"
 import type { Lead } from "@/types"
 
 interface Props {
@@ -23,10 +24,13 @@ interface Props {
 export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
   const [whatsappStatus, setWhatsappStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [errorMsg, setErrorMsg] = useState("")
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const demoMode = isDemoMode()
 
   const reset = () => {
     setWhatsappStatus("idle")
     setErrorMsg("")
+    setPreviewUrl(null)
   }
 
   const handleClose = () => {
@@ -34,9 +38,22 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
     setTimeout(reset, 300)
   }
 
+  function openStudentPreview() {
+    window.open(`/psp/demo-preview?leadId=${lead.id}`, "_blank", "noopener,noreferrer")
+  }
+
   async function sendWhatsApp() {
     setWhatsappStatus("sending")
     setErrorMsg("")
+    setPreviewUrl(null)
+
+    if (demoMode) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setPreviewUrl(`${window.location.origin}/psp/demo-preview?leadId=${lead.id}`)
+      setWhatsappStatus("sent")
+      return
+    }
+
     try {
       const res = await fetch("/api/psp/self-service/send-whatsapp", {
         method: "POST",
@@ -49,6 +66,8 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
         setWhatsappStatus("error")
         return
       }
+      const data = await res.json().catch(() => ({})) as { url?: string }
+      if (data.url) setPreviewUrl(data.url)
       setWhatsappStatus("sent")
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Failed to send")
@@ -84,8 +103,24 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
               {whatsappStatus === "sent" ? "Sent via WhatsApp" : "Send via WhatsApp"}
             </Button>
 
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openStudentPreview}
+              className="w-full justify-start gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Preview as student
+            </Button>
+
             {!lead.phone && (
               <p className="text-xs text-amber-600">Lead has no phone number — WhatsApp is unavailable.</p>
+            )}
+
+            {previewUrl && whatsappStatus === "sent" && (
+              <div className="text-xs text-[var(--text-secondary)] break-all bg-[var(--bg-sunken)] rounded-md p-2 border border-[var(--border)]">
+                <span className="font-medium text-[var(--text-primary)]">Link:</span> {previewUrl}
+              </div>
             )}
 
             {errorMsg && (

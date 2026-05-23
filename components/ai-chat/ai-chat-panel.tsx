@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Send, Trash2, Sparkles } from "lucide-react"
+import { Plus, Send, Trash2, Sparkles, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAiChat } from "@/lib/hooks/use-ai-chat"
 import { AIChatMessage } from "./ai-chat-message"
@@ -73,6 +73,7 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
+        hideClose
         className="w-[420px] max-w-full p-0 flex flex-col gap-0 sm:max-w-[420px] border-l border-[var(--border)]"
       >
         <SheetTitle className="sr-only">Kadi - AI Assistant</SheetTitle>
@@ -90,14 +91,24 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
               <p className="text-[11px] text-[var(--text-muted)] leading-tight">AI Assistant</p>
             </div>
           </div>
-          <button
-            onClick={newConversation}
-            className="p-2 rounded-lg hover:bg-[var(--bg-sunken)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-            title="New conversation"
-            aria-label="New conversation"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={newConversation}
+              className="p-2 rounded-lg hover:bg-[var(--bg-sunken)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              title="New conversation"
+              aria-label="New conversation"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="p-2 rounded-lg hover:bg-[var(--bg-sunken)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              title="Close"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Conversation history sidebar (mini) */}
