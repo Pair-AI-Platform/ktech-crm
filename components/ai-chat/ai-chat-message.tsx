@@ -34,7 +34,7 @@ export function AIChatMessage({ role, content }: AIChatMessageProps) {
       transition={{ duration: 0.18 }}
       className="flex gap-2.5 px-4 py-2"
     >
-      <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mt-0.5 shadow-sm">
+      <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-[var(--primary)] flex items-center justify-center mt-0.5 shadow-sm">
         <Sparkles className="w-3 h-3 text-white" />
       </div>
       <div
@@ -51,7 +51,7 @@ export function AIChatMessage({ role, content }: AIChatMessageProps) {
   )
 }
 
-/** Simple markdown formatting — handles bold, italic, code, lists, and tables */
+/** Simple markdown formatting that handles bold, italic, code, lists, and tables */
 function formatMarkdown(text: string): string {
   if (!text) return ""
 

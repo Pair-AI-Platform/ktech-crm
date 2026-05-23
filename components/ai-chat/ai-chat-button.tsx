@@ -15,8 +15,8 @@ export function AIChatButton({ onClick }: AIChatButtonProps) {
       className={cn(
         "fixed z-40 flex items-center justify-center",
         "w-12 h-12 rounded-xl shadow-lg",
-        "bg-gradient-to-br from-emerald-500 to-teal-600 text-white",
-        "hover:shadow-xl hover:shadow-emerald-500/20 transition-shadow",
+        "bg-[var(--primary)] text-white",
+        "hover:shadow-xl hover:bg-[var(--primary-hover)] transition-all",
         // Desktop: bottom-right
         "bottom-6 right-6",
         // Mobile: offset up to avoid bottom nav
