@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react"
 export function AIChatTyping() {
   return (
     <div className="flex items-center gap-2.5 px-4 py-2">
-      <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+      <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-[var(--primary)] flex items-center justify-center shadow-sm">
         <Sparkles className="w-3 h-3 text-white" />
       </div>
       <div className="flex items-center gap-1">

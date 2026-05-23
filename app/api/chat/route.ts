@@ -143,7 +143,7 @@ interface MockAnswer {
 const MOCK_ANSWERS: MockAnswer[] = [
   {
     keywords: ['hello', 'hi', 'hey', 'marhaba', 'hala'],
-    response: `Hey! 👋 I'm **Kadi**, your CRM assistant. I can help you with:\n\n- **Pipeline stats** — "How many leads do we have?"\n- **Agent performance** — "Compare top agents"\n- **Conversions** — "Show me the funnel"\n- **Enrollments** — "How many students enrolled?"\n- **Payments** — "What's our revenue?"\n- **Recent activity** — "What happened today?"\n\nWhat would you like to know?`,
+    response: `Hey! 👋 I'm **Kadi**, your CRM assistant. I can help you with:\n\n- **Pipeline stats**: "How many leads do we have?"\n- **Agent performance**: "Compare top agents"\n- **Conversions**: "Show me the funnel"\n- **Enrollments**: "How many students enrolled?"\n- **Payments**: "What's our revenue?"\n- **Recent activity**: "What happened today?"\n\nWhat would you like to know?`,
   },
   {
     keywords: ['pipeline', 'breakdown', 'stages', 'stage'],
@@ -159,11 +159,11 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
   {
     keywords: ['conversion', 'funnel', 'rate', 'drop'],
-    response: `Here's the **conversion funnel** (1,247 total leads):\n\n| Stage | Reached | % of Total | Drop-off |\n|-------|---------|------------|----------|\n| New | 1,247 | 100% | — |\n| Contacted | 935 | 75% | 25% |\n| Visit | 598 | 48% | 36% |\n| Test | 412 | 33% | 31% |\n| Application | 287 | 23% | 30% |\n| Applicant | 198 | 16% | 31% |\n| Enrolled | 63 | 5% | 68% |\n\n**Key insight**: The biggest drop-off is at the **Applicant → Enrolled** stage (68%). This suggests follow-up during the enrollment process needs improvement.\n\nWould you like time-trend analysis or per-agent conversion rates?`,
+    response: `Here's the **conversion funnel** (1,247 total leads):\n\n| Stage | Reached | % of Total | Drop-off |\n|-------|---------|------------|----------|\n| New | 1,247 | 100% | - |\n| Contacted | 935 | 75% | 25% |\n| Visit | 598 | 48% | 36% |\n| Test | 412 | 33% | 31% |\n| Application | 287 | 23% | 30% |\n| Applicant | 198 | 16% | 31% |\n| Enrolled | 63 | 5% | 68% |\n\n**Key insight**: The biggest drop-off is at the **Applicant → Enrolled** stage (68%). This suggests follow-up during the enrollment process needs improvement.\n\nWould you like time-trend analysis or per-agent conversion rates?`,
   },
   {
     keywords: ['enrol', 'student', 'enrollment'],
-    response: `We have **63 enrolled students** this cycle:\n\n| Funding Type | Count | % |\n|-------------|-------|---|\n| Self-funded | 41 | 65% |\n| PUC | 22 | 35% |\n\n| Gender | Count | % |\n|--------|-------|---|\n| Male | 36 | 57% |\n| Female | 27 | 43% |\n\n**Top enrolling agents:**\n1. Aldana — 14 students\n2. Fatima — 11 students\n3. Nasser — 9 students\n\nEnrollment is up **18%** compared to the same period last cycle. Want a breakdown by major or placement level?`,
+    response: `We have **63 enrolled students** this cycle:\n\n| Funding Type | Count | % |\n|-------------|-------|---|\n| Self-funded | 41 | 65% |\n| PUC | 22 | 35% |\n\n| Gender | Count | % |\n|--------|-------|---|\n| Male | 36 | 57% |\n| Female | 27 | 43% |\n\n**Top enrolling agents:**\n1. Aldana: 14 students\n2. Fatima: 11 students\n3. Nasser: 9 students\n\nEnrollment is up **18%** compared to the same period last cycle. Want a breakdown by major or placement level?`,
   },
   {
     keywords: ['payment', 'revenue', 'money', 'income', 'paid'],
@@ -171,11 +171,11 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
   {
     keywords: ['recent', 'activity', 'today', 'latest', 'update', 'happened'],
-    response: `Here's the latest CRM activity:\n\n| Time | Lead | Action | Agent |\n|------|------|--------|-------|\n| 10 min ago | Mohammed A. | Moved to **Test** | Aldana |\n| 25 min ago | Noura K. | Marked **Interested** | Fatima |\n| 1 hr ago | Abdullah S. | Scheduled visit for Mar 18 | Nasser |\n| 1 hr ago | Dana M. | **Enrolled** 🎉 | Sara |\n| 2 hrs ago | Khaled R. | Payment received (250 KWD) | Ahmad |\n| 2 hrs ago | Reem H. | Moved to **Application** | Fatima |\n| 3 hrs ago | Yousef B. | First contact — Interested | Aldana |\n\n**Today's highlights**: 3 stage changes, 1 enrollment, 1 payment, 12 calls made.\n\nWant me to filter by a specific agent or stage?`,
+    response: `Here's the latest CRM activity:\n\n| Time | Lead | Action | Agent |\n|------|------|--------|-------|\n| 10 min ago | Mohammed A. | Moved to **Test** | Aldana |\n| 25 min ago | Noura K. | Marked **Interested** | Fatima |\n| 1 hr ago | Abdullah S. | Scheduled visit for Mar 18 | Nasser |\n| 1 hr ago | Dana M. | **Enrolled** 🎉 | Sara |\n| 2 hrs ago | Khaled R. | Payment received (250 KWD) | Ahmad |\n| 2 hrs ago | Reem H. | Moved to **Application** | Fatima |\n| 3 hrs ago | Yousef B. | First contact: Interested | Aldana |\n\n**Today's highlights**: 3 stage changes, 1 enrollment, 1 payment, 12 calls made.\n\nWant me to filter by a specific agent or stage?`,
   },
   {
     keywords: ['source', 'where', 'marketing', 'channel', 'campaign'],
-    response: `Here's a breakdown of lead sources this month:\n\n| Source | Leads | Enrolled | Conv. Rate |\n|--------|-------|----------|------------|\n| Website | 62 | 9 | 14.5% |\n| Instagram | 48 | 6 | 12.5% |\n| Referral | 31 | 7 | 22.6% |\n| Walk-in | 24 | 5 | 20.8% |\n| Karnival | 14 | 2 | 14.3% |\n| WhatsApp | 7 | 1 | 14.3% |\n\n**Best converting source**: **Referrals** at 22.6% — word of mouth is strong!\n**Highest volume**: **Website** with 62 leads.\n\nWant me to compare this to previous months?`,
+    response: `Here's a breakdown of lead sources this month:\n\n| Source | Leads | Enrolled | Conv. Rate |\n|--------|-------|----------|------------|\n| Website | 62 | 9 | 14.5% |\n| Instagram | 48 | 6 | 12.5% |\n| Referral | 31 | 7 | 22.6% |\n| Walk-in | 24 | 5 | 20.8% |\n| Karnival | 14 | 2 | 14.3% |\n| WhatsApp | 7 | 1 | 14.3% |\n\n**Best converting source**: **Referrals** at 22.6%. Word of mouth is strong!\n**Highest volume**: **Website** with 62 leads.\n\nWant me to compare this to previous months?`,
   },
   {
     keywords: ['lost', 'why', 'reason', 'losing'],
@@ -183,7 +183,7 @@ const MOCK_ANSWERS: MockAnswer[] = [
   },
   {
     keywords: ['appointment', 'calendar', 'schedule', 'visit', 'meeting'],
-    response: `Here's the **appointment overview** for this week:\n\n| Day | Scheduled | Completed | No-show |\n|-----|-----------|-----------|--------|\n| Sunday | 8 | 6 | 2 |\n| Monday | 12 | 10 | 2 |\n| Tuesday | 9 | 7 | 2 |\n| Wednesday | 11 | — | — |\n| Thursday | 6 | — | — |\n\n**This week**: 46 appointments scheduled, 23 completed so far\n**Show rate**: 77% (above 75% target ✅)\n\n| Type | Count |\n|------|-------|\n| Campus Visit | 28 |\n| Placement Test | 12 |\n| Online Consultation | 6 |\n\nWant me to show per-agent appointment stats?`,
+    response: `Here's the **appointment overview** for this week:\n\n| Day | Scheduled | Completed | No-show |\n|-----|-----------|-----------|--------|\n| Sunday | 8 | 6 | 2 |\n| Monday | 12 | 10 | 2 |\n| Tuesday | 9 | 7 | 2 |\n| Wednesday | 11 | - | - |\n| Thursday | 6 | - | - |\n\n**This week**: 46 appointments scheduled, 23 completed so far\n**Show rate**: 77% (above 75% target ✅)\n\n| Type | Count |\n|------|-------|\n| Campus Visit | 28 |\n| Placement Test | 12 |\n| Online Consultation | 6 |\n\nWant me to show per-agent appointment stats?`,
   },
 ]
 
@@ -204,7 +204,7 @@ function generateMockResponse(userMessage: string): string {
   }
 
   // Fallback
-  return `Great question! Here's what I can help you with:\n\n- 📊 **"Show me the pipeline"** — lead distribution by stage\n- 👥 **"Compare agent performance"** — leaderboard & conversion rates\n- 📈 **"What's the conversion funnel?"** — stage-by-stage drop-off\n- 🎓 **"How many students enrolled?"** — enrollment breakdown\n- 💰 **"What's our revenue?"** — payment summary\n- 🕐 **"What happened today?"** — recent activity feed\n- 📣 **"Where are leads coming from?"** — source analysis\n- ❌ **"Why are we losing leads?"** — lost lead reasons\n- 📅 **"Show appointments"** — calendar overview\n\nJust ask in your own words — I'll figure it out!`
+  return `Great question! Here's what I can help you with:\n\n- 📊 **"Show me the pipeline"**: lead distribution by stage\n- 👥 **"Compare agent performance"**: leaderboard & conversion rates\n- 📈 **"What's the conversion funnel?"**: stage-by-stage drop-off\n- 🎓 **"How many students enrolled?"**: enrollment breakdown\n- 💰 **"What's our revenue?"**: payment summary\n- 🕐 **"What happened today?"**: recent activity feed\n- 📣 **"Where are leads coming from?"**: source analysis\n- ❌ **"Why are we losing leads?"**: lost lead reasons\n- 📅 **"Show appointments"**: calendar overview\n\nJust ask in your own words. I'll figure it out!`
 }
 
 async function mockStreamResponse(text: string, conversationId: string): Promise<Response> {
