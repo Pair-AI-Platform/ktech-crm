@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   const { data: lead, error: leadErr } = await supabase
     .from("leads")
     .select(
-      "id, first_name, last_name, first_name_ar, last_name_ar, civil_id, phone, phone_secondary, email, date_of_birth, school_id, graduation_year, gpa_grade_11, actual_gpa, intended_major, education_type, is_diplomatic, is_special_needs, funding_type",
+      "id, first_name, last_name, first_name_ar, last_name_ar, civil_id, phone, phone_secondary, email, date_of_birth, school_id, graduation_year, gpa_grade_11, actual_gpa, intended_major, preferred_major, ministry_accepted_major, education_type, is_diplomatic, is_special_needs, funding_type",
     )
     .eq("id", result.leadId)
     .single()
