@@ -243,7 +243,7 @@ function SubNavLink({ item, index, isCollapsed, onNavigate }: Omit<NavLinkProps,
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & stats" },
   { name: "Leads", href: "/leads", icon: Users, description: "Manage prospects", roles: ["admin", "agent"], children: [
-    { name: "PUC", href: "/puc-psp", icon: GraduationCap, description: "PUC PSP submissions" },
+    { name: "PUC", href: "/puc-psp", icon: GraduationCap, description: "PUC submissions" },
     { name: "Self Funded", href: "/puc-psp?tab=self_fund", icon: Wallet, description: "Self-funded leads" },
     { name: "Archive", href: "/leads/archive", icon: Archive, description: "Previous yearly cycles", roles: ["admin"] },
     { name: "Lost", href: "/leads/lost", icon: Ban, description: "Lost leads" },

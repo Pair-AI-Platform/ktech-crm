@@ -587,7 +587,7 @@ export default function PUCPSPPage() {
     <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0 min-w-0">
       <Header
         user={profile}
-        title={topTab === "puc" ? "PUC PSP" : "Self Funded"}
+        title={topTab === "puc" ? "PUC" : "Self Funded"}
         action={{
           label: "Add Lead",
           onClick: () => setShowAddForm(true),
