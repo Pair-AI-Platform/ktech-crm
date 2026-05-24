@@ -50,6 +50,7 @@ interface LeadTableProps {
   totalCount?: number
   pageSize?: number
   onPageChange?: (page: number) => void
+  onStageChanged?: (leadId: string, newStage: PipelineStage, status?: LeadStatus | null) => void
 }
 
 type PaymentLeadRow = { lead_id: string }
@@ -68,6 +69,7 @@ export function LeadTable({
   totalCount,
   pageSize = 50,
   onPageChange,
+  onStageChanged,
 }: LeadTableProps) {
   const { updateLeadStage, updateLead, incrementContactCount } = useLeadMutations()
   const { settings: stageSettings } = useStageSettings()
@@ -496,6 +498,7 @@ export function LeadTable({
       [leadId]: { ...prev[leadId], pipeline_stage: newStage, status: undefined, contact_count: nextCount }
     }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, newStage, null)
 
     // Update stage and clear status
     const result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
@@ -539,6 +542,7 @@ export function LeadTable({
     const nextCount = getNextCount(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'lost' as PipelineStage, contact_count: nextCount } }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, 'lost' as PipelineStage)
 
     const result = await updateLeadStage(leadId, 'lost' as PipelineStage, reasonId, notes)
 
@@ -584,6 +588,7 @@ export function LeadTable({
       [leadId]: { ...prev[leadId], pipeline_stage: 'contacted' as PipelineStage, status, contact_count: nextCount }
     }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, 'contacted' as PipelineStage, status)
 
     const updateData: Partial<Lead> = { pipeline_stage: 'contacted' as PipelineStage, status }
     if (notes) updateData.notes = notes
@@ -626,6 +631,7 @@ export function LeadTable({
     // Optimistic update
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'withdraw' as PipelineStage, contact_count: nextCount } }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, 'withdraw' as PipelineStage)
 
     const result = await updateLeadStage(leadId, 'withdraw' as PipelineStage, undefined, undefined, reason, notes)
 
