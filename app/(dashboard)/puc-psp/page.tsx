@@ -127,6 +127,19 @@ export default function PUCPSPPage() {
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [sfStageFilter, setSfStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSearchQuery, setSfSearchQuery] = useState("")
+  // Lead IDs whose stage was just changed in the current view — keep them visible
+  // until the user navigates away from this tab/stage filter.
+  const [pucStickyLeadIds, setPucStickyLeadIds] = useState<Set<string>>(new Set())
+  const [sfStickyLeadIds, setSfStickyLeadIds] = useState<Set<string>>(new Set())
+
+  // Clear sticky leads whenever the active tab/stage filter changes — the user
+  // moved off the tab they were working in.
+  useEffect(() => {
+    setPucStickyLeadIds(new Set())
+  }, [stageFilter, topTab])
+  useEffect(() => {
+    setSfStickyLeadIds(new Set())
+  }, [sfStageFilter, topTab])
 
   // Restore view state from sessionStorage on mount (for back navigation)
   useEffect(() => {
@@ -425,18 +438,18 @@ export default function PUCPSPPage() {
   const pucFilteredLeads = useMemo(() => {
     let result: Lead[]
     if (stageFilter === "link_sent") {
-      result = pucLeads.filter((lead) => linkSentLeadIds.has(lead.id))
+      result = pucLeads.filter((lead) => linkSentLeadIds.has(lead.id) || pucStickyLeadIds.has(lead.id))
     } else if (stageFilter === "all") {
       result = [...pucLeads]
     } else {
-      result = pucLeads.filter((lead) => lead.pipeline_stage === stageFilter)
+      result = pucLeads.filter((lead) => lead.pipeline_stage === stageFilter || pucStickyLeadIds.has(lead.id))
     }
 
     // Apply advanced filters
     result = applyAdvancedFilters(result)
 
     return result
-  }, [pucLeads, stageFilter, linkSentLeadIds, applyAdvancedFilters])
+  }, [pucLeads, stageFilter, linkSentLeadIds, pucStickyLeadIds, applyAdvancedFilters])
 
   // Count active filters for badge
   const activeFiltersCount =
@@ -459,11 +472,11 @@ export default function PUCPSPPage() {
     let result = [...sfLeads]
     // Apply stage filter client-side
     if (sfStageFilter !== "all") {
-      result = result.filter(lead => lead.pipeline_stage === sfStageFilter)
+      result = result.filter(lead => lead.pipeline_stage === sfStageFilter || sfStickyLeadIds.has(lead.id))
     }
     result = applyAdvancedFilters(result)
     return result
-  }, [sfLeads, sfStageFilter, applyAdvancedFilters])
+  }, [sfLeads, sfStageFilter, sfStickyLeadIds, applyAdvancedFilters])
 
   const filteredLeads = topTab === "puc" ? pucFilteredLeads : sfFilteredLeads
 
@@ -587,7 +600,7 @@ export default function PUCPSPPage() {
     <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0 min-w-0">
       <Header
         user={profile}
-        title={topTab === "puc" ? "PUC PSP" : "Self Funded"}
+        title={topTab === "puc" ? "PUC" : "Self Funded"}
         action={{
           label: "Add Lead",
           onClick: () => setShowAddForm(true),
@@ -765,6 +778,26 @@ export default function PUCPSPPage() {
             }}
             currentStageFilter={topTab === "puc" ? (stageFilter === "link_sent" ? "all" : stageFilter as PipelineStage | "all") : sfStageFilter}
             fundingTypeFilter={topTab === "puc" ? "puc" : "self_funded"}
+            onStageChanged={(leadId) => {
+              // Only pin when a sub-filter is active — on "all" the lead never disappears anyway.
+              if (topTab === "puc") {
+                if (stageFilter !== "all") {
+                  setPucStickyLeadIds((prev) => {
+                    if (prev.has(leadId)) return prev
+                    const next = new Set(prev)
+                    next.add(leadId)
+                    return next
+                  })
+                }
+              } else if (sfStageFilter !== "all") {
+                setSfStickyLeadIds((prev) => {
+                  if (prev.has(leadId)) return prev
+                  const next = new Set(prev)
+                  next.add(leadId)
+                  return next
+                })
+              }
+            }}
           />
         </motion.div>
 

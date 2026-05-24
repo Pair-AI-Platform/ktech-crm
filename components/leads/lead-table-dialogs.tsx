@@ -43,6 +43,7 @@ export interface LeadTableDialogsProps {
   setBlockedDialogLead: (lead: Lead | null) => void
   setWithdrawDialogLead: (lead: Lead | null) => void
   setFileFeeDialogLead: (lead: Lead | null) => void
+  handleFileFeeSuccess: (action: 'paid' | 'sent' | 'exempt') => Promise<void>
   setPaymentDialogLead: (lead: Lead | null) => void
   setPspWizardLead: (lead: Lead | null) => void
   setViewingAppointment: (apt: import("@/types").Appointment | null) => void
@@ -84,6 +85,7 @@ export function LeadTableDialogs({
   setBlockedDialogLead,
   setWithdrawDialogLead,
   setFileFeeDialogLead,
+  handleFileFeeSuccess,
   setPaymentDialogLead,
   setPspWizardLead,
   setViewingAppointment,
@@ -197,7 +199,7 @@ export function LeadTableDialogs({
           open={!!fileFeeDialogLead}
           onOpenChange={(open) => { if (!open) setFileFeeDialogLead(null) }}
           lead={fileFeeDialogLead}
-          onSuccess={async () => { setFileFeeDialogLead(null) }}
+          onSuccess={handleFileFeeSuccess}
         />
       )}
 

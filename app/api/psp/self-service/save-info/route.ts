@@ -12,6 +12,10 @@ import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
 // password for the self-service flow. If the student typed the wrong
 // number on the form they would lock themselves out on the next save.
 // Agents can correct it from the CRM side.
+//
+// `education_type` is also NOT editable: staff set it before sending the
+// link and it gates which documents the student can upload. Letting the
+// student change it would swap their entire document checklist.
 const ALLOWED_FIELDS = new Set([
   "first_name",
   "last_name",
@@ -24,7 +28,8 @@ const ALLOWED_FIELDS = new Set([
   "school_id",
   "graduation_year",
   "gpa_grade_11",
-  "education_type",
+  "actual_gpa",
+  "intended_major",
   "is_diplomatic",
   "is_special_needs",
 ])

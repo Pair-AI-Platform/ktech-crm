@@ -419,6 +419,7 @@ export function LeadFormAcademic({
             )}
             {formData.education_type === 'other' && (
               <motion.div
+                id="education_type_custom"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
@@ -428,8 +429,11 @@ export function LeadFormAcademic({
                   placeholder="Enter education type..."
                   value={formData.education_type_custom}
                   onChange={(e) => setFormData(prev => ({ ...prev, education_type_custom: e.target.value }))}
-                  className="w-full"
+                  className={cn("w-full", errors.education_type_custom && "border-[var(--error)]")}
                 />
+                {errors.education_type_custom && (
+                  <p className="text-xs text-[var(--error)] mt-1">{errors.education_type_custom}</p>
+                )}
               </motion.div>
             )}
           </div>

@@ -35,15 +35,17 @@ export async function POST(request: NextRequest) {
   const phone = formData.get("phone") as string | null
   const file = formData.get("file") as File | null
   const documentType = formData.get("document_type") as string | null
-  const graduateType = formData.get("graduate_type") as string | null
+  // `graduate_type` is intentionally ignored if present in the form data.
+  // We derive it server-side from the lead row below so the student's
+  // session can't override the staff-assigned curriculum lock.
   const expirationDate = formData.get("expiration_date") as string | null
 
   if (!token) {
     return errorResponse("Token is required", 400, logger)
   }
-  if (!file || !documentType || !graduateType) {
+  if (!file || !documentType) {
     return errorResponse(
-      "file, document_type, and graduate_type are required",
+      "file and document_type are required",
       400,
       logger,
     )
@@ -82,11 +84,29 @@ export async function POST(request: NextRequest) {
 
   const service = createServiceRoleClient()
 
+  // Resolve graduate_type from the lead row — staff lock the curriculum
+  // when they set education_type, and the student's session cannot change
+  // it. Reject the upload if no education_type is set (legacy edge case).
+  const { data: lead, error: leadErr } = await service
+    .from("leads")
+    .select("education_type")
+    .eq("id", result.leadId)
+    .single()
+  if (leadErr || !lead?.education_type) {
+    logger.warn("Upload blocked: lead has no education_type", { leadId: result.leadId })
+    return errorResponse(
+      "Education type is not set for this lead. Contact admissions.",
+      409,
+      logger,
+    )
+  }
+  const graduateType = lead.education_type
+
   const timestamp = Date.now()
   const safeName = sanitizeFilename(file.name)
-  // Sanitize graduate_type / document_type before they hit the storage path
-  // (they're free-text from the client). Limit to a conservative slug to
-  // prevent path traversal via these segments.
+  // Sanitize graduate_type / document_type before they hit the storage path.
+  // graduate_type now comes from the lead row (trusted), but we still slug
+  // it defensively; document_type is still free-text from the client.
   const safeGraduate = String(graduateType).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "unknown"
   const safeDoc = String(documentType).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "unknown"
   const storagePath = `leads/${result.leadId}/psp/${safeGraduate}/${safeDoc}/${timestamp}-${safeName}`

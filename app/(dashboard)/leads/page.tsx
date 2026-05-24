@@ -28,7 +28,6 @@ import { PucImportDialog } from "@/components/leads/puc-import-dialog"
 import { PucImportBadge } from "@/components/leads/puc-import-badge"
 import { EnrollFromListDialog } from "@/components/leads/enroll-from-list-dialog"
 import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
-import { MOEGPAFetchDialog } from "@/components/leads/moe-gpa-fetch-dialog"
 import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
@@ -94,12 +93,21 @@ export default function LeadsPage() {
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
   const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
   const [lostAtFilter, setLostAtFilter] = useState<PipelineStage | "all">("all")
+  // Leads whose stage was just changed in the current view — snapshot so they
+  // stay visible until the user navigates away from this stage filter.
+  // Stored as a Map<id, Lead> because the server-side query no longer returns
+  // them after the stage moves them out of the active filter.
+  const [stickyLeads, setStickyLeads] = useState<Map<string, Lead>>(new Map())
+
+  // Clear sticky leads when the active stage/lost-at filter changes
+  useEffect(() => {
+    setStickyLeads(new Map())
+  }, [stageFilter, lostAtFilter])
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showLostModal, setShowLostModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showPSPTransferModal, setShowPSPTransferModal] = useState(false)
-const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   const [showRSVPModal, setShowRSVPModal] = useState(false)
   const [showMinistryImportModal, setShowMinistryImportModal] = useState(false)
   const [showPucImportModal, setShowPucImportModal] = useState(false)
@@ -329,7 +337,7 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
   }, [filters.paymentStatus, isPaymentRangeActive, leadIds])
 
   // Client-side filtering (only for filters that can't be done server-side)
-  const filteredLeads = leads.filter((lead) => {
+  const filteredLeadsBase = leads.filter((lead) => {
     // Exclude lost leads from "all" view (they have their own sidebar tab)
     if (stageFilter === "all" && lead.pipeline_stage === "lost") return false
     // Funding type filter (also applied server-side, but kept for "all" stage lost exclusion consistency)
@@ -362,6 +370,20 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     }
     return true
   })
+
+  // Merge sticky leads (those whose stage was just changed) on top of the
+  // filtered list so they remain visible until the user moves off this tab.
+  // Server-side data wins if the lead is still in the response.
+  const filteredLeads = stickyLeads.size === 0
+    ? filteredLeadsBase
+    : (() => {
+        const present = new Set(filteredLeadsBase.map(l => l.id))
+        const extras: Lead[] = []
+        for (const lead of stickyLeads.values()) {
+          if (!present.has(lead.id)) extras.push(lead)
+        }
+        return extras.length === 0 ? filteredLeadsBase : [...filteredLeadsBase, ...extras]
+      })()
 
   // Compute lost-at stage counts for the lost view tabs
   const lostAtStats = stageFilter === "lost" ? leads.reduce<Record<string, number>>((acc, lead) => {
@@ -493,14 +515,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     refetch()
   }
 
-  const handleMOEFetchSuccess = () => {
-    setShowMOEFetchModal(false)
-    setSelectedLeads([])
-    setSuccessMessage("GPA fetch completed successfully")
-    setShowSuccessToast(true)
-    refetch()
-  }
-
   const handleMinistryImportSuccess = (updatedCount: number, createdCount: number) => {
     const messages: string[] = []
     if (updatedCount > 0) messages.push(`${updatedCount} lead${updatedCount !== 1 ? "s" : ""} updated`)
@@ -520,7 +534,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
     refetch()
   }
 
-  // Get the selected lead objects for the MOE dialog
   const selectedLeadObjects = filteredLeads.filter((lead) =>
     selectedLeads.includes(lead.id)
   )
@@ -698,6 +711,27 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
             onEditLead={handleEditLead}
             currentStageFilter={stageFilter}
             fundingTypeFilter={filters.fundingType}
+            onStageChanged={(leadId, newStage, status) => {
+              // Only pin on a filtered view — on "all" the lead never disappears.
+              if (stageFilter === "all") return
+              // Snapshot the lead from current data with the new stage/status applied
+              // so it survives the refetch that drops it from the server response.
+              const existing = leads.find(l => l.id === leadId)
+              if (!existing) return
+              const snapshot: Lead = {
+                ...existing,
+                pipeline_stage: newStage,
+                status: status === undefined ? existing.status : status,
+              }
+              setStickyLeads(prev => {
+                if (prev.get(leadId)?.pipeline_stage === newStage && prev.get(leadId)?.status === snapshot.status) {
+                  return prev
+                }
+                const next = new Map(prev)
+                next.set(leadId, snapshot)
+                return next
+              })
+            }}
             currentPage={currentPage}
             totalPages={hasClientSideFilters ? Math.ceil(filteredLeads.length / pageSize) || 1 : totalPages}
             totalCount={hasClientSideFilters ? filteredLeads.length : totalCount}
@@ -756,7 +790,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
               onLost={handleBulkLost}
               onDelete={handleBulkDelete}
               onClear={() => setSelectedLeads([])}
-              onMOEFetch={() => setShowMOEFetchModal(true)}
               onSendRSVP={() => setShowRSVPModal(true)}
               onCampaign={() => {
                 stashCampaignPrefill({
@@ -867,14 +900,6 @@ const [showMOEFetchModal, setShowMOEFetchModal] = useState(false)
           setSuccessMessage("PUC leads transferred to Submission stage")
           setShowSuccessToast(true)
         }}
-      />
-
-      {/* MOE GPA Fetch Modal */}
-      <MOEGPAFetchDialog
-        isOpen={showMOEFetchModal}
-        onClose={() => setShowMOEFetchModal(false)}
-        selectedLeads={selectedLeadObjects}
-        onSuccess={handleMOEFetchSuccess}
       />
 
       {/* Send RSVP Modal */}

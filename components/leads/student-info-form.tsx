@@ -25,9 +25,7 @@ import {
   AlertCircle,
   Building2,
   Search,
-  BookOpen,
   CheckCircle2,
-  XCircle,
   ScanLine,
   ClipboardList,
   RefreshCw,
@@ -71,7 +69,6 @@ import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
 import { createClient } from "@/lib/supabase/client"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { formatDate } from "@/lib/utils"
-import type { MOEFetchResponse } from "@/lib/moe/types"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 
 const SOURCE_CATEGORIES = [
@@ -99,8 +96,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [nationalitySearch, setNationalitySearch] = useState("")
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const [hasGpaError, setHasGpaError] = useState(false)
-  const [moeFetching, setMoeFetching] = useState(false)
-  const [moeFetchResult, setMoeFetchResult] = useState<{ success: boolean; message: string } | null>(null)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [declarationSent, setDeclarationSent] = useState(false)
 
@@ -311,6 +306,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       newErrors.civil_id = "Civil ID must be 12 digits starting with 2 or 3"
     }
 
+    if (!formData.education_type) {
+      newErrors.education_type = "Education type is required"
+    } else if (formData.education_type === "other" && !formData.education_type_custom.trim()) {
+      newErrors.education_type_custom = "Please describe the curriculum"
+    }
+
     if (formData.funding_type === 'puc') {
       if (!formData.actual_gpa.trim()) {
         newErrors.actual_gpa = "GPA is required for PUC"
@@ -412,58 +413,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
-    if (field === 'civil_id' || field === 'seat_number') {
-      setMoeFetchResult(null)
-    }
   }
-
-  const handleMOEFetch = async () => {
-    const civilId = formData.civil_id.replace(/\D/g, "")
-    const seatNumber = formData.seat_number.trim()
-
-    if (!civilId || !isValidKuwaitCivilId(civilId)) {
-      setMoeFetchResult({ success: false, message: "Valid Civil ID is required (12 digits starting with 2 or 3)" })
-      return
-    }
-    if (!seatNumber) {
-      setMoeFetchResult({ success: false, message: "Seat Number is required to fetch GPA from MOE" })
-      return
-    }
-
-    setMoeFetching(true)
-    setMoeFetchResult(null)
-
-    try {
-      const response = await fetch("/api/moe/fetch-gpa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadIds: [lead.id] }),
-      })
-
-      const data = (await response.json()) as MOEFetchResponse | { error: string }
-
-      if (!response.ok) {
-        throw new Error((data as { error: string }).error || "Fetch failed")
-      }
-
-      const fetchResponse = data as MOEFetchResponse
-      const result = fetchResponse.results[0]
-
-      if (result?.success && result.gpa !== undefined) {
-        setFormData(prev => ({ ...prev, actual_gpa: result.gpa!.toString() }))
-        setMoeFetchResult({ success: true, message: `GPA ${result.gpa}% fetched successfully from MOE portal` })
-        onSuccess?.()
-      } else {
-        setMoeFetchResult({ success: false, message: result?.error || "Failed to fetch GPA from MOE portal" })
-      }
-    } catch (err) {
-      setMoeFetchResult({ success: false, message: err instanceof Error ? err.message : "Failed to fetch GPA" })
-    } finally {
-      setMoeFetching(false)
-    }
-  }
-
-  const canFetchMOE = formData.civil_id.trim() && formData.seat_number.trim()
 
   // Auto-calculate placement level
   const englishPassed = formData.has_ielts_toefl || formData.placement_english_override || (lead.placement_english_passed ?? false)
@@ -851,14 +801,14 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="seat_number">Seat Number (MOE)</Label>
+                <Label htmlFor="seat_number">Seat Number</Label>
                 <Input
                   id="seat_number"
                   value={formData.seat_number}
                   onChange={(e) => handleChange("seat_number", e.target.value)}
                   placeholder="Enter seat number"
                 />
-                <p className="text-xs text-[var(--text-muted)]">Required to fetch GPA from MOE portal</p>
+                <p className="text-xs text-[var(--text-muted)]">Used to match Ministry GPA import results</p>
               </div>
             </div>
           </div>
@@ -1081,8 +1031,8 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
 
             {/* Education Type */}
-            <div className="space-y-2">
-              <Label>Education Type</Label>
+            <div id="education_type" className="space-y-2">
+              <Label>Education Type <span className="text-[var(--error)]">*</span></Label>
               <div className="grid grid-cols-5 gap-2">
                 {EDUCATION_TYPES.map((type) => (
                   <button
@@ -1094,6 +1044,9 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         education_type: prev.education_type === type.value ? "" : type.value,
                         education_type_custom: type.value !== 'other' ? "" : prev.education_type_custom,
                       }))
+                      if (errors.education_type) {
+                        setErrors(prev => ({ ...prev, education_type: "" }))
+                      }
                     }}
                     className={cn(
                       "flex flex-col items-center gap-1 p-3 rounded-xl border transition-all text-center",
@@ -1112,13 +1065,20 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   </button>
                 ))}
               </div>
+              {errors.education_type && (
+                <p className="text-xs text-[var(--error)]">{errors.education_type}</p>
+              )}
               {formData.education_type === 'other' && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-2">
+                <motion.div id="education_type_custom" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-2">
                   <Input
                     placeholder="Enter education type..."
                     value={formData.education_type_custom}
                     onChange={(e) => setFormData(prev => ({ ...prev, education_type_custom: e.target.value }))}
+                    className={cn(errors.education_type_custom && "border-[var(--error)]")}
                   />
+                  {errors.education_type_custom && (
+                    <p className="text-xs text-[var(--error)] mt-1">{errors.education_type_custom}</p>
+                  )}
                 </motion.div>
               )}
             </div>
@@ -1336,61 +1296,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
             </div>
 
-            {/* MOE Fetch Button (for PUC) */}
-            {formData.funding_type === 'puc' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
-                    <BookOpen className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-blue-700 dark:text-blue-300 text-sm">
-                      Fetch from Ministry of Education
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      {canFetchMOE
-                        ? "Click to automatically retrieve GPA using Civil ID and Seat Number"
-                        : "Enter Civil ID and Seat Number above to enable"}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleMOEFetch}
-                    disabled={!canFetchMOE || moeFetching}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
-                    size="sm"
-                  >
-                    {moeFetching ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Fetching...
-                      </>
-                    ) : (
-                      <>
-                        <BookOpen className="w-4 h-4 mr-2" />
-                        Fetch GPA
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {moeFetchResult && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={cn(
-                      "flex items-center gap-2 p-3 rounded-lg text-sm",
-                      moeFetchResult.success
-                        ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                        : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                    )}
-                  >
-                    {moeFetchResult.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
-                    {moeFetchResult.message}
-                  </motion.div>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>

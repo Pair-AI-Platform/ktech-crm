@@ -17,7 +17,6 @@ import {
   UserPlus,
   Calendar,
   Trash2,
-  BookOpen,
   Send,
   MessageSquare,
 } from "lucide-react"
@@ -25,6 +24,8 @@ import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES, SF_DOCUMENTS, type Lead,
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useStageSettings } from "@/lib/hooks/use-stage-settings"
+import { queryKeys } from "@/lib/hooks/query-keys"
+import { useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import type { SubmissionBlockedReason } from "@/types"
 
@@ -50,6 +51,7 @@ interface LeadTableProps {
   totalCount?: number
   pageSize?: number
   onPageChange?: (page: number) => void
+  onStageChanged?: (leadId: string, newStage: PipelineStage, status?: LeadStatus | null) => void
 }
 
 type PaymentLeadRow = { lead_id: string }
@@ -68,9 +70,11 @@ export function LeadTable({
   totalCount,
   pageSize = 50,
   onPageChange,
+  onStageChanged,
 }: LeadTableProps) {
   const { updateLeadStage, updateLead, incrementContactCount } = useLeadMutations()
   const { settings: stageSettings } = useStageSettings()
+  const queryClient = useQueryClient()
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   const [editingStage, setEditingStage] = useState<string | null>(null)
@@ -496,6 +500,7 @@ export function LeadTable({
       [leadId]: { ...prev[leadId], pipeline_stage: newStage, status: undefined, contact_count: nextCount }
     }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, newStage, null)
 
     // Update stage and clear status
     const result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
@@ -531,6 +536,22 @@ export function LeadTable({
     // Payment dialog opens first, and the RPC promotes the lead after payment
   }
 
+  const handleFileFeeSuccess = async (action: 'paid' | 'sent' | 'exempt') => {
+    if (!fileFeeDialogLead) return
+    if (action !== 'paid' && action !== 'exempt') return
+    const leadId = fileFeeDialogLead.id
+    setPendingUpdates(prev => ({
+      ...prev,
+      [leadId]: {
+        ...prev[leadId],
+        pipeline_stage: 'application' as PipelineStage,
+        file_fee_status: action === 'paid' ? 'paid' : 'exempt',
+      },
+    }))
+    onStageChanged?.(leadId, 'application' as PipelineStage)
+    queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+  }
+
   const handleLostConfirm = async (reasonId: string, notes?: string) => {
     if (!lostDialogLead) return
 
@@ -539,6 +560,7 @@ export function LeadTable({
     const nextCount = getNextCount(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'lost' as PipelineStage, contact_count: nextCount } }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, 'lost' as PipelineStage)
 
     const result = await updateLeadStage(leadId, 'lost' as PipelineStage, reasonId, notes)
 
@@ -584,6 +606,7 @@ export function LeadTable({
       [leadId]: { ...prev[leadId], pipeline_stage: 'contacted' as PipelineStage, status, contact_count: nextCount }
     }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, 'contacted' as PipelineStage, status)
 
     const updateData: Partial<Lead> = { pipeline_stage: 'contacted' as PipelineStage, status }
     if (notes) updateData.notes = notes
@@ -626,6 +649,7 @@ export function LeadTable({
     // Optimistic update
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'withdraw' as PipelineStage, contact_count: nextCount } }))
     setEditingStage(leadId)
+    onStageChanged?.(leadId, 'withdraw' as PipelineStage)
 
     const result = await updateLeadStage(leadId, 'withdraw' as PipelineStage, undefined, undefined, reason, notes)
 
@@ -1163,6 +1187,7 @@ export function LeadTable({
       setBlockedDialogLead={setBlockedDialogLead}
       setWithdrawDialogLead={setWithdrawDialogLead}
       setFileFeeDialogLead={setFileFeeDialogLead}
+      handleFileFeeSuccess={handleFileFeeSuccess}
       setPaymentDialogLead={setPaymentDialogLead}
       setPspWizardLead={setPspWizardLead}
       setViewingAppointment={setViewingAppointment}
@@ -1193,12 +1218,11 @@ interface BulkActionsProps {
   onLost?: () => void
   onDelete: () => void
   onClear: () => void
-  onMOEFetch?: () => void
   onSendRSVP?: () => void
   onCampaign?: () => void
 }
 
-export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDelete, onClear, onMOEFetch, onSendRSVP, onCampaign }: BulkActionsProps) {
+export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDelete, onClear, onSendRSVP, onCampaign }: BulkActionsProps) {
   if (selectedCount === 0) return null
 
   return (
@@ -1233,12 +1257,6 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
             <Calendar className="w-4 h-4 mr-1.5" />
             Book
           </Button>
-          {onMOEFetch && (
-            <Button variant="ghost" size="sm" onClick={onMOEFetch} className="rounded-lg hover:bg-blue-50 hover:text-blue-600">
-              <BookOpen className="w-4 h-4 mr-1.5" />
-              Fetch GPA
-            </Button>
-          )}
           {onSendRSVP && (
             <Button variant="ghost" size="sm" onClick={onSendRSVP} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
               <Send className="w-4 h-4 mr-1.5" />

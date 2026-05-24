@@ -35,6 +35,22 @@ export const POST = withApiHandler(
     )
     if (ownershipBlock) return ownershipBlock
 
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("education_type")
+      .eq("id", leadId)
+      .single()
+
+    if (leadErr || !lead) {
+      return NextResponse.json({ error: "Lead not found" }, { status: 404 })
+    }
+    if (!lead.education_type) {
+      return NextResponse.json(
+        { error: "Set the lead's education type before sending the self-service link." },
+        { status: 400 },
+      )
+    }
+
     // Service role for the rotate-and-insert: we want this to bypass RLS
     // so a non-admin agent can deactivate prior tokens for their lead.
     const service = createServiceRoleClient()

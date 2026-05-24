@@ -2,12 +2,15 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
+import { Lock } from "lucide-react"
 import {
   getDocumentsForGraduateType,
   type GraduateType,
   type DocumentRule,
   type ConditionalDocumentFlags,
 } from "@/lib/psp/document-rules"
+import { MAJORS } from "@/types"
+import type { IntendedMajor } from "@/types"
 
 type PageState = "verify" | "verifying" | "ready" | "submitted" | "expired" | "error"
 
@@ -25,6 +28,8 @@ interface LeadView {
   school_id: string | null
   graduation_year: number | null
   gpa_grade_11: number | null
+  actual_gpa: number | null
+  intended_major: IntendedMajor | null
   education_type: GraduateType | null
   is_diplomatic: boolean | null
   is_special_needs: boolean | null
@@ -42,13 +47,24 @@ interface UploadedDoc {
   expiration_date: string | null
 }
 
-const GRAD_TYPES: { id: GraduateType; label: string; labelAr: string }[] = [
-  { id: "GOV", label: "GOV", labelAr: "حكومية" },
-  { id: "US", label: "US", labelAr: "أمريكية" },
-  { id: "UK", label: "UK", labelAr: "بريطانية" },
-  { id: "KSA", label: "KSA", labelAr: "سعودية" },
-  { id: "OTHER", label: "Others", labelAr: "أخرى" },
+const GRAD_TYPES: { id: GraduateType; label: string; labelAr: string; curriculum: string }[] = [
+  { id: "GOV", label: "GOV", labelAr: "حكومية", curriculum: "Kuwait Government School" },
+  { id: "US", label: "US", labelAr: "أمريكية", curriculum: "American Curriculum" },
+  { id: "UK", label: "UK", labelAr: "بريطانية", curriculum: "British Curriculum" },
+  { id: "KSA", label: "KSA", labelAr: "سعودية", curriculum: "Saudi Arabian Curriculum" },
+  { id: "OTHER", label: "Others", labelAr: "أخرى", curriculum: "Other curriculum" },
 ]
+
+// Normalize the lead's stored education_type (staff form persists 'other'
+// in lowercase per types/index.ts:106, while GraduateType uses 'OTHER').
+function normalizeGraduate(value: string | null | undefined): GraduateType | null {
+  if (!value) return null
+  const upper = value.toUpperCase()
+  if (upper === "GOV" || upper === "US" || upper === "UK" || upper === "KSA" || upper === "OTHER") {
+    return upper
+  }
+  return null
+}
 
 export default function PspSelfServicePage() {
   const { token } = useParams<{ token: string }>()
@@ -77,7 +93,8 @@ export default function PspSelfServicePage() {
     email: "",
     date_of_birth: "",
     graduation_year: "",
-    gpa_grade_11: "",
+    actual_gpa: "",
+    intended_major: "" as IntendedMajor | "",
     education_type: "GOV" as GraduateType,
     is_diplomatic: false,
     is_special_needs: false,
@@ -109,7 +126,9 @@ export default function PspSelfServicePage() {
         date_of_birth: "2006-03-14",
         school_id: null,
         graduation_year: 2025,
-        gpa_grade_11: 3.6,
+        gpa_grade_11: null,
+        actual_gpa: 86,
+        intended_major: "network_security",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -128,7 +147,8 @@ export default function PspSelfServicePage() {
         email: demoLead.email ?? "",
         date_of_birth: demoLead.date_of_birth ?? "",
         graduation_year: String(demoLead.graduation_year ?? ""),
-        gpa_grade_11: String(demoLead.gpa_grade_11 ?? ""),
+        actual_gpa: demoLead.actual_gpa != null ? String(demoLead.actual_gpa) : "",
+        intended_major: demoLead.intended_major ?? "",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -157,6 +177,18 @@ export default function PspSelfServicePage() {
         return
       }
       const json = (await res.json()) as { lead: LeadView; documents: UploadedDoc[]; submitted_at: string | null }
+      const lockedGraduate = normalizeGraduate(json.lead.education_type)
+      if (!lockedGraduate) {
+        // Legacy: token minted before education_type became required.
+        // Send-link guards prevent this on new tokens, but old links can
+        // still land here. Steer the student to admissions rather than
+        // letting them pick blindly.
+        setState("error")
+        setErrorMsg(
+          "Your application is missing a required curriculum. Please contact the admissions team to continue.",
+        )
+        return
+      }
       setLead(json.lead)
       setDocs(json.documents || [])
       setPhone(trimmed)
@@ -170,8 +202,14 @@ export default function PspSelfServicePage() {
         email: json.lead.email ?? "",
         date_of_birth: json.lead.date_of_birth ?? "",
         graduation_year: json.lead.graduation_year ? String(json.lead.graduation_year) : "",
-        gpa_grade_11: json.lead.gpa_grade_11 != null ? String(json.lead.gpa_grade_11) : "",
-        education_type: (json.lead.education_type as GraduateType) || "GOV",
+        actual_gpa:
+          json.lead.actual_gpa != null
+            ? String(json.lead.actual_gpa)
+            : json.lead.gpa_grade_11 != null
+              ? String(json.lead.gpa_grade_11)
+              : "",
+        intended_major: json.lead.intended_major ?? "",
+        education_type: lockedGraduate,
         is_diplomatic: !!json.lead.is_diplomatic,
         is_special_needs: !!json.lead.is_special_needs,
       })
@@ -222,6 +260,8 @@ export default function PspSelfServicePage() {
     }
     setSaving(true)
     try {
+      // education_type is intentionally omitted — it is locked by staff
+      // and the save-info endpoint also filters it from the allow-list.
       const updates: Record<string, unknown> = {
         first_name: form.first_name || null,
         last_name: form.last_name || null,
@@ -232,8 +272,9 @@ export default function PspSelfServicePage() {
         email: form.email || null,
         date_of_birth: form.date_of_birth || null,
         graduation_year: form.graduation_year ? Number(form.graduation_year) : null,
-        gpa_grade_11: form.gpa_grade_11 ? Number(form.gpa_grade_11) : null,
-        education_type: form.education_type,
+        actual_gpa: form.actual_gpa ? Number(form.actual_gpa) : null,
+        gpa_grade_11: form.actual_gpa ? Number(form.actual_gpa) : null,
+        intended_major: form.intended_major || null,
         is_diplomatic: form.is_diplomatic,
         is_special_needs: form.is_special_needs,
       }
@@ -292,7 +333,7 @@ export default function PspSelfServicePage() {
       fd.append("phone", phone)
       fd.append("file", file)
       fd.append("document_type", rule.id)
-      fd.append("graduate_type", form.education_type)
+      // graduate_type omitted — server derives it from the lead row.
       const res = await fetch("/api/psp/self-service/upload-doc", { method: "POST", body: fd })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -440,8 +481,21 @@ export default function PspSelfServicePage() {
             <Field label="Graduation Year" labelAr="سنة التخرج">
               <Input value={form.graduation_year} onChange={(v) => setForm({ ...form, graduation_year: v })} inputMode="numeric" />
             </Field>
-            <Field label="GPA (Grade 11)" labelAr="المعدل (الصف 11)">
-              <Input value={form.gpa_grade_11} onChange={(v) => setForm({ ...form, gpa_grade_11: v })} inputMode="decimal" />
+            <Field label="Cumulative GPA" labelAr="المعدل التراكمي">
+              <Input value={form.actual_gpa} onChange={(v) => setForm({ ...form, actual_gpa: v })} inputMode="decimal" />
+            </Field>
+            <Field label="ktech Intended Major" labelAr="التخصص المرغوب في كي تك">
+              <Select
+                value={form.intended_major}
+                onChange={(v) => setForm({ ...form, intended_major: v as IntendedMajor | "" })}
+              >
+                <option value="">— Select / اختر —</option>
+                {MAJORS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
           </div>
         </section>
@@ -450,26 +504,25 @@ export default function PspSelfServicePage() {
         <section className="p-6 sm:p-8 border-t border-slate-200 space-y-5 bg-slate-50/40">
           <SectionTitle en="Documents" ar="المستندات" />
 
-          <div>
-            <p className="text-xs text-slate-500 mb-2">Graduate Type / نوع الشهادة</p>
-            <div className="flex flex-wrap gap-2">
-              {GRAD_TYPES.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, education_type: g.id })}
-                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                    form.education_type === g.id
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-slate-700 border-slate-200 hover:border-blue-400"
-                  }`}
-                >
-                  <span className="font-medium">{g.label}</span>
-                  <span className="text-xs opacity-70 ml-1.5">{g.labelAr}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Education Type is locked by staff before the link is sent.
+              The student sees it as a read-only chip and cannot change it. */}
+          {(() => {
+            const locked = GRAD_TYPES.find((g) => g.id === form.education_type)
+            return (
+              <div className="rounded-lg border border-slate-200 bg-white p-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Education Type / نوع الشهادة</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {locked?.label ?? form.education_type} · {locked?.curriculum ?? ""}
+                  </p>
+                  {locked?.labelAr && (
+                    <p className="text-xs text-slate-500" dir="rtl">{locked.labelAr}</p>
+                  )}
+                </div>
+                <Lock className="w-4 h-4 text-slate-400 shrink-0" aria-label="Locked" />
+              </div>
+            )
+          })()}
 
           <div className="flex flex-wrap gap-4 text-sm">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -652,6 +705,22 @@ function Input(props: {
       onChange={(e) => props.onChange(e.target.value)}
       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     />
+  )
+}
+
+function Select(props: {
+  value: string
+  onChange: (v: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <select
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+    >
+      {props.children}
+    </select>
   )
 }
 

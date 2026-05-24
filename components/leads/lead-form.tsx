@@ -319,6 +319,8 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     // Academic validation
     if (!formData.education_type) {
       newErrors.education_type = "Education type is required"
+    } else if (formData.education_type === "other" && !formData.education_type_custom.trim()) {
+      newErrors.education_type_custom = "Please describe the curriculum"
     }
     if (!formData.academic_track) {
       newErrors.academic_track = "Type (Science/Art) is required"

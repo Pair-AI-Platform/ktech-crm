@@ -45,7 +45,7 @@ export const POST = withApiHandler(
 
     const { data: lead, error: leadErr } = await supabase
       .from("leads")
-      .select("id, first_name, first_name_ar, phone")
+      .select("id, first_name, first_name_ar, phone, education_type")
       .eq("id", leadId)
       .single()
 
@@ -54,6 +54,12 @@ export const POST = withApiHandler(
     }
     if (!lead.phone) {
       return NextResponse.json({ error: "Lead has no phone number" }, { status: 400 })
+    }
+    if (!lead.education_type) {
+      return NextResponse.json(
+        { error: "Set the lead's education type before sending the self-service link." },
+        { status: 400 },
+      )
     }
 
     const service = createServiceRoleClient()
