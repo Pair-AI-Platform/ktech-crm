@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import {
   Loader2,
@@ -30,6 +30,7 @@ import { FILE_APPLICATION_FEE_AMOUNT, FILE_TEST_FEE_AMOUNT } from "@/lib/config/
 import { isDemoMode } from "@/lib/demo-data"
 
 type Step = "select" | "finance" | "cash" | "link-sent" | "success" | "exempt-confirm" | "exempt-done"
+type SuccessAction = 'paid' | 'sent' | 'exempt'
 
 interface FileFeePaymentDialogProps {
   open: boolean
@@ -47,6 +48,7 @@ export function FileFeePaymentDialog({
   const [step, setStep] = useState<Step>("select")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const notifiedActionRef = useRef<SuccessAction | null>(null)
 
   // Fee amounts
   const [testFee, setTestFee] = useState(lead.file_test_fee ?? FILE_TEST_FEE_AMOUNT)
@@ -65,6 +67,7 @@ export function FileFeePaymentDialog({
     if (!loading) {
       setStep("select")
       setError(null)
+      notifiedActionRef.current = null
       setCivilId(lead.civil_id || "")
       setTestFee(lead.file_test_fee ?? FILE_TEST_FEE_AMOUNT)
       setInvoiceNumber("")
@@ -72,6 +75,12 @@ export function FileFeePaymentDialog({
       setInvoiceUrl(null)
       onOpenChange(false)
     }
+  }
+
+  const notifySuccess = async (action: SuccessAction) => {
+    if (notifiedActionRef.current === action) return
+    notifiedActionRef.current = action
+    await onSuccess?.(action)
   }
 
   const openWhatsAppLink = (paymentUrl: string) => {
@@ -145,6 +154,7 @@ export function FileFeePaymentDialog({
       await new Promise(resolve => setTimeout(resolve, 500))
       setLoading(false)
       setStep("success")
+      await notifySuccess("paid")
       return
     }
 
@@ -167,6 +177,7 @@ export function FileFeePaymentDialog({
       }
 
       setStep("success")
+      await notifySuccess("paid")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to process payment")
     } finally {
@@ -182,6 +193,7 @@ export function FileFeePaymentDialog({
       await new Promise(resolve => setTimeout(resolve, 500))
       setLoading(false)
       setStep("exempt-done")
+      await notifySuccess("exempt")
       return
     }
 
@@ -201,6 +213,7 @@ export function FileFeePaymentDialog({
       }
 
       setStep("exempt-done")
+      await notifySuccess("exempt")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to exempt lead")
     } finally {
@@ -209,9 +222,7 @@ export function FileFeePaymentDialog({
   }
 
   const handleSuccessClose = async () => {
-    if (onSuccess) {
-      await onSuccess(step === "exempt-done" ? "exempt" : step === "link-sent" ? "sent" : "paid")
-    }
+    await notifySuccess(step === "exempt-done" ? "exempt" : step === "link-sent" ? "sent" : "paid")
     handleClose()
   }
 
