@@ -213,9 +213,20 @@ async function executeAction(
 
         const oldStage = ctx.leadData.pipeline_stage as string | undefined
 
+        // Parity with updateLeadMutation: shift positions in the target stage
+        // so the moved lead lands at the top. Best-effort — if the RPC fails
+        // we still proceed with the stage change (position is cosmetic for
+        // ordering on the kanban).
+        if (oldStage !== target_stage) {
+          await supabase.rpc("shift_stage_positions", { target_stage }).then(() => {}, () => {})
+        }
+
         const { error } = await supabase
           .from("leads")
-          .update({ pipeline_stage: target_stage })
+          .update({
+            pipeline_stage: target_stage,
+            ...(oldStage !== target_stage ? { position_in_stage: 0 } : {}),
+          })
           .eq("id", ctx.leadId)
 
         if (error) return { success: false, error: error.message }
@@ -235,6 +246,20 @@ async function executeAction(
           },
           created_by: ctx.userId,
         })
+
+        // Parity: notify the assigned agent when an automation moves their lead.
+        const assignedTo = ctx.leadData.assigned_to as string | undefined
+        if (assignedTo && assignedTo !== ctx.userId) {
+          await supabase.from("notifications").insert({
+            user_id: assignedTo,
+            type: "stage_change",
+            title: `Lead moved to ${target_stage}`,
+            body: `Automation rule "${rule.name}" moved this lead${oldStage ? ` from ${oldStage}` : ""} to ${target_stage}`,
+            lead_id: ctx.leadId,
+            action_url: `/leads/${ctx.leadId}`,
+            created_by: ctx.userId,
+          }).then(() => {}, () => {})
+        }
 
         return { success: true, result: { new_stage: target_stage } }
       }

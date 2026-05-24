@@ -3,6 +3,9 @@ import twilio from "twilio"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { PUC_FEE_AMOUNT } from "@/types"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { createLogger } from "@/lib/logger"
+
+const logger = createLogger("PUC Fee Link")
 
 // Lazy-initialize Twilio client
 function getTwilioClient() {
@@ -107,7 +110,7 @@ ${transaction.myfatoorah_invoice_url}
       to: whatsappTo,
     })
 
-    console.log(`[PUC Fee Link] WhatsApp sent, SID: ${twilioMessage.sid}`)
+    logger.info("WhatsApp sent", { sid: twilioMessage.sid })
 
     // Log WhatsApp message
     const { data: messageRecord } = await supabase

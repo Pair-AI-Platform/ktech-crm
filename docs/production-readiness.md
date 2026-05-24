@@ -86,19 +86,45 @@ Current status on `fix/greeting-header-hydration`:
 
 ## Required production environment variables
 
-Verified by `scripts/verify-production-env.mjs`:
+Verified by `scripts/verify-production-env.mjs`. Missing any of these
+fails the production release check:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
-- `MYFATOORAH_WEBHOOK_SECRET`
 - `AI_TRANSFER_WEBHOOK_SECRET`
-- `TWILIO_AUTH_TOKEN`
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 - `NEXT_PUBLIC_SENTRY_DSN`
 
 Forbidden in production: `DEMO_MODE_ENABLED=true`, `ENABLE_MIGRATION_API=true`.
+
+### Integration variables (warn-only)
+
+These gate specific features. The release check warns when they are
+missing but does not fail. Set them before turning the feature on in
+production — the matching routes are designed to fail safely without
+them.
+
+- `MYFATOORAH_WEBHOOK_SECRET` — payment webhooks via MyFatoorah. Not
+  in production scope for this release; webhook handlers reject
+  unsigned payloads with "MYFATOORAH_WEBHOOK_SECRET is not configured"
+  if the route is hit.
+- `TWILIO_AUTH_TOKEN` (and `TWILIO_ACCOUNT_SID`, `TWILIO_WHATSAPP_NUMBER`)
+  — Twilio integration is **not used in production**. Messaging is
+  routed through Pair (in-house service). The four `payments/*/send-link`
+  routes that currently import `twilio` will throw "Twilio credentials
+  not configured" if invoked; revisit when the Pair messaging client
+  replaces those calls.
+
+### Required GitHub Actions repository secrets
+
+For the `cron-priority-reminders` workflow:
+
+- `CRON_SECRET` — same value as the Vercel env above.
+- `PRODUCTION_APP_URL` — e.g. `https://ktech-adl.vercel.app`.
+
+Set via Settings → Secrets and variables → Actions (or `gh secret set`).
 
 See `.env.local.example` for the full template, including optional
 `ALLOWED_ORIGIN_HOSTS` and `HEALTH_TOKEN`.
@@ -131,21 +157,35 @@ Snapshot at 2026-05-23. Run `npm audit --production` for a current view.
 
 - Migration 169 status in production should be visually confirmed
   before the next payment correction is attempted.
-- `change_stage` automation action still bypasses `updateLeadMutation`;
-  consider funneling it through the shared mutation helper if the
-  parity matters for activity logs / position recompute.
-- AI tools (`lib/ai/tools/*`) should be re-verified to query-filter on
-  `assigned_to`/`assigned_agent` rather than JS post-filter, even after
-  the round-2 RLS lockdown.
-- `/api/cron/priority-reminders` is not declared in `vercel.json`'s
-  `crons` array. It is protected by `CRON_SECRET` and ready to be
-  triggered by Vercel Cron, GitHub Actions, or an external scheduler;
-  confirm with operations which scheduler should fire it and how
-  often (suggested: every 60 s, matching the in-route lock TTL).
-- `incrementContactCount` in `lib/hooks/use-leads.ts` is a documented
-  read-then-write race on a cosmetic counter; safe in current usage,
-  fix via Postgres RPC when the counter becomes load-bearing.
-- Ad-hoc `console.log` calls in 4 payment routes (`psp/webhook`,
-  `psp/send-link`, `send-link`, `puc-fee/send-link`) bypass the
-  redacting logger. Payloads logged are IDs/SIDs (low PII risk) but
-  should be routed through `lib/logger.ts` for consistency.
+- AI tools (`lib/ai/tools/*`) re-verified to query-filter on
+  `assigned_to`/`assigned_agent` rather than JS post-filter
+  (`get-payment-summary.ts:23-34`, `get-enrollment-stats.ts:20-22`,
+  `get-lead-stats.ts:21-22`). No drift.
+- Two migrations share the `178_` prefix
+  (`178_registration_forms_storage_bucket.sql`,
+  `178_repair_puc_student_fee_columns.sql`). They are functionally
+  independent (storage bucket vs students table columns) and both
+  are now idempotent — safe to apply in either order.
+
+## Closed since last snapshot
+
+- `/api/cron/priority-reminders` invoked from
+  `.github/workflows/cron-priority-reminders.yml` on a 5-minute
+  schedule. Vercel Hobby only supports daily crons, so we drive the
+  schedule from GitHub Actions instead. The endpoint is gated by
+  `Authorization: Bearer ${CRON_SECRET}` and dedupes cross-instance
+  via Upstash, so overlapping firings are safe.
+  Required repo secrets: `CRON_SECRET` (same value as the Vercel env)
+  and `PRODUCTION_APP_URL` (e.g. `https://ktech-adl.vercel.app`).
+- `change_stage` automation now performs position recompute via the
+  shared `shift_stage_positions` RPC and posts the same assignee
+  notification as the manual path. The only intentional divergence
+  is no recursive automation cascade (depth/re-entry guarded).
+- `incrementContactCount` is now atomic via the
+  `increment_contact_count(uuid)` Postgres RPC (migration 179).
+- Ad-hoc `console.log` calls in the four payment routes
+  (`psp/webhook`, `psp/send-link`, `send-link`, `puc-fee/send-link`)
+  are routed through `lib/logger.ts::createLogger` — payloads now
+  pass through `redactLogData`.
+- `verify-production-env.mjs` now blocks both `DEMO_MODE_ENABLED=true`
+  and `ENABLE_MIGRATION_API=true` for production releases.
