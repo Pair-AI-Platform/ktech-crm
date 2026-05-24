@@ -102,7 +102,7 @@ export function PipelineSection({ sfLeads, pucLeads, loading }: PipelineSectionP
           title="PUC"
           subtitle="PUC lead progression funnel"
           icon={<GraduationCap className="w-5 h-5 text-white" />}
-          onStageClick={(stage) => router.push(`/puc-psp?tab=puc&stage=${stage}`)}
+          onStageClick={(stage) => router.push(`/puc?tab=puc&stage=${stage}`)}
         />
       </div>
     </div>

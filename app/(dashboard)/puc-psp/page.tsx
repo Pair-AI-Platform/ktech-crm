@@ -127,13 +127,12 @@ export default function PUCPSPPage() {
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [sfStageFilter, setSfStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSearchQuery, setSfSearchQuery] = useState("")
-  // Lead IDs whose stage was just changed in the current view — keep them visible
+  // Lead IDs whose stage was just changed in the current view - keep them visible
   // until the user navigates away from this tab/stage filter.
   const [pucStickyLeadIds, setPucStickyLeadIds] = useState<Set<string>>(new Set())
   const [sfStickyLeadIds, setSfStickyLeadIds] = useState<Set<string>>(new Set())
 
-  // Clear sticky leads whenever the active tab/stage filter changes — the user
-  // moved off the tab they were working in.
+  // Clear sticky leads whenever the active tab/stage filter changes.
   useEffect(() => {
     setPucStickyLeadIds(new Set())
   }, [stageFilter, topTab])
@@ -779,7 +778,7 @@ export default function PUCPSPPage() {
             currentStageFilter={topTab === "puc" ? (stageFilter === "link_sent" ? "all" : stageFilter as PipelineStage | "all") : sfStageFilter}
             fundingTypeFilter={topTab === "puc" ? "puc" : "self_funded"}
             onStageChanged={(leadId) => {
-              // Only pin when a sub-filter is active — on "all" the lead never disappears anyway.
+              // Only pin when a sub-filter is active; on "all" the lead never disappears.
               if (topTab === "puc") {
                 if (stageFilter !== "all") {
                   setPucStickyLeadIds((prev) => {

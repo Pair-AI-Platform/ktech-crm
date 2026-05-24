@@ -1,6 +1,6 @@
 // Handoff layer for "Create Campaign from selected leads".
 //
-// Lead tables on /leads, /leads/archive, and /puc-psp expose a Campaign action
+// Lead tables on /leads, /leads/archive, and /puc expose a Campaign action
 // in their bulk-action bar. Clicking it stashes the selected leads here and
 // routes the user to /campaigns?prefill=1, which on mount reads this back,
 // clears it, and pre-fills the campaign wizard with those leads as the
@@ -20,7 +20,7 @@ export interface CampaignPrefillContact {
 }
 
 export interface CampaignPrefillPayload {
-  origin: "leads" | "puc-psp" | "archive"
+  origin: "leads" | "puc" | "archive"
   contacts: CampaignPrefillContact[]
   createdAt: number
 }
