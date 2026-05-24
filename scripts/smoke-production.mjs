@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const baseUrl = (process.env.SMOKE_BASE_URL || process.argv[2] || "https://ktech-crm.vercel.app").replace(/\/$/, "")
+const baseUrl = (process.env.SMOKE_BASE_URL || process.argv[2] || "https://ktech-adl.vercel.app").replace(/\/$/, "")
 const failures = []
 
 async function check(name, fn) {
