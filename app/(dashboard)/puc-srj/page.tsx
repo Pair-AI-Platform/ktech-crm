@@ -14,7 +14,7 @@ export default function LegacyPucSrjRedirectPage() {
     }
 
     const query = nextParams.toString()
-    router.replace(query ? `/puc?` : "/puc")
+    router.replace(query ? `/puc?${query}` : "/puc")
   }, [router, searchParams])
 
   return null
