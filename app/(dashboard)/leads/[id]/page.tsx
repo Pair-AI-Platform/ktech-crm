@@ -341,9 +341,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   // Get the stage filter from URL params for back navigation
   const stageFromUrl = searchParams.get('stage') as PipelineStage | null
   const fromPage = searchParams.get('from')
-  const backUrl = fromPage === 'sf_srj' ? '/puc-psp?tab=self_fund'
-    : fromPage === 'puc' ? '/puc-psp?tab=puc'
-    : fromPage === 'self_fund' ? '/puc-psp?tab=self_fund'
+  const backUrl = fromPage === 'sf_srj' ? '/puc?tab=self_fund'
+    : fromPage === 'puc' ? '/puc?tab=puc'
+    : fromPage === 'self_fund' ? '/puc?tab=self_fund'
     : stageFromUrl ? `/leads?stage=${stageFromUrl}` : '/leads'
   const backLabel = fromPage === 'sf_srj' ? 'Self Funded'
     : fromPage === 'puc' ? 'PUC'
