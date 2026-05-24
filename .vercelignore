@@ -1,0 +1,28 @@
+# Unrelated sibling projects in repo root
+/thekstocks-automation/
+/domain-name-brainstormer/
+/domain-name-brainstormer.zip
+/pair_assets/
+/old req/
+
+# Stray contract / requirement / planning artifacts at root only
+/*.pdf
+/*.docx
+/*.xlsx
+/*.html
+/*.png
+/*.jpeg
+/*.jpg
+
+# Local-only docs / snapshots at root
+/REVIEW.md
+/form-snapshot.md
+/form2.md
+/CONTENT RESERCHER.md
+
+# Planning + GSD scaffolding
+.planning/
+.claude/
+
+# OS junk
+.DS_Store
