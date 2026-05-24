@@ -86,19 +86,36 @@ Current status on `fix/greeting-header-hydration`:
 
 ## Required production environment variables
 
-Verified by `scripts/verify-production-env.mjs`:
+Verified by `scripts/verify-production-env.mjs`. Missing any of these
+fails the production release check:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
-- `MYFATOORAH_WEBHOOK_SECRET`
 - `AI_TRANSFER_WEBHOOK_SECRET`
-- `TWILIO_AUTH_TOKEN`
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 - `NEXT_PUBLIC_SENTRY_DSN`
 
 Forbidden in production: `DEMO_MODE_ENABLED=true`, `ENABLE_MIGRATION_API=true`.
+
+### Integration variables (warn-only)
+
+These gate specific features. The release check warns when they are
+missing but does not fail. Set them before turning the feature on in
+production — the matching routes are designed to fail safely without
+them.
+
+- `MYFATOORAH_WEBHOOK_SECRET` — payment webhooks via MyFatoorah. Not
+  in production scope for this release; webhook handlers reject
+  unsigned payloads with "MYFATOORAH_WEBHOOK_SECRET is not configured"
+  if the route is hit.
+- `TWILIO_AUTH_TOKEN` (and `TWILIO_ACCOUNT_SID`, `TWILIO_WHATSAPP_NUMBER`)
+  — Twilio integration is **not used in production**. Messaging is
+  routed through Pair (in-house service). The four `payments/*/send-link`
+  routes that currently import `twilio` will throw "Twilio credentials
+  not configured" if invoked; revisit when the Pair messaging client
+  replaces those calls.
 
 ### Required GitHub Actions repository secrets
 
