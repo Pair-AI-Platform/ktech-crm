@@ -1261,7 +1261,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="actual_gpa" className="text-xs">Actual Cumulative GPA</Label>
+                  <Label htmlFor="actual_gpa" className="text-xs">Actual Accumulative GPA</Label>
                   <Input
                     id="actual_gpa"
                     type="number"
