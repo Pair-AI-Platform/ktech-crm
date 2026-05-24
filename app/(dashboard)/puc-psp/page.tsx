@@ -38,6 +38,7 @@ type PucPaymentLeadRow = { lead_id: string }
 type PucPaymentAmountRow = { lead_id: string; amount: number | null }
 type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: string | null }
 type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
+type RecentStageMove = { stage: PipelineStage; rank: number }
 
 // PUC pipeline stage pills (the stages a PUC lead progresses through)
 const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
@@ -131,6 +132,8 @@ export default function PUCPSPPage() {
   // until the user navigates away from this tab/stage filter.
   const [pucStickyLeadIds, setPucStickyLeadIds] = useState<Set<string>>(new Set())
   const [sfStickyLeadIds, setSfStickyLeadIds] = useState<Set<string>>(new Set())
+  const [recentStageMoves, setRecentStageMoves] = useState<Record<string, RecentStageMove>>({})
+  const stageMoveRankRef = useRef(0)
 
   // Clear sticky leads whenever the active tab/stage filter changes.
   useEffect(() => {
@@ -479,6 +482,19 @@ export default function PUCPSPPage() {
 
   const filteredLeads = topTab === "puc" ? pucFilteredLeads : sfFilteredLeads
 
+  const activeFilteredStage = topTab === "puc"
+    ? (stageFilter === "link_sent" ? "all" : stageFilter)
+    : sfStageFilter
+  const pinnedLeadRanks = useMemo(() => {
+    if (activeFilteredStage === "all") return {}
+
+    return Object.fromEntries(
+      Object.entries(recentStageMoves)
+        .filter(([, move]) => move.stage === activeFilteredStage)
+        .map(([leadId, move]) => [leadId, move.rank])
+    )
+  }, [activeFilteredStage, recentStageMoves])
+
   const stageCounts = useMemo(() => {
     let allCount = 0
     const counts: Record<string, number> = {}
@@ -777,7 +793,14 @@ export default function PUCPSPPage() {
             }}
             currentStageFilter={topTab === "puc" ? (stageFilter === "link_sent" ? "all" : stageFilter as PipelineStage | "all") : sfStageFilter}
             fundingTypeFilter={topTab === "puc" ? "puc" : "self_funded"}
-            onStageChanged={(leadId) => {
+            pinnedLeadRanks={pinnedLeadRanks}
+            onStageChanged={(leadId, newStage) => {
+              stageMoveRankRef.current += 1
+              setRecentStageMoves((prev) => ({
+                ...prev,
+                [leadId]: { stage: newStage, rank: stageMoveRankRef.current },
+              }))
+
               // Only pin when a sub-filter is active; on "all" the lead never disappears.
               if (topTab === "puc") {
                 if (stageFilter !== "all") {
