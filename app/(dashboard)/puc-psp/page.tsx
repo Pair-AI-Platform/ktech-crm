@@ -111,7 +111,7 @@ export default function PUCPSPPage() {
   // Legacy sf_srj links now resolve to the plain self-funded workspace.
   useEffect(() => {
     if (tabParam === "sf_srj") {
-      router.replace("/puc-psp?tab=self_fund")
+      router.replace("/puc?tab=self_fund")
       setTopTab("self_fund")
     } else if (tabParam === "self_fund") {
       setTopTab("self_fund")
@@ -816,7 +816,7 @@ export default function PUCPSPPage() {
                   .filter((l) => selectedSet.has(l.id))
                   .map(leadToPrefillContact)
                 stashCampaignPrefill({
-                  origin: "puc-psp",
+                  origin: "puc",
                   contacts,
                   createdAt: Date.now(),
                 })
