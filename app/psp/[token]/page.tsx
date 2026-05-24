@@ -440,7 +440,7 @@ export default function PspSelfServicePage() {
             <Field label="Graduation Year" labelAr="سنة التخرج">
               <Input value={form.graduation_year} onChange={(v) => setForm({ ...form, graduation_year: v })} inputMode="numeric" />
             </Field>
-            <Field label="GPA (Grade 11)" labelAr="المعدل (الصف 11)">
+            <Field label="Actual Cumulative GPA" labelAr="المعدل التراكمي الفعلي">
               <Input value={form.gpa_grade_11} onChange={(v) => setForm({ ...form, gpa_grade_11: v })} inputMode="decimal" />
             </Field>
           </div>

@@ -52,6 +52,7 @@ interface LeadTableProps {
   pageSize?: number
   onPageChange?: (page: number) => void
   onStageChanged?: (leadId: string, newStage: PipelineStage, status?: LeadStatus | null) => void
+  pinnedLeadRanks?: Record<string, number>
 }
 
 type PaymentLeadRow = { lead_id: string }
@@ -71,6 +72,7 @@ export function LeadTable({
   pageSize = 50,
   onPageChange,
   onStageChanged,
+  pinnedLeadRanks,
 }: LeadTableProps) {
   const { updateLeadStage, updateLead, incrementContactCount } = useLeadMutations()
   const { settings: stageSettings } = useStageSettings()
@@ -419,6 +421,10 @@ export function LeadTable({
   const PRIORITY_WEIGHT: Record<string, number> = { critical: 0, important: 1, normal: 2 }
 
   const sortedLeads = [...leads].sort((a, b) => {
+    const aPinRank = pinnedLeadRanks?.[a.id] ?? 0
+    const bPinRank = pinnedLeadRanks?.[b.id] ?? 0
+    if (aPinRank !== bPinRank) return bPinRank - aPinRank
+
     // Always sort by priority first (critical > important > normal/undefined)
     const aPriority = PRIORITY_WEIGHT[a.priority || 'normal'] ?? 2
     const bPriority = PRIORITY_WEIGHT[b.priority || 'normal'] ?? 2
