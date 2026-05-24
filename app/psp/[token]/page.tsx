@@ -50,6 +50,17 @@ const GRAD_TYPES: { id: GraduateType; label: string; labelAr: string }[] = [
   { id: "OTHER", label: "Others", labelAr: "أخرى" },
 ]
 
+// Lead.education_type may arrive as lowercase "other" (from EducationType enum).
+// PSP document rules use uppercase "OTHER" (GraduateType enum). Normalize here.
+function normalizeGraduateType(raw: unknown): GraduateType | null {
+  if (typeof raw !== "string") return null
+  const upper = raw.toUpperCase()
+  if (upper === "GOV" || upper === "US" || upper === "UK" || upper === "KSA" || upper === "OTHER") {
+    return upper
+  }
+  return null
+}
+
 export default function PspSelfServicePage() {
   const { token } = useParams<{ token: string }>()
   const [state, setState] = useState<PageState>("verify")
@@ -78,7 +89,7 @@ export default function PspSelfServicePage() {
     date_of_birth: "",
     graduation_year: "",
     gpa_grade_11: "",
-    education_type: "GOV" as GraduateType,
+    education_type: null as GraduateType | null,
     is_diplomatic: false,
     is_special_needs: false,
   })
@@ -171,7 +182,7 @@ export default function PspSelfServicePage() {
         date_of_birth: json.lead.date_of_birth ?? "",
         graduation_year: json.lead.graduation_year ? String(json.lead.graduation_year) : "",
         gpa_grade_11: json.lead.gpa_grade_11 != null ? String(json.lead.gpa_grade_11) : "",
-        education_type: (json.lead.education_type as GraduateType) || "GOV",
+        education_type: normalizeGraduateType(json.lead.education_type),
         is_diplomatic: !!json.lead.is_diplomatic,
         is_special_needs: !!json.lead.is_special_needs,
       })
@@ -193,6 +204,7 @@ export default function PspSelfServicePage() {
   }
 
   const requiredDocs = useMemo<DocumentRule[]>(() => {
+    if (!form.education_type) return []
     const flags: ConditionalDocumentFlags = {
       isSpecialNeeds: form.is_special_needs,
       isDiplomatic: form.is_diplomatic,
@@ -202,6 +214,7 @@ export default function PspSelfServicePage() {
 
   const docsByType = useMemo(() => {
     const map = new Map<string, UploadedDoc>()
+    if (!form.education_type) return map
     for (const d of docs) {
       if (d.graduate_type === form.education_type) {
         map.set(d.document_type, d)
@@ -266,15 +279,17 @@ export default function PspSelfServicePage() {
 
   async function uploadDoc(rule: DocumentRule, file: File) {
     if (!token || !phone) return
+    const gradType = form.education_type
+    if (!gradType) return
     if (token === "demo-preview") {
       setUploadingDocId(rule.id)
       await new Promise(r => setTimeout(r, 400))
       setDocs(prev => [
-        ...prev.filter(d => !(d.document_type === rule.id && d.graduate_type === form.education_type)),
+        ...prev.filter(d => !(d.document_type === rule.id && d.graduate_type === gradType)),
         {
           id: `demo-${rule.id}-${Date.now()}`,
           document_type: rule.id,
-          graduate_type: form.education_type,
+          graduate_type: gradType,
           file_name: file.name,
           public_url: null,
           is_verified: false,
@@ -292,7 +307,7 @@ export default function PspSelfServicePage() {
       fd.append("phone", phone)
       fd.append("file", file)
       fd.append("document_type", rule.id)
-      fd.append("graduate_type", form.education_type)
+      fd.append("graduate_type", gradType)
       const res = await fetch("/api/psp/self-service/upload-doc", { method: "POST", body: fd })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -451,24 +466,38 @@ export default function PspSelfServicePage() {
           <SectionTitle en="Documents" ar="المستندات" />
 
           <div>
-            <p className="text-xs text-slate-500 mb-2">Graduate Type / نوع الشهادة</p>
-            <div className="flex flex-wrap gap-2">
-              {GRAD_TYPES.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, education_type: g.id })}
-                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                    form.education_type === g.id
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-slate-700 border-slate-200 hover:border-blue-400"
-                  }`}
-                >
-                  <span className="font-medium">{g.label}</span>
-                  <span className="text-xs opacity-70 ml-1.5">{g.labelAr}</span>
-                </button>
-              ))}
-            </div>
+            <p className="text-xs text-slate-500 mb-2">
+              Graduate Type / نوع الشهادة
+              <span className="text-rose-600 ml-1">*</span>
+            </p>
+            {form.education_type ? (
+              (() => {
+                const g = GRAD_TYPES.find((t) => t.id === form.education_type)
+                if (!g) return null
+                return (
+                  <div
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm bg-blue-600 text-white border border-blue-600"
+                    aria-label="Graduate type (set by admissions, not editable)"
+                  >
+                    <span className="font-medium">{g.label}</span>
+                    <span className="text-xs opacity-80">{g.labelAr}</span>
+                    <span
+                      className="ml-1 text-[10px] uppercase tracking-wide opacity-70"
+                      aria-hidden="true"
+                    >
+                      Locked
+                    </span>
+                  </div>
+                )
+              })()
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm bg-rose-50 text-rose-700 border border-rose-200">
+                <span className="font-medium">Not set — contact admissions</span>
+                <span className="text-xs" dir="rtl">
+                  لم يتم تحديد نوع الشهادة — يرجى التواصل مع القبول
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm">
@@ -525,7 +554,8 @@ export default function PspSelfServicePage() {
             <button
               type="button"
               onClick={submit}
-              disabled={saving || submitting}
+              disabled={saving || submitting || !form.education_type}
+              title={!form.education_type ? "Graduate type is not set — please contact admissions" : undefined}
               className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 font-medium"
             >
               {submitting ? "Submitting..." : submittedBadge ? "Re-submit / إعادة الإرسال" : "Submit / إرسال"}
