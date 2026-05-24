@@ -100,6 +100,15 @@ Verified by `scripts/verify-production-env.mjs`:
 
 Forbidden in production: `DEMO_MODE_ENABLED=true`, `ENABLE_MIGRATION_API=true`.
 
+### Required GitHub Actions repository secrets
+
+For the `cron-priority-reminders` workflow:
+
+- `CRON_SECRET` — same value as the Vercel env above.
+- `PRODUCTION_APP_URL` — e.g. `https://ktech-adl.vercel.app`.
+
+Set via Settings → Secrets and variables → Actions (or `gh secret set`).
+
 See `.env.local.example` for the full template, including optional
 `ALLOWED_ORIGIN_HOSTS` and `HEALTH_TOKEN`.
 
