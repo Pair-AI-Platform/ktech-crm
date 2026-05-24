@@ -28,7 +28,6 @@ interface LeadView {
   gpa_grade_11: number | null
   intended_major: IntendedMajor | null
   preferred_major: string | null
-  ministry_accepted_major: string | null
   education_type: GraduateType | null
   is_diplomatic: boolean | null
   is_special_needs: boolean | null
@@ -95,7 +94,6 @@ export default function PspSelfServicePage() {
     gpa_grade_11: "",
     intended_major: "" as IntendedMajor | "",
     preferred_major: "",
-    ministry_accepted_major: "",
     education_type: null as GraduateType | null,
     is_diplomatic: false,
     is_special_needs: false,
@@ -130,7 +128,6 @@ export default function PspSelfServicePage() {
         gpa_grade_11: 3.6,
         intended_major: "network_security",
         preferred_major: "أمن الشبكات",
-        ministry_accepted_major: null,
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -152,7 +149,6 @@ export default function PspSelfServicePage() {
         gpa_grade_11: String(demoLead.gpa_grade_11 ?? ""),
         intended_major: demoLead.intended_major ?? "",
         preferred_major: demoLead.preferred_major ?? "",
-        ministry_accepted_major: demoLead.ministry_accepted_major ?? "",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -197,7 +193,6 @@ export default function PspSelfServicePage() {
         gpa_grade_11: json.lead.gpa_grade_11 != null ? String(json.lead.gpa_grade_11) : "",
         intended_major: json.lead.intended_major ?? "",
         preferred_major: json.lead.preferred_major ?? "",
-        ministry_accepted_major: json.lead.ministry_accepted_major ?? "",
         education_type: normalizeGraduateType(json.lead.education_type),
         is_diplomatic: !!json.lead.is_diplomatic,
         is_special_needs: !!json.lead.is_special_needs,
@@ -487,9 +482,6 @@ export default function PspSelfServicePage() {
             <Field label="Preferred Major" labelAr="التخصص المفضل">
               <Input value={form.preferred_major} onChange={(v) => setForm({ ...form, preferred_major: v })} dir="rtl" />
             </Field>
-            <Field label="ktech Actual Major" labelAr="التخصص الفعلي في KTECH">
-              <Input value={form.ministry_accepted_major} disabled placeholder="From ministry file" dir="rtl" />
-            </Field>
           </div>
         </section>
 
@@ -700,12 +692,10 @@ function Field({ label, labelAr, children }: { label: string; labelAr: string; c
 
 function Input(props: {
   value: string
-  onChange?: (v: string) => void
+  onChange: (v: string) => void
   type?: string
   inputMode?: "text" | "numeric" | "tel" | "email" | "decimal"
   dir?: "ltr" | "rtl"
-  disabled?: boolean
-  placeholder?: string
 }) {
   return (
     <input
@@ -713,11 +703,8 @@ function Input(props: {
       inputMode={props.inputMode}
       dir={props.dir}
       value={props.value}
-      onChange={(e) => props.onChange?.(e.target.value)}
-      readOnly={!props.onChange}
-      disabled={props.disabled}
-      placeholder={props.placeholder}
-      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+      onChange={(e) => props.onChange(e.target.value)}
+      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     />
   )
 }
