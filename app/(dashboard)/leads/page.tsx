@@ -721,7 +721,7 @@ export default function LeadsPage() {
               const snapshot: Lead = {
                 ...existing,
                 pipeline_stage: newStage,
-                status: status === undefined ? existing.status : status,
+                status: status === undefined ? existing.status : (status ?? undefined),
               }
               setStickyLeads(prev => {
                 if (prev.get(leadId)?.pipeline_stage === newStage && prev.get(leadId)?.status === snapshot.status) {
