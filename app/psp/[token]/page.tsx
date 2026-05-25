@@ -27,7 +27,6 @@ interface LeadView {
   graduation_year: number | null
   gpa_grade_11: number | null
   intended_major: IntendedMajor | null
-  preferred_major: string | null
   education_type: GraduateType | null
   is_diplomatic: boolean | null
   is_special_needs: boolean | null
@@ -93,7 +92,6 @@ export default function PspSelfServicePage() {
     graduation_year: "",
     gpa_grade_11: "",
     intended_major: "" as IntendedMajor | "",
-    preferred_major: "",
     education_type: null as GraduateType | null,
     is_diplomatic: false,
     is_special_needs: false,
@@ -127,7 +125,6 @@ export default function PspSelfServicePage() {
         graduation_year: 2025,
         gpa_grade_11: 3.6,
         intended_major: "network_security",
-        preferred_major: "أمن الشبكات",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -148,7 +145,6 @@ export default function PspSelfServicePage() {
         graduation_year: String(demoLead.graduation_year ?? ""),
         gpa_grade_11: String(demoLead.gpa_grade_11 ?? ""),
         intended_major: demoLead.intended_major ?? "",
-        preferred_major: demoLead.preferred_major ?? "",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -192,7 +188,6 @@ export default function PspSelfServicePage() {
         graduation_year: json.lead.graduation_year ? String(json.lead.graduation_year) : "",
         gpa_grade_11: json.lead.gpa_grade_11 != null ? String(json.lead.gpa_grade_11) : "",
         intended_major: json.lead.intended_major ?? "",
-        preferred_major: json.lead.preferred_major ?? "",
         education_type: normalizeGraduateType(json.lead.education_type),
         is_diplomatic: !!json.lead.is_diplomatic,
         is_special_needs: !!json.lead.is_special_needs,
@@ -258,10 +253,7 @@ export default function PspSelfServicePage() {
         graduation_year: form.graduation_year ? Number(form.graduation_year) : null,
         gpa_grade_11: form.gpa_grade_11 ? Number(form.gpa_grade_11) : null,
         intended_major: form.intended_major || null,
-        preferred_major: form.preferred_major || null,
         education_type: form.education_type,
-        is_diplomatic: form.is_diplomatic,
-        is_special_needs: form.is_special_needs,
       }
       const res = await fetch("/api/psp/self-service/save-info", {
         method: "POST",
@@ -479,9 +471,6 @@ export default function PspSelfServicePage() {
                 options={MAJORS}
               />
             </Field>
-            <Field label="Preferred Major" labelAr="التخصص المفضل">
-              <Input value={form.preferred_major} onChange={(v) => setForm({ ...form, preferred_major: v })} dir="rtl" />
-            </Field>
           </div>
         </section>
 
@@ -522,27 +511,6 @@ export default function PspSelfServicePage() {
                 </span>
               </div>
             )}
-          </div>
-
-          <div className="flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_special_needs}
-                onChange={(e) => setForm({ ...form, is_special_needs: e.target.checked })}
-                className="w-4 h-4"
-              />
-              <span>Special Needs / ذوو الاحتياجات الخاصة</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_diplomatic}
-                onChange={(e) => setForm({ ...form, is_diplomatic: e.target.checked })}
-                className="w-4 h-4"
-              />
-              <span>Diplomatic / دبلوماسي</span>
-            </label>
           </div>
 
           <div className="space-y-2">
