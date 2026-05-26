@@ -21,7 +21,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import { LeadForm } from "@/components/leads/lead-form"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
 import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
-import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
+import { BulkAssignModal, BulkDeleteModal, BulkStageModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { CSVImportModal } from "@/components/leads/csv-import-modal"
 import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
 import { PucImportDialog } from "@/components/leads/puc-import-dialog"
@@ -31,7 +31,9 @@ import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
 import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
 import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
-import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
+import { openCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
+import { checkStageTransition } from "@/lib/lead-stage-guards"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { ErrorState } from "@/components/ui/error-state"
@@ -104,6 +106,7 @@ export default function LeadsPage() {
     setStickyLeads(new Map())
   }, [stageFilter, lostAtFilter])
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showStageModal, setShowStageModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showLostModal, setShowLostModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -486,6 +489,58 @@ export default function LeadsPage() {
     }
   }
 
+  const handleBulkStageConfirm = async (stage: PipelineStage) => {
+    if (selectedLeadObjects.length === 0) return
+
+    if (stage === "application") {
+      const blocked = selectedLeadObjects
+        .filter((lead) => lead.pipeline_stage !== "application")
+        .map((lead) => ({ lead, guard: checkStageTransition({ lead, newStage: "application" }) }))
+        .filter(({ guard }) => guard.kind === "file_requirements" || guard.kind === "file_fee")
+
+      const missingInfo = blocked.filter(({ guard }) => guard.kind === "file_requirements")
+      if (missingInfo.length > 0) {
+        const details = missingInfo
+          .slice(0, 4)
+          .map(({ lead, guard }) => {
+            const missing = guard.kind === "file_requirements" ? guard.missingFields.join(", ") : ""
+            return `${getLeadDisplayName(lead)}: ${missing}`
+          })
+          .join("\n")
+        const suffix = missingInfo.length > 4 ? `\n...and ${missingInfo.length - 4} more` : ""
+        window.alert(
+          `Cannot move ${missingInfo.length} selected lead${missingInfo.length !== 1 ? "s" : ""} to File yet.\n\nComplete the missing required fields first.\n\n${details}${suffix}`
+        )
+        return
+      }
+
+      const missingFee = blocked.filter(({ guard }) => guard.kind === "file_fee")
+      if (missingFee.length > 0) {
+        const details = missingFee
+          .slice(0, 4)
+          .map(({ lead }) => getLeadDisplayName(lead))
+          .join("\n")
+        const suffix = missingFee.length > 4 ? `\n...and ${missingFee.length - 4} more` : ""
+        window.alert(
+          `Cannot move ${missingFee.length} selected lead${missingFee.length !== 1 ? "s" : ""} to File yet.\n\nHandle the file fee first for:\n\n${details}${suffix}`
+        )
+        return
+      }
+    }
+
+    const result = await bulkUpdateStage(selectedLeads, stage)
+    if (result.error) {
+      window.alert(result.error)
+      return
+    }
+
+    setShowStageModal(false)
+    setSelectedLeads([])
+    setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} moved`)
+    setShowSuccessToast(true)
+    refetch()
+  }
+
   const handleBulkLost = () => {
     setShowLostModal(true)
   }
@@ -786,18 +841,18 @@ export default function LeadsPage() {
             <BulkActionsBar
               selectedCount={selectedLeads.length}
               onAssign={handleBulkAssign}
+              onStage={() => setShowStageModal(true)}
               onBook={handleBulkBook}
               onLost={handleBulkLost}
               onDelete={handleBulkDelete}
               onClear={() => setSelectedLeads([])}
               onSendRSVP={() => setShowRSVPModal(true)}
               onCampaign={() => {
-                stashCampaignPrefill({
+                openCampaignPrefill({
                   origin: "leads",
                   contacts: selectedLeadObjects.map(leadToPrefillContact),
                   createdAt: Date.now(),
                 })
-                router.push("/campaigns?prefill=1")
               }}
             />
           )}
@@ -832,6 +887,16 @@ export default function LeadsPage() {
         onClose={() => setShowAssignModal(false)}
         selectedCount={selectedLeads.length}
         onConfirm={handleBulkAssignConfirm}
+        loading={mutationLoading}
+      />
+
+      {/* Bulk Stage Modal */}
+      <BulkStageModal
+        isOpen={showStageModal}
+        onClose={() => setShowStageModal(false)}
+        selectedCount={selectedLeads.length}
+        options={PIPELINE_STAGES.filter((s) => s.value !== "lost").map((s) => ({ value: s.value, label: s.label }))}
+        onConfirm={handleBulkStageConfirm}
         loading={mutationLoading}
       />
 

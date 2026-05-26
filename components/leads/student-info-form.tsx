@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input, Textarea } from "@/components/ui/input"
@@ -43,6 +43,7 @@ import {
   Ban,
   History,
   ArrowRight,
+  type LucideIcon,
 } from "lucide-react"
 import {
   SCHOOLS,
@@ -69,15 +70,71 @@ import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
 import { createClient } from "@/lib/supabase/client"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { formatDate } from "@/lib/utils"
+import { compareSchoolsBySearch, schoolMatchesSearch } from "@/lib/schools/search"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
 
-const SOURCE_CATEGORIES = [
-  { value: "direct", label: "Direct", icon: "📞" },
-  { value: "events", label: "Events", icon: "🎪" },
-  { value: "marketing", label: "Marketing", icon: "📱" },
-  { value: "referrals", label: "Referrals", icon: "👥" },
-  { value: "outreach", label: "Outreach", icon: "📣" },
+const SOURCE_CATEGORIES: { value: string; label: string; description: string; icon: LucideIcon }[] = [
+  { value: "direct", label: "Direct", description: "Walk-ins and calls", icon: Phone },
+  { value: "events", label: "Events", description: "School visits and fairs", icon: Building2 },
+  { value: "marketing", label: "Marketing", description: "Ads and web forms", icon: Megaphone },
+  { value: "referrals", label: "Referrals", description: "Students and families", icon: Users },
+  { value: "outreach", label: "Outreach", description: "Campaign follow-up", icon: Send },
 ]
+
+const sectionBodyClass = "space-y-5 border-t border-[var(--border-subtle)] px-4 py-5 sm:px-5"
+const fieldGridClass = "grid grid-cols-1 gap-4 xl:grid-cols-2"
+
+function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <section
+      className={cn(
+        "rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)]",
+        "transition-colors duration-150 hover:border-[var(--border-emphasis)]",
+        className
+      )}
+    >
+      {children}
+    </section>
+  )
+}
+
+function SectionHeader({ icon: Icon, title, description, open, onToggle, trailing, iconBg }: {
+  icon: LucideIcon
+  title: string
+  description?: string
+  open: boolean
+  onToggle: () => void
+  trailing?: ReactNode
+  iconBg?: string
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 p-4 sm:p-5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="group flex min-w-0 flex-1 items-start gap-3 text-left"
+      >
+        <div className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)]",
+          iconBg || "bg-[var(--bg-sunken)]"
+        )}>
+          <Icon className={cn("h-4 w-4", iconBg ? "text-white" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]")} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h4>
+          {description && (
+            <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">{description}</p>
+          )}
+        </div>
+        <ChevronDown className={cn(
+          "mt-2 h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform",
+          open && "rotate-180"
+        )} />
+      </button>
+      {trailing}
+    </div>
+  )
+}
 
 interface StudentInfoFormProps {
   lead: Lead
@@ -247,14 +304,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     ? dbSchools
     : SCHOOLS.map(s => ({ id: s.value, name_en: s.labelEn, name_ar: s.labelAr || s.label, gender: s.gender }))
 
-  // Filter schools based on search
+  // Filter schools based on Arabic, English, compact text, and acronyms like BSK/NES/KES.
   const filteredSchools = schoolSource.filter(school => {
     if (formData.gender === 'male' && school.gender && school.gender !== 'boys' && school.gender !== 'male' && school.gender !== 'mixed') return false
     if (formData.gender === 'female' && school.gender && school.gender !== 'girls' && school.gender !== 'female' && school.gender !== 'mixed') return false
-    if (!schoolSearch) return true
-    const term = schoolSearch.toLowerCase()
-    return school.name_ar.includes(schoolSearch) || school.name_en.toLowerCase().includes(term)
-  })
+    return schoolMatchesSearch(school, schoolSearch)
+  }).sort(compareSchoolsBySearch(schoolSearch))
 
   // Filter nationalities
   const filteredNationalities = NATIONALITIES.filter(n => {
@@ -451,28 +506,17 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [isNationalityDropdownOpen])
 
-  // Section header component
-  const SectionHeader = ({ icon: Icon, title, open, onToggle, iconBg }: {
-    icon: typeof User, title: string, open: boolean, onToggle: () => void, iconBg?: string
-  }) => (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex items-center gap-2 w-full text-left cursor-pointer"
-    >
-      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", iconBg || "bg-[var(--primary-muted)]")}>
-        <Icon className={cn("w-4 h-4", iconBg ? "text-white" : "text-[var(--primary)]")} />
-      </div>
-      <h4 className="font-semibold text-[var(--text-primary)]">{title}</h4>
-      <ChevronDown className={cn(
-        "w-4 h-4 text-[var(--text-muted)] transition-transform ml-auto",
-        open && "rotate-180"
-      )} />
-    </button>
-  )
+  const requiredFields = [
+    { label: "First name", complete: Boolean(formData.first_name.trim()) },
+    { label: "Last name", complete: Boolean(formData.last_name.trim()) },
+    { label: "Phone", complete: Boolean(formData.phone.trim()) },
+    { label: "Civil ID", complete: Boolean(formData.civil_id.trim()) },
+    { label: "Education type", complete: Boolean(formData.education_type) },
+  ]
+  const requiredCompletedCount = requiredFields.filter(field => field.complete).length
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1380px] space-y-4 pb-6">
       {errors.submit && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -512,13 +556,48 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         />
       )}
 
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 shadow-[var(--shadow-card)] sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)]">
+              <ClipboardList className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">File readiness</p>
+              <p className="text-xs text-[var(--text-tertiary)]">{requiredCompletedCount} of {requiredFields.length} required fields complete</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            {requiredFields.map((field) => (
+              <span
+                key={field.label}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+                  field.complete
+                    ? "border-[var(--success)]/20 bg-[var(--success-bg)] text-[var(--success)]"
+                    : "border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-tertiary)]"
+                )}
+              >
+                {field.complete ? <Check className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />}
+                {field.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* ═══════════════════════════════════════════ */}
       {/* Section 1: Personal Information */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <SectionHeader icon={User} title="Personal Information" open={personalOpen} onToggle={() => setPersonalOpen(!personalOpen)} />
-          <div>
+      <SectionCard>
+        <SectionHeader
+          icon={User}
+          title="Personal Information"
+          description="Identity, nationality, and student profile"
+          open={personalOpen}
+          onToggle={() => setPersonalOpen(!personalOpen)}
+          trailing={(
+            <div>
             <input
               ref={civilIdFileRef}
               type="file"
@@ -533,7 +612,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               size="sm"
               disabled={scanning}
               onClick={() => civilIdFileRef.current?.click()}
-              className="gap-2 text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-950/30"
+              className="gap-2 border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
             >
               {scanning ? (
                 <>
@@ -547,13 +626,14 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 </>
               )}
             </Button>
-          </div>
-        </div>
+            </div>
+          )}
+        />
 
         {personalOpen && (
-          <div className="space-y-4 pl-10">
+          <div className={sectionBodyClass}>
             {/* Name */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
                 <Input
@@ -583,7 +663,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             {/* Gender */}
             <div className="space-y-2">
               <Label>Gender</Label>
-              <div className="flex gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   { value: "male", label: "Male" },
                   { value: "female", label: "Female" },
@@ -596,7 +676,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                       "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
                       formData.gender === option.value
                         ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                        : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                     )}
                   >
                     <Users className="w-4 h-4" />
@@ -626,7 +706,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 </div>
 
                 {isNationalityDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
+                  <div className="absolute z-50 w-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
                     <div className="p-2 border-b border-[var(--border)]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -682,30 +762,30 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             {/* Student Profile Checkboxes */}
             <div className="pt-2">
               <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-3 block">Student Profile</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {([
-                  { key: 'is_transfer_student', label: 'Transfer Student', icon: UserCheck, color: 'blue' },
-                  { key: 'is_special_needs', label: 'Special Needs', icon: Heart, color: 'rose' },
-                  { key: 'is_diplomatic', label: 'Diplomatic', icon: Globe, color: 'amber' },
-                  { key: 'is_athlete', label: 'Athlete', icon: Trophy, color: 'orange' },
-                  { key: 'is_married', label: 'Married', icon: Users, color: 'pink' },
-                  { key: 'is_employee', label: 'Employee', icon: Briefcase, color: 'indigo' },
-                  { key: 'is_marketing_student', label: 'Marketing Student', icon: Megaphone, color: 'teal' },
-                ] as const).map(({ key, label, icon: ItemIcon, color }) => (
+                  { key: 'is_transfer_student', label: 'Transfer Student', icon: UserCheck },
+                  { key: 'is_special_needs', label: 'Special Needs', icon: Heart },
+                  { key: 'is_diplomatic', label: 'Diplomatic', icon: Globe },
+                  { key: 'is_athlete', label: 'Athlete', icon: Trophy },
+                  { key: 'is_married', label: 'Married', icon: Users },
+                  { key: 'is_employee', label: 'Employee', icon: Briefcase },
+                  { key: 'is_marketing_student', label: 'Marketing Student', icon: Megaphone },
+                ] as const).map(({ key, label, icon: ItemIcon }) => (
                   <div
                     key={key}
                     onClick={() => setFormData(prev => ({ ...prev, [key]: !prev[key] }))}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                      "group flex min-h-[68px] items-center gap-3 rounded-lg border p-3 cursor-pointer transition-all",
                       formData[key]
-                        ? `border-${color}-500 bg-${color}-50 dark:bg-${color}-950/30`
-                        : `border-[var(--border)] hover:border-${color}-300`
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                     )}
                   >
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                       formData[key]
-                        ? `bg-${color}-500 text-white`
+                        ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                         : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     )}>
                       <ItemIcon className="w-4 h-4" />
@@ -723,17 +803,23 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 2: Contact Information */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <SectionHeader icon={Phone} title="Contact Information" open={contactOpen} onToggle={() => setContactOpen(!contactOpen)} />
+      <SectionCard>
+        <SectionHeader
+          icon={Phone}
+          title="Contact Information"
+          description="Mobile, Civil ID, and matching details"
+          open={contactOpen}
+          onToggle={() => setContactOpen(!contactOpen)}
+        />
 
         {contactOpen && (
-          <div className="space-y-4 pl-10">
-            <div className="grid grid-cols-2 gap-4">
+          <div className={sectionBodyClass}>
+            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number *</Label>
                 <Input
@@ -760,7 +846,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -786,7 +872,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="date_of_birth">Date of Birth</Label>
                 <Input
@@ -813,51 +899,71 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 3: Lead Source */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <SectionHeader icon={Sparkles} title="Lead Source" open={sourceOpen} onToggle={() => setSourceOpen(!sourceOpen)} />
+      <SectionCard>
+        <SectionHeader
+          icon={Sparkles}
+          title="Lead Source"
+          description="Where this student came from"
+          open={sourceOpen}
+          onToggle={() => setSourceOpen(!sourceOpen)}
+        />
 
         {sourceOpen && (
-          <div className="space-y-4 pl-10">
+          <div className={sectionBodyClass}>
             <div className="space-y-2">
               <Label>Source Category</Label>
-              <div className="grid grid-cols-5 gap-2">
-                {SOURCE_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.value}
-                    type="button"
-                    onClick={() => {
-                      handleChange("source_category", cat.value)
-                      const categoryMap: Record<string, string> = {
-                        direct: "walk_in",
-                        events: "school_visit",
-                        marketing: "website_form",
-                        referrals: "current_student_referral",
-                        outreach: "old_contacts",
-                      }
-                      handleChange("source", categoryMap[cat.value] || "")
-                    }}
-                    className={cn(
-                      "flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all",
-                      formData.source_category === cat.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                    )}
-                  >
-                    <span className="text-lg">{cat.icon}</span>
-                    <span className="text-xs font-medium">{cat.label}</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                {SOURCE_CATEGORIES.map((cat) => {
+                  const CatIcon = cat.icon
+                  const selected = formData.source_category === cat.value
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => {
+                        handleChange("source_category", cat.value)
+                        const categoryMap: Record<string, string> = {
+                          direct: "walk_in",
+                          events: "school_visit",
+                          marketing: "website_form",
+                          referrals: "current_student_referral",
+                          outreach: "old_contacts",
+                        }
+                        handleChange("source", categoryMap[cat.value] || "")
+                      }}
+                      className={cn(
+                        "flex min-h-[72px] items-center gap-3 rounded-lg border p-3 text-left transition-all",
+                        selected
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
+                      )}
+                    >
+                      <span className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                        selected
+                          ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                          : "bg-[var(--bg-sunken)] text-[var(--text-secondary)]"
+                      )}>
+                        <CatIcon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[var(--text-primary)]">{cat.label}</span>
+                        <span className="block truncate text-xs text-[var(--text-tertiary)]">{cat.description}</span>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Source</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
                 {filteredSources.map((source) => (
                   <button
                     key={source.value}
@@ -867,7 +973,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                       "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
                       formData.source === source.value
                         ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
                     )}
                   >
                     <div className={cn(
@@ -957,16 +1063,22 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             )}
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 4: Academic Information */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <SectionHeader icon={GraduationCap} title="Academic Information" open={academicOpen} onToggle={() => setAcademicOpen(!academicOpen)} />
+      <SectionCard>
+        <SectionHeader
+          icon={GraduationCap}
+          title="Academic Information"
+          description="School, education type, funding, and GPA"
+          open={academicOpen}
+          onToggle={() => setAcademicOpen(!academicOpen)}
+        />
 
         {academicOpen && (
-          <div className="space-y-4 pl-10">
+          <div className={sectionBodyClass}>
             {/* School */}
             <div className="space-y-2">
               <Label>School</Label>
@@ -987,7 +1099,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 </div>
 
                 {isSchoolDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                  <div className="absolute z-50 w-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
                     <div className="p-2 border-b border-[var(--border)]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -997,6 +1109,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                           onChange={(e) => setSchoolSearch(e.target.value)}
                           placeholder="Search schools..."
                           className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                          dir="auto"
                           autoFocus
                         />
                       </div>
@@ -1033,7 +1146,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             {/* Education Type */}
             <div id="education_type" className="space-y-2">
               <Label>Education Type <span className="text-[var(--error)]">*</span></Label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
                 {EDUCATION_TYPES.map((type) => (
                   <button
                     key={type.value}
@@ -1049,12 +1162,17 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                       }
                     }}
                     className={cn(
-                      "flex flex-col items-center gap-1 p-3 rounded-xl border transition-all text-center",
+                      "relative flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-lg border p-3 text-center transition-all",
                       formData.education_type === type.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                        ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                     )}
                   >
+                    {formData.education_type === type.value && (
+                      <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)]">
+                        <Check className="h-3 w-3" />
+                      </span>
+                    )}
                     <span className={cn(
                       "text-sm font-bold",
                       formData.education_type === type.value ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
@@ -1100,7 +1218,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                       "flex items-center justify-center p-3 rounded-xl border transition-all text-sm font-bold",
                       formData.grade_level === grade.value
                         ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-primary)]"
+                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
                     )}
                   >
                     {grade.label}
@@ -1117,10 +1235,10 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   type="button"
                   onClick={() => handleChange("funding_type", "self_funded")}
                   className={cn(
-                    "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                    "flex min-h-[78px] items-center gap-3 rounded-lg border p-4 text-left transition-all",
                     formData.funding_type === "self_funded"
                       ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                      : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                   )}
                 >
                   <div className={cn(
@@ -1140,10 +1258,10 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   type="button"
                   onClick={() => handleChange("funding_type", "puc")}
                   className={cn(
-                    "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                    "flex min-h-[78px] items-center gap-3 rounded-lg border p-4 text-left transition-all",
                     formData.funding_type === "puc"
                       ? "border-[var(--accent)] bg-[var(--accent)]/10"
-                      : "border-[var(--border)] hover:border-[var(--accent)]/50"
+                      : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                   )}
                 >
                   <div className={cn(
@@ -1183,7 +1301,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
 
             {/* Majors & Graduation */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label>ktech Intended Major</Label>
                 <Select
@@ -1222,7 +1340,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="preferred_major">Preferred Major</Label>
                 <Input
@@ -1246,7 +1364,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             {/* GPA Section */}
             <div className="space-y-3">
               <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide">GPA Scores (0-100%)</Label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="expected_gpa" className="text-xs">Expected GPA</Label>
                   <Input
@@ -1298,17 +1416,24 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
 
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 5: Discount (Self-Funded only) */}
       {/* ═══════════════════════════════════════════ */}
       {formData.funding_type === 'self_funded' && (
-        <div className="space-y-4">
-          <SectionHeader icon={Percent} title="Discount" open={discountOpen} onToggle={() => setDiscountOpen(!discountOpen)} iconBg="bg-emerald-500" />
+        <SectionCard>
+          <SectionHeader
+            icon={Percent}
+            title="Discount"
+            description="Scholarship and private-payment discount notes"
+            open={discountOpen}
+            onToggle={() => setDiscountOpen(!discountOpen)}
+            iconBg="bg-[var(--success)]"
+          />
 
           {discountOpen && (
-            <div className="space-y-4 pl-10">
+            <div className={sectionBodyClass}>
               <div className="space-y-2">
                 <Label>Discount Type</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1404,36 +1529,29 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 6: Placement Test */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setPlacementOpen(!placementOpen)}
-          className="flex items-center gap-2 w-full text-left cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
-            <ClipboardList className="w-4 h-4 text-[var(--primary)]" />
-          </div>
-          <h4 className="font-semibold text-[var(--text-primary)]">Placement Test</h4>
-          {lead.placement_lms_synced && (
-            <span className="ml-2 flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950/30 px-2 py-1 rounded-full">
-              <RefreshCw className="w-3 h-3" />
+      <SectionCard>
+        <SectionHeader
+          icon={ClipboardList}
+          title="Placement Test"
+          description="Passed subjects and placement level"
+          open={placementOpen}
+          onToggle={() => setPlacementOpen(!placementOpen)}
+          trailing={lead.placement_lms_synced ? (
+            <span className="hidden items-center gap-1 rounded-full border border-[var(--success)]/20 bg-[var(--success-bg)] px-2.5 py-1 text-xs font-medium text-[var(--success)] sm:flex">
+              <RefreshCw className="h-3 w-3" />
               LMS Synced
             </span>
-          )}
-          <ChevronDown className={cn(
-            "w-4 h-4 text-[var(--text-muted)] transition-transform ml-auto",
-            placementOpen && "rotate-180"
-          )} />
-        </button>
+          ) : null}
+        />
 
         {placementOpen && (
-          <div className="space-y-4 pl-10">
+          <div className={sectionBodyClass}>
             {/* Placement Level */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -1656,16 +1774,22 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 7: Ministry Blocked */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <SectionHeader icon={Ban} title="Ministry Blocking" open={ministryOpen} onToggle={() => setMinistryOpen(!ministryOpen)} />
+      <SectionCard>
+        <SectionHeader
+          icon={Ban}
+          title="Ministry Blocking"
+          description="Eligibility restrictions for ministry submission"
+          open={ministryOpen}
+          onToggle={() => setMinistryOpen(!ministryOpen)}
+        />
 
         {ministryOpen && (
-          <div className="space-y-4 pl-10">
+          <div className={sectionBodyClass}>
             <div
               onClick={() => setFormData(prev => ({ ...prev, ministry_blocked: !prev.ministry_blocked }))}
               className={cn(
@@ -1729,16 +1853,22 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             )}
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Section 8: Notes */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <SectionHeader icon={FileText} title="Notes" open={notesOpen} onToggle={() => setNotesOpen(!notesOpen)} />
+      <SectionCard>
+        <SectionHeader
+          icon={FileText}
+          title="Notes"
+          description="Internal notes for admissions follow-up"
+          open={notesOpen}
+          onToggle={() => setNotesOpen(!notesOpen)}
+        />
 
         {notesOpen && (
-          <div className="space-y-4 pl-10">
+          <div className={sectionBodyClass}>
             <div className="space-y-2">
               <Label htmlFor="notes">Additional Notes</Label>
               <Textarea
@@ -1751,16 +1881,21 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* ═══════════════════════════════════════════ */}
       {/* Save Button */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="pt-4 border-t border-[var(--border)]">
+      <div className="sticky bottom-0 z-20 -mx-1 bg-[var(--bg-base)]/90 py-3 backdrop-blur">
+        <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 shadow-[var(--shadow-lg)] sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Save student profile</p>
+            <p className="text-xs text-[var(--text-tertiary)]">{requiredCompletedCount}/{requiredFields.length} required fields complete</p>
+          </div>
         <Button
           onClick={handleSubmit}
           disabled={loading || (hasGpaError && formData.funding_type === 'puc')}
-          className="w-full"
+          className="w-full sm:w-auto sm:min-w-[180px]"
         >
           {loading ? (
             <>
@@ -1774,6 +1909,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
             </>
           )}
         </Button>
+        </div>
         {hasGpaError && formData.funding_type === 'puc' && (
           <p className="text-xs text-center text-red-500 mt-2">
             Cannot save - GPA must be 70% or higher for PUC

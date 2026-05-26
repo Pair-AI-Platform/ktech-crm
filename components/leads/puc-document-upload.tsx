@@ -40,7 +40,14 @@ function educationToGraduateType(educationType?: EducationType): GraduateType | 
 
 function getProfileDocuments(educationType?: EducationType, flags?: ConditionalDocumentFlags): { id: string; name: string; nameAr: string; required?: boolean }[] {
   const graduateType = educationToGraduateType(educationType)
-  if (!graduateType) return [...DEFAULT_PROFILE_DOCUMENTS]
+  if (!graduateType) {
+    return [
+      ...DEFAULT_PROFILE_DOCUMENTS,
+      ...(flags?.isTransfer
+        ? [{ id: "transfer_certificate", name: "Transcript", nameAr: "كشف الدرجات الرسمي", required: true }]
+        : []),
+    ]
+  }
   const docs = getDocumentsForGraduateType(graduateType, flags)
   return docs.map(d => ({ id: d.id, name: d.name, nameAr: d.nameAr, required: d.required }))
 }
@@ -101,7 +108,7 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
   // Load existing documents from the psp_documents table
   useEffect(() => {
     loadDocuments()
-  }, [leadId, lead?.education_type]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leadId, lead?.education_type, lead?.is_transfer_student, lead?.is_special_needs, lead?.is_diplomatic]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDocuments = async () => {
     setLoading(true)
@@ -274,7 +281,11 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
     document.body.removeChild(link)
   }
 
-  const uploadedCount = profileDocuments.filter((d) => documents[d.id]).length
+  const requiredProfileDocuments = profileDocuments.filter((d) => d.required)
+  const requiredDocumentTotal = requiredProfileDocuments.length || profileDocuments.length
+  const uploadedRequiredCount = requiredProfileDocuments.length > 0
+    ? requiredProfileDocuments.filter((d) => documents[d.id]).length
+    : profileDocuments.filter((d) => documents[d.id]).length
 
   if (loading) {
     return (
@@ -290,29 +301,29 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
       <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-[var(--text-primary)]">
-            Documents Uploaded
+            Required Documents Uploaded
           </span>
           <span className="text-sm text-[var(--primary)] font-semibold">
-            {uploadedCount} / {profileDocuments.length}
+            {uploadedRequiredCount} / {requiredDocumentTotal}
           </span>
         </div>
         <div className="w-full bg-[var(--border)] rounded-full h-2">
           <div
             className={cn(
               "h-2 rounded-full transition-all duration-300",
-              uploadedCount === profileDocuments.length
+              uploadedRequiredCount === requiredDocumentTotal
                 ? "bg-[var(--success)]"
                 : "bg-[var(--primary)]"
             )}
             style={{
-              width: `${Math.round((uploadedCount / profileDocuments.length) * 100)}%`,
+              width: `${Math.round((uploadedRequiredCount / requiredDocumentTotal) * 100)}%`,
             }}
           />
         </div>
-        {uploadedCount === profileDocuments.length && (
+        {uploadedRequiredCount === requiredDocumentTotal && (
           <p className="text-xs text-[var(--success)] mt-2 flex items-center gap-1">
             <Check className="w-3 h-3" />
-            All documents uploaded
+            All required documents uploaded
           </p>
         )}
       </div>
@@ -356,6 +367,11 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[var(--text-primary)]">
                     {docType.name}
+                    {docType.required && (
+                      <span className="ml-2 rounded-full bg-[var(--error-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--error)]">
+                        Required
+                      </span>
+                    )}
                   </p>
                   {hasFile ? (
                     <p className="text-xs text-[var(--text-muted)] truncate">

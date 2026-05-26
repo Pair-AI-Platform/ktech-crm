@@ -45,22 +45,54 @@ export function leadToPrefillContact(lead: Pick<Lead,
 }
 
 /** Stash contacts in sessionStorage; safe no-op outside the browser. */
-export function stashCampaignPrefill(payload: CampaignPrefillPayload): void {
-  if (typeof window === "undefined") return
+export function stashCampaignPrefill(payload: CampaignPrefillPayload): boolean {
+  if (typeof window === "undefined") return false
+  const serialized = JSON.stringify(payload)
+  let saved = false
+
   try {
-    sessionStorage.setItem(CAMPAIGN_PREFILL_KEY, JSON.stringify(payload))
-  } catch {
-    // sessionStorage can throw in private windows / when full; treat as no-op.
+    sessionStorage.setItem(CAMPAIGN_PREFILL_KEY, serialized)
+    saved = true
+  } catch {}
+
+  try {
+    localStorage.setItem(CAMPAIGN_PREFILL_KEY, serialized)
+    saved = true
+  } catch {}
+
+  return saved
+}
+
+export function openCampaignPrefill(payload: CampaignPrefillPayload): boolean {
+  if (payload.contacts.length === 0) {
+    if (typeof window !== "undefined") {
+      window.alert("Select at least one lead with campaign contact details first.")
+    }
+    return false
   }
+
+  const stashed = stashCampaignPrefill(payload)
+  if (!stashed) {
+    if (typeof window !== "undefined") {
+      window.alert("Could not prepare the selected leads for a campaign. Please try again.")
+    }
+    return false
+  }
+
+  window.location.assign("/campaigns?prefill=1")
+  return true
 }
 
 /** Read and clear the stashed payload. Returns null when nothing is staged. */
 export function consumeCampaignPrefill(): CampaignPrefillPayload | null {
   if (typeof window === "undefined") return null
   try {
-    const raw = sessionStorage.getItem(CAMPAIGN_PREFILL_KEY)
+    const raw =
+      sessionStorage.getItem(CAMPAIGN_PREFILL_KEY) ||
+      localStorage.getItem(CAMPAIGN_PREFILL_KEY)
     if (!raw) return null
     sessionStorage.removeItem(CAMPAIGN_PREFILL_KEY)
+    localStorage.removeItem(CAMPAIGN_PREFILL_KEY)
     const parsed = JSON.parse(raw) as CampaignPrefillPayload
     if (!parsed || !Array.isArray(parsed.contacts)) return null
     return parsed

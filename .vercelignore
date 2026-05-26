@@ -24,5 +24,10 @@
 .planning/
 .claude/
 
+# Local build/test/browser artifacts
+.next/
+.playwright-mcp/
+test-results/
+
 # OS junk
 .DS_Store

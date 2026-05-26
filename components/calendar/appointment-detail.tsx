@@ -421,12 +421,20 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           setContactedDialogLead(guard.lead)
           return
         }
+        if (guard.kind === "file_requirements") {
+          window.alert(`Complete ${guard.missingFields.join(", ")} before moving this lead to File.`)
+          return
+        }
         if (guard.kind === "file_fee") {
           setFileFeeDialogLead(guard.lead)
           return
         }
         if (guard.kind === "enrollment_payment") {
           setPaymentDialogLead(guard.lead)
+          return
+        }
+        if (guard.kind === "puc_document_requirements") {
+          window.alert(`Complete ${guard.missingFields.join(", ")} before moving this lead to Documents.`)
           return
         }
       }

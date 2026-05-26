@@ -10,17 +10,34 @@ import { AIChatPanel } from "@/components/ai-chat/ai-chat-panel"
 import { cn } from "@/lib/utils"
 import type { Profile } from "@/types"
 
-// Demo user profile for testing
-const DEMO_USER: Profile = {
-  id: "demo-user-id",
-  email: "aldana@ktech.edu.kw",
-  full_name: "Aldana Ali",
-  role: "admin",
-  avatar_url: undefined,
-  is_active: true,
-  monthly_target: 50,
-  created_at: "2024-01-01T00:00:00.000Z",
-  updated_at: "2024-01-01T00:00:00.000Z",
+function getDemoShellUser(): Profile {
+  const now = new Date().toISOString()
+  const role = typeof window !== "undefined" ? localStorage.getItem("ktech-demo-role") : null
+  if (role === "admin") {
+    return {
+      id: "demo-user-id",
+      email: "aldana@ktech.edu.kw",
+      full_name: "Aldana Ali",
+      role: "admin",
+      avatar_url: undefined,
+      is_active: true,
+      monthly_target: 50,
+      created_at: now,
+      updated_at: now,
+    }
+  }
+
+  return {
+    id: "agent-1",
+    email: "demo-agent@ktech.edu.kw",
+    full_name: "Khalifa",
+    role: "agent",
+    avatar_url: undefined,
+    is_active: true,
+    monthly_target: 40,
+    created_at: now,
+    updated_at: now,
+  }
 }
 
 // Context for sidebar state
@@ -63,7 +80,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   const isDemoMode = useDemoMode()
 
   // Compute active user based on props and demo mode
-  const activeUser = user || (isDemoMode ? DEMO_USER : null)
+  const activeUser = isDemoMode ? getDemoShellUser() : user
 
   const handleQuickAction = (action: string) => {
     switch (action) {

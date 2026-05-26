@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { PucImportBadge } from "./puc-import-badge"
+import { QualityTierBadge } from "./quality-tier-badge"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import {
   PIPELINE_STAGES,
@@ -236,12 +237,12 @@ export const LeadTableRow = React.memo(function LeadTableRow({
       onClick={handleRowClick}
       className={cn(
         "border-b border-[var(--border)] transition-all duration-150 group/row",
-        "bg-white dark:bg-[var(--bg-surface)]",
+        "bg-[var(--bg-surface)]",
         onLeadClick && "cursor-pointer",
         isSentToRegistration
           ? "border-l-[3px] border-l-emerald-500 hover:bg-[var(--bg-hover)]"
           : isSelected
-            ? "border-l-2 border-l-[var(--primary)]"
+            ? "border-l-2 border-l-[var(--primary)] bg-[var(--primary-subtle)]"
             : "hover:bg-[var(--bg-hover)] border-l-2 border-l-transparent hover:border-l-[var(--border-emphasis)]"
       )}
     >
@@ -342,6 +343,9 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 <div className="flex items-center gap-1.5">
                   {lead.puc_import_flagged && (
                     <PucImportBadge size="sm" />
+                  )}
+                  {lead.quality_tier && (
+                    <QualityTierBadge tier={lead.quality_tier} score={lead.final_weighted_score} />
                   )}
                   {lead.ministry_assigned && (
                     <SimpleTooltip content="Ministry assigned (not 1st choice ktech)">
@@ -1257,11 +1261,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="group/btn hover:bg-amber-50"
+                className="group/btn hover:bg-[var(--warning-bg)]"
                 onClick={(e) => { e.stopPropagation(); onPaymentClick(lead) }}
                 title="Record payment"
               >
-                <Banknote className="w-4 h-4 text-amber-500 group-hover/btn:!text-amber-600 animate-pulse" />
+                <Banknote className="w-4 h-4 text-[var(--warning)] group-hover/btn:!text-[var(--warning)] animate-pulse" />
               </Button>
             </SimpleTooltip>
           )}
@@ -1269,11 +1273,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="group/btn hover:bg-purple-50"
+              className="group/btn hover:bg-[var(--primary-muted)]"
               onClick={handleOpenPspWizard}
               title="Open PSP Wizard"
             >
-              <Wand2 className="w-4 h-4 text-purple-400/70 group-hover/btn:!text-purple-600" />
+              <Wand2 className="w-4 h-4 text-[var(--primary)] opacity-75 group-hover/btn:opacity-100" />
             </Button>
           )}
           <LeadAppointmentsPopover
@@ -1285,11 +1289,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="group/btn hover:bg-green-50"
+              className="group/btn hover:bg-[var(--success-bg)]"
               onClick={handleScheduleCallback}
               title="Schedule callback"
             >
-              <PhoneForwarded className="w-4 h-4 text-green-400/70 group-hover/btn:!text-green-600" />
+              <PhoneForwarded className="w-4 h-4 text-[var(--success)] opacity-75 group-hover/btn:opacity-100" />
             </Button>
             {lead.pipeline_stage === 'lost' ? (
               <SimpleTooltip
@@ -1314,7 +1318,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                     }
                   }}
                 >
-                  <XCircle className="w-4 h-4 text-red-400 group-hover/btn:!text-red-600" />
+                  <XCircle className="w-4 h-4 text-[var(--error)] opacity-80 group-hover/btn:opacity-100" />
                 </Button>
               </SimpleTooltip>
             ) : (
@@ -1325,7 +1329,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 onClick={handleMarkLost}
                 title="Mark as lost"
               >
-                <XCircle className="w-4 h-4 text-red-300 group-hover/btn:!text-red-600" />
+                <XCircle className="w-4 h-4 text-[var(--error)] opacity-70 group-hover/btn:opacity-100" />
               </Button>
             )}
           </div>

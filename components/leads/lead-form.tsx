@@ -19,6 +19,7 @@ import { isArabicText } from "@/lib/string-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
 import { useDuplicateCheck } from "@/lib/hooks/use-duplicate-check"
+import { compareSchoolsBySearch, schoolMatchesSearch } from "@/lib/schools/search"
 import { DuplicateWarningDialog } from "./duplicate-warning-dialog"
 import { LeadFormPersonal } from "./lead-form-personal"
 import { LeadFormContact } from "./lead-form-contact"
@@ -169,18 +170,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     ? dbSchools
     : SCHOOLS.map(s => ({ id: s.value, name_en: s.labelEn, name_ar: s.labelAr || s.label, gender: s.gender }))
 
-  // Filter schools based on search (supports Arabic, English, and abbreviations)
+  // Filter schools based on Arabic, English, compact text, and acronyms like BSK/NES/KES.
   const filteredSchools = schoolSource.filter(school => {
     // Gender filter: male students → boys/male schools, female students → girls/female schools
     if (formData.gender === 'male' && school.gender && school.gender !== 'boys' && school.gender !== 'male' && school.gender !== 'mixed') return false
     if (formData.gender === 'female' && school.gender && school.gender !== 'girls' && school.gender !== 'female' && school.gender !== 'mixed') return false
-    if (!schoolSearch) return true
-    const term = schoolSearch.toLowerCase()
-    return (
-      school.name_ar.includes(schoolSearch) ||
-      school.name_en.toLowerCase().includes(term)
-    )
-  })
+    return schoolMatchesSearch(school, schoolSearch)
+  }).sort(compareSchoolsBySearch(schoolSearch))
 
   // Filter nationalities based on search (supports Arabic)
   const filteredNationalities = NATIONALITIES.filter(n =>

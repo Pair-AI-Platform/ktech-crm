@@ -50,8 +50,8 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
   const [sentToRegistration, setSentToRegistration] = useState(false)
   const [sendingRegistration, setSendingRegistration] = useState(false)
   const [includePreferences, setIncludePreferences] = useState(false)
-  const [isTransfer, setIsTransfer] = useState(false)
-  const [isSpecialNeeds, setIsSpecialNeeds] = useState(false)
+  const [isTransfer, setIsTransfer] = useState(!!lead.is_transfer_student)
+  const [isSpecialNeeds, setIsSpecialNeeds] = useState(!!lead.is_special_needs)
   const { updateLead } = useLeadMutations()
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
@@ -64,16 +64,10 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
     if (stored === 'true') {
       setSentToRegistration(true)
     }
-    // Load conditional flags
-    const storedFlags = localStorage.getItem(`sf-flags-${lead.id}`)
-    if (storedFlags) {
-      try {
-        const flags = JSON.parse(storedFlags)
-        setIsTransfer(!!flags.isTransfer)
-        setIsSpecialNeeds(!!flags.isSpecialNeeds)
-      } catch { /* ignore */ }
-    }
-  }, [lead.id])
+    // Keep the lead profile as the source of truth for conditional documents.
+    setIsTransfer(!!lead.is_transfer_student)
+    setIsSpecialNeeds(!!lead.is_special_needs)
+  }, [lead.id, lead.is_transfer_student, lead.is_special_needs])
 
   const handleSendToRegistration = async () => {
     setSendingRegistration(true)
@@ -162,18 +156,32 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
   }, [lead.id, selectedType])
 
   // Toggle conditional flags
-  const handleToggleTransfer = () => {
+  const handleToggleTransfer = async () => {
     const newVal = !isTransfer
     setIsTransfer(newVal)
     const flags = { isTransfer: newVal, isSpecialNeeds }
     localStorage.setItem(`sf-flags-${lead.id}`, JSON.stringify(flags))
+    const result = await updateLead(lead.id, { is_transfer_student: newVal } as Partial<Lead>)
+    if (result.error) {
+      setIsTransfer(!newVal)
+      toast.error(result.error)
+      return
+    }
+    onUpdate?.()
   }
 
-  const handleToggleSpecialNeeds = () => {
+  const handleToggleSpecialNeeds = async () => {
     const newVal = !isSpecialNeeds
     setIsSpecialNeeds(newVal)
     const flags = { isTransfer, isSpecialNeeds: newVal }
     localStorage.setItem(`sf-flags-${lead.id}`, JSON.stringify(flags))
+    const result = await updateLead(lead.id, { is_special_needs: newVal } as Partial<Lead>)
+    if (result.error) {
+      setIsSpecialNeeds(!newVal)
+      toast.error(result.error)
+      return
+    }
+    onUpdate?.()
   }
 
   // Get documents for selected type (with conditional flags)
@@ -368,7 +376,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={handleToggleTransfer}
+            onClick={() => void handleToggleTransfer()}
             className={cn(
               "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm",
               isTransfer
@@ -385,7 +393,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
           </button>
           <button
             type="button"
-            onClick={handleToggleSpecialNeeds}
+            onClick={() => void handleToggleSpecialNeeds()}
             className={cn(
               "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm",
               isSpecialNeeds

@@ -12,6 +12,7 @@ import { BlockedReasonDialog } from "@/components/leads/blocked-reason-dialog"
 import { WithdrawReasonDialog } from "@/components/leads/withdraw-reason-dialog"
 import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
 import { FileFeePaymentDialog } from "@/components/leads/file-fee-payment-dialog"
+import { FileStageRequirementsDialog } from "@/components/leads/file-stage-requirements-dialog"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { getLeadDisplayName as _getLeadDisplayName } from "@/lib/lead-utils"
 
@@ -29,6 +30,7 @@ export interface LeadTableDialogsProps {
   contactedDialogLead: Lead | null
   blockedDialogLead: Lead | null
   withdrawDialogLead: Lead | null
+  fileRequirementsDialog: { lead: Lead; missingFields: string[] } | null
   fileFeeDialogLead: Lead | null
   paymentDialogLead: Lead | null
   pspWizardLead: Lead | null
@@ -42,6 +44,7 @@ export interface LeadTableDialogsProps {
   setContactedDialogLead: (lead: Lead | null) => void
   setBlockedDialogLead: (lead: Lead | null) => void
   setWithdrawDialogLead: (lead: Lead | null) => void
+  setFileRequirementsDialog: (dialog: { lead: Lead; missingFields: string[] } | null) => void
   setFileFeeDialogLead: (lead: Lead | null) => void
   handleFileFeeSuccess: (action: 'paid' | 'sent' | 'exempt') => Promise<void>
   setPaymentDialogLead: (lead: Lead | null) => void
@@ -71,6 +74,7 @@ export function LeadTableDialogs({
   contactedDialogLead,
   blockedDialogLead,
   withdrawDialogLead,
+  fileRequirementsDialog,
   fileFeeDialogLead,
   paymentDialogLead,
   pspWizardLead,
@@ -84,6 +88,7 @@ export function LeadTableDialogs({
   setContactedDialogLead,
   setBlockedDialogLead,
   setWithdrawDialogLead,
+  setFileRequirementsDialog,
   setFileFeeDialogLead,
   handleFileFeeSuccess,
   setPaymentDialogLead,
@@ -193,6 +198,21 @@ export function LeadTableDialogs({
         onConfirm={handleBlockedConfirm}
       />
 
+      {/* File stage requirements dialog */}
+      <FileStageRequirementsDialog
+        open={!!fileRequirementsDialog}
+        lead={fileRequirementsDialog?.lead ?? null}
+        missingFields={fileRequirementsDialog?.missingFields ?? []}
+        onOpenChange={(open) => {
+          if (!open) setFileRequirementsDialog(null)
+        }}
+        onFillRequiredFields={() => {
+          const lead = fileRequirementsDialog?.lead
+          setFileRequirementsDialog(null)
+          if (lead) setPspWizardLead(lead)
+        }}
+      />
+
       {/* File Fee Payment Dialog - shown when moving lead to File (application) stage */}
       {fileFeeDialogLead && (
         <FileFeePaymentDialog
@@ -213,7 +233,7 @@ export function LeadTableDialogs({
         />
       )}
 
-      {/* PSP Submission Wizard - shown after moving PUC lead to Document Submission */}
+      {/* PSP Submission Wizard - used to complete PUC info/docs before Document Submission */}
       <PSPSubmissionWizard
         isOpen={!!pspWizardLead}
         onClose={() => {

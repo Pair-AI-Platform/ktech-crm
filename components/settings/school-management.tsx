@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { GOVERNORATES, SCHOOL_GENDERS, SCHOOL_TYPES, type SchoolEntity, type Governorate, type SchoolGender, type SchoolType } from "@/types"
 import { createClient } from "@/lib/supabase/client"
+import { compareSchoolsBySearch, schoolMatchesSearch } from "@/lib/schools/search"
 
 export function SchoolManagement() {
   const [schools, setSchools] = useState<SchoolEntity[]>([])
@@ -348,9 +349,7 @@ export function SchoolManagement() {
   }
 
   const filteredSchools = schools.filter(s => {
-    const matchesSearch =
-      s.name_ar.includes(searchQuery) ||
-      s.name_en.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = schoolMatchesSearch(s, searchQuery)
     const matchesGovernorate =
       governorateFilter === "all" || s.governorate === governorateFilter
     const matchesGender =
@@ -358,7 +357,7 @@ export function SchoolManagement() {
     const matchesType =
       typeFilter === "all" || s.school_type === typeFilter
     return matchesSearch && matchesGovernorate && matchesGender && matchesType
-  })
+  }).sort(compareSchoolsBySearch(searchQuery))
 
   const activeCount = schools.filter(s => s.is_active).length
   const totalCount = schools.length

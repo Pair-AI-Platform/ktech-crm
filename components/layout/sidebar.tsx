@@ -37,6 +37,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { createClient } from "@/lib/supabase/client"
 import { useSidebar } from "@/components/layout/dashboard-shell"
 import { useAgentStatus } from "@/components/layout/heartbeat-provider"
+import { useUser } from "@/lib/hooks/use-user"
 import type { ManualStatus } from "@/lib/hooks/use-heartbeat"
 import type { Profile } from "@/types"
 
@@ -260,6 +261,38 @@ const secondaryNavigation = [
 
 const emptySubscribe = () => () => {}
 
+function getDemoSidebarProfile(): Profile | null {
+  if (typeof window === "undefined") return null
+  if (localStorage.getItem("ktech-demo-mode") !== "true") return null
+
+  const now = new Date().toISOString()
+  const role = localStorage.getItem("ktech-demo-role")
+
+  if (role === "admin") {
+    return {
+      id: "demo-admin-id",
+      email: "aldana@ktech.edu.kw",
+      full_name: "Aldana Ali",
+      role: "admin",
+      is_active: true,
+      monthly_target: 50,
+      created_at: now,
+      updated_at: now,
+    }
+  }
+
+  return {
+    id: "agent-1",
+    email: "demo-agent@ktech.edu.kw",
+    full_name: "Khalifa",
+    role: "agent",
+    is_active: true,
+    monthly_target: 40,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
 const statusOptions: { value: ManualStatus; label: string; icon: React.ElementType; color: string; dot: string }[] = [
   { value: null, label: "Online", icon: Circle, color: "text-emerald-600", dot: "bg-emerald-500" },
   { value: "meeting", label: "In Meeting", icon: Video, color: "text-blue-600", dot: "bg-blue-500" },
@@ -371,8 +404,11 @@ export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const supabase = createClient()
   const { collapsed, setCollapsed, openQuickFind } = useSidebar()
+  const { profile: clientProfile } = useUser()
   const [mobileOpen, setMobileOpen] = useState(false)
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+  const demoProfile = mounted ? getDemoSidebarProfile() : null
+  const activeUser = demoProfile ?? clientProfile ?? user
 
 
   // On mobile, always show expanded sidebar with names
@@ -388,13 +424,14 @@ export function Sidebar({ user }: SidebarProps) {
       localStorage.removeItem("ktech-demo-mode")
       localStorage.removeItem("ktech-demo-role")
       document.cookie = "ktech-demo-mode=; path=/; max-age=0"
+      document.cookie = "ktech-demo-role=; path=/; max-age=0"
       window.location.href = "/login"
     }
   }
 
   const handleNavigate = () => setMobileOpen(false)
 
-  const userRole = user?.role || "agent"
+  const userRole = activeUser?.role || "agent"
   const filteredNavigation = navigation
     .filter((item) => !item.roles || item.roles.includes(userRole))
     .map((item) => item.children
@@ -502,7 +539,7 @@ export function Sidebar({ user }: SidebarProps) {
         </div>
 
         {/* Admin-only section */}
-        {user?.role === 'admin' && (
+        {userRole === 'admin' && (
           <div className="pt-5 mt-5 space-y-1">
             {/* Section divider with label */}
             <div className="relative mb-3">
@@ -544,7 +581,7 @@ export function Sidebar({ user }: SidebarProps) {
 
         {/* User Card */}
         <UserCard
-          user={user}
+          user={activeUser}
           mounted={mounted}
           isCollapsed={isCollapsed}
           onSignOut={handleSignOut}

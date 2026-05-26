@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/input"
 import {
   ArrowLeft,
@@ -20,7 +19,6 @@ import {
   XCircle,
   Loader2,
   Clock,
-  Copy,
   Check,
   ChevronDown,
   Flame,
@@ -33,26 +31,22 @@ import {
   Mail,
   X,
   RotateCcw,
-  Building,
   CalendarDays,
   UserCircle,
-  Sparkles,
   ArrowUpRight,
   ChevronRight,
   ArrowRightLeft,
   CircleDot,
-  Ban,
   ClipboardList,
   StickyNote,
   Send,
   Star,
-  Shield,
   GraduationCap,
   PhoneForwarded,
   RefreshCw,
 } from "lucide-react"
-import { PIPELINE_STAGES, SCHOOLS, MINISTRY_BLOCK_REASONS, ORIENTATION_STATUSES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, MAJORS, type PipelineStage, type OrientationStatus, type Lead, type LeadStatus } from "@/types"
-import { formatKuwaitPhone, formatDate, cn, getInitials } from "@/lib/utils"
+import { PIPELINE_STAGES, MINISTRY_BLOCK_REASONS, ORIENTATION_STATUSES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, type PipelineStage, type OrientationStatus, type Lead, type LeadStatus } from "@/types"
+import { formatDate, cn, getInitials } from "@/lib/utils"
 import { useLead, useLeadMutations } from "@/lib/hooks/use-leads"
 import { useLeadAppointments, useAppointmentMutations } from "@/lib/hooks/use-appointments"
 import { useUser } from "@/lib/hooks/use-user"
@@ -74,11 +68,14 @@ import { SFDocumentManager } from "@/components/leads/sf-document-manager"
 import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { PucImportBadge } from "@/components/leads/puc-import-badge"
+import { QualityTierBadge } from "@/components/leads/quality-tier-badge"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { SendPspSelfServiceDialog } from "@/components/leads/send-psp-self-service-dialog"
+import { FileStageRequirementsDialog } from "@/components/leads/file-stage-requirements-dialog"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
-import { useSemesters } from "@/lib/hooks/use-semesters"
-import { useCycles } from "@/lib/hooks/use-cycles"
+import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
+import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
+import { checkStageTransition } from "@/lib/lead-stage-guards"
 
 // Simplified stage order for the pipeline
 const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"] as const
@@ -109,13 +106,6 @@ function calculateLeadHeat(lead: { last_contacted_at?: string; pipeline_stage: s
   }
 
   return "warm"
-}
-
-// Calculate days in current stage
-function calculateDaysInStage(updatedAt: string): number {
-  const now = new Date()
-  const updated = new Date(updatedAt)
-  return Math.floor((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 // Note types for activity feed
@@ -289,6 +279,34 @@ function groupNotesByDate(notes: ParsedNote[]): { label: string; notes: ParsedNo
   return groups.filter(g => g.notes.length > 0)
 }
 
+function StickFigureAvatar({ gender }: { gender?: string | null }) {
+  const isFemale = gender === 'female'
+
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      className="h-12 w-12"
+      fill="none"
+      aria-hidden="true"
+    >
+      {isFemale ? (
+        <>
+          <path d="M28 26c0-9 6-16 12-16s12 7 12 16" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          <circle cx="40" cy="27" r="10" stroke="currentColor" strokeWidth="4.5" />
+          <path d="M24 63c0-12 7-20 16-20s16 8 16 20" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          <path d="M30 45c4 4 16 4 20 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <circle cx="40" cy="24" r="11" stroke="currentColor" strokeWidth="4.5" />
+          <path d="M24 63c0-12 7-20 16-20s16 8 16 20" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          <path d="M31 45c5 4 13 4 18 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
+  )
+}
+
 // Stage gradient colors
 const STAGE_GRADIENT: Record<string, { from: string; to: string; text: string }> = {
   new: { from: 'var(--primary)', to: 'var(--primary)', text: 'white' },
@@ -315,9 +333,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const { appointments } = useLeadAppointments(resolvedParams.id)
   const { activities } = useLeadActivities(resolvedParams.id)
   const { updateLeadStage, updateLead, loading: mutationLoading } = useLeadMutations()
-  const { semesters } = useSemesters()
-  const { cycles } = useCycles()
-  const [showCycleSelector, setShowCycleSelector] = useState(false)
   // Show all pipeline stages in the stepper (excluding 'lost' and 'withdraw' as they're handled separately)
   const activeStageOrder = useMemo(() => {
     return STAGE_ORDER.filter(s => {
@@ -333,10 +348,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [editingOrientationStatus, setEditingOrientationStatus] = useState(false)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false)
-  const [updatingPriority, setUpdatingPriority] = useState(false)
   const statusDropdownRef = useRef<HTMLDivElement>(null)
-  const priorityDropdownRef = useRef<HTMLDivElement>(null)
 
   // Get the stage filter from URL params for back navigation
   const stageFromUrl = searchParams.get('stage') as PipelineStage | null
@@ -350,12 +362,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     : fromPage === 'self_fund' ? 'Self Fund'
     : stageFromUrl ? PIPELINE_STAGES.find(s => s.value === stageFromUrl)?.label || 'Leads' : null
   const [newNote, setNewNote] = useState("")
-  const [copiedPhone, setCopiedPhone] = useState(false)
   const [showLostDialog, setShowLostDialog] = useState(false)
   const [showReactivateMenu, setShowReactivateMenu] = useState(false)
   const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
   const [showFileFeeDialog, setShowFileFeeDialog] = useState(false)
+  const [fileRequirementsMissingFields, setFileRequirementsMissingFields] = useState<string[]>([])
   const [noteFilter, setNoteFilter] = useState<FilterCategory>('all')
   const [pinnedNoteIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
@@ -384,27 +396,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setShowStatusDropdown(false)
       }
-      if (priorityDropdownRef.current && !priorityDropdownRef.current.contains(event.target as Node)) {
-        setShowPriorityDropdown(false)
-      }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
-
-  // Handle priority change (admin only)
-  const handlePriorityChange = async (newPriority: 'normal' | 'important' | 'critical') => {
-    if (!lead || !profile) return
-    setUpdatingPriority(true)
-    setShowPriorityDropdown(false)
-    await updateLead(lead.id, {
-      priority: newPriority,
-      priority_set_by: profile.id,
-      priority_set_at: new Date().toISOString(),
-    })
-    await refetchLead()
-    setUpdatingPriority(false)
-  }
 
   const handleOrientationStatusChange = async (newStatus: OrientationStatus | '') => {
     if (!lead) return
@@ -453,16 +448,45 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     setShowStatusDropdown(false)
   }
 
-  const copyPhone = () => {
-    if (lead?.phone) {
-      navigator.clipboard.writeText(lead.phone)
-      setCopiedPhone(true)
-      setTimeout(() => setCopiedPhone(false), 2000)
-    }
-  }
-
   // Only the assigned agent or admin can change the stage
   const canChangeStage = isAdmin || (profile && lead?.assigned_to === profile.id)
+
+  const getPucDocumentCountForLead = async (targetLead: Lead): Promise<PucDocumentCount | undefined> => {
+    const rawGraduateType = targetLead.education_type?.toUpperCase()
+    if (!rawGraduateType) return undefined
+
+    const graduateType = rawGraduateType as GraduateType
+    const requiredIds = getDocumentsForGraduateType(graduateType, {
+      isTransfer: targetLead.is_transfer_student,
+      isSpecialNeeds: targetLead.is_special_needs,
+      isDiplomatic: targetLead.is_diplomatic,
+    })
+      .filter(doc => doc.required)
+      .map(doc => doc.id)
+
+    if (requiredIds.length === 0) {
+      return { uploaded: 0, required: 0 }
+    }
+
+    try {
+      const response = await fetch(`/api/psp/documents?lead_id=${targetLead.id}&graduate_type=${graduateType}`)
+      if (!response.ok) {
+        return { uploaded: 0, required: requiredIds.length }
+      }
+      const data = await response.json().catch(() => ({})) as { documents?: Array<{ document_type?: string | null }> }
+      const uploadedTypes = new Set(
+        (data.documents ?? [])
+          .map(doc => doc.document_type)
+          .filter((documentType): documentType is string => !!documentType)
+      )
+      return {
+        uploaded: requiredIds.filter(id => uploadedTypes.has(id)).length,
+        required: requiredIds.length,
+      }
+    } catch {
+      return { uploaded: 0, required: requiredIds.length }
+    }
+  }
 
   const handleStageClick = async (stage: string) => {
     console.log('[Stage Click] Clicked stage:', stage, 'Current stage:', lead?.pipeline_stage)
@@ -477,12 +501,26 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       return
     }
 
-    // Intercept "application" (File) stage - require file fee payment first
+    // Intercept "application" (File) stage - require complete info and file fee first
     if (stage === 'application' && lead.pipeline_stage !== 'application') {
-      // Skip if fees already paid or exempted
-      if (lead.file_fee_status !== 'paid' && lead.file_fee_status !== 'exempt') {
+      const guard = checkStageTransition({ lead, newStage: "application" })
+      if (guard.kind === "file_requirements") {
+        setFileRequirementsMissingFields(guard.missingFields)
+        return
+      }
+      if (guard.kind === "file_fee") {
         console.log('[Stage Click] Intercepting file stage click - showing file fee dialog')
         setShowFileFeeDialog(true)
+        return
+      }
+    }
+
+    if (stage === 'puc_document_submission' && lead.pipeline_stage === 'application' && lead.funding_type === 'puc') {
+      const documentCount = await getPucDocumentCountForLead(lead)
+      const missingFields = getMissingPucDocumentStageRequirements(lead, documentCount)
+      if (missingFields.length > 0) {
+        window.alert(`Complete ${missingFields.join(", ")} before moving this lead to Documents.`)
+        setShowPSPWizard(true)
         return
       }
     }
@@ -590,6 +628,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       }
     }
 
+    if (reactivateToStage === 'application') {
+      const guard = checkStageTransition({ lead, newStage: "application" })
+      if (guard.kind === "file_requirements") {
+        setFileRequirementsMissingFields(guard.missingFields)
+        return
+      }
+      if (guard.kind === "file_fee") {
+        setShowFileFeeDialog(true)
+        return
+      }
+    }
+
     const result = await updateLead(lead.id, {
       pipeline_stage: reactivateToStage,
       lost_reason_id: null,
@@ -674,7 +724,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const stageInfo = PIPELINE_STAGES.find((s) => s.value === lead.pipeline_stage)
-  const schoolInfo = SCHOOLS.find((s) => s.value === lead.school)
   const currentStageIndex = activeStageOrder.indexOf(lead.pipeline_stage as (typeof activeStageOrder)[number])
 
   const upcomingAppointments = appointments
@@ -685,7 +734,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     .slice(0, 2)
 
   const leadHeat = calculateLeadHeat(lead, appointments.length)
-  const daysInStage = calculateDaysInStage(lead.updated_at)
   const HeatIcon = LEAD_HEAT_CONFIG[leadHeat].icon
 
   const parsedNotes = parseNotes(lead.notes, pinnedNoteIds, lead.assigned_agent?.full_name)
@@ -752,6 +800,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Hero Section - Architectural Card */}
         <motion.div
+          data-lead-header-version="no-green-rail-v2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
@@ -763,13 +812,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
           style={{ boxShadow: lead.priority !== 'critical' ? 'var(--shadow-card)' : undefined }}
         >
-          {/* Left accent bar — stage color */}
-          <div
-            className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
-            style={{ background: stageGradient.from }}
-          />
-
-          <div className="relative pl-7 pr-6 py-6 sm:pl-8 sm:pr-7 sm:py-7">
+          <div className="relative px-6 py-6 sm:px-7 sm:py-7">
             {/* Top Row: Avatar + Info + Actions */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-6">
               {/* Avatar — compact with heat dot */}
@@ -778,14 +821,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 whileHover={{ scale: 1.03 }}
                 transition={{ type: "spring", stiffness: 400, damping: 25 }}
               >
-                <Avatar className="relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg shadow-sm">
-                  <AvatarFallback
-                    className="text-xl sm:text-2xl font-semibold text-white rounded-lg"
-                    style={{ background: stageGradient.from }}
-                  >
-                    {(lead.first_name_ar || '').charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
+                <div
+                  data-lead-avatar-version="stick-figure-v2"
+                  role="img"
+                  aria-label={`${lead.gender === 'female' ? 'Female' : lead.gender === 'male' ? 'Male' : 'Lead'} profile`}
+                  className="relative flex w-[72px] h-[72px] sm:w-20 sm:h-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-secondary)] shadow-sm"
+                >
+                  <StickFigureAvatar gender={lead.gender} />
+                </div>
                 {/* Heat indicator — small dot */}
                 {lead.pipeline_stage !== 'lost' && (
                   <SimpleTooltip
@@ -845,64 +888,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       {lead.puc_import_flagged && (
                         <PucImportBadge size="md" showLabel />
                       )}
-                      {lead.source && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold tracking-wide rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 ring-1 ring-teal-500/25">
-                          <Tag className="w-3.5 h-3.5" />
-                          {lead.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                        </span>
-                      )}
-                      {/* Admin-only priority toggle */}
-                      {isAdmin && (
-                        <div className="relative" ref={priorityDropdownRef}>
-                          <button
-                            onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-                            disabled={updatingPriority}
-                            className={cn(
-                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
-                              "hover:bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
-                              updatingPriority && "opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            {updatingPriority ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Shield className="w-3 h-3" />
-                            )}
-                            <ChevronDown className="w-3 h-3" />
-                          </button>
-                          <AnimatePresence>
-                            {showPriorityDropdown && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                                transition={{ duration: 0.15 }}
-                                className="absolute left-0 top-full mt-1 z-50 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] shadow-lg overflow-hidden"
-                              >
-                                {([
-                                  { value: 'normal' as const, label: 'Normal', icon: null, color: 'text-[var(--text-secondary)]' },
-                                  { value: 'important' as const, label: 'Important', icon: Star, color: 'text-amber-500' },
-                                  { value: 'critical' as const, label: 'Critical', icon: Flame, color: 'text-red-500' },
-                                ]).map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => handlePriorityChange(option.value)}
-                                    className={cn(
-                                      "flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors hover:bg-[var(--bg-muted)]",
-                                      lead.priority === option.value ? "bg-[var(--bg-muted)] font-medium" : ""
-                                    )}
-                                  >
-                                    {option.icon ? <option.icon className={cn("w-3.5 h-3.5", option.color)} /> : <span className="w-3.5" />}
-                                    <span className={option.color}>{option.label}</span>
-                                    {(lead.priority || 'normal') === option.value && (
-                                      <Check className="w-3.5 h-3.5 ml-auto text-[var(--primary)]" />
-                                    )}
-                                  </button>
-                                ))}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                      {lead.quality_tier && (
+                        <QualityTierBadge
+                          tier={lead.quality_tier}
+                          score={lead.final_weighted_score}
+                          size="sm"
+                          showLabel
+                        />
                       )}
                       <div className="flex items-center gap-2">
                         <span
@@ -915,187 +907,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
                           {stageInfo?.label}
                         </span>
-                        <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                          <Clock className="w-3 h-3" />
-                          {daysInStage === 0 ? 'Today' : `${daysInStage}d`}
-                        </span>
                       </div>
                     </motion.div>
 
-                    {/* Info pills — flat, semantic colors */}
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.25 }}
-                      className="flex flex-wrap items-center gap-1.5 mt-3"
-                    >
-                      {lead.funding_type === "puc" && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--warning-muted)] text-[var(--warning)] ring-1 ring-[var(--warning)]/10">
-                          <Sparkles className="w-3 h-3" />
-                          PUC
-                        </span>
-                      )}
-                      {lead.is_kuwaiti && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--success-muted)] text-[var(--success)] ring-1 ring-[var(--success)]/10">
-                          <Tag className="w-3 h-3" />
-                          Kuwaiti
-                        </span>
-                      )}
-                      {(schoolInfo?.label || lead.school_name_custom) && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--info-muted)] text-[var(--info)] ring-1 ring-[var(--info)]/10">
-                          <Building className="w-3 h-3" />
-                          {schoolInfo?.label || lead.school_name_custom}
-                        </span>
-                      )}
-                      {lead.puc_choice && (
-                        <span className={cn(
-                          "inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium ring-1",
-                          lead.puc_choice === "1"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 ring-emerald-300/30"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 ring-amber-300/30"
-                        )}>
-                          {lead.puc_choice === "1" ? "1st" : lead.puc_choice === "2" ? "2nd" : lead.puc_choice === "3" ? "3rd" : "4th"} Choice
-                          {lead.puc_first_choice_college ? ` — 1st: ${lead.puc_first_choice_college}` : ""}
-                        </span>
-                      )}
-                      {lead.ministry_blocked && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--error-muted)] text-[var(--error)] ring-1 ring-[var(--error)]/10">
-                          <Ban className="w-3 h-3" />
-                          Blocked
-                        </span>
-                      )}
-                      {lead.intended_major && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 ring-1 ring-rose-300/30">
-                          <GraduationCap className="w-3 h-3" />
-                          ktech intended major: {MAJORS.find(m => m.value === lead.intended_major)?.label || lead.intended_major}
-                        </span>
-                      )}
-                      {lead.ministry_accepted_major && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 ring-1 ring-emerald-300/30">
-                          <GraduationCap className="w-3 h-3" />
-                          ktech actual major: {lead.ministry_accepted_major}
-                        </span>
-                      )}
-                      {/* Cycle selector */}
-                      <div className="relative">
-                        <button
-                          onClick={() => isAdmin && setShowCycleSelector(!showCycleSelector)}
-                          className={cn(
-                            "inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium ring-1 transition-colors",
-                            lead.semester
-                              ? "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400 ring-violet-300/30"
-                              : "bg-[var(--bg-sunken)] text-[var(--text-muted)] ring-[var(--border)]",
-                            isAdmin && "cursor-pointer hover:ring-[var(--border-hover)]"
-                          )}
-                        >
-                          <CalendarDays className="w-3 h-3" />
-                          {lead.semester?.name || "No Cycle"}
-                          {isAdmin && <ChevronDown className="w-2.5 h-2.5 ml-0.5" />}
-                        </button>
-                        {showCycleSelector && isAdmin && (
-                          <>
-                            <div className="fixed inset-0 z-40" onClick={() => setShowCycleSelector(false)} />
-                            <div className="absolute top-full left-0 mt-1 z-50 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg shadow-lg py-1 min-w-[180px] max-h-[300px] overflow-y-auto">
-                              {cycles.map((cycle) => (
-                                <div key={cycle.id}>
-                                  <div className="px-3 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
-                                    {cycle.name}
-                                    {cycle.is_active && <span className="text-green-500">●</span>}
-                                  </div>
-                                  {cycle.terms?.map(s => (
-                                    <button
-                                      key={s.id}
-                                      onClick={async () => {
-                                        await updateLead(lead.id, { semester_id: s.id })
-                                        refetchLead()
-                                        setShowCycleSelector(false)
-                                      }}
-                                      className={cn(
-                                        "w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2",
-                                        !cycle.is_active && "text-[var(--text-muted)]",
-                                        lead.semester_id === s.id && "font-semibold text-[var(--primary)]"
-                                      )}
-                                    >
-                                      {s.name}
-                                      {s.is_open && <span className="text-[10px] text-green-500 ml-auto">Open</span>}
-                                      {lead.semester_id === s.id && <Check className="w-3 h-3 ml-auto" />}
-                                    </button>
-                                  ))}
-                                </div>
-                              ))}
-                              {/* Orphan semesters without a cycle */}
-                              {semesters.filter(s => !s.cycle_id).length > 0 && (
-                                <>
-                                  <div className="border-t border-[var(--border)] my-1" />
-                                  <div className="px-3 py-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Other</div>
-                                  {semesters.filter(s => !s.cycle_id).map(s => (
-                                    <button
-                                      key={s.id}
-                                      onClick={async () => {
-                                        await updateLead(lead.id, { semester_id: s.id })
-                                        refetchLead()
-                                        setShowCycleSelector(false)
-                                      }}
-                                      className={cn(
-                                        "w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2 text-[var(--text-muted)]",
-                                        lead.semester_id === s.id && "font-semibold text-[var(--primary)]"
-                                      )}
-                                    >
-                                      {s.name}
-                                      {lead.semester_id === s.id && <Check className="w-3 h-3 ml-auto" />}
-                                    </button>
-                                  ))}
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </motion.div>
-
-
-                    {/* Phone — clean monospace */}
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3 }}
-                      className="flex flex-wrap items-center gap-2.5 mt-4"
-                    >
-                      <button
-                        onClick={copyPhone}
-                        className="group inline-flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--bg-sunken)] hover:bg-[var(--bg-hover)] ring-1 ring-transparent hover:ring-[var(--border)] transition-all duration-200"
-                      >
-                        <Phone className="w-4 h-4 text-[var(--text-muted)]" />
-                        <span className="font-mono text-sm font-medium text-[var(--text-primary)] tracking-wide">
-                          {formatKuwaitPhone(lead.phone)}
-                        </span>
-                        {copiedPhone ? (
-                          <motion.span
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="flex items-center gap-1 text-[var(--success)]"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-semibold uppercase tracking-wider">Copied</span>
-                          </motion.span>
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-60 transition-opacity" />
-                        )}
-                      </button>
-
-                      {lead.phone_secondary && (
-                        <a
-                          href={`tel:+965${lead.phone_secondary}`}
-                          className="group inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-sunken)]/60 hover:bg-[var(--bg-hover)] ring-1 ring-transparent hover:ring-[var(--border)] transition-all duration-200"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                          <span className="font-mono text-xs font-medium text-[var(--text-secondary)]">
-                            {formatKuwaitPhone(lead.phone_secondary)}
-                          </span>
-                          <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider font-medium">2nd</span>
-                        </a>
-                      )}
-                    </motion.div>
                   </div>
 
                   {/* Top action buttons */}
@@ -1949,6 +1763,23 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         onConfirm={async (reasonId, notes) => {
           await updateLeadStage(lead.id, 'lost', reasonId, notes)
           await refetchLead()
+        }}
+      />
+
+      <FileStageRequirementsDialog
+        open={fileRequirementsMissingFields.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setFileRequirementsMissingFields([])
+        }}
+        lead={lead}
+        missingFields={fileRequirementsMissingFields}
+        onFillRequiredFields={() => {
+          setFileRequirementsMissingFields([])
+          if (lead.funding_type === "self_funded") {
+            setShowEditForm(true)
+          } else {
+            setShowPSPWizard(true)
+          }
         }}
       />
 

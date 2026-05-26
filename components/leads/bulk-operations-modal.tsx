@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
+  ArrowRightLeft,
   UserPlus,
   Trash2,
   AlertTriangle,
@@ -25,7 +26,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import type { Profile } from "@/types"
+import type { PipelineStage, Profile } from "@/types"
 
 interface BulkAssignModalProps {
   isOpen: boolean
@@ -228,6 +229,106 @@ export function BulkAssignModal({
             )}
             Assign {selectedCount} Lead{selectedCount !== 1 ? "s" : ""}
             {selectedAgents.length > 1 && ` to ${selectedAgents.length} Agents`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface BulkStageOption {
+  value: PipelineStage
+  label: string
+}
+
+interface BulkStageModalProps {
+  isOpen: boolean
+  onClose: () => void
+  selectedCount: number
+  options: BulkStageOption[]
+  onConfirm: (stage: PipelineStage) => Promise<void>
+  loading?: boolean
+}
+
+export function BulkStageModal({
+  isOpen,
+  onClose,
+  selectedCount,
+  options,
+  onConfirm,
+  loading = false,
+}: BulkStageModalProps) {
+  const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset state on dialog open
+      setSelectedStage(null)
+    }
+  }, [isOpen])
+
+  const handleConfirm = async () => {
+    if (!selectedStage) return
+    await onConfirm(selectedStage)
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center mb-2">
+            <ArrowRightLeft className="w-6 h-6 text-[var(--primary)]" />
+          </div>
+          <DialogTitle>Change Stage</DialogTitle>
+          <DialogDescription>
+            Move {selectedCount} selected lead{selectedCount !== 1 ? "s" : ""} to a new pipeline stage.
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogBody>
+          <div className="max-h-[320px] overflow-y-auto rounded-xl border border-[var(--border)] divide-y divide-[var(--border)]">
+            {options.map((option) => {
+              const isSelected = selectedStage === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSelectedStage(option.value)}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--bg-elevated)]",
+                    isSelected && "bg-[var(--primary-muted)]"
+                  )}
+                >
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    {option.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors",
+                      isSelected
+                        ? "bg-[var(--primary)] border-[var(--primary)]"
+                        : "border-[var(--border)]"
+                    )}
+                  >
+                    {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </DialogBody>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={!selectedStage || loading}>
+            {loading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <ArrowRightLeft className="w-4 h-4 mr-2" />
+            )}
+            Change Stage
           </Button>
         </DialogFooter>
       </DialogContent>

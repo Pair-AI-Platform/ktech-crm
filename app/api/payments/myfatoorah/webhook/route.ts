@@ -5,6 +5,7 @@ import { getPaymentStatus, verifyWebhookSignature } from '@/lib/myfatoorah/clien
 import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT, PUC_FEE_AMOUNT, TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { createLogger } from '@/lib/logger'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
+import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
 // Use service role for webhook (no user session)
 function createServiceClient() {
@@ -183,10 +184,64 @@ async function processEnrollmentInvoice(
 
       // Handle file fee payments — move lead to application (file) stage
       if (transaction.payment_purpose === 'file_fee') {
+        const { data: leadForFileStage } = await supabase
+          .from('leads')
+          .select('id, first_name, last_name, phone, civil_id, education_type')
+          .eq('id', transaction.lead_id)
+          .single()
+        const missingFields = leadForFileStage ? getMissingPspSelfServiceFields(leadForFileStage) : []
+
+        if (missingFields.length > 0) {
+          const now = new Date().toISOString()
+          await supabase
+            .from('leads')
+            .update({
+              file_fee_status: 'paid',
+              last_contacted_at: now,
+            })
+            .eq('id', transaction.lead_id)
+
+          await supabase
+            .from('payment_transactions')
+            .update({
+              status: 'completed',
+              completed_at: now,
+            })
+            .eq('id', transaction.id)
+
+          await supabase.from('activities').insert({
+            lead_id: transaction.lead_id,
+            activity_type: 'payment_received',
+            title: 'File Fee Payment Received',
+            description: `File fee payment of ${transaction.amount} KWD received via MyFatoorah. File stage was blocked because required fields are missing: ${missingFields.join(', ')}`,
+            metadata: {
+              transaction_id: transaction.id,
+              payment_method: 'myfatoorah',
+              payment_purpose: 'file_fee',
+              amount: transaction.amount,
+              invoice_id: invoiceId,
+              payment_id: statusResult.paymentId,
+              missing_fields: missingFields,
+            },
+          })
+
+          logger.info('File fee paid but File stage blocked by missing fields', {
+            leadId: transaction.lead_id,
+            missingFields,
+          })
+          return NextResponse.json({
+            success: true,
+            message: 'File fee payment processed. File stage is pending until required fields are complete.',
+          })
+        }
+
+        await supabase.rpc('shift_stage_positions', { target_stage: 'application' })
+
         const { error: updateError } = await supabase
           .from('leads')
           .update({
             pipeline_stage: 'application',
+            position_in_stage: 0,
             status: null,
             last_contacted_at: new Date().toISOString(),
             file_fee_status: 'paid',

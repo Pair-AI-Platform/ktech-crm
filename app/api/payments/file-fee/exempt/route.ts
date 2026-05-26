@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
+import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
 export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'] }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
@@ -20,7 +21,7 @@ export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'
   // Verify lead exists
   const { data: lead, error: leadError } = await serviceClient
     .from('leads')
-    .select('id, first_name, last_name, pipeline_stage, file_fee_status')
+    .select('id, first_name, last_name, phone, civil_id, education_type, pipeline_stage, file_fee_status')
     .eq('id', leadId)
     .single()
 
@@ -37,12 +38,23 @@ export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'
     return NextResponse.json({ error: 'Lead has already been exempted from file fees' }, { status: 409 })
   }
 
+  const missingFields = getMissingPspSelfServiceFields(lead)
+  if (missingFields.length > 0) {
+    return NextResponse.json(
+      { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
+      { status: 400 }
+    )
+  }
+
   // Update lead: exempt from fees and move to file stage
   const now = new Date().toISOString()
+  await serviceClient.rpc('shift_stage_positions', { target_stage: 'application' })
+
   const { error: updateError } = await serviceClient
     .from('leads')
     .update({
       pipeline_stage: 'application',
+      position_in_stage: 0,
       last_contacted_at: now,
       file_fee_status: 'exempt',
       file_fee_exempted: true,

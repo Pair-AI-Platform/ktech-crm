@@ -24,6 +24,15 @@ export type ContactStatus =
   | 'uncontacted' | 'interested' | 'not_interested' | 'no_answer'
   | 'callback' | 'will_see' | 'wrong_number'
 
+export type QualityTier =
+  | 'tier_1_excellent'
+  | 'tier_2_very_good'
+  | 'tier_3_good'
+  | 'tier_4_weak'
+  | 'tier_5_not_eligible'
+
+export type FoundationLevel = 'not_pass' | 'f1' | 'f2' | 'major'
+
 export type School =
   // Capital (العاصمة) - Boys (19)
   | 'jaber_mubarak_boys' | 'jasem_alkhurafi' | 'abdullah_aljaber' | 'ahmad_mishari_aladwani'
@@ -327,6 +336,7 @@ export interface Lead {
 
   // Address & Civil ID
   address?: string
+  governorate?: Governorate | string | null
   civil_id_expiry?: string
 
   // MOE GPA Fetch
@@ -438,6 +448,18 @@ export interface Lead {
 
   // Notes
   notes?: string
+
+  // Quality Scoring (College Applicant Quality Scale — see lib/lead-scoring.ts)
+  quality_tier?: QualityTier
+  final_weighted_score?: number
+  gpa_auto_score?: number
+  placement_test_auto_score?: number
+  foundation_level?: FoundationLevel
+  gender_score?: number
+  governorate_score?: number
+  quality_score_updated_at?: string
+  placement_test_raw?: number
+  external_code?: string
 
   // Callback
   callback_date?: string

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { FILE_APPLICATION_FEE_AMOUNT, FILE_TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
+import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
 export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
@@ -24,7 +25,7 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
   // Verify lead exists
   const { data: lead, error: leadError } = await supabase
     .from('leads')
-    .select('id, first_name, last_name, pipeline_stage, file_fee_status')
+    .select('id, first_name, last_name, phone, civil_id, education_type, pipeline_stage, file_fee_status')
     .eq('id', leadId)
     .single()
 
@@ -34,6 +35,14 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
 
   if (lead.file_fee_status === 'paid' || lead.file_fee_status === 'exempt') {
     return NextResponse.json({ error: 'File fees have already been handled for this lead' }, { status: 409 })
+  }
+
+  const missingFields = getMissingPspSelfServiceFields(lead)
+  if (missingFields.length > 0) {
+    return NextResponse.json(
+      { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
+      { status: 400 }
+    )
   }
 
   // Create payment transaction record
@@ -63,10 +72,13 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
   }
 
   // Move lead to application (file) stage and update fee status
+  await supabase.rpc("shift_stage_positions", { target_stage: "application" })
+
   const { error: updateError } = await supabase
     .from('leads')
     .update({
       pipeline_stage: 'application',
+      position_in_stage: 0,
       status: null,
       last_contacted_at: new Date().toISOString(),
       file_fee_status: 'paid',
