@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { useLeads, useLeadMutations } from "@/lib/hooks/use-leads"
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
@@ -37,12 +38,16 @@ import {
 
 type TopTab = "puc" | "self_fund"
 
+// Self Fund tab page size (server-side paginated)
+const SF_PAGE_SIZE = 50
+
 type PucPaymentLeadRow = { lead_id: string }
 type PucPaymentAmountRow = { lead_id: string; amount: number | null }
 type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: string | null }
 type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
 type RecentStageMove = { stage: PipelineStage; rank: number; lead: Lead }
 type LeadStageChangedDetail = { leadId: string; stage: PipelineStage; status?: LeadStatus | null; lead: Lead }
+type SfStageRow = { pipeline_stage: string }
 
 // PUC pipeline stage pills (the stages a PUC lead progresses through)
 const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
@@ -132,6 +137,7 @@ export default function PUCPSPPage() {
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [sfStageFilter, setSfStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSearchQuery, setSfSearchQuery] = useState("")
+  const [sfPage, setSfPage] = useState(1)
   // Lead IDs whose stage was just changed in the current view - keep them visible
   // until the user navigates away from this tab/stage filter.
   const [pucStickyLeadIds, setPucStickyLeadIds] = useState<Set<string>>(new Set())
@@ -146,6 +152,12 @@ export default function PUCPSPPage() {
   useEffect(() => {
     setSfStickyLeadIds(new Set())
   }, [sfStageFilter, topTab])
+
+  // Reset SF pagination when the stage filter or search query changes,
+  // otherwise users get stuck on an empty page after narrowing the result set.
+  useEffect(() => {
+    setSfPage(1)
+  }, [sfStageFilter, sfSearchQuery, topTab])
 
   useEffect(() => {
     const handleLeadStageChanged = (event: Event) => {
@@ -203,23 +215,34 @@ export default function PUCPSPPage() {
 
   const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
 
+  // Debounce search inputs so each keystroke doesn't fire a Supabase query.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300)
+  const debouncedSfSearchQuery = useDebouncedValue(sfSearchQuery, 300)
+
   // PUC leads - only fetch when PUC tab is active
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
     fundingType: "puc",
-    searchQuery,
+    searchQuery: debouncedSearchQuery,
     limit: 5000,
     enabled: topTab === "puc",
   })
 
-  // Self Fund leads — server-side stage filter. The "all" tab is capped low
-  // because pulling 15k+ SF leads with embedded JOINs is too slow for this
-  // single-list view; users needing the full set are routed to /leads via
-  // the banner below.
-  const { leads: sfLeads, loading: sfLoading, refetch: sfRefetch } = useLeads({
+  // Self Fund leads — server-side stage filter + server-side pagination.
+  // Pulling 15k+ SF leads with embedded JOINs is too slow for one list view,
+  // so we page the result instead. Stage pill counts come from a separate
+  // lightweight query below so the pills stay accurate across pages.
+  const {
+    leads: sfLeads,
+    loading: sfLoading,
+    refetch: sfRefetch,
+    totalCount: sfTotalCount,
+    totalPages: sfTotalPages,
+  } = useLeads({
     fundingType: "self_funded",
-    searchQuery: sfSearchQuery,
+    searchQuery: debouncedSfSearchQuery,
     stage: sfStageFilter !== "all" ? (sfStageFilter as PipelineStage) : "all",
-    limit: sfStageFilter === "all" ? 200 : 2000,
+    page: sfPage,
+    pageSize: SF_PAGE_SIZE,
     enabled: topTab === "self_fund",
   })
 
@@ -622,14 +645,35 @@ export default function PUCPSPPage() {
     return counts
   }, [pucLeads])
 
-  // SF stage counts
-  const sfStageCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: sfLeads.length }
-    for (const lead of sfLeads) {
-      counts[lead.pipeline_stage] = (counts[lead.pipeline_stage] || 0) + 1
-    }
-    return counts
-  }, [sfLeads])
+  // SF stage counts — fetched independently of the paginated lead list so the
+  // pill counts stay accurate even when the user is on page 2+ of a single stage.
+  // We pull just the pipeline_stage column for all SF leads and tally client-side;
+  // that's a single ~15k-row column scan and is much cheaper than the joined list
+  // query used for the table itself.
+  const [sfStageCounts, setSfStageCounts] = useState<Record<string, number>>({ all: 0 })
+
+  useEffect(() => {
+    if (topTab !== "self_fund") return
+
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from("leads")
+      .select("pipeline_stage")
+      .eq("funding_type", "self_funded")
+      .limit(20000)
+      .then(({ data }: { data: SfStageRow[] | null }) => {
+        if (cancelled || !data) return
+        const counts: Record<string, number> = { all: data.length }
+        for (const row of data) {
+          if (!row.pipeline_stage) continue
+          counts[row.pipeline_stage] = (counts[row.pipeline_stage] || 0) + 1
+        }
+        setSfStageCounts(counts)
+      })
+
+    return () => { cancelled = true }
+  }, [topTab, sfTotalCount])
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -982,28 +1026,6 @@ export default function PUCPSPPage() {
           </div>
         </div>
 
-        {/* Banner: routes users to /leads when this single-list view can't show
-            the full SF dataset. Shown on "all" (capped at 200 for speed) and on
-            any stage that returned >= 2000 leads (likely truncated). */}
-        {topTab === "self_fund" && !sfLoading && (
-          (sfStageFilter === "all" && sfLeads.length >= 200) ||
-          (sfStageFilter !== "all" && sfLeads.length >= 2000)
-        ) && (
-          <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between">
-            <span>
-              {sfStageFilter === "all"
-                ? `Showing ${sfLeads.length} of 15,000+ self-funded leads. Use the Leads page for the full paginated list.`
-                : `Showing the first ${sfLeads.length.toLocaleString()} leads in this stage. The full list is too large for this view.`}
-            </span>
-            <a
-              href={`/leads?fundingType=self_funded${sfStageFilter !== "all" ? `&stage=${sfStageFilter}` : ""}`}
-              className="font-medium underline hover:no-underline whitespace-nowrap ml-3"
-            >
-              View all in Leads page →
-            </a>
-          </div>
-        )}
-
         {/* Lead Table (full width) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1017,6 +1039,11 @@ export default function PUCPSPPage() {
             selectedLeads={selectedLeads}
             onSelectLead={toggleSelectLead}
             onSelectAll={toggleSelectAll}
+            currentPage={topTab === "self_fund" ? sfPage : 1}
+            totalPages={topTab === "self_fund" ? (sfTotalPages || 1) : 1}
+            totalCount={topTab === "self_fund" ? sfTotalCount : undefined}
+            pageSize={SF_PAGE_SIZE}
+            onPageChange={topTab === "self_fund" ? setSfPage : undefined}
             onLeadClick={(lead) => {
               // Save view state so we can restore it on back navigation
               const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
