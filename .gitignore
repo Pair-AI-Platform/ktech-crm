@@ -51,3 +51,27 @@ next-env.d.ts
 
 # sentry
 .sentryclirc
+
+# Bulk-import artifacts (PII — generated locally by scripts/ingest-excel-data.mjs)
+/imports/*.json
+/imports/*.txt
+/imports/*.log
+
+# Source spreadsheets / contracts / one-off binaries that shouldn't ship with the repo
+/*.xlsx
+/*.pdf
+/*.docx
+/*.html
+/*.png
+/*.jpeg
+/*.jpg
+/*.zip
+/REVIEW.md
+/form-snapshot.md
+/form2.md
+/CONTENT*.md
+/old\ req/
+/pair_assets/
+/thekstocks-automation/
+/domain-name-brainstormer/
+/domain-name-brainstormer.zip
