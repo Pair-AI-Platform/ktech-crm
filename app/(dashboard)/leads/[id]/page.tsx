@@ -46,7 +46,6 @@ import {
   StickyNote,
   Send,
   Star,
-  Shield,
   GraduationCap,
   PhoneForwarded,
   RefreshCw,
@@ -74,11 +73,16 @@ import { SFDocumentManager } from "@/components/leads/sf-document-manager"
 import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { PucImportBadge } from "@/components/leads/puc-import-badge"
+import { QualityTierBadge } from "@/components/leads/quality-tier-badge"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { SendPspSelfServiceDialog } from "@/components/leads/send-psp-self-service-dialog"
+import { FileStageRequirementsDialog } from "@/components/leads/file-stage-requirements-dialog"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { useSemesters } from "@/lib/hooks/use-semesters"
 import { useCycles } from "@/lib/hooks/use-cycles"
+import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
+import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
+import { checkStageTransition } from "@/lib/lead-stage-guards"
 
 // Simplified stage order for the pipeline
 const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"] as const
@@ -333,10 +337,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [editingOrientationStatus, setEditingOrientationStatus] = useState(false)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false)
-  const [updatingPriority, setUpdatingPriority] = useState(false)
   const statusDropdownRef = useRef<HTMLDivElement>(null)
-  const priorityDropdownRef = useRef<HTMLDivElement>(null)
 
   // Get the stage filter from URL params for back navigation
   const stageFromUrl = searchParams.get('stage') as PipelineStage | null
@@ -356,6 +357,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const reactivateMenuRef = useRef<HTMLDivElement>(null)
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false)
   const [showFileFeeDialog, setShowFileFeeDialog] = useState(false)
+  const [fileRequirementsMissingFields, setFileRequirementsMissingFields] = useState<string[]>([])
   const [noteFilter, setNoteFilter] = useState<FilterCategory>('all')
   const [pinnedNoteIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
@@ -384,27 +386,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setShowStatusDropdown(false)
       }
-      if (priorityDropdownRef.current && !priorityDropdownRef.current.contains(event.target as Node)) {
-        setShowPriorityDropdown(false)
-      }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
-
-  // Handle priority change (admin only)
-  const handlePriorityChange = async (newPriority: 'normal' | 'important' | 'critical') => {
-    if (!lead || !profile) return
-    setUpdatingPriority(true)
-    setShowPriorityDropdown(false)
-    await updateLead(lead.id, {
-      priority: newPriority,
-      priority_set_by: profile.id,
-      priority_set_at: new Date().toISOString(),
-    })
-    await refetchLead()
-    setUpdatingPriority(false)
-  }
 
   const handleOrientationStatusChange = async (newStatus: OrientationStatus | '') => {
     if (!lead) return
@@ -464,6 +449,43 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   // Only the assigned agent or admin can change the stage
   const canChangeStage = isAdmin || (profile && lead?.assigned_to === profile.id)
 
+  const getPucDocumentCountForLead = async (targetLead: Lead): Promise<PucDocumentCount | undefined> => {
+    const rawGraduateType = targetLead.education_type?.toUpperCase()
+    if (!rawGraduateType) return undefined
+
+    const graduateType = rawGraduateType as GraduateType
+    const requiredIds = getDocumentsForGraduateType(graduateType, {
+      isTransfer: targetLead.is_transfer_student,
+      isSpecialNeeds: targetLead.is_special_needs,
+      isDiplomatic: targetLead.is_diplomatic,
+    })
+      .filter(doc => doc.required)
+      .map(doc => doc.id)
+
+    if (requiredIds.length === 0) {
+      return { uploaded: 0, required: 0 }
+    }
+
+    try {
+      const response = await fetch(`/api/psp/documents?lead_id=${targetLead.id}&graduate_type=${graduateType}`)
+      if (!response.ok) {
+        return { uploaded: 0, required: requiredIds.length }
+      }
+      const data = await response.json().catch(() => ({})) as { documents?: Array<{ document_type?: string | null }> }
+      const uploadedTypes = new Set(
+        (data.documents ?? [])
+          .map(doc => doc.document_type)
+          .filter((documentType): documentType is string => !!documentType)
+      )
+      return {
+        uploaded: requiredIds.filter(id => uploadedTypes.has(id)).length,
+        required: requiredIds.length,
+      }
+    } catch {
+      return { uploaded: 0, required: requiredIds.length }
+    }
+  }
+
   const handleStageClick = async (stage: string) => {
     console.log('[Stage Click] Clicked stage:', stage, 'Current stage:', lead?.pipeline_stage)
 
@@ -477,12 +499,26 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       return
     }
 
-    // Intercept "application" (File) stage - require file fee payment first
+    // Intercept "application" (File) stage - require complete info and file fee first
     if (stage === 'application' && lead.pipeline_stage !== 'application') {
-      // Skip if fees already paid or exempted
-      if (lead.file_fee_status !== 'paid' && lead.file_fee_status !== 'exempt') {
+      const guard = checkStageTransition({ lead, newStage: "application" })
+      if (guard.kind === "file_requirements") {
+        setFileRequirementsMissingFields(guard.missingFields)
+        return
+      }
+      if (guard.kind === "file_fee") {
         console.log('[Stage Click] Intercepting file stage click - showing file fee dialog')
         setShowFileFeeDialog(true)
+        return
+      }
+    }
+
+    if (stage === 'puc_document_submission' && lead.pipeline_stage === 'application' && lead.funding_type === 'puc') {
+      const documentCount = await getPucDocumentCountForLead(lead)
+      const missingFields = getMissingPucDocumentStageRequirements(lead, documentCount)
+      if (missingFields.length > 0) {
+        window.alert(`Complete ${missingFields.join(", ")} before moving this lead to Documents.`)
+        setShowPSPWizard(true)
         return
       }
     }
@@ -587,6 +623,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           reactivateToStage = stage as PipelineStage
           break
         }
+      }
+    }
+
+    if (reactivateToStage === 'application') {
+      const guard = checkStageTransition({ lead, newStage: "application" })
+      if (guard.kind === "file_requirements") {
+        setFileRequirementsMissingFields(guard.missingFields)
+        return
+      }
+      if (guard.kind === "file_fee") {
+        setShowFileFeeDialog(true)
+        return
       }
     }
 
@@ -845,64 +893,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       {lead.puc_import_flagged && (
                         <PucImportBadge size="md" showLabel />
                       )}
-                      {lead.source && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold tracking-wide rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 ring-1 ring-teal-500/25">
-                          <Tag className="w-3.5 h-3.5" />
-                          {lead.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                        </span>
-                      )}
-                      {/* Admin-only priority toggle */}
-                      {isAdmin && (
-                        <div className="relative" ref={priorityDropdownRef}>
-                          <button
-                            onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-                            disabled={updatingPriority}
-                            className={cn(
-                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
-                              "hover:bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
-                              updatingPriority && "opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            {updatingPriority ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Shield className="w-3 h-3" />
-                            )}
-                            <ChevronDown className="w-3 h-3" />
-                          </button>
-                          <AnimatePresence>
-                            {showPriorityDropdown && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                                transition={{ duration: 0.15 }}
-                                className="absolute left-0 top-full mt-1 z-50 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] shadow-lg overflow-hidden"
-                              >
-                                {([
-                                  { value: 'normal' as const, label: 'Normal', icon: null, color: 'text-[var(--text-secondary)]' },
-                                  { value: 'important' as const, label: 'Important', icon: Star, color: 'text-amber-500' },
-                                  { value: 'critical' as const, label: 'Critical', icon: Flame, color: 'text-red-500' },
-                                ]).map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => handlePriorityChange(option.value)}
-                                    className={cn(
-                                      "flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors hover:bg-[var(--bg-muted)]",
-                                      lead.priority === option.value ? "bg-[var(--bg-muted)] font-medium" : ""
-                                    )}
-                                  >
-                                    {option.icon ? <option.icon className={cn("w-3.5 h-3.5", option.color)} /> : <span className="w-3.5" />}
-                                    <span className={option.color}>{option.label}</span>
-                                    {(lead.priority || 'normal') === option.value && (
-                                      <Check className="w-3.5 h-3.5 ml-auto text-[var(--primary)]" />
-                                    )}
-                                  </button>
-                                ))}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                      {lead.quality_tier && (
+                        <QualityTierBadge
+                          tier={lead.quality_tier}
+                          score={lead.final_weighted_score}
+                          size="sm"
+                          showLabel
+                        />
                       )}
                       <div className="flex items-center gap-2">
                         <span
@@ -1949,6 +1946,23 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         onConfirm={async (reasonId, notes) => {
           await updateLeadStage(lead.id, 'lost', reasonId, notes)
           await refetchLead()
+        }}
+      />
+
+      <FileStageRequirementsDialog
+        open={fileRequirementsMissingFields.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setFileRequirementsMissingFields([])
+        }}
+        lead={lead}
+        missingFields={fileRequirementsMissingFields}
+        onFillRequiredFields={() => {
+          setFileRequirementsMissingFields([])
+          if (lead.funding_type === "self_funded") {
+            setShowEditForm(true)
+          } else {
+            setShowPSPWizard(true)
+          }
         }}
       />
 
