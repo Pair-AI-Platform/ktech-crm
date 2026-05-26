@@ -155,7 +155,7 @@ const PAYMENT_RECEIPT: DocumentRule = {
 
 const TRANSFER_CERTIFICATE: DocumentRule = {
   id: 'transfer_certificate',
-  name: 'Official Transcript',
+  name: 'Transcript',
   nameAr: 'كشف الدرجات الرسمي',
   required: true,
   acceptedFileTypes: DOCUMENT_FILE_TYPES,
@@ -468,7 +468,6 @@ export function getDocumentsForGraduateType(
 
   if (flags?.isTransfer) {
     docs.push(TRANSFER_CERTIFICATE)
-    docs.push(COURSE_DESCRIPTION)
   }
   if (flags?.isSpecialNeeds) {
     docs.push(SPECIAL_NEEDS_CERTIFICATE)

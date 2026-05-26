@@ -13,41 +13,48 @@ export interface TagOption {
   color?: string
 }
 
-// Enhanced Notion-style color palette with richer, more vibrant colors
+const themeColor = (token: string, bg = 12, border = 22, hover = 18) => ({
+  bg: `color-mix(in srgb, var(${token}) ${bg}%, transparent)`,
+  text: `var(${token})`,
+  border: `color-mix(in srgb, var(${token}) ${border}%, transparent)`,
+  hover: `color-mix(in srgb, var(${token}) ${hover}%, transparent)`,
+})
+
+// Enhanced Notion-style color palette that follows the active theme tokens.
 const TAG_COLORS: Record<string, { bg: string; text: string; border: string; hover: string }> = {
   // Default colors (used when no specific color is set)
-  gray: { bg: "rgba(140, 140, 140, 0.08)", text: "#6b7280", border: "rgba(140, 140, 140, 0.15)", hover: "rgba(140, 140, 140, 0.15)" },
+  gray: themeColor("--text-secondary", 10, 18, 16),
   brown: { bg: "rgba(180, 130, 100, 0.1)", text: "#92400e", border: "rgba(180, 130, 100, 0.2)", hover: "rgba(180, 130, 100, 0.18)" },
-  orange: { bg: "rgba(251, 146, 60, 0.12)", text: "#c2410c", border: "rgba(251, 146, 60, 0.2)", hover: "rgba(251, 146, 60, 0.2)" },
-  yellow: { bg: "rgba(250, 204, 21, 0.15)", text: "#a16207", border: "rgba(250, 204, 21, 0.25)", hover: "rgba(250, 204, 21, 0.25)" },
-  green: { bg: "rgba(34, 197, 94, 0.1)", text: "#15803d", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
-  blue: { bg: "rgba(59, 130, 246, 0.1)", text: "#1d4ed8", border: "rgba(59, 130, 246, 0.2)", hover: "rgba(59, 130, 246, 0.18)" },
-  purple: { bg: "rgba(147, 51, 234, 0.1)", text: "#7c3aed", border: "rgba(147, 51, 234, 0.2)", hover: "rgba(147, 51, 234, 0.18)" },
+  orange: themeColor("--stage-application", 13, 24, 20),
+  yellow: themeColor("--warning", 15, 28, 22),
+  green: themeColor("--success", 12, 24, 18),
+  blue: themeColor("--info", 12, 24, 18),
+  purple: themeColor("--stage-tested", 14, 26, 20),
   pink: { bg: "rgba(236, 72, 153, 0.1)", text: "#be185d", border: "rgba(236, 72, 153, 0.2)", hover: "rgba(236, 72, 153, 0.18)" },
-  red: { bg: "rgba(239, 68, 68, 0.1)", text: "#b91c1c", border: "rgba(239, 68, 68, 0.2)", hover: "rgba(239, 68, 68, 0.18)" },
+  red: themeColor("--error", 12, 24, 18),
   // Status colors (used by LEAD_STATUSES)
-  warning: { bg: "rgba(251, 146, 60, 0.12)", text: "#c2410c", border: "rgba(251, 146, 60, 0.2)", hover: "rgba(251, 146, 60, 0.2)" },
-  accent: { bg: "rgba(99, 102, 241, 0.1)", text: "#4f46e5", border: "rgba(99, 102, 241, 0.2)", hover: "rgba(99, 102, 241, 0.18)" },
-  destructive: { bg: "rgba(239, 68, 68, 0.1)", text: "#b91c1c", border: "rgba(239, 68, 68, 0.2)", hover: "rgba(239, 68, 68, 0.18)" },
-  secondary: { bg: "rgba(140, 140, 140, 0.08)", text: "#6b7280", border: "rgba(140, 140, 140, 0.15)", hover: "rgba(140, 140, 140, 0.15)" },
-  success: { bg: "rgba(34, 197, 94, 0.1)", text: "#15803d", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
+  warning: themeColor("--warning", 14, 26, 20),
+  accent: themeColor("--accent", 12, 24, 18),
+  destructive: themeColor("--error", 12, 24, 18),
+  secondary: themeColor("--text-secondary", 10, 18, 16),
+  success: themeColor("--success", 12, 24, 18),
   // Pipeline stage specific colors
-  new: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb", border: "rgba(59, 130, 246, 0.2)", hover: "rgba(59, 130, 246, 0.18)" },
-  contacted: { bg: "rgba(14, 165, 233, 0.1)", text: "#0284c7", border: "rgba(14, 165, 233, 0.2)", hover: "rgba(14, 165, 233, 0.18)" },
-  appointment: { bg: "rgba(99, 102, 241, 0.1)", text: "#4f46e5", border: "rgba(99, 102, 241, 0.2)", hover: "rgba(99, 102, 241, 0.18)" },
-  visit: { bg: "rgba(8, 145, 178, 0.1)", text: "#0e7490", border: "rgba(8, 145, 178, 0.2)", hover: "rgba(8, 145, 178, 0.18)" },
-  test: { bg: "rgba(139, 92, 246, 0.1)", text: "#7c3aed", border: "rgba(139, 92, 246, 0.2)", hover: "rgba(139, 92, 246, 0.18)" },
-  application: { bg: "rgba(168, 85, 247, 0.1)", text: "#9333ea", border: "rgba(168, 85, 247, 0.2)", hover: "rgba(168, 85, 247, 0.18)" },
-  documents: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706", border: "rgba(245, 158, 11, 0.2)", hover: "rgba(245, 158, 11, 0.18)" },
-  submissions: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb", border: "rgba(59, 130, 246, 0.2)", hover: "rgba(59, 130, 246, 0.18)" },
-  submission: { bg: "rgba(147, 197, 253, 0.3)", text: "#1d4ed8", border: "rgba(59, 130, 246, 0.4)", hover: "rgba(147, 197, 253, 0.4)" },
-  payment: { bg: "rgba(34, 197, 94, 0.1)", text: "#16a34a", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
-  applicant: { bg: "rgba(34, 197, 94, 0.1)", text: "#16a34a", border: "rgba(34, 197, 94, 0.2)", hover: "rgba(34, 197, 94, 0.18)" },
-  enrolled: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669", border: "rgba(16, 185, 129, 0.2)", hover: "rgba(16, 185, 129, 0.18)" },
-  withdraw: { bg: "rgba(239, 68, 68, 0.1)", text: "#b91c1c", border: "rgba(239, 68, 68, 0.2)", hover: "rgba(239, 68, 68, 0.18)" },
-  lost: { bg: "rgba(220, 38, 38, 0.1)", text: "#DC2626", border: "rgba(220, 38, 38, 0.2)", hover: "rgba(220, 38, 38, 0.18)" },
-  puc_document_submission: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706", border: "rgba(245, 158, 11, 0.2)", hover: "rgba(245, 158, 11, 0.18)" },
-  puc_application_submission: { bg: "rgba(168, 85, 247, 0.1)", text: "#9333ea", border: "rgba(168, 85, 247, 0.2)", hover: "rgba(168, 85, 247, 0.18)" },
+  new: themeColor("--stage-new", 12, 22, 18),
+  contacted: themeColor("--stage-contacted", 12, 24, 18),
+  appointment: themeColor("--stage-appointed", 12, 24, 18),
+  visit: themeColor("--stage-visited", 12, 24, 18),
+  test: themeColor("--stage-tested", 14, 26, 20),
+  application: themeColor("--stage-application", 12, 24, 18),
+  documents: themeColor("--warning", 13, 24, 20),
+  submissions: themeColor("--info", 12, 24, 18),
+  submission: themeColor("--info", 14, 28, 22),
+  payment: themeColor("--stage-payment", 12, 24, 18),
+  applicant: themeColor("--stage-applied", 12, 24, 18),
+  enrolled: themeColor("--stage-enrolled", 12, 24, 18),
+  withdraw: themeColor("--error", 12, 24, 18),
+  lost: themeColor("--stage-lost", 12, 24, 18),
+  puc_document_submission: themeColor("--warning", 13, 24, 20),
+  puc_application_submission: themeColor("--stage-tested", 14, 26, 20),
 }
 
 // Color rotation for options without explicit colors
@@ -57,11 +64,11 @@ const COLOR_ROTATION = ["blue", "green", "purple", "orange", "pink", "yellow", "
 export type RowVariant = 'lost' | 'blocked' | 'documents-complete' | 'submission' | 'default'
 
 const ROW_VARIANT_COLORS: Record<RowVariant, { bg: string; text: string; border: string; hover: string }> = {
-  lost: { bg: "rgba(239, 68, 68, 0.15)", text: "#b91c1c", border: "rgba(239, 68, 68, 0.25)", hover: "rgba(239, 68, 68, 0.25)" },
-  blocked: { bg: "rgba(251, 146, 60, 0.15)", text: "#c2410c", border: "rgba(251, 146, 60, 0.25)", hover: "rgba(251, 146, 60, 0.25)" },
-  'documents-complete': { bg: "rgba(16, 185, 129, 0.15)", text: "#059669", border: "rgba(16, 185, 129, 0.25)", hover: "rgba(16, 185, 129, 0.25)" },
-  submission: { bg: "rgba(59, 130, 246, 0.12)", text: "#1d4ed8", border: "rgba(59, 130, 246, 0.2)", hover: "rgba(59, 130, 246, 0.2)" },
-  default: { bg: "rgba(140, 140, 140, 0.08)", text: "#6b7280", border: "rgba(140, 140, 140, 0.15)", hover: "rgba(140, 140, 140, 0.15)" },
+  lost: themeColor("--error", 14, 26, 22),
+  blocked: themeColor("--warning", 14, 26, 22),
+  'documents-complete': themeColor("--success", 14, 26, 22),
+  submission: themeColor("--info", 13, 24, 20),
+  default: themeColor("--text-secondary", 10, 18, 16),
 }
 
 function getTagColor(value: string, color?: string, index: number = 0) {

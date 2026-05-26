@@ -33,6 +33,9 @@ import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationTyp
 import { cn } from "@/lib/utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { PSPDocumentManager } from "./psp-document-manager"
+import { SendPspSelfServiceDialog } from "./send-psp-self-service-dialog"
+import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
+import { compareSchoolsBySearch, schoolMatchesSearch } from "@/lib/schools/search"
 import { getCachedSchools, preloadSchools, getCachedPaymentStatus, preloadPaymentStatus } from "@/lib/psp/preloader"
 import { getDocumentsForGraduateType, type GraduateType as GraduateTypeFromRules, type ConditionalDocumentFlags } from "@/lib/psp/document-rules"
 import { computePUCDocumentStatus as computePUCDocumentStatusFn } from "@/lib/psp/document-status"
@@ -111,6 +114,8 @@ export function PSPWizardContent({
   const [loadingSchools, setLoadingSchools] = useState(false)
   const [schoolSearch, setSchoolSearch] = useState("")
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
+  const [showSelfServiceDialog, setShowSelfServiceDialog] = useState(false)
+  const [savingSelfServicePrereqs, setSavingSelfServicePrereqs] = useState(false)
 
   const { updateLead } = useLeadMutations()
 
@@ -249,6 +254,8 @@ export function PSPWizardContent({
       setPaymentStatus(null)
       setPaymentLinkSent(false)
       setCurrentTransactionId(null)
+      setShowSelfServiceDialog(false)
+      setSavingSelfServicePrereqs(false)
     }
   }, [isActive, lead?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -292,17 +299,16 @@ export function PSPWizardContent({
     }
   }, [schools, schoolId, lead?.school])
 
-  // Filter schools based on search (supports Arabic)
-  const filteredSchools = schools.filter(school =>
-    school.name_ar.includes(schoolSearch) ||
-    school.name_en.toLowerCase().includes(schoolSearch.toLowerCase())
-  )
+  // Filter schools based on Arabic, English, compact text, and acronyms like BSK/NES/KES.
+  const filteredSchools = schools
+    .filter(school => schoolMatchesSearch(school, schoolSearch))
+    .sort(compareSchoolsBySearch(schoolSearch))
 
 
   // Update documents when graduate type or conditional flags change
   useEffect(() => {
     if (graduateType) {
-      setDocuments(getDocumentsForType(graduateType, { isSpecialNeeds, isDiplomatic }))
+      setDocuments(getDocumentsForType(graduateType, { isTransfer: !!lead?.is_transfer_student, isSpecialNeeds, isDiplomatic }))
       setCheckedDocs({})
 
       // Save education_type to the lead so the badge can show correct counts
@@ -319,7 +325,7 @@ export function PSPWizardContent({
       setCheckedDocs({})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graduateType, isSpecialNeeds, isDiplomatic, lead?.id, lead?.submission_substage])
+  }, [graduateType, lead?.is_transfer_student, isSpecialNeeds, isDiplomatic, lead?.id, lead?.submission_substage])
 
   // Fetch payment status when wizard opens (use preloaded cache if available)
   useEffect(() => {
@@ -600,9 +606,9 @@ Kuwait Technical College`
 
   const validateDocuments = (): boolean => {
     if (!graduateType) {
-      setError("Please select a graduate type")
+      setError("Please select a document education type")
       setValidationErrors({
-        graduateType: "Please select a graduate type before continuing"
+        graduateType: "Please select a document education type before continuing"
       })
       return false
     }
@@ -646,11 +652,78 @@ Kuwait Technical College`
   const canProceed = (): boolean => {
     switch (currentStep) {
       case "info":
-        return !!firstName && !!lastName && !!civilId && !!phone
+        return !!firstName && !!lastName && !!civilId && !!phone && !!graduateType
       case "payments":
         return !pucFeeAlreadyPaid || !!pucFeeReceiptFile
       default:
         return false
+    }
+  }
+
+  const selfServiceMissingFields = getMissingPspSelfServiceFields({
+    first_name: firstName,
+    last_name: lastName,
+    civil_id: civilId,
+    phone,
+    education_type: graduateType ? (graduateType === "OTHER" ? "other" : graduateType) : null,
+  })
+  const canSendSelfServiceLink = !!lead && selfServiceMissingFields.length === 0
+
+  const handleOpenSelfServiceDialog = async () => {
+    if (!lead?.id) return
+
+    const infoValid = validateInfo()
+    if (!graduateType) {
+      setValidationErrors(prev => ({
+        ...prev,
+        graduateType: "Document education type is required before sending the self-service link",
+      }))
+    }
+
+    if (!infoValid || !graduateType) {
+      setCurrentStep("info")
+      setError("Complete the main info and document education type before sending the self-service link.")
+      return
+    }
+
+    setSavingSelfServicePrereqs(true)
+    setError(null)
+
+    try {
+      const educationType = (graduateType === "OTHER" ? "other" : graduateType) as EducationType
+      const updates: Partial<Lead> = {
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        civil_id: civilId.trim(),
+        phone: phone.trim(),
+        phone_secondary: phoneSecondary.trim() || undefined,
+        email: email.trim() || undefined,
+        date_of_birth: dateOfBirth || undefined,
+        is_diplomatic: isDiplomatic,
+        is_special_needs: isSpecialNeeds,
+        school_id: schoolId || undefined,
+        graduation_year: graduationYear ? parseInt(graduationYear) : undefined,
+        gpa_grade_11: actualGpa ? parseFloat(actualGpa) : undefined,
+        intended_major: (intendedMajor as IntendedMajor) || undefined,
+        preferred_college: preferredCollege.trim() || undefined,
+        funding_type: fundingType,
+        education_type: educationType,
+        seat_number: seatNumber || undefined,
+      }
+      if (!lead.submission_substage) {
+        updates.submission_substage = "documents"
+      }
+
+      const result = await updateLead(lead.id, updates)
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      setShowSelfServiceDialog(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save PSP info before sending link")
+    } finally {
+      setSavingSelfServicePrereqs(false)
     }
   }
 
@@ -787,7 +860,6 @@ Kuwait Technical College`
 
       setCurrentStep("success")
       onSuccess()
-      window.open("https://www.mohe.edu.kw", "_blank")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit lead")
     } finally {
@@ -809,6 +881,22 @@ Kuwait Technical College`
     }
   }
 
+  const selfServiceDialogLead = lead
+    ? {
+        ...lead,
+        first_name: firstName.trim() || lead.first_name,
+        last_name: lastName.trim() || lead.last_name,
+        civil_id: civilId.trim() || lead.civil_id,
+        phone: phone.trim() || lead.phone,
+        phone_secondary: phoneSecondary.trim() || lead.phone_secondary,
+        email: email.trim() || lead.email,
+        education_type: graduateType ? (graduateType === "OTHER" ? "other" : graduateType) as EducationType : lead.education_type,
+        is_transfer_student: lead.is_transfer_student,
+        is_diplomatic: isDiplomatic,
+        is_special_needs: isSpecialNeeds,
+      }
+    : null
+
   return (
     <div className={cn(
       "flex flex-col",
@@ -820,16 +908,45 @@ Kuwait Technical College`
           "border-b border-[var(--border)] bg-[var(--bg-sunken)]",
           variant === "modal" ? "p-6 pb-5" : "p-6 pb-5"
         )}>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-sm">
-              <ClipboardCheck className="w-5 h-5 text-white" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-sm shrink-0">
+                <ClipboardCheck className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-lg font-semibold">PSP</span>
+                <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5 truncate">
+                  {lead ? getLeadDisplayName(lead) : "Process lead through PSP"}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="text-lg font-semibold">PSP</span>
-              <p className="text-xs text-[var(--text-muted)] font-normal mt-0.5">
-                {lead ? getLeadDisplayName(lead) : "Process lead through PSP"}
-              </p>
-            </div>
+
+            {lead && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleOpenSelfServiceDialog}
+                disabled={savingSelfServicePrereqs}
+                aria-label="Send PSP self-service link"
+                title={
+                  canSendSelfServiceLink
+                    ? "Send PSP self-service link"
+                    : `Complete ${selfServiceMissingFields.join(", ")} first`
+                }
+                className={cn(
+                  "rounded-lg shrink-0",
+                  !canSendSelfServiceLink && "opacity-70"
+                )}
+              >
+                {savingSelfServicePrereqs ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Send link</span>
+              </Button>
+            )}
           </div>
 
           {/* Step Indicators */}
@@ -1028,7 +1145,7 @@ Kuwait Technical College`
                     </div>
 
                     {isSchoolDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                      <div className="absolute z-50 w-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
                         <div className="p-2 border-b border-[var(--border)]">
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -1038,7 +1155,7 @@ Kuwait Technical College`
                               onChange={(e) => setSchoolSearch(e.target.value)}
                               placeholder="Search schools..."
                               className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] text-right"
-                              dir="rtl"
+                              dir="auto"
                               autoFocus
                             />
                           </div>
@@ -1064,7 +1181,8 @@ Kuwait Technical College`
                                 )}
                                 dir="rtl"
                               >
-                                {school.name_ar}
+                                <span>{school.name_ar}</span>
+                                <span className="block text-xs text-[var(--text-muted)]" dir="ltr">{school.name_en}</span>
                               </button>
                             ))
                           ) : (
@@ -1110,21 +1228,36 @@ Kuwait Technical College`
                     Documents
                   </h3>
                   <p className="text-sm text-[var(--text-muted)] mt-1">
-                    Select graduate type and upload required documents
+                    Select document education type and upload required documents
                   </p>
                 </div>
 
                 {/* Graduate Type Selector */}
-                <div className="grid grid-cols-5 gap-2 mt-4">
+                <div className="flex items-center justify-between gap-3 mt-4">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
+                    Document Education Type <span className="text-[var(--error)]">*</span>
+                  </label>
+                  <Badge variant="destructive" size="sm">Required</Badge>
+                </div>
+                <div className="grid grid-cols-5 gap-2 mt-2" aria-describedby="graduate-type-error">
                   {GRADUATE_TYPE_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => setGraduateType(option.value)}
+                      aria-invalid={!graduateType && !!validationErrors.graduateType}
+                      aria-pressed={graduateType === option.value}
+                      onClick={() => {
+                        setGraduateType(option.value)
+                        if (validationErrors.graduateType) {
+                          setValidationErrors(prev => ({ ...prev, graduateType: "" }))
+                        }
+                      }}
                       className={cn(
                         "p-3 rounded-xl border text-center transition-all",
                         graduateType === option.value
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                          : validationErrors.graduateType
+                            ? "border-[var(--error)] bg-[var(--error-bg)]"
                           : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
                       )}
                     >
@@ -1140,6 +1273,9 @@ Kuwait Technical College`
                     </button>
                   ))}
                 </div>
+                {validationErrors.graduateType && (
+                  <p id="graduate-type-error" className="text-xs text-[var(--error)] mt-2">{validationErrors.graduateType}</p>
+                )}
 
                 {/* Conditional Document Flags */}
                 {graduateType && (
@@ -1256,7 +1392,7 @@ Kuwait Technical College`
                           })))
                         }}
                         graduateType={graduateType}
-                        conditionalFlags={{ isSpecialNeeds, isDiplomatic }}
+                        conditionalFlags={{ isTransfer: !!lead.is_transfer_student, isSpecialNeeds, isDiplomatic }}
                       />
                     )}
                   </div>
@@ -1267,7 +1403,7 @@ Kuwait Technical College`
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <GraduationCap className="w-12 h-12 text-[var(--text-muted)] mb-3" />
                     <p className="text-sm text-[var(--text-muted)]">
-                      Please select a graduate type above to view required documents
+                      Required: select a document education type above to continue and view required documents
                     </p>
                   </div>
                 )}
@@ -1827,6 +1963,14 @@ Kuwait Technical College`
             </Button>
           )}
         </div>
+      )}
+
+      {selfServiceDialogLead && (
+        <SendPspSelfServiceDialog
+          isOpen={showSelfServiceDialog}
+          onClose={() => setShowSelfServiceDialog(false)}
+          lead={selfServiceDialogLead}
+        />
       )}
 
     </div>

@@ -9,8 +9,8 @@ export function isDemoMode(): boolean {
 
 // Get the demo role (admin or agent)
 export function getDemoRole(): "admin" | "agent" {
-  if (typeof window === "undefined") return "admin"
-  return (localStorage.getItem("ktech-demo-role") as "admin" | "agent") || "admin"
+  if (typeof window === "undefined") return "agent"
+  return localStorage.getItem("ktech-demo-role") === "admin" ? "admin" : "agent"
 }
 
 // Demo data persistence - store updates in localStorage

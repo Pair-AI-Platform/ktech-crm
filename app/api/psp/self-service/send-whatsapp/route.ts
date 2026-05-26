@@ -3,6 +3,7 @@ import crypto from "crypto"
 import twilio from "twilio"
 import { withApiHandler } from "@/lib/api-handler"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
+import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 
 const TOKEN_TTL_DAYS = 7
@@ -45,19 +46,17 @@ export const POST = withApiHandler(
 
     const { data: lead, error: leadErr } = await supabase
       .from("leads")
-      .select("id, first_name, first_name_ar, phone, education_type")
+      .select("id, first_name, last_name, first_name_ar, civil_id, phone, education_type")
       .eq("id", leadId)
       .single()
 
     if (leadErr || !lead) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 })
     }
-    if (!lead.phone) {
-      return NextResponse.json({ error: "Lead has no phone number" }, { status: 400 })
-    }
-    if (!lead.education_type) {
+    const missingFields = getMissingPspSelfServiceFields(lead)
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: "Set the lead's education type before sending the self-service link." },
+        { error: `Complete ${missingFields.join(", ")} before sending the self-service link.` },
         { status: 400 },
       )
     }
@@ -90,7 +89,7 @@ export const POST = withApiHandler(
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.headers.get("origin") || ""
     const url = `${baseUrl}/psp/${token}`
 
-    let formattedPhone = lead.phone.replace(/\D/g, "")
+    let formattedPhone = (lead.phone ?? "").replace(/\D/g, "")
     if (!formattedPhone.startsWith("965")) {
       formattedPhone = `965${formattedPhone}`
     }

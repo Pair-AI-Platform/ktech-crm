@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Check, ExternalLink, Loader2, MessageSquare } from "lucide-react"
 import { isDemoMode } from "@/lib/demo-data"
+import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import type { Lead } from "@/types"
 
 interface Props {
@@ -26,6 +27,8 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
   const [errorMsg, setErrorMsg] = useState("")
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const demoMode = isDemoMode()
+  const missingFields = getMissingPspSelfServiceFields(lead)
+  const canSend = missingFields.length === 0
 
   const reset = () => {
     setWhatsappStatus("idle")
@@ -43,6 +46,12 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
   }
 
   async function sendWhatsApp() {
+    if (!canSend) {
+      setErrorMsg(`Complete ${missingFields.join(", ")} before sending.`)
+      setWhatsappStatus("error")
+      return
+    }
+
     setWhatsappStatus("sending")
     setErrorMsg("")
     setPreviewUrl(null)
@@ -90,7 +99,7 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
             <Button
               type="button"
               onClick={sendWhatsApp}
-              disabled={whatsappStatus === "sending" || whatsappStatus === "sent" || !lead.phone}
+              disabled={whatsappStatus === "sending" || whatsappStatus === "sent" || !canSend}
               className="w-full justify-start gap-2"
             >
               {whatsappStatus === "sending" ? (
@@ -113,8 +122,10 @@ export function SendPspSelfServiceDialog({ isOpen, onClose, lead }: Props) {
               Preview as student
             </Button>
 
-            {!lead.phone && (
-              <p className="text-xs text-amber-600">Lead has no phone number — WhatsApp is unavailable.</p>
+            {!canSend && (
+              <p className="text-xs text-amber-600">
+                Complete {missingFields.join(", ")} before sending the self-service link.
+              </p>
             )}
 
             {previewUrl && whatsappStatus === "sent" && (

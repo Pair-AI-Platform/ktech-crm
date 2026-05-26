@@ -6,7 +6,7 @@ type RouteParams = { params: Promise<{ contactId: string }> }
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { contactId } = await params
   const handler = withApiHandler(
-    { context: 'campaign-contact-messages', roles: ['admin', 'agent'] },
+    { context: 'campaign-contact-messages', roles: ['admin'] },
     async ({ supabase }) => {
       const { data: messages, error } = await supabase
         .from('campaign_contact_messages')

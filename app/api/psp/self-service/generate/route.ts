@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { withApiHandler } from "@/lib/api-handler"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
+import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 
 const TOKEN_TTL_DAYS = 7
@@ -37,16 +38,17 @@ export const POST = withApiHandler(
 
     const { data: lead, error: leadErr } = await supabase
       .from("leads")
-      .select("education_type")
+      .select("first_name, last_name, civil_id, phone, education_type")
       .eq("id", leadId)
       .single()
 
     if (leadErr || !lead) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 })
     }
-    if (!lead.education_type) {
+    const missingFields = getMissingPspSelfServiceFields(lead)
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: "Set the lead's education type before sending the self-service link." },
+        { error: `Complete ${missingFields.join(", ")} before sending the self-service link.` },
         { status: 400 },
       )
     }

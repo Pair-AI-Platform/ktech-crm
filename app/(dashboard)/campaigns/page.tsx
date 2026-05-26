@@ -20,7 +20,6 @@ import {
   CheckCircle2,
   Search,
   Filter,
-  Sparkles,
   Target,
   Edit,
   Trash2,
@@ -28,7 +27,6 @@ import {
   Send,
   FileText,
   Layers,
-  Globe,
   Upload,
   X,
   AlertCircle,
@@ -38,9 +36,6 @@ import {
   ChevronLeft,
   ArrowRight,
   Loader2,
-  ImageIcon,
-  Video,
-  Paperclip,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { RoleGuard } from "@/components/auth/role-guard"
@@ -112,6 +107,76 @@ const CAMPAIGN_STATUS_CONFIG: Record<CampaignStatus, { label: string; color: str
   paused: { label: "Paused", color: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
   completed: { label: "Completed", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
 }
+
+const CAMPAIGN_TEMPLATE_CATEGORY_CONFIG = {
+  welcome: { label: "Welcome", color: "bg-emerald-500", text: "text-emerald-600" },
+  follow_up: { label: "Follow up", color: "bg-amber-500", text: "text-amber-600" },
+  appointment: { label: "Appointment", color: "bg-blue-500", text: "text-blue-600" },
+  documents: { label: "Documents", color: "bg-violet-500", text: "text-violet-600" },
+  payment: { label: "Payment", color: "bg-rose-500", text: "text-rose-600" },
+} as const
+
+type CampaignTemplateCategory = keyof typeof CAMPAIGN_TEMPLATE_CATEGORY_CONFIG
+
+interface CampaignPresetTemplate {
+  id: string
+  title: string
+  description: string
+  category: CampaignTemplateCategory
+  body: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+const CAMPAIGN_PRESET_TEMPLATES: CampaignPresetTemplate[] = [
+  {
+    id: "new_lead_welcome",
+    title: "New Lead Welcome",
+    description: "First message after a student becomes a lead.",
+    category: "welcome",
+    icon: MessageSquare,
+    body: "Hello {{first_name}}, this is KTECH Admissions. Thank you for your interest. I can help you with the next steps, requirements, and available programs.",
+  },
+  {
+    id: "visit_invite",
+    title: "Visit Invite",
+    description: "Invite a student to visit campus or book a meeting.",
+    category: "appointment",
+    icon: Calendar,
+    body: "Hi {{first_name}}, would you like to visit KTECH and speak with an advisor? Reply with a good day and time, and we will book it for you.",
+  },
+  {
+    id: "test_follow_up",
+    title: "Test Follow-up",
+    description: "Follow up after the student reaches the test stage.",
+    category: "follow_up",
+    icon: Target,
+    body: "Hi {{first_name}}, I wanted to follow up about your KTECH test step. Let me know if you need help booking or confirming your appointment.",
+  },
+  {
+    id: "file_missing_info",
+    title: "File Info Needed",
+    description: "Ask for missing details before opening the file.",
+    category: "documents",
+    icon: FileText,
+    body: "Hi {{first_name}}, we need to complete your file information before moving forward. Please send your Civil ID, phone number, school details, and document education type.",
+  },
+  {
+    id: "documents_reminder",
+    title: "Documents Reminder",
+    description: "Remind the student to upload or send required documents.",
+    category: "documents",
+    icon: CheckCircle2,
+    body: "Hi {{first_name}}, your KTECH file is missing required documents. Please send the documents as soon as possible so we can continue your application.",
+  },
+  {
+    id: "payment_reminder",
+    title: "Payment Reminder",
+    description: "Friendly reminder for pending payment steps.",
+    category: "payment",
+    icon: Clock,
+    body: "Hi {{first_name}}, this is a reminder that your payment step is still pending. Please complete it so we can continue processing your application.",
+  },
+]
 
 // ============================================================================
 // CSV Parser Utility
@@ -348,7 +413,6 @@ function NewCampaignModal({
   const [step, setStep] = useState(hasPrefill ? 2 : 1)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [showArabic, setShowArabic] = useState(false)
   const createCampaign = useCreateCampaign()
 
   const { data: audienceFilters, isLoading: filtersLoading } = useAudienceCounts()
@@ -378,46 +442,12 @@ function NewCampaignModal({
     useTemplate: false,
   })
 
-  const [mediaUploading, setMediaUploading] = useState(false)
-  const mediaInputRef = useRef<HTMLInputElement>(null)
-
   const selectedFilter = audienceFilters?.find(f => f.id === formData.audienceFilter)
   const validContacts = formData.uploadedContacts.filter(c => c.valid)
   const invalidContacts = formData.uploadedContacts.filter(c => !c.valid)
+  const selectedTemplate = CAMPAIGN_PRESET_TEMPLATES.find(template => template.id === formData.templateId)
 
   const totalSteps = 4
-
-  // Media upload handler
-  const handleMediaUpload = useCallback(async (file: File) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm']
-    if (!allowedTypes.includes(file.type)) {
-      alert('Unsupported file type. Use JPEG, PNG, GIF, WebP, MP4, MOV, or WebM.')
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size exceeds 10MB limit.')
-      return
-    }
-
-    setMediaUploading(true)
-    try {
-      const body = new FormData()
-      body.append('file', file)
-      const res = await fetch('/api/campaigns/media', { method: 'POST', body })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      setFormData(prev => ({
-        ...prev,
-        mediaUrl: data.url,
-        mediaType: data.mediaType,
-        mediaFileName: data.fileName,
-      }))
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to upload media')
-    } finally {
-      setMediaUploading(false)
-    }
-  }, [])
 
   // File handling
   const handleFileSelect = useCallback((file: File) => {
@@ -479,7 +509,7 @@ function NewCampaignModal({
         if (formData.audienceSource === 'upload') return validContacts.length > 0
         return formData.audienceFilter !== ''
       case 4:
-        return formData.messageContent.trim().length > 0
+        return !!formData.templateId && formData.messageContent.trim().length > 0
       default: return false
     }
   }
@@ -543,7 +573,7 @@ function NewCampaignModal({
                 {step === 1 && "Choose your campaign channel"}
                 {step === 2 && "Name your campaign"}
                 {step === 3 && "Select your audience"}
-                {step === 4 && "Compose your message"}
+                {step === 4 && "Choose a preset template"}
               </p>
             </div>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)]">
@@ -869,181 +899,98 @@ function NewCampaignModal({
             </div>
           )}
 
-          {/* Step 4: Message Composition */}
+          {/* Step 4: Preset Template Selection */}
           {step === 4 && (
             <div className="space-y-6">
-              {/* Message Content */}
-              {formData.type === "whatsapp" && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-[var(--text-primary)]">
-                      Message Content *
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1 text-xs"
-                        onClick={() => setShowArabic(!showArabic)}
-                      >
-                        <Globe className="w-3.5 h-3.5" />
-                        {showArabic ? 'EN' : 'AR'}
-                      </Button>
-                    </div>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                      Preset templates
+                    </h3>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      Select one approved template for this campaign.
+                    </p>
                   </div>
-
-                  <textarea
-                    value={showArabic ? (formData.messageContentAr || '') : formData.messageContent}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      [showArabic ? 'messageContentAr' : 'messageContent']: e.target.value
-                    }))}
-                    placeholder={showArabic
-                      ? "Type your Arabic message here..."
-                      : "Hello {{first_name}}! I wanted to reach out..."}
-                    rows={4}
-                    className={cn(
-                      "w-full p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)]/50 resize-none",
-                      showArabic && "text-right font-arabic"
-                    )}
-                  />
-
-                  {/* Variables */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="text-xs text-[var(--text-muted)]">Insert:</span>
-                    {['{{first_name}}', '{{last_name}}', '{{phone}}', '{{school_name}}'].map(variable => (
-                      <button
-                        key={variable}
-                        onClick={() => {
-                          const field = showArabic ? 'messageContentAr' : 'messageContent'
-                          setFormData(prev => ({
-                            ...prev,
-                            [field]: (prev[field as keyof CampaignFormData] || '') + ' ' + variable
-                          }))
-                        }}
-                        className="px-2 py-1 rounded-md text-xs bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]"
-                      >
-                        {variable}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-3">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Sparkles className="w-4 h-4" />
-                      Improve with AI
-                    </Button>
-
-                    {/* Media attach button - WhatsApp only */}
-                    {formData.type === 'whatsapp' && !formData.mediaUrl && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => mediaInputRef.current?.click()}
-                          disabled={mediaUploading}
-                        >
-                          {mediaUploading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Paperclip className="w-4 h-4" />
-                          )}
-                          {mediaUploading ? 'Uploading...' : 'Attach Media'}
-                        </Button>
-                        <input
-                          ref={mediaInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) handleMediaUpload(file)
-                            e.target.value = ''
-                          }}
-                        />
-                      </>
-                    )}
-                  </div>
-
-                  {/* Media preview */}
-                  {formData.mediaUrl && (
-                    <div className="mt-3 relative inline-block">
-                      <div className="rounded-xl border border-[var(--border)] overflow-hidden bg-[var(--bg-sunken)]">
-                        {formData.mediaType === 'image' ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={formData.mediaUrl}
-                            alt="Campaign media"
-                            className="max-h-48 max-w-full object-contain"
-                          />
-                        ) : (
-                          <video
-                            src={formData.mediaUrl}
-                            controls
-                            className="max-h-48 max-w-full"
-                          />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between mt-1.5">
-                        <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                          {formData.mediaType === 'image' ? <ImageIcon className="w-3 h-3" /> : <Video className="w-3 h-3" />}
-                          {formData.mediaFileName || 'Media attached'}
-                        </span>
-                        <button
-                          onClick={() => setFormData(prev => ({ ...prev, mediaUrl: undefined, mediaType: undefined, mediaFileName: undefined }))}
-                          className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
-                        >
-                          <X className="w-3 h-3" />
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
+                  <Badge variant="secondary">{CAMPAIGN_PRESET_TEMPLATES.length} presets</Badge>
                 </div>
-              )}
 
-              {/* Preview */}
-              {(formData.messageContent || formData.mediaUrl) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {CAMPAIGN_PRESET_TEMPLATES.map((template) => {
+                    const Icon = template.icon
+                    const category = CAMPAIGN_TEMPLATE_CATEGORY_CONFIG[template.category]
+                    const isSelected = formData.templateId === template.id
+
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          useTemplate: true,
+                          templateId: template.id,
+                          messageContent: template.body,
+                          messageContentAr: "",
+                          mediaUrl: undefined,
+                          mediaType: undefined,
+                          mediaFileName: undefined,
+                        }))}
+                        className={cn(
+                          "text-left rounded-2xl border p-4 transition-all min-h-[150px]",
+                          isSelected
+                            ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
+                            : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50 hover:bg-[var(--bg-hover)]"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className={cn(
+                            "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+                            isSelected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                          )}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={cn("h-2 w-2 rounded-full", category.color)} />
+                            <span className={cn("text-xs font-medium", category.text)}>
+                              {category.label}
+                            </span>
+                            {isSelected && <Check className="h-4 w-4 text-[var(--primary)]" />}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <h4 className="font-semibold text-[var(--text-primary)]">{template.title}</h4>
+                          <p className="text-sm text-[var(--text-muted)] mt-1 leading-relaxed">
+                            {template.description}
+                          </p>
+                        </div>
+                        <p className="mt-3 text-xs text-[var(--text-secondary)] line-clamp-2">
+                          {template.body}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {selectedTemplate && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                     Preview
                   </label>
-                  <div className={cn(
-                    "rounded-xl border overflow-hidden",
-                    formData.type === 'whatsapp' ? "bg-[#DCF8C6] border-emerald-200" : "bg-blue-50 border-blue-200"
-                  )}>
-                    {formData.mediaUrl && (
-                      <div className="border-b border-emerald-200/50">
-                        {formData.mediaType === 'image' ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={formData.mediaUrl}
-                            alt="Campaign media"
-                            className="w-full max-h-48 object-cover"
-                          />
-                        ) : (
-                          <video
-                            src={formData.mediaUrl}
-                            className="w-full max-h-48 object-cover"
-                            muted
-                          />
-                        )}
+                  <div className="rounded-2xl border border-emerald-200 bg-[#DCF8C6] overflow-hidden">
+                    <div className="px-4 py-3 border-b border-emerald-200/70 bg-white/35">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-800">{selectedTemplate.title}</span>
+                        <span className="text-xs text-gray-600">WhatsApp preset</span>
                       </div>
-                    )}
-                    {formData.messageContent && (
-                      <p className={cn(
-                        "text-sm whitespace-pre-wrap p-4",
-                        formData.type === 'whatsapp' ? "text-gray-800" : "text-gray-700"
-                      )}>
-                        {formData.messageContent
-                          .replace(/\{\{first_name\}\}/g, 'Ahmed')
-                          .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
-                          .replace(/\{\{phone\}\}/g, '+965 1234 5678')
-                          .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')}
-                      </p>
-                    )}
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap p-4 text-gray-800 leading-relaxed">
+                      {selectedTemplate.body
+                        .replace(/\{\{first_name\}\}/g, 'Ahmed')
+                        .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
+                        .replace(/\{\{phone\}\}/g, '+965 1234 5678')
+                        .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1115,22 +1062,20 @@ export default function CampaignsPage() {
   const [showNewCampaign, setShowNewCampaign] = useState(false)
   const [prefillContacts, setPrefillContacts] = useState<CampaignPrefillContact[] | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const prefillParam = searchParams.get("prefill")
 
   // When the user clicked "Campaign" in a leads-table bulk action, they arrive
   // here with ?prefill=1 and the selected contacts stashed in sessionStorage.
-  // Consume them, open the wizard, and scrub the query param so a refresh
-  // doesn't reopen an empty modal.
+  // Consume them and open the wizard. Keep the query param in place so we do
+  // not risk remounting the page after the selected contacts are loaded.
   useEffect(() => {
-    if (searchParams.get("prefill") !== "1") return
+    if (prefillParam !== "1") return
     const payload = consumeCampaignPrefill()
     if (payload && payload.contacts.length > 0) {
       setPrefillContacts(payload.contacts)
       setShowNewCampaign(true)
     }
-    router.replace("/campaigns")
-    // Run once on mount; intentionally not chasing searchParams identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [prefillParam])
 
   const { campaigns, isLoading, invalidate } = useCampaigns({
     type: activeView !== 'all' ? activeView : undefined,

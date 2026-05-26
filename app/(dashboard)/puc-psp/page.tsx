@@ -9,15 +9,18 @@ import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
-import { BulkAssignModal, BulkDeleteModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
+import { BulkAssignModal, BulkDeleteModal, BulkStageModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SearchInput } from "@/components/ui/input"
-import type { Lead, PipelineStage, PUCDocumentStatus } from "@/types"
+import type { Lead, LeadStatus, PipelineStage, PUCDocumentStatus } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
 import { computePUCDocumentStatus } from "@/lib/psp/document-status"
+import { getMissingPucDocumentStageRequirements } from "@/lib/psp/document-stage-requirements"
+import { checkStageTransition } from "@/lib/lead-stage-guards"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { LeadFiltersPanel, type LeadFilters } from "@/components/leads/lead-filters"
 import { cn } from "@/lib/utils"
@@ -38,7 +41,8 @@ type PucPaymentLeadRow = { lead_id: string }
 type PucPaymentAmountRow = { lead_id: string; amount: number | null }
 type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: string | null }
 type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
-type RecentStageMove = { stage: PipelineStage; rank: number }
+type RecentStageMove = { stage: PipelineStage; rank: number; lead: Lead }
+type LeadStageChangedDetail = { leadId: string; stage: PipelineStage; status?: LeadStatus | null; lead: Lead }
 
 // PUC pipeline stage pills (the stages a PUC lead progresses through)
 const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
@@ -143,6 +147,31 @@ export default function PUCPSPPage() {
     setSfStickyLeadIds(new Set())
   }, [sfStageFilter, topTab])
 
+  useEffect(() => {
+    const handleLeadStageChanged = (event: Event) => {
+      const detail = (event as CustomEvent<LeadStageChangedDetail>).detail
+      if (!detail?.leadId || !detail.stage || !detail.lead) return
+
+      stageMoveRankRef.current += 1
+      setRecentStageMoves((prev) => ({
+        ...prev,
+        [detail.leadId]: {
+          stage: detail.stage,
+          rank: stageMoveRankRef.current,
+          lead: {
+            ...detail.lead,
+            pipeline_stage: detail.stage,
+            position_in_stage: 0,
+            status: detail.status === undefined ? detail.lead.status : (detail.status ?? undefined),
+          },
+        },
+      }))
+    }
+
+    window.addEventListener("adl:lead-stage-changed", handleLeadStageChanged)
+    return () => window.removeEventListener("adl:lead-stage-changed", handleLeadStageChanged)
+  }, [])
+
   // Restore view state from sessionStorage on mount (for back navigation)
   useEffect(() => {
     const saved = sessionStorage.getItem("puc-psp-view-state")
@@ -166,12 +195,13 @@ export default function PUCPSPPage() {
   // New state for table + modal layout
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showStageModal, setShowStageModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
 
-  const { bulkAssignLeads, bulkDeleteLeads, loading: mutationLoading } = useLeadMutations()
+  const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
 
   // PUC leads - only fetch when PUC tab is active
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
@@ -314,36 +344,60 @@ export default function PUCPSPPage() {
       { data: PspDocumentRow[] | null },
       { data: PspDocumentConfigRow[] | null },
     ]) => {
-      const uploadedByLead: Record<string, Set<string>> = {}
+      const uploadedByLead: Record<string, { types: Set<string>; gradType: string }> = {}
       for (const doc of docsResult.data ?? []) {
-        if (!uploadedByLead[doc.lead_id]) uploadedByLead[doc.lead_id] = new Set()
-        uploadedByLead[doc.lead_id].add(doc.document_type)
+        if (!uploadedByLead[doc.lead_id]) {
+          uploadedByLead[doc.lead_id] = {
+            types: new Set(),
+            gradType: doc.graduate_type?.toUpperCase() || "",
+          }
+        }
+        uploadedByLead[doc.lead_id].types.add(doc.document_type)
+        if (!uploadedByLead[doc.lead_id].gradType && doc.graduate_type) {
+          uploadedByLead[doc.lead_id].gradType = doc.graduate_type.toUpperCase()
+        }
       }
 
-      const dbRequiredCounts: Record<string, number> = {}
+      const dbRequiredIds: Record<string, Set<string>> = {}
       const hasDbConfigs = (configsResult.data ?? []).length > 0
       for (const cfg of configsResult.data ?? []) {
         if (cfg.required) {
-          dbRequiredCounts[cfg.graduate_type] = (dbRequiredCounts[cfg.graduate_type] || 0) + 1
+          const key = cfg.graduate_type.toUpperCase()
+          if (!dbRequiredIds[key]) dbRequiredIds[key] = new Set()
+          dbRequiredIds[key].add(cfg.document_id)
         }
       }
 
       const result: Record<string, { uploaded: number; required: number }> = {}
       for (const lead of pucLeads) {
-        const uploaded = uploadedByLead[lead.id]?.size ?? 0
-        let requiredCount = 0
-        const gradType = lead.academic_track || 'science'
-        if (hasDbConfigs && dbRequiredCounts[gradType] !== undefined) {
-          requiredCount = dbRequiredCounts[gradType]
-        } else {
+        const uploadedTypes = uploadedByLead[lead.id]?.types ?? new Set<string>()
+        const gradType = uploadedByLead[lead.id]?.gradType || lead.education_type?.toUpperCase() || ""
+        let requiredIds: string[] = []
+
+        if (gradType && hasDbConfigs && dbRequiredIds[gradType]) {
+          requiredIds = Array.from(dbRequiredIds[gradType])
+          const baseIds = new Set(getDocumentsForGraduateType(gradType as GraduateType).map(d => d.id))
+          const conditionalDocs = getDocumentsForGraduateType(gradType as GraduateType, {
+            isTransfer: lead.is_transfer_student,
+            isSpecialNeeds: lead.is_special_needs,
+            isDiplomatic: lead.is_diplomatic,
+          })
+          for (const doc of conditionalDocs) {
+            if (doc.required && !baseIds.has(doc.id) && !requiredIds.includes(doc.id)) {
+              requiredIds.push(doc.id)
+            }
+          }
+        } else if (gradType) {
           const allDocs = getDocumentsForGraduateType(gradType as GraduateType, {
             isTransfer: lead.is_transfer_student,
             isSpecialNeeds: lead.is_special_needs,
             isDiplomatic: lead.is_diplomatic,
           })
-          requiredCount = allDocs.filter(d => d.required).length
+          requiredIds = allDocs.filter(d => d.required).map(d => d.id)
         }
-        result[lead.id] = { uploaded, required: requiredCount }
+
+        const uploadedRequiredCount = requiredIds.filter(id => uploadedTypes.has(id)).length
+        result[lead.id] = { uploaded: uploadedRequiredCount, required: requiredIds.length }
       }
       setPucDocCounts(result)
     })
@@ -444,14 +498,32 @@ export default function PUCPSPPage() {
     } else if (stageFilter === "all") {
       result = [...pucLeads]
     } else {
-      result = pucLeads.filter((lead) => lead.pipeline_stage === stageFilter || pucStickyLeadIds.has(lead.id))
+      result = pucLeads.filter((lead) =>
+        lead.pipeline_stage === stageFilter ||
+        pucStickyLeadIds.has(lead.id) ||
+        recentStageMoves[lead.id]?.stage === stageFilter
+      )
     }
+
+    const resultById = new Map(result.map((lead) => [lead.id, lead]))
+    for (const [leadId, move] of Object.entries(recentStageMoves)) {
+      if (stageFilter === "all" || move.stage === stageFilter || pucStickyLeadIds.has(leadId)) {
+        resultById.set(leadId, move.lead)
+      }
+    }
+    result = Array.from(resultById.values())
 
     // Apply advanced filters
     result = applyAdvancedFilters(result)
 
+    result.sort((a, b) => {
+      const aRank = recentStageMoves[a.id]?.rank ?? 0
+      const bRank = recentStageMoves[b.id]?.rank ?? 0
+      return bRank - aRank
+    })
+
     return result
-  }, [pucLeads, stageFilter, linkSentLeadIds, pucStickyLeadIds, applyAdvancedFilters])
+  }, [pucLeads, stageFilter, linkSentLeadIds, pucStickyLeadIds, recentStageMoves, applyAdvancedFilters])
 
   // Count active filters for badge
   const activeFiltersCount =
@@ -474,26 +546,64 @@ export default function PUCPSPPage() {
     let result = [...sfLeads]
     // Apply stage filter client-side
     if (sfStageFilter !== "all") {
-      result = result.filter(lead => lead.pipeline_stage === sfStageFilter || sfStickyLeadIds.has(lead.id))
+      result = result.filter(lead =>
+        lead.pipeline_stage === sfStageFilter ||
+        sfStickyLeadIds.has(lead.id) ||
+        recentStageMoves[lead.id]?.stage === sfStageFilter
+      )
     }
+    const resultById = new Map(result.map((lead) => [lead.id, lead]))
+    for (const [leadId, move] of Object.entries(recentStageMoves)) {
+      if (sfStageFilter === "all" || move.stage === sfStageFilter || sfStickyLeadIds.has(leadId)) {
+        resultById.set(leadId, move.lead)
+      }
+    }
+    result = Array.from(resultById.values())
+
     result = applyAdvancedFilters(result)
+    result.sort((a, b) => {
+      const aRank = recentStageMoves[a.id]?.rank ?? 0
+      const bRank = recentStageMoves[b.id]?.rank ?? 0
+      return bRank - aRank
+    })
     return result
-  }, [sfLeads, sfStageFilter, sfStickyLeadIds, applyAdvancedFilters])
+  }, [sfLeads, sfStageFilter, sfStickyLeadIds, recentStageMoves, applyAdvancedFilters])
 
   const filteredLeads = topTab === "puc" ? pucFilteredLeads : sfFilteredLeads
+  const selectedLeadObjects = useMemo(() => {
+    const selectedSet = new Set(selectedLeads)
+    return leads.filter((lead) => selectedSet.has(lead.id))
+  }, [leads, selectedLeads])
+
+  const bulkStageOptions = useMemo(() => {
+    if (topTab === "puc") {
+      return Object.entries(PUC_STAGE_CONFIG).map(([value, config]) => ({
+        value: value as PipelineStage,
+        label: config.label,
+      }))
+    }
+
+    return SF_STAGE_CONFIG
+      .filter((stage) => stage.value !== "all" && stage.value !== "lost")
+      .map((stage) => ({
+        value: stage.value as PipelineStage,
+        label: stage.label,
+      }))
+  }, [topTab])
 
   const activeFilteredStage = topTab === "puc"
     ? (stageFilter === "link_sent" ? "all" : stageFilter)
     : sfStageFilter
+  const activeStickyLeadIds = topTab === "puc" ? pucStickyLeadIds : sfStickyLeadIds
   const pinnedLeadRanks = useMemo(() => {
     if (activeFilteredStage === "all") return {}
 
     return Object.fromEntries(
       Object.entries(recentStageMoves)
-        .filter(([, move]) => move.stage === activeFilteredStage)
+        .filter(([leadId, move]) => activeStickyLeadIds.has(leadId) || move.stage === activeFilteredStage)
         .map(([leadId, move]) => [leadId, move.rank])
     )
-  }, [activeFilteredStage, recentStageMoves])
+  }, [activeFilteredStage, activeStickyLeadIds, recentStageMoves])
 
   const stageCounts = useMemo(() => {
     let allCount = 0
@@ -573,6 +683,109 @@ export default function PUCPSPPage() {
         refetch()
       }
     }
+  }
+
+  const handleBulkStageConfirm = async (stage: PipelineStage) => {
+    if (selectedLeadObjects.length === 0) return
+
+    if (stage === "application") {
+      const blocked = selectedLeadObjects
+        .filter((lead) => lead.pipeline_stage !== "application")
+        .map((lead) => ({
+          lead,
+          guard: checkStageTransition({ lead, newStage: "application" }),
+        }))
+        .filter(({ guard }) => guard.kind === "file_requirements" || guard.kind === "file_fee")
+
+      const missingInfo = blocked.filter(({ guard }) => guard.kind === "file_requirements")
+      if (missingInfo.length > 0) {
+        const details = missingInfo
+          .slice(0, 4)
+          .map(({ lead, guard }) => {
+            const missing = guard.kind === "file_requirements" ? guard.missingFields.join(", ") : ""
+            return `${getLeadDisplayName(lead)}: ${missing}`
+          })
+          .join("\n")
+        const suffix = missingInfo.length > 4 ? `\n...and ${missingInfo.length - 4} more` : ""
+        window.alert(
+          `Cannot move ${missingInfo.length} selected lead${missingInfo.length !== 1 ? "s" : ""} to File yet.\n\nComplete the missing required fields first.\n\n${details}${suffix}`
+        )
+        return
+      }
+
+      const missingFee = blocked.filter(({ guard }) => guard.kind === "file_fee")
+      if (missingFee.length > 0) {
+        const details = missingFee
+          .slice(0, 4)
+          .map(({ lead }) => getLeadDisplayName(lead))
+          .join("\n")
+        const suffix = missingFee.length > 4 ? `\n...and ${missingFee.length - 4} more` : ""
+        window.alert(
+          `Cannot move ${missingFee.length} selected lead${missingFee.length !== 1 ? "s" : ""} to File yet.\n\nHandle the file fee first for:\n\n${details}${suffix}`
+        )
+        return
+      }
+    }
+
+    if (topTab === "puc" && stage === "puc_document_submission") {
+      const blocked = selectedLeadObjects
+        .filter((lead) => lead.funding_type === "puc" && lead.pipeline_stage === "application")
+        .map((lead) => ({
+          lead,
+          missing: getMissingPucDocumentStageRequirements(lead, pucDocCounts[lead.id]),
+        }))
+        .filter(({ missing }) => missing.length > 0)
+
+      if (blocked.length > 0) {
+        const details = blocked
+          .slice(0, 4)
+          .map(({ lead, missing }) => `${getLeadDisplayName(lead)}: ${missing.join(", ")}`)
+          .join("\n")
+        const suffix = blocked.length > 4 ? `\n...and ${blocked.length - 4} more` : ""
+        window.alert(
+          `Cannot move ${blocked.length} selected lead${blocked.length !== 1 ? "s" : ""} to Documents yet.\n\nComplete the missing PSP information and required documents first.\n\n${details}${suffix}`
+        )
+        return
+      }
+    }
+
+    const result = await bulkUpdateStage(selectedLeadObjects.map((lead) => lead.id), stage)
+    if (result.error) {
+      window.alert(result.error)
+      return
+    }
+
+    const rankBase = stageMoveRankRef.current + 1
+    setRecentStageMoves((prev) => ({
+      ...prev,
+      ...Object.fromEntries(
+        selectedLeadObjects.map((lead, index) => [
+          lead.id,
+          { stage, rank: rankBase + index, lead: { ...lead, pipeline_stage: stage, position_in_stage: index } },
+        ])
+      ),
+    }))
+    stageMoveRankRef.current = rankBase + selectedLeadObjects.length - 1
+
+    if (topTab === "puc" && stageFilter !== "all") {
+      setPucStickyLeadIds((prev) => {
+        const next = new Set(prev)
+        selectedLeadObjects.forEach((lead) => next.add(lead.id))
+        return next
+      })
+    } else if (topTab === "self_fund" && sfStageFilter !== "all") {
+      setSfStickyLeadIds((prev) => {
+        const next = new Set(prev)
+        selectedLeadObjects.forEach((lead) => next.add(lead.id))
+        return next
+      })
+    }
+
+    setShowStageModal(false)
+    setSelectedLeads([])
+    setSuccessMessage(`${result.count} lead${result.count !== 1 ? "s" : ""} moved`)
+    setShowSuccessToast(true)
+    refetch()
   }
 
   const handleBulkDeleteConfirm = async () => {
@@ -794,11 +1007,21 @@ export default function PUCPSPPage() {
             currentStageFilter={topTab === "puc" ? (stageFilter === "link_sent" ? "all" : stageFilter as PipelineStage | "all") : sfStageFilter}
             fundingTypeFilter={topTab === "puc" ? "puc" : "self_funded"}
             pinnedLeadRanks={pinnedLeadRanks}
-            onStageChanged={(leadId, newStage) => {
+            onStageChanged={(leadId, newStage, status, leadSnapshot) => {
               stageMoveRankRef.current += 1
+              const existing = leadSnapshot || leads.find((lead) => lead.id === leadId) || filteredLeads.find((lead) => lead.id === leadId)
               setRecentStageMoves((prev) => ({
                 ...prev,
-                [leadId]: { stage: newStage, rank: stageMoveRankRef.current },
+                [leadId]: {
+                  stage: newStage,
+                  rank: stageMoveRankRef.current,
+                  lead: {
+                    ...(existing ?? ({ id: leadId } as Lead)),
+                    pipeline_stage: newStage,
+                    position_in_stage: 0,
+                    status: status === undefined ? existing?.status : (status ?? undefined),
+                  },
+                },
               }))
 
               // Only pin when a sub-filter is active; on "all" the lead never disappears.
@@ -829,20 +1052,33 @@ export default function PUCPSPPage() {
             <BulkActionsBar
               selectedCount={selectedLeads.length}
               onAssign={() => setShowAssignModal(true)}
+              onStage={() => setShowStageModal(true)}
               onBook={handleBulkBook}
               onDelete={() => setShowDeleteModal(true)}
               onClear={() => setSelectedLeads([])}
               onCampaign={() => {
-                const selectedSet = new Set(selectedLeads)
-                const contacts = filteredLeads
-                  .filter((l) => selectedSet.has(l.id))
+                const selectedLeadById = new Map([...leads, ...filteredLeads].map((lead) => [lead.id, lead]))
+                const contacts = selectedLeads
+                  .map((leadId) => selectedLeadById.get(leadId))
+                  .filter((lead): lead is Lead => Boolean(lead))
                   .map(leadToPrefillContact)
-                stashCampaignPrefill({
+
+                if (contacts.length === 0) {
+                  window.alert("Select at least one lead first.")
+                  return
+                }
+
+                const ready = stashCampaignPrefill({
                   origin: "puc",
                   contacts,
                   createdAt: Date.now(),
                 })
-                router.push("/campaigns?prefill=1")
+                if (!ready) {
+                  window.alert("Could not prepare the selected leads for a campaign. Please try again.")
+                  return
+                }
+
+                window.location.assign("/campaigns?prefill=1")
               }}
             />
           )}
@@ -864,6 +1100,16 @@ export default function PUCPSPPage() {
         onClose={() => setShowAssignModal(false)}
         selectedCount={selectedLeads.length}
         onConfirm={handleBulkAssignConfirm}
+        loading={mutationLoading}
+      />
+
+      {/* Bulk Stage Modal */}
+      <BulkStageModal
+        isOpen={showStageModal}
+        onClose={() => setShowStageModal(false)}
+        selectedCount={selectedLeads.length}
+        options={bulkStageOptions}
+        onConfirm={handleBulkStageConfirm}
         loading={mutationLoading}
       />
 

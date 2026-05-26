@@ -63,6 +63,7 @@ export default function LoginPage() {
     localStorage.setItem("ktech-demo-mode", "true")
     localStorage.setItem("ktech-demo-role", role)
     document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; samesite=lax"
+    document.cookie = `ktech-demo-role=${role}; path=/; max-age=86400; samesite=lax`
 
     window.location.href = "/dashboard"
   }

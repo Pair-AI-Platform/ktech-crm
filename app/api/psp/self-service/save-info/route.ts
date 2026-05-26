@@ -30,8 +30,6 @@ const ALLOWED_FIELDS = new Set([
   "gpa_grade_11",
   "actual_gpa",
   "intended_major",
-  "is_diplomatic",
-  "is_special_needs",
 ])
 
 export async function POST(request: NextRequest) {

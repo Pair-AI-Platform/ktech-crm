@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoRole, DEMO_AGENTS } from "@/lib/demo-data"
@@ -47,15 +47,16 @@ const USER_QUERY_KEY = ['current-user'] as const
 
 export function useUser() {
   const queryClient = useQueryClient()
+  const demoMode = isDemoMode()
+  const demoRole = demoMode ? getDemoRole() : null
 
-  const { data, isLoading: loading } = useQuery({
-    queryKey: USER_QUERY_KEY,
+  const { data, isLoading: queryLoading } = useQuery({
+    queryKey: [...USER_QUERY_KEY, demoMode ? demoRole : "auth"],
     queryFn: async (): Promise<{ user: User | null; profile: Profile | null }> => {
-      if (isDemoMode()) {
-        const demoRole = getDemoRole()
+      if (demoMode) {
         return {
           user: null,
-          profile: demoRole === "agent" ? DEMO_AGENT_PROFILE : DEMO_ADMIN_PROFILE,
+          profile: demoRole === "admin" ? DEMO_ADMIN_PROFILE : DEMO_AGENT_PROFILE,
         }
       }
 
@@ -89,14 +90,19 @@ export function useUser() {
     return () => subscription.unsubscribe()
   }, [queryClient])
 
-  const user = data?.user ?? null
-  const profile = data?.profile ?? null
+  const demoProfile = demoMode
+    ? demoRole === "admin" ? DEMO_ADMIN_PROFILE : DEMO_AGENT_PROFILE
+    : null
+  const user = demoMode ? null : data?.user ?? null
+  const profile = demoMode ? demoProfile : data?.profile ?? null
+  const loading = demoMode ? false : queryLoading
 
   const signOut = useCallback(async () => {
     if (isDemoMode()) {
       localStorage.removeItem("ktech-demo-mode")
       localStorage.removeItem("ktech-demo-role")
       document.cookie = "ktech-demo-mode=; path=/; max-age=0"
+      document.cookie = "ktech-demo-role=; path=/; max-age=0"
       window.location.href = "/login"
       return
     }

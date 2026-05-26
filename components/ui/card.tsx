@@ -31,7 +31,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           "rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] transition-all duration-200",
           !flat && "shadow-[var(--shadow-card)]",
           flat && "shadow-none",
-          elevated && "shadow-[var(--shadow-lg)] border-transparent",
+          elevated && "shadow-[var(--shadow-lg)]",
           hover && "hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-emphasis)] cursor-pointer",
           glow && "hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-emphasis)]",
           interactive && "cursor-pointer active:scale-[0.99]",

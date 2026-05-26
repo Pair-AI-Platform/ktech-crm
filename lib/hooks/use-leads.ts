@@ -9,7 +9,33 @@ import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
 import { GPA_SELF_FUNDED_THRESHOLD, PUC_PSP_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
 import { isArabicText } from "@/lib/string-utils"
+import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
+import { calculateLeadQuality } from "@/lib/lead-scoring"
 import { queryKeys } from "./query-keys"
+
+function applyQualityScoring<T extends Partial<Lead>>(lead: T): T {
+  const gpa = lead.gpa_grade_12_expected ?? lead.actual_gpa ?? null
+  const placement = lead.placement_test_raw ?? lead.placement_english_score ?? null
+  // Only recompute when we have at least one scoring input
+  if (gpa == null && placement == null && !lead.gender && !lead.governorate) return lead
+  const scoring = calculateLeadQuality({
+    gpa,
+    placement_test_raw: placement,
+    gender: lead.gender ?? null,
+    governorate: lead.governorate ?? null,
+  })
+  return {
+    ...lead,
+    gpa_auto_score: scoring.gpa_auto_score ?? lead.gpa_auto_score,
+    placement_test_auto_score: scoring.placement_test_auto_score ?? lead.placement_test_auto_score,
+    foundation_level: scoring.foundation_level ?? lead.foundation_level,
+    gender_score: scoring.gender_score ?? lead.gender_score,
+    governorate_score: scoring.governorate_score ?? lead.governorate_score,
+    final_weighted_score: scoring.final_weighted_score ?? lead.final_weighted_score,
+    quality_tier: scoring.quality_tier ?? lead.quality_tier,
+    quality_score_updated_at: scoring.final_weighted_score != null ? new Date().toISOString() : lead.quality_score_updated_at,
+  }
+}
 
 interface UseLeadsFilters {
   statuses?: string[]
@@ -48,6 +74,14 @@ interface UseLeadsOptions {
 }
 
 type LeadStatsRow = Pick<Lead, "created_at" | "pipeline_stage" | "funding_type">
+type BulkStageLeadSnapshot = {
+  pipeline_stage: PipelineStage
+  first_name?: string | null
+  last_name?: string | null
+  phone?: string | null
+  civil_id?: string | null
+  education_type?: string | null
+}
 
 export function useLeads(options: UseLeadsOptions = {}) {
   const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25, filters: advancedFilters, enabled = true } = options
@@ -324,12 +358,14 @@ export function useLeadMutations() {
         }
       }
 
+      const scoredLeadData = applyQualityScoring(finalLeadData)
+
       const { data, error } = await supabase
         .from("leads")
         .insert({
-          ...finalLeadData,
+          ...scoredLeadData,
           contact_status: null,
-          assigned_to: finalLeadData.assigned_to || user?.id,
+          assigned_to: scoredLeadData.assigned_to || user?.id,
           assigned_at: new Date().toISOString(),
         })
         .select()
@@ -398,9 +434,17 @@ export function useLeadMutations() {
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, contact_status, first_name, last_name, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college, source")
+        .select("pipeline_stage, contact_status, first_name, last_name, phone, civil_id, education_type, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college, source, gender, governorate, placement_english_score, placement_test_raw")
         .eq("id", id)
         .single()
+
+      if (updates.pipeline_stage === "application" && oldLead?.pipeline_stage !== "application") {
+        const mergedLead = { ...oldLead, ...updates }
+        const missingFields = getMissingPspSelfServiceFields(mergedLead)
+        if (missingFields.length > 0) {
+          throw new Error(`Complete ${missingFields.join(", ")} before moving this lead to File.`)
+        }
+      }
 
       // Auto-set funding_type to self_funded if any GPA (new or existing) is below 70
       const mergedGpaData = {
@@ -450,6 +494,27 @@ export function useLeadMutations() {
       if ('status' in updates) {
         updates.contact_status = updates.status as unknown as Lead['contact_status']
         delete updates.status
+      }
+
+      // Recompute quality tier if any scoring input changed
+      const scoringInputChanged =
+        'gpa_grade_12_expected' in updates ||
+        'actual_gpa' in updates ||
+        'placement_test_raw' in updates ||
+        'placement_english_score' in updates ||
+        'gender' in updates ||
+        'governorate' in updates
+      if (scoringInputChanged) {
+        const merged = { ...(oldLead as Partial<Lead>), ...updates }
+        const scored = applyQualityScoring(merged)
+        updates.gpa_auto_score = scored.gpa_auto_score
+        updates.placement_test_auto_score = scored.placement_test_auto_score
+        updates.foundation_level = scored.foundation_level
+        updates.gender_score = scored.gender_score
+        updates.governorate_score = scored.governorate_score
+        updates.final_weighted_score = scored.final_weighted_score
+        updates.quality_tier = scored.quality_tier
+        updates.quality_score_updated_at = scored.quality_score_updated_at
       }
 
       const { data, error } = await supabase
@@ -797,21 +862,31 @@ export function useLeadMutations() {
       // Update each lead individually with sequential positions
       const errors: string[] = []
       for (const id of leadIds) {
-        // Get old stage for lost_at_stage tracking
-        let oldStage: PipelineStage | null = null
-        if (stage === 'lost') {
-          const { data: oldLead } = await supabase
+        let oldLead: BulkStageLeadSnapshot | null = null
+
+        if (stage === 'lost' || stage === 'application') {
+          const { data } = await supabase
             .from("leads")
-            .select("pipeline_stage")
+            .select("pipeline_stage, first_name, last_name, phone, civil_id, education_type")
             .eq("id", id)
             .single()
-          oldStage = oldLead?.pipeline_stage || null
+          oldLead = data as BulkStageLeadSnapshot | null
+        }
+
+        if (stage === 'application' && oldLead?.pipeline_stage !== 'application') {
+          const missingFields = getMissingPspSelfServiceFields(oldLead ?? {})
+          if (missingFields.length > 0) {
+            const leadName = `${oldLead?.first_name ?? ""} ${oldLead?.last_name ?? ""}`.trim() || id
+            errors.push(`${leadName}: missing ${missingFields.join(", ")}`)
+            continue
+          }
         }
 
         const updateData: Record<string, unknown> = {
           pipeline_stage: stage,
           position_in_stage: nextPos,
           last_contacted_at: new Date().toISOString(),
+          contact_status: null,
         }
 
         if (stage === 'lost') {
@@ -821,8 +896,8 @@ export function useLeadMutations() {
           if (lostReasonNotes) {
             updateData.lost_reason_notes = lostReasonNotes
           }
-          if (oldStage && oldStage !== 'lost') {
-            updateData.lost_at_stage = oldStage
+          if (oldLead?.pipeline_stage && oldLead.pipeline_stage !== 'lost') {
+            updateData.lost_at_stage = oldLead.pipeline_stage
           }
         }
 

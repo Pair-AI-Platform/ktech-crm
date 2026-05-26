@@ -36,14 +36,13 @@ import {
   MessageSquare,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReRegisterLeads, useActiveSemesters } from "@/lib/hooks/use-semesters"
 import { createClient } from "@/lib/supabase/client"
 import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
-import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
+import { openCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
 import { useStageSettings } from "@/lib/hooks/use-stage-settings"
 import type { Lead, Semester, EducationCycle, Profile, PipelineStage } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
@@ -525,7 +524,6 @@ function CycleStagePills({
 // ── Main Archive Page ────────────────────────────────────────────────────────
 
 export default function ArchivePage() {
-  const router = useRouter()
   const { profile, isAdmin } = useUser()
   const { activeSemesters } = useActiveSemesters()
   const [loading, setLoading] = useState(true)
@@ -950,12 +948,11 @@ export default function ArchivePage() {
                     const contacts = allLeadsFlat
                       .filter((l) => selectedLeads.has(l.id))
                       .map(leadToPrefillContact)
-                    stashCampaignPrefill({
+                    openCampaignPrefill({
                       origin: "archive",
                       contacts,
                       createdAt: Date.now(),
                     })
-                    router.push("/campaigns?prefill=1")
                   }}
                 >
                   <MessageSquare className="w-4 h-4 mr-1.5" />

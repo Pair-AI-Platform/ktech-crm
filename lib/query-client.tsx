@@ -5,6 +5,7 @@ import { useState } from "react"
 
 function isDemoMode() {
   if (typeof window === "undefined") return false
+  if (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE !== "true") return false
   return window.localStorage?.getItem("ktech-demo-mode") === "true"
 }
 

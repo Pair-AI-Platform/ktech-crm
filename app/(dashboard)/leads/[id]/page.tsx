@@ -293,6 +293,38 @@ function groupNotesByDate(notes: ParsedNote[]): { label: string; notes: ParsedNo
   return groups.filter(g => g.notes.length > 0)
 }
 
+function StickFigureAvatar({ gender }: { gender?: string | null }) {
+  const isFemale = gender === 'female'
+
+  return (
+    <div className="flex h-full w-full items-center justify-center rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)]">
+      <svg
+        viewBox="0 0 80 80"
+        className="h-14 w-14"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle cx="40" cy="22" r="10" stroke="currentColor" strokeWidth="4" />
+        {isFemale ? (
+          <>
+            <path d="M29 19c3-8 19-8 22 0" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            <path d="M40 34v9" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            <path d="M28 59l12-18 12 18H28Z" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" />
+            <path d="M32 43l-9 8M48 43l9 8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            <path d="M33 63v7M47 63v7" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+          </>
+        ) : (
+          <>
+            <path d="M40 34v24" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            <path d="M27 44h26" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            <path d="M40 58l-12 12M40 58l12 12" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+          </>
+        )}
+      </svg>
+    </div>
+  )
+}
+
 // Stage gradient colors
 const STAGE_GRADIENT: Record<string, { from: string; to: string; text: string }> = {
   new: { from: 'var(--primary)', to: 'var(--primary)', text: 'white' },
@@ -811,13 +843,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
           style={{ boxShadow: lead.priority !== 'critical' ? 'var(--shadow-card)' : undefined }}
         >
-          {/* Left accent bar — stage color */}
-          <div
-            className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
-            style={{ background: stageGradient.from }}
-          />
-
-          <div className="relative pl-7 pr-6 py-6 sm:pl-8 sm:pr-7 sm:py-7">
+          <div className="relative px-6 py-6 sm:px-7 sm:py-7">
             {/* Top Row: Avatar + Info + Actions */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-6">
               {/* Avatar — compact with heat dot */}
@@ -826,12 +852,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 whileHover={{ scale: 1.03 }}
                 transition={{ type: "spring", stiffness: 400, damping: 25 }}
               >
-                <Avatar className="relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg shadow-sm">
-                  <AvatarFallback
-                    className="text-xl sm:text-2xl font-semibold text-white rounded-lg"
-                    style={{ background: stageGradient.from }}
-                  >
-                    {(lead.first_name_ar || '').charAt(0)}
+                <Avatar
+                  className="relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] shadow-sm"
+                  aria-label={`${lead.gender === 'female' ? 'Female' : lead.gender === 'male' ? 'Male' : 'Lead'} profile`}
+                >
+                  <AvatarFallback className="rounded-lg bg-transparent p-0">
+                    <StickFigureAvatar gender={lead.gender} />
                   </AvatarFallback>
                 </Avatar>
                 {/* Heat indicator — small dot */}

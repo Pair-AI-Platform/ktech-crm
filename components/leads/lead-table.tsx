@@ -14,6 +14,7 @@ import {
   Search,
   CheckCircle2,
   XCircle,
+  ArrowRightLeft,
   UserPlus,
   Calendar,
   Trash2,
@@ -51,7 +52,7 @@ interface LeadTableProps {
   totalCount?: number
   pageSize?: number
   onPageChange?: (page: number) => void
-  onStageChanged?: (leadId: string, newStage: PipelineStage, status?: LeadStatus | null) => void
+  onStageChanged?: (leadId: string, newStage: PipelineStage, status?: LeadStatus | null, leadSnapshot?: Lead) => void
   pinnedLeadRanks?: Record<string, number>
 }
 
@@ -77,7 +78,7 @@ export function LeadTable({
   const { updateLeadStage, updateLead, incrementContactCount } = useLeadMutations()
   const { settings: stageSettings } = useStageSettings()
   const queryClient = useQueryClient()
-  const [sortField, setSortField] = useState<SortField>("name")
+  const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   const [editingStage, setEditingStage] = useState<string | null>(null)
   const [editingSchool, setEditingSchool] = useState<string | null>(null)
@@ -105,6 +106,7 @@ export function LeadTable({
   const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
   const [editWithdrawReasonLead, setEditWithdrawReasonLead] = useState<Lead | null>(null)
   const [paymentDialogLead, setPaymentDialogLead] = useState<Lead | null>(null)
+  const [fileRequirementsDialog, setFileRequirementsDialog] = useState<{ lead: Lead; missingFields: string[] } | null>(null)
   const [fileFeeDialogLead, setFileFeeDialogLead] = useState<Lead | null>(null)
   const [pspWizardLead, setPspWizardLead] = useState<Lead | null>(null)
   const [pucPaymentLeads, setPucPaymentLeads] = useState<Set<string>>(new Set())
@@ -323,25 +325,26 @@ export function LeadTable({
       const docs = docsResult.data
       const dbConfigs = configsResult.data
 
-      // Build required counts from DB configs, grouped by graduate type
-      const dbRequiredCounts: Record<string, number> = {}
+      // Build required document ids from DB configs, grouped by graduate type.
+      const dbRequiredIds: Record<string, Set<string>> = {}
       if (dbConfigs && dbConfigs.length > 0) {
         for (const cfg of dbConfigs) {
-          if (cfg.required) {
+          if (cfg.required && cfg.document_id) {
             const key = cfg.graduate_type.toUpperCase()
-            dbRequiredCounts[key] = (dbRequiredCounts[key] || 0) + 1
+            if (!dbRequiredIds[key]) dbRequiredIds[key] = new Set()
+            dbRequiredIds[key].add(cfg.document_id)
           }
         }
       }
 
       // Group uploaded docs by lead_id and track graduate type
-      const uploadedMap: Record<string, { count: number; gradType: string }> = {}
+      const uploadedMap: Record<string, { types: Set<string>; gradType: string }> = {}
       if (docs) {
         for (const doc of docs) {
           if (!uploadedMap[doc.lead_id]) {
-            uploadedMap[doc.lead_id] = { count: 0, gradType: doc.graduate_type?.toUpperCase() || '' }
+            uploadedMap[doc.lead_id] = { types: new Set(), gradType: doc.graduate_type?.toUpperCase() || '' }
           }
-          uploadedMap[doc.lead_id].count += 1
+          uploadedMap[doc.lead_id].types.add(doc.document_type)
           if (!uploadedMap[doc.lead_id].gradType && doc.graduate_type) {
             uploadedMap[doc.lead_id].gradType = doc.graduate_type.toUpperCase()
           }
@@ -352,14 +355,25 @@ export function LeadTable({
       const hasDbConfigs = dbConfigs && dbConfigs.length > 0
       const result: Record<string, { uploaded: number; required: number }> = {}
       for (const lead of pucLeads) {
-        const uploaded = uploadedMap[lead.id]?.count ?? 0
+        const uploadedTypes = uploadedMap[lead.id]?.types ?? new Set<string>()
         const gradType = uploadedMap[lead.id]?.gradType || lead.education_type?.toUpperCase() || ''
 
-        let requiredCount = 0
+        let requiredIds: string[] = []
         if (gradType) {
-          if (hasDbConfigs && dbRequiredCounts[gradType] !== undefined) {
+          if (hasDbConfigs && dbRequiredIds[gradType]) {
             // Use DB configs if available
-            requiredCount = dbRequiredCounts[gradType]
+            requiredIds = Array.from(dbRequiredIds[gradType])
+            const baseIds = new Set(getDocumentsForGraduateType(gradType as GraduateType).map(d => d.id))
+            const conditionalDocs = getDocumentsForGraduateType(gradType as GraduateType, {
+              isTransfer: lead.is_transfer_student,
+              isSpecialNeeds: lead.is_special_needs,
+              isDiplomatic: lead.is_diplomatic,
+            })
+            for (const doc of conditionalDocs) {
+              if (doc.required && !baseIds.has(doc.id) && !requiredIds.includes(doc.id)) {
+                requiredIds.push(doc.id)
+              }
+            }
           } else {
             // Fallback to hardcoded rules
             const allDocs = getDocumentsForGraduateType(gradType as GraduateType, {
@@ -367,10 +381,11 @@ export function LeadTable({
               isSpecialNeeds: lead.is_special_needs,
               isDiplomatic: lead.is_diplomatic,
             })
-            requiredCount = allDocs.filter(d => d.required).length
+            requiredIds = allDocs.filter(d => d.required).map(d => d.id)
           }
         }
-        result[lead.id] = { uploaded, required: requiredCount }
+        const uploadedRequiredCount = requiredIds.filter(id => uploadedTypes.has(id)).length
+        result[lead.id] = { uploaded: uploadedRequiredCount, required: requiredIds.length }
       }
       setPucDocCounts(result)
     } catch (error) {
@@ -408,6 +423,38 @@ export function LeadTable({
 
   // Optimistic updates - store pending changes locally
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, Partial<Lead>>>({})
+  const [topPinnedLeadId, setTopPinnedLeadId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setTopPinnedLeadId(null)
+  }, [currentStageFilter, fundingTypeFilter])
+
+  const pinLeadToTop = useCallback((leadId: string) => {
+    setTopPinnedLeadId(leadId)
+  }, [])
+
+  const notifyStageChanged = useCallback((
+    leadId: string,
+    newStage: PipelineStage,
+    status?: LeadStatus | null,
+    leadSnapshot?: Lead,
+  ) => {
+    const existing = leadSnapshot ?? leads.find((lead) => lead.id === leadId)
+    const snapshot = existing
+      ? {
+          ...existing,
+          pipeline_stage: newStage,
+          position_in_stage: 0,
+          status: status === undefined ? existing.status : (status ?? undefined),
+        }
+      : undefined
+    onStageChanged?.(leadId, newStage, status, snapshot)
+    if (typeof window !== "undefined" && snapshot) {
+      window.dispatchEvent(new CustomEvent("adl:lead-stage-changed", {
+        detail: { leadId, stage: newStage, status, lead: snapshot },
+      }))
+    }
+  }, [leads, onStageChanged])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -421,9 +468,20 @@ export function LeadTable({
   const PRIORITY_WEIGHT: Record<string, number> = { critical: 0, important: 1, normal: 2 }
 
   const sortedLeads = [...leads].sort((a, b) => {
+    const aIsTopPinned = topPinnedLeadId === a.id
+    const bIsTopPinned = topPinnedLeadId === b.id
+    if (aIsTopPinned !== bIsTopPinned) return aIsTopPinned ? -1 : 1
+
     const aPinRank = pinnedLeadRanks?.[a.id] ?? 0
     const bPinRank = pinnedLeadRanks?.[b.id] ?? 0
     if (aPinRank !== bPinRank) return bPinRank - aPinRank
+
+    if (!sortField) {
+      const aPosition = a.position_in_stage ?? Number.MAX_SAFE_INTEGER
+      const bPosition = b.position_in_stage ?? Number.MAX_SAFE_INTEGER
+      if (aPosition !== bPosition) return aPosition - bPosition
+      return 0
+    }
 
     // Always sort by priority first (critical > important > normal/undefined)
     const aPriority = PRIORITY_WEIGHT[a.priority || 'normal'] ?? 2
@@ -476,6 +534,7 @@ export function LeadTable({
         newStage,
         amountPaid: sfPaymentData[leadId]?.amount_paid ?? 0,
         isPucSrjView,
+        pucDocumentCount: pucDocCounts[leadId],
       })
       switch (guard.kind) {
         case "lost":
@@ -487,11 +546,18 @@ export function LeadTable({
         case "contacted":
           setContactedDialogLead(guard.lead)
           return
+        case "file_requirements":
+          setFileRequirementsDialog({ lead: guard.lead, missingFields: guard.missingFields })
+          return
         case "file_fee":
           setFileFeeDialogLead(guard.lead)
           return
         case "enrollment_payment":
           setPaymentDialogLead(guard.lead)
+          return
+        case "puc_document_requirements":
+          window.alert(`Complete ${guard.missingFields.join(", ")} before moving this lead to Documents.`)
+          setPspWizardLead(guard.lead)
           return
         case "allow":
           break
@@ -501,12 +567,13 @@ export function LeadTable({
     // Optimistic update - immediately show the new value
     // Always clear status when changing stage so user must re-select
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({
       ...prev,
       [leadId]: { ...prev[leadId], pipeline_stage: newStage, status: undefined, contact_count: nextCount }
     }))
     setEditingStage(leadId)
-    onStageChanged?.(leadId, newStage, null)
+    notifyStageChanged(leadId, newStage, null, lead)
 
     // Update stage and clear status
     const result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
@@ -546,15 +613,17 @@ export function LeadTable({
     if (!fileFeeDialogLead) return
     if (action !== 'paid' && action !== 'exempt') return
     const leadId = fileFeeDialogLead.id
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({
       ...prev,
       [leadId]: {
         ...prev[leadId],
         pipeline_stage: 'application' as PipelineStage,
+        position_in_stage: 0,
         file_fee_status: action === 'paid' ? 'paid' : 'exempt',
       },
     }))
-    onStageChanged?.(leadId, 'application' as PipelineStage)
+    notifyStageChanged(leadId, 'application' as PipelineStage, undefined, fileFeeDialogLead)
     queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
   }
 
@@ -564,9 +633,10 @@ export function LeadTable({
     const leadId = lostDialogLead.id
     // Optimistic update
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'lost' as PipelineStage, contact_count: nextCount } }))
     setEditingStage(leadId)
-    onStageChanged?.(leadId, 'lost' as PipelineStage)
+    notifyStageChanged(leadId, 'lost' as PipelineStage, undefined, lostDialogLead)
 
     const result = await updateLeadStage(leadId, 'lost' as PipelineStage, reasonId, notes)
 
@@ -606,13 +676,14 @@ export function LeadTable({
 
     const leadId = contactedDialogLead.id
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     // Optimistic update - set both stage and status
     setPendingUpdates(prev => ({
       ...prev,
       [leadId]: { ...prev[leadId], pipeline_stage: 'contacted' as PipelineStage, status, contact_count: nextCount }
     }))
     setEditingStage(leadId)
-    onStageChanged?.(leadId, 'contacted' as PipelineStage, status)
+    notifyStageChanged(leadId, 'contacted' as PipelineStage, status, contactedDialogLead)
 
     const updateData: Partial<Lead> = { pipeline_stage: 'contacted' as PipelineStage, status }
     if (notes) updateData.notes = notes
@@ -653,9 +724,10 @@ export function LeadTable({
     const leadId = withdrawDialogLead.id
     const nextCount = getNextCount(leadId)
     // Optimistic update
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'withdraw' as PipelineStage, contact_count: nextCount } }))
     setEditingStage(leadId)
-    onStageChanged?.(leadId, 'withdraw' as PipelineStage)
+    notifyStageChanged(leadId, 'withdraw' as PipelineStage, undefined, withdrawDialogLead)
 
     const result = await updateLeadStage(leadId, 'withdraw' as PipelineStage, undefined, undefined, reason, notes)
 
@@ -789,6 +861,7 @@ export function LeadTable({
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
     // Optimistic update - increment contact_count on every status change
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({
       ...prev,
       [leadId]: {
@@ -851,6 +924,7 @@ export function LeadTable({
   const handleSubmissionSubstageChange = async (leadId: string, newSubstage: SubmissionSubstage) => {
     // Optimistic update
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], submission_substage: newSubstage, contact_count: nextCount } }))
     setEditingSubmissionSubstage(leadId)
 
@@ -875,6 +949,7 @@ export function LeadTable({
   const handleSubmissionStatusChange = async (leadId: string, newStatus: SubmissionStatus) => {
     // Optimistic update
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], submission_status: newStatus, contact_count: nextCount } }))
     setEditingSubmissionStatus(leadId)
 
@@ -899,6 +974,7 @@ export function LeadTable({
   const handleOrientationStatusChange = async (leadId: string, newStatus: OrientationStatus | '') => {
     const value = newStatus === '' ? null : newStatus
     const nextCount = getNextCount(leadId)
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], orientation_status: value ?? undefined, contact_count: nextCount } }))
     setEditingOrientationStatus(leadId)
 
@@ -922,6 +998,7 @@ export function LeadTable({
 
   const handleDocStatusOverrideChange = async (leadId: string, newStatus: PUCDocumentStatus | '') => {
     const value = newStatus === '' ? null : newStatus
+    pinLeadToTop(leadId)
     setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], puc_document_status_override: value ?? undefined } }))
     setEditingDocStatus(leadId)
 
@@ -1042,8 +1119,8 @@ export function LeadTable({
 
   return (
     <>
-    <Card className="overflow-hidden border-[var(--border)] flex-1 flex flex-col min-h-0 min-w-0 h-full" elevated>
-      <div className="overflow-auto scrollbar-thin flex-1 min-h-0 h-full">
+    <Card className="overflow-hidden border-[var(--border)] bg-[var(--bg-surface)] flex-1 flex flex-col min-h-0 min-w-0 h-full" elevated>
+      <div className="overflow-auto scrollbar-thin flex-1 min-h-0 h-full bg-[var(--bg-surface)]">
         <table className="w-full table-fixed min-w-[1450px]">
           <LeadTableHeader
             isSubmissionView={isSubmissionView}
@@ -1130,9 +1207,9 @@ export function LeadTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="flex items-center justify-between p-4 border-t border-[var(--border)] bg-[var(--bg-sunken)]">
+      <div className="flex items-center justify-between p-4 border-t border-[var(--border)] bg-[var(--bg-canvas)]">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)]">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
             <span className="text-2xl font-bold text-[var(--primary)]">{totalCount ?? leads.length}</span>
             <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">leads</span>
           </div>
@@ -1179,6 +1256,7 @@ export function LeadTable({
       contactedDialogLead={contactedDialogLead}
       blockedDialogLead={blockedDialogLead}
       withdrawDialogLead={withdrawDialogLead}
+      fileRequirementsDialog={fileRequirementsDialog}
       fileFeeDialogLead={fileFeeDialogLead}
       paymentDialogLead={paymentDialogLead}
       pspWizardLead={pspWizardLead}
@@ -1192,6 +1270,7 @@ export function LeadTable({
       setContactedDialogLead={setContactedDialogLead}
       setBlockedDialogLead={setBlockedDialogLead}
       setWithdrawDialogLead={setWithdrawDialogLead}
+      setFileRequirementsDialog={setFileRequirementsDialog}
       setFileFeeDialogLead={setFileFeeDialogLead}
       handleFileFeeSuccess={handleFileFeeSuccess}
       setPaymentDialogLead={setPaymentDialogLead}
@@ -1220,6 +1299,7 @@ export function LeadTable({
 interface BulkActionsProps {
   selectedCount: number
   onAssign: () => void
+  onStage?: () => void
   onBook: () => void
   onLost?: () => void
   onDelete: () => void
@@ -1228,7 +1308,7 @@ interface BulkActionsProps {
   onCampaign?: () => void
 }
 
-export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDelete, onClear, onSendRSVP, onCampaign }: BulkActionsProps) {
+export function BulkActionsBar({ selectedCount, onAssign, onStage, onBook, onLost, onDelete, onClear, onSendRSVP, onCampaign }: BulkActionsProps) {
   if (selectedCount === 0) return null
 
   return (
@@ -1237,7 +1317,7 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
       animate={{ y: 0, opacity: 1, scale: 1 }}
       exit={{ y: 100, opacity: 0, scale: 0.95 }}
       transition={{ type: "spring", damping: 25, stiffness: 300 }}
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 lg:left-[calc(50%+130px)] z-40 max-w-[calc(100vw-2rem)]"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 lg:left-[calc(50%+130px)] z-50 max-w-[calc(100vw-2rem)] pointer-events-auto"
     >
       <div className="flex items-center gap-4 px-5 py-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-md overflow-x-auto">
         {/* Selected count */}
@@ -1255,22 +1335,28 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={onAssign} className="rounded-lg hover:bg-[var(--primary-muted)] hover:text-[var(--primary)]">
+          <Button type="button" variant="ghost" size="sm" onClick={onAssign} className="rounded-lg hover:bg-[var(--primary-muted)] hover:text-[var(--primary)]">
             <UserPlus className="w-4 h-4 mr-1.5" />
             Assign
           </Button>
-          <Button variant="ghost" size="sm" onClick={onBook} className="rounded-lg hover:bg-[var(--success-bg)] hover:text-[var(--success)]">
+          {onStage && (
+            <Button type="button" variant="ghost" size="sm" onClick={onStage} className="rounded-lg hover:bg-[var(--primary-muted)] hover:text-[var(--primary)]">
+              <ArrowRightLeft className="w-4 h-4 mr-1.5" />
+              Stage
+            </Button>
+          )}
+          <Button type="button" variant="ghost" size="sm" onClick={onBook} className="rounded-lg hover:bg-[var(--success-bg)] hover:text-[var(--success)]">
             <Calendar className="w-4 h-4 mr-1.5" />
             Book
           </Button>
           {onSendRSVP && (
-            <Button variant="ghost" size="sm" onClick={onSendRSVP} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
+            <Button type="button" variant="ghost" size="sm" onClick={onSendRSVP} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
               <Send className="w-4 h-4 mr-1.5" />
               RSVP
             </Button>
           )}
           {onCampaign && (
-            <Button variant="ghost" size="sm" onClick={onCampaign} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
+            <Button type="button" variant="ghost" size="sm" onClick={onCampaign} className="rounded-lg hover:bg-emerald-50 hover:text-emerald-600">
               <MessageSquare className="w-4 h-4 mr-1.5" />
               Campaign
             </Button>
@@ -1283,6 +1369,7 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
         <div className="flex items-center gap-1">
           {onLost && (
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               onClick={onLost}
@@ -1293,6 +1380,7 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
             </Button>
           )}
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={onDelete}
@@ -1307,6 +1395,7 @@ export function BulkActionsBar({ selectedCount, onAssign, onBook, onLost, onDele
 
         {/* Clear */}
         <Button
+          type="button"
           variant="ghost"
           size="icon-sm"
           onClick={onClear}

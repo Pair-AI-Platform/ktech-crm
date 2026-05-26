@@ -8,6 +8,7 @@ import {
   type DocumentRule,
   type ConditionalDocumentFlags,
 } from "@/lib/psp/document-rules"
+import { MAJORS, type IntendedMajor } from "@/types"
 
 type PageState = "verify" | "verifying" | "ready" | "submitted" | "expired" | "error"
 
@@ -25,6 +26,7 @@ interface LeadView {
   school_id: string | null
   graduation_year: number | null
   gpa_grade_11: number | null
+  intended_major: IntendedMajor | null
   education_type: GraduateType | null
   is_diplomatic: boolean | null
   is_special_needs: boolean | null
@@ -89,6 +91,7 @@ export default function PspSelfServicePage() {
     date_of_birth: "",
     graduation_year: "",
     gpa_grade_11: "",
+    intended_major: "" as IntendedMajor | "",
     education_type: null as GraduateType | null,
     is_diplomatic: false,
     is_special_needs: false,
@@ -121,6 +124,7 @@ export default function PspSelfServicePage() {
         school_id: null,
         graduation_year: 2025,
         gpa_grade_11: 3.6,
+        intended_major: "network_security",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -140,6 +144,7 @@ export default function PspSelfServicePage() {
         date_of_birth: demoLead.date_of_birth ?? "",
         graduation_year: String(demoLead.graduation_year ?? ""),
         gpa_grade_11: String(demoLead.gpa_grade_11 ?? ""),
+        intended_major: demoLead.intended_major ?? "",
         education_type: "GOV",
         is_diplomatic: false,
         is_special_needs: false,
@@ -182,6 +187,7 @@ export default function PspSelfServicePage() {
         date_of_birth: json.lead.date_of_birth ?? "",
         graduation_year: json.lead.graduation_year ? String(json.lead.graduation_year) : "",
         gpa_grade_11: json.lead.gpa_grade_11 != null ? String(json.lead.gpa_grade_11) : "",
+        intended_major: json.lead.intended_major ?? "",
         education_type: normalizeGraduateType(json.lead.education_type),
         is_diplomatic: !!json.lead.is_diplomatic,
         is_special_needs: !!json.lead.is_special_needs,
@@ -246,9 +252,8 @@ export default function PspSelfServicePage() {
         date_of_birth: form.date_of_birth || null,
         graduation_year: form.graduation_year ? Number(form.graduation_year) : null,
         gpa_grade_11: form.gpa_grade_11 ? Number(form.gpa_grade_11) : null,
+        intended_major: form.intended_major || null,
         education_type: form.education_type,
-        is_diplomatic: form.is_diplomatic,
-        is_special_needs: form.is_special_needs,
       }
       const res = await fetch("/api/psp/self-service/save-info", {
         method: "POST",
@@ -458,6 +463,14 @@ export default function PspSelfServicePage() {
             <Field label="Actual Accumulative GPA" labelAr="المعدل التراكمي الفعلي">
               <Input value={form.gpa_grade_11} onChange={(v) => setForm({ ...form, gpa_grade_11: v })} inputMode="decimal" />
             </Field>
+            <Field label="ktech Intended Major" labelAr="التخصص المطلوب في KTECH">
+              <SelectInput
+                value={form.intended_major}
+                onChange={(v) => setForm({ ...form, intended_major: v as IntendedMajor | "" })}
+                placeholder="Select intended major"
+                options={MAJORS}
+              />
+            </Field>
           </div>
         </section>
 
@@ -498,27 +511,6 @@ export default function PspSelfServicePage() {
                 </span>
               </div>
             )}
-          </div>
-
-          <div className="flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_special_needs}
-                onChange={(e) => setForm({ ...form, is_special_needs: e.target.checked })}
-                className="w-4 h-4"
-              />
-              <span>Special Needs / ذوو الاحتياجات الخاصة</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_diplomatic}
-                onChange={(e) => setForm({ ...form, is_diplomatic: e.target.checked })}
-                className="w-4 h-4"
-              />
-              <span>Diplomatic / دبلوماسي</span>
-            </label>
           </div>
 
           <div className="space-y-2">
@@ -682,6 +674,28 @@ function Input(props: {
       onChange={(e) => props.onChange(e.target.value)}
       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     />
+  )
+}
+
+function SelectInput(props: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  options: { value: string; label: string }[]
+}) {
+  return (
+    <select
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    >
+      <option value="">{props.placeholder}</option>
+      {props.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   )
 }
 

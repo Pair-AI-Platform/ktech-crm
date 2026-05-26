@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createPaymentLink, validateCivilId } from '@/lib/myfatoorah/client'
 import { FILE_APPLICATION_FEE_AMOUNT, FILE_TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
+import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     // Verify lead exists
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('id, first_name, last_name, first_name_ar, last_name_ar, phone, email, file_fee_status')
+      .select('id, first_name, last_name, first_name_ar, last_name_ar, phone, email, civil_id, education_type, file_fee_status')
       .eq('id', leadId)
       .single()
 
@@ -55,6 +56,14 @@ export async function POST(request: NextRequest) {
 
     if (lead.file_fee_status === 'paid' || lead.file_fee_status === 'exempt') {
       return NextResponse.json({ error: 'File fees have already been handled for this lead' }, { status: 409 })
+    }
+
+    const missingFields = getMissingPspSelfServiceFields(lead)
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
+        { status: 400 }
+      )
     }
 
     // Check for existing pending file fee payment (idempotency)

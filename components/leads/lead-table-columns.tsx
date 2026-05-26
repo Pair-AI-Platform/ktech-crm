@@ -42,8 +42,8 @@ export function LeadTableHeader({
 }: LeadTableHeaderProps) {
   return (
     <thead className="sticky top-0 z-30">
-      <tr className="border-b border-[var(--border)] bg-[var(--bg-sunken)]">
-        <th className="px-3 py-1.5 text-left w-10 sticky left-0 z-30 bg-[var(--bg-sunken)]">
+      <tr className="border-b border-[var(--border)] bg-[var(--bg-canvas)]">
+        <th className="px-3 py-1.5 text-left w-10 sticky left-0 z-30 bg-[var(--bg-canvas)]">
           <div className="flex items-center justify-center">
             <input
               type="checkbox"
@@ -53,7 +53,7 @@ export function LeadTableHeader({
             />
           </div>
         </th>
-        <th className="px-3 py-1.5 text-left w-[180px] min-w-[180px] max-w-[180px] sticky left-10 z-30 bg-[var(--bg-sunken)] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-[var(--border)]">
+        <th className="px-3 py-1.5 text-left w-[180px] min-w-[180px] max-w-[180px] sticky left-10 z-30 bg-[var(--bg-canvas)] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-[var(--border)]">
           <button
             onClick={() => handleSort("name")}
             className="flex items-center text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors group"
@@ -264,7 +264,7 @@ export function LeadTableHeader({
             </th>
           </>
         )}
-        <th className="px-3 py-1.5 text-left min-w-[130px] w-[140px] sticky right-0 z-30 bg-[var(--bg-sunken)]">
+        <th className="px-3 py-1.5 text-left min-w-[130px] w-[140px] sticky right-0 z-30 bg-[var(--bg-canvas)]">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
             Actions
           </span>

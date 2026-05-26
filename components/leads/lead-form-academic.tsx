@@ -332,7 +332,7 @@ export function LeadFormAcademic({
               </div>
 
               {isSchoolDropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
+                <div className="absolute z-50 w-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
                   <div className="p-2 border-b border-[var(--border)]">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -342,6 +342,7 @@ export function LeadFormAcademic({
                         onChange={(e) => setSchoolSearch(e.target.value)}
                         placeholder="Search schools..."
                         className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
+                        dir="auto"
                         autoFocus
                       />
                     </div>

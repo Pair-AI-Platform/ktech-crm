@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================
    ADL CRM Design System
    Navy & Blue, Enterprise Professional
@@ -99,6 +101,7 @@
   --primary-hover: #3a4a80;
   --primary-muted: rgba(45, 58, 109, 0.08);
   --primary-subtle: rgba(45, 58, 109, 0.04);
+  --primary-rgb: 45, 58, 109;
   --primary-foreground: #FFFFFF;
   --primary-gradient: linear-gradient(135deg, #2d3a6d 0%, #3a4a80 100%);
 
@@ -106,6 +109,7 @@
   --accent: #5b73a8;
   --accent-hover: #4a5f96;
   --accent-muted: rgba(91, 115, 168, 0.08);
+  --accent-subtle: rgba(91, 115, 168, 0.04);
   --accent-foreground: #FFFFFF;
 
   /* Secondary - Cool slate */
@@ -210,6 +214,7 @@
   --background: var(--bg-base);
   --foreground: var(--text-primary);
   --card: var(--bg-surface);
+  --bg-card: var(--bg-surface);
   --card-foreground: var(--text-primary);
   --muted: var(--bg-sunken);
   --muted-foreground: var(--text-secondary);
@@ -227,79 +232,81 @@ html.light, .light {
    True-black base, brand indigo, clear elevation
    ============================================ */
 html.dark, .dark {
-  /* Backgrounds - Deep, clearly distinct elevation steps */
-  --bg-base: #0b0d18;
-  --bg-surface: #111525;
-  --bg-elevated: #181d30;
-  --bg-sunken: #07080f;
-  --bg-hover: #1d2438;
-  --bg-active: #232c48;
-  --bg-canvas: #07080f;
+  /* Backgrounds - Graphite base with clear elevation steps */
+  --bg-base: #090b10;
+  --bg-surface: #10141d;
+  --bg-elevated: #161c28;
+  --bg-sunken: #06080c;
+  --bg-hover: #1d2533;
+  --bg-active: #273247;
+  --bg-canvas: #07090e;
 
-  /* Primary - ADL brand indigo */
-  --primary: #5a72d4;
-  --primary-hover: #6b83e5;
-  --primary-muted: rgba(90, 114, 212, 0.15);
-  --primary-subtle: rgba(90, 114, 212, 0.07);
+  /* Primary - ADL indigo tuned for dark surfaces */
+  --primary: #8196f3;
+  --primary-hover: #9aacff;
+  --primary-muted: rgba(129, 150, 243, 0.18);
+  --primary-subtle: rgba(129, 150, 243, 0.09);
+  --primary-rgb: 129, 150, 243;
   --primary-foreground: #ffffff;
-  --primary-gradient: linear-gradient(135deg, #5a72d4 0%, #7a5fcc 100%);
+  --primary-gradient: linear-gradient(135deg, #8196f3 0%, #5fc4d6 100%);
 
-  /* Accent - Vibrant blue */
-  --accent: #7b9ce8;
-  --accent-hover: #93b0f5;
-  --accent-muted: rgba(123, 156, 232, 0.14);
-  --accent-foreground: #ffffff;
+  /* Accent - Teal counterpoint to keep the interface from becoming one-note */
+  --accent: #5fd3c7;
+  --accent-hover: #8be2da;
+  --accent-muted: rgba(95, 211, 199, 0.14);
+  --accent-subtle: rgba(95, 211, 199, 0.08);
+  --accent-foreground: #07100f;
 
   /* Secondary */
-  --secondary: #94A3B8;
-  --secondary-hover: #CBD5E1;
-  --secondary-muted: rgba(148, 163, 184, 0.12);
+  --secondary: #a6b1c4;
+  --secondary-hover: #d4dbea;
+  --secondary-muted: rgba(166, 177, 196, 0.12);
 
   /* Text - Cool hierarchy, no harsh pure white */
-  --text-primary: #dce4f5;
-  --text-secondary: #8a97b8;
-  --text-tertiary: #5c6a8a;
-  --text-muted: #3d4d6a;
-  --text-disabled: #28334d;
-  --text-inverse: #0b0d18;
+  --text-primary: #eef3fb;
+  --text-secondary: #aeb9cf;
+  --text-tertiary: #8290aa;
+  --text-muted: #62708a;
+  --text-disabled: #3f4a5f;
+  --text-inverse: #090b10;
 
-  /* Borders - Glass-morphism style transparent */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-emphasis: rgba(255, 255, 255, 0.14);
+  /* Borders - visible enough for dense data, never chalky */
+  --border: rgba(184, 198, 222, 0.13);
+  --border-subtle: rgba(184, 198, 222, 0.07);
+  --border-emphasis: rgba(184, 198, 222, 0.22);
   --border-focus: var(--primary);
 
-  /* Semantic - Vibrant dark variants */
-  --success: #3dd68c;
-  --success-muted: rgba(61, 214, 140, 0.12);
-  --success-bg: rgba(61, 214, 140, 0.08);
-  --success-foreground: #07080f;
+  /* Semantic - readable on dark surfaces */
+  --success: #5be49b;
+  --success-muted: rgba(91, 228, 155, 0.14);
+  --success-bg: rgba(91, 228, 155, 0.09);
+  --success-foreground: #07100a;
 
-  --warning: #f5c842;
-  --warning-muted: rgba(245, 200, 66, 0.12);
-  --warning-bg: rgba(245, 200, 66, 0.08);
-  --warning-foreground: #07080f;
+  --warning: #ffd166;
+  --warning-muted: rgba(255, 209, 102, 0.15);
+  --warning-bg: rgba(255, 209, 102, 0.09);
+  --warning-foreground: #120d03;
 
-  --error: #f06b6b;
-  --error-muted: rgba(240, 107, 107, 0.12);
-  --error-bg: rgba(240, 107, 107, 0.08);
-  --error-foreground: #07080f;
+  --error: #ff8585;
+  --error-muted: rgba(255, 133, 133, 0.14);
+  --error-bg: rgba(255, 133, 133, 0.09);
+  --error-foreground: #130606;
 
-  --info: #7b9ce8;
-  --info-muted: rgba(123, 156, 232, 0.12);
-  --info-bg: rgba(123, 156, 232, 0.08);
+  --info: #7bb7ff;
+  --info-muted: rgba(123, 183, 255, 0.14);
+  --info-bg: rgba(123, 183, 255, 0.09);
 
   /* Pipeline Stages - Vibrant, distinct */
-  --stage-new: #7a8aaa;
-  --stage-contacted: #7b9ce8;
-  --stage-appointed: #5a72d4;
-  --stage-visited: #8b7dde;
-  --stage-applied: #86d96a;
-  --stage-tested: #f5c842;
-  --stage-application: #f0a030;
-  --stage-payment: #3dd68c;
-  --stage-enrolled: #2fc885;
-  --stage-lost: #f06b6b;
+  --stage-new: #9fb1d2;
+  --stage-contacted: #7bb7ff;
+  --stage-appointed: #8196f3;
+  --stage-visited: #6ed2c8;
+  --stage-applied: #8ee86f;
+  --stage-tested: #c8a4ff;
+  --stage-application: #f7a65a;
+  --stage-payment: #5be49b;
+  --stage-enrolled: #4fd890;
+  --stage-lost: #ff8585;
 
   /* Shadows - Blue-ambient depth system */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -309,18 +316,26 @@ html.dark, .dark {
   --shadow-xl: 0 20px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
   --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  --shadow-focus: 0 0 0 2px var(--bg-surface), 0 0 0 4px rgba(90, 114, 212, 0.4);
-  --shadow-glow: 0 0 40px rgba(90, 114, 212, 0.12);
+  --shadow-focus: 0 0 0 2px var(--bg-surface), 0 0 0 4px rgba(var(--primary-rgb), 0.4);
+  --shadow-glow: 0 0 40px rgba(129, 150, 243, 0.14);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(90, 114, 212, 0.2);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(129, 150, 243, 0.22);
+
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --bg-card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --muted: var(--bg-sunken);
+  --muted-foreground: var(--text-secondary);
 }
 
 /* Sidebar subtle gradient */
 html.dark .sidebar,
 html.dark [data-sidebar],
 html.dark nav[class*="sidebar"] {
-  background: linear-gradient(180deg, #111525 0%, #0e1220 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, var(--bg-surface) 0%, #0c1018 100%);
+  border-right: 1px solid var(--border);
 }
 
 /* RTL */
@@ -367,7 +382,7 @@ body {
   font-weight: 400;
   font-size: 14px;
   line-height: 1.55;
-  letter-spacing: -0.006em;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color var(--transition-base), color var(--transition-base);
@@ -379,13 +394,13 @@ body {
 .font-display {
   font-family: 'Geist', system-ui, sans-serif;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .font-body {
   font-family: 'Geist', system-ui, sans-serif;
   font-weight: 400;
-  letter-spacing: -0.006em;
+  letter-spacing: 0;
 }
 
 .font-mono {
@@ -398,33 +413,33 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'Geist', system-ui, sans-serif;
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.2;
 }
 
 h1 {
   font-size: 1.875rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.1;
 }
 
 h2 {
   font-size: 1.5rem;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.2;
 }
 
 h3 {
   font-size: 1.25rem;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.3;
 }
 
 h4 {
   font-size: 1rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.4;
 }
 
@@ -441,7 +456,7 @@ h6 {
 .stat-number {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .label-caps {
@@ -1042,7 +1057,7 @@ h6 {
 .stat-value {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1;
 }
 
@@ -1075,7 +1090,7 @@ h6 {
 .stat-hero {
   font-size: 2.5rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1;
   color: var(--text-primary);
 }
