@@ -22,8 +22,6 @@ import {
   Check,
   ChevronDown,
   Flame,
-  Zap,
-  Snowflake,
   Bell,
   Tag,
   Activity,
@@ -67,8 +65,6 @@ import { LeadDocuments } from "@/components/leads/lead-documents"
 import { SFDocumentManager } from "@/components/leads/sf-document-manager"
 import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
-import { PucImportBadge } from "@/components/leads/puc-import-badge"
-import { QualityTierBadge } from "@/components/leads/quality-tier-badge"
 import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
 import { SendPspSelfServiceDialog } from "@/components/leads/send-psp-self-service-dialog"
 import { FileStageRequirementsDialog } from "@/components/leads/file-stage-requirements-dialog"
@@ -80,33 +76,6 @@ import { checkStageTransition } from "@/lib/lead-stage-guards"
 // Simplified stage order for the pipeline
 const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"] as const
 
-
-// Lead Heat Configuration
-type LeadHeat = "hot" | "warm" | "cold"
-const LEAD_HEAT_CONFIG: Record<LeadHeat, { label: string; icon: typeof Flame; color: string; description: string }> = {
-  hot: { label: "Hot", icon: Flame, color: "text-orange-500", description: "Recently contacted, has appointments, or in advanced stages" },
-  warm: { label: "Warm", icon: Zap, color: "text-amber-500", description: "Moderate engagement - follow up soon" },
-  cold: { label: "Cold", icon: Snowflake, color: "text-slate-400", description: "No recent contact - needs attention" },
-}
-
-// Calculate lead heat based on engagement
-function calculateLeadHeat(lead: { last_contacted_at?: string; pipeline_stage: string; created_at: string }, appointmentCount: number): LeadHeat {
-  const now = new Date()
-  const lastContact = lead.last_contacted_at ? new Date(lead.last_contacted_at) : null
-  const daysSinceContact = lastContact ? Math.floor((now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24)) : Infinity
-
-  const advancedStages = ["test", "application"]
-  if (daysSinceContact <= 3 || appointmentCount > 0 || advancedStages.includes(lead.pipeline_stage)) {
-    return "hot"
-  }
-
-  const daysSinceCreated = Math.floor((now.getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
-  if (daysSinceContact > 14 || (lead.pipeline_stage === "new" && daysSinceCreated > 7)) {
-    return "cold"
-  }
-
-  return "warm"
-}
 
 // Note types for activity feed
 type NoteType = string
@@ -280,7 +249,7 @@ function groupNotesByDate(notes: ParsedNote[]): { label: string; notes: ParsedNo
 }
 
 function StickFigureAvatar({ gender }: { gender?: string | null }) {
-  const isFemale = gender === 'female'
+  const isFemale = gender?.toLowerCase() === 'female'
 
   return (
     <svg
@@ -291,10 +260,10 @@ function StickFigureAvatar({ gender }: { gender?: string | null }) {
     >
       {isFemale ? (
         <>
-          <path d="M28 26c0-9 6-16 12-16s12 7 12 16" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          <path d="M27 28c0-10 6.5-18 13-18s13 8 13 18" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
           <circle cx="40" cy="27" r="10" stroke="currentColor" strokeWidth="4.5" />
-          <path d="M24 63c0-12 7-20 16-20s16 8 16 20" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-          <path d="M30 45c4 4 16 4 20 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          <path d="M23 64c0-13 7.5-21 17-21s17 8 17 21" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          <path d="M30 45c4 3.5 16 3.5 20 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
         </>
       ) : (
         <>
@@ -733,9 +702,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     })
     .slice(0, 2)
 
-  const leadHeat = calculateLeadHeat(lead, appointments.length)
-  const HeatIcon = LEAD_HEAT_CONFIG[leadHeat].icon
-
   const parsedNotes = parseNotes(lead.notes, pinnedNoteIds, lead.assigned_agent?.full_name)
 
   // Convert activities to ParsedNote format
@@ -798,9 +764,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </Link>
         </div>
 
-        {/* Hero Section - Architectural Card */}
+        {/* Profile header */}
         <motion.div
-          data-lead-header-version="no-green-rail-v2"
+          data-lead-header-version="clean-profile-v1"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
@@ -812,59 +778,33 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
           style={{ boxShadow: lead.priority !== 'critical' ? 'var(--shadow-card)' : undefined }}
         >
-          <div className="relative px-6 py-6 sm:px-7 sm:py-7">
-            {/* Top Row: Avatar + Info + Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-start gap-6">
-              {/* Avatar — compact with heat dot */}
-              <motion.div
-                className="relative shrink-0"
-                whileHover={{ scale: 1.03 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              >
-                <div
-                  data-lead-avatar-version="stick-figure-v2"
-                  role="img"
-                  aria-label={`${lead.gender === 'female' ? 'Female' : lead.gender === 'male' ? 'Male' : 'Lead'} profile`}
-                  className="relative flex w-[72px] h-[72px] sm:w-20 sm:h-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-secondary)] shadow-sm"
-                >
-                  <StickFigureAvatar gender={lead.gender} />
-                </div>
-                {/* Heat indicator — small dot */}
-                {lead.pipeline_stage !== 'lost' && (
-                  <SimpleTooltip
-                    content={`${LEAD_HEAT_CONFIG[leadHeat].label}: ${LEAD_HEAT_CONFIG[leadHeat].description}`}
-                    side="right"
-                    wrapperClassName="absolute -bottom-1 -right-1"
+          <div className="relative px-5 py-5 sm:px-6 sm:py-6">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <motion.div
+                    className="relative shrink-0"
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
                   >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.3, type: "spring", stiffness: 400 }}
-                      className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center ring-[2.5px] ring-[var(--bg-surface)] cursor-help",
-                        leadHeat === 'hot' && "bg-[var(--error)]",
-                        leadHeat === 'warm' && "bg-[var(--warning)]",
-                        leadHeat === 'cold' && "bg-[var(--text-muted)]"
-                      )}
+                    <div
+                      data-lead-avatar-version="profile-bust-v4"
+                      role="img"
+                      aria-label={`${lead.gender?.toLowerCase() === 'female' ? 'Female' : lead.gender?.toLowerCase() === 'male' ? 'Male' : 'Lead'} profile`}
+                      className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-950/25 dark:text-blue-300"
                     >
-                      <HeatIcon className="w-2.5 h-2.5 text-white" />
-                    </motion.div>
-                  </SimpleTooltip>
-                )}
-              </motion.div>
+                      <StickFigureAvatar gender={lead.gender} />
+                    </div>
+                  </motion.div>
 
-              {/* Lead Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    {/* Name + inline stage tag */}
                     <motion.div
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.15 }}
-                      className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5"
+                      className="flex flex-wrap items-center gap-x-3 gap-y-2"
                     >
-                      <h1 className="text-[1.625rem] sm:text-[1.875rem] font-bold text-[var(--text-primary)] tracking-[-0.025em] leading-none" dir="auto">
+                      <h1 className="text-2xl sm:text-[1.75rem] font-semibold text-[var(--text-primary)] leading-tight" dir="auto">
                         {getLeadDisplayName(lead)}
                       </h1>
                       {lead.priority === 'critical' && (
@@ -879,77 +819,39 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           Important
                         </span>
                       )}
-                      {lead.ministry_assigned && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/25">
-                          <GraduationCap className="w-3.5 h-3.5" />
-                          Ministry Assigned
-                        </span>
-                      )}
-                      {lead.puc_import_flagged && (
-                        <PucImportBadge size="md" showLabel />
-                      )}
-                      {lead.quality_tier && (
-                        <QualityTierBadge
-                          tier={lead.quality_tier}
-                          score={lead.final_weighted_score}
-                          size="sm"
-                          showLabel
-                        />
-                      )}
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] rounded"
-                          style={{
-                            background: stageGradient.from,
-                            color: stageGradient.text,
-                          }}
-                        >
-                          {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
-                          {stageInfo?.label}
-                        </span>
-                      </div>
-                    </motion.div>
-
-                  </div>
-
-                  {/* Top action buttons */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Book Appointment button */}
-                    <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                      <Link href={`/calendar?book=${lead.id}`}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 rounded-lg text-xs font-semibold text-[var(--info)] border-[var(--info)]/30 hover:bg-[var(--info)]/10 hover:border-[var(--info)]/50"
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          Appointment
-                        </Button>
-                      </Link>
-                    </motion.div>
-                    {/* Edit button */}
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowEditForm(true)}
-                        className="w-9 h-9 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)] shrink-0"
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
+                        style={{
+                          background: stageGradient.from,
+                          color: stageGradient.text,
+                        }}
                       >
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                        {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
+                        {stageInfo?.label}
+                      </span>
                     </motion.div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Action bar — moved above appointments for prominence */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.35 }}
-              className="flex items-center gap-2 mt-5 pt-5 border-t border-[var(--border-subtle)]"
-            >
+                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="self-start">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowEditForm(true)}
+                    className="h-10 w-10 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)]"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </motion.div>
+              </div>
+
+              {/* Action bar */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.35 }}
+                className="flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-4 sm:flex-row sm:items-center"
+              >
               {/* Primary CTA */}
               {lead.pipeline_stage === 'lost' && canChangeStage ? (
                 <div className="relative flex-1" ref={reactivateMenuRef}>
@@ -957,7 +859,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     onClick={() => setShowReactivateMenu(!showReactivateMenu)}
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-[var(--text-primary)] text-[var(--text-inverse)] font-medium text-sm shadow-sm hover:opacity-90 transition-all"
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--text-primary)] px-4 text-sm font-medium text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>Reactivate To</span>
@@ -995,11 +897,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               ) : null}
 
               {/* Book Appointment button */}
-              <Link href={`/calendar?book=${lead.id}`} className="flex-1">
+              <Link href={`/calendar?book=${lead.id}`} className="min-w-0 flex-1">
                 <motion.div
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--info-bg)] text-[var(--info)] hover:bg-[var(--info)]/15 ring-1 ring-[var(--info)]/20 hover:ring-[var(--info)]/40 transition-all duration-200 font-medium text-sm"
+                  className="flex h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Book Appointment</span>
@@ -1011,7 +913,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setShowCallbackScheduler(true)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 ring-1 ring-amber-200/50 hover:ring-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:hover:bg-amber-950/30 dark:ring-amber-800/30 transition-all duration-200 cursor-pointer font-medium text-sm"
+                className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
               >
                 <PhoneForwarded className="w-4 h-4" />
                 <span>Schedule Callback</span>
@@ -1023,7 +925,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setShowPSPWizard(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 ring-1 ring-purple-200/50 hover:ring-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:hover:bg-purple-950/30 dark:ring-purple-800/30 transition-all duration-200 cursor-pointer font-medium text-sm"
+                  className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
                 >
                   <FileText className="w-4 h-4" />
                   <span>PSP</span>
@@ -1038,7 +940,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowPSPSelfService(true)}
-                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-purple-50 hover:text-purple-600 ring-1 ring-[var(--border-subtle)] hover:ring-purple-200 transition-all duration-200 cursor-pointer"
+                    className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 sm:w-11 dark:hover:bg-purple-950/20"
                   >
                     <Send className="w-[18px] h-[18px]" />
                   </motion.div>
@@ -1052,22 +954,22 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowRSVPDialog(true)}
-                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-emerald-50 hover:text-emerald-600 ring-1 ring-[var(--border-subtle)] hover:ring-emerald-200 transition-all duration-200 cursor-pointer"
+                    className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-secondary)] transition-all duration-200 hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 sm:w-11 dark:hover:bg-emerald-950/20"
                   >
                     <Send className="w-[18px] h-[18px]" />
                   </motion.div>
                 </SimpleTooltip>
               )}
-            </motion.div>
+              </motion.div>
 
-            {/* Upcoming Appointments */}
-            {upcomingAppointments.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="mt-3 space-y-2"
-              >
+              {/* Upcoming Appointments */}
+              {upcomingAppointments.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-3 space-y-2"
+                >
                 {upcomingAppointments.map((apt) => (
                   <div key={apt.id}>
                     <div
@@ -1216,8 +1118,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     </AnimatePresence>
                   </div>
                 ))}
-              </motion.div>
-            )}
+                </motion.div>
+              )}
+            </div>
           </div>
         </motion.div>
 
