@@ -211,10 +211,13 @@ export default function PUCPSPPage() {
     enabled: topTab === "puc",
   })
 
-  // Self Fund leads - only fetch when Self Fund tab is active
+  // Self Fund leads — server-side stage filter so per-stage requests stay
+  // under Supabase's max_rows ceiling. The "all" tab still pulls up to limit,
+  // but individual stage tabs only fetch leads in that stage.
   const { leads: sfLeads, loading: sfLoading, refetch: sfRefetch } = useLeads({
     fundingType: "self_funded",
     searchQuery: sfSearchQuery,
+    stage: sfStageFilter !== "all" ? (sfStageFilter as PipelineStage) : "all",
     limit: 5000,
     enabled: topTab === "self_fund",
   })
@@ -977,6 +980,23 @@ export default function PUCPSPPage() {
             )}
           </div>
         </div>
+
+        {/* Truncation banner — visible on SF tab when the response likely hit the
+            Supabase max_rows ceiling. Points users at the canonical /leads
+            page which uses real pagination. */}
+        {topTab === "self_fund" && sfLeads.length >= 1000 && (
+          <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between">
+            <span>
+              Showing the first {sfLeads.length.toLocaleString()} leads in this stage. The full list is too large for this view.
+            </span>
+            <a
+              href={`/leads?fundingType=self_funded${sfStageFilter !== "all" ? `&stage=${sfStageFilter}` : ""}`}
+              className="font-medium underline hover:no-underline whitespace-nowrap ml-3"
+            >
+              View all in Leads page →
+            </a>
+          </div>
+        )}
 
         {/* Lead Table (full width) */}
         <motion.div
