@@ -207,7 +207,7 @@ export default function PUCPSPPage() {
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
     fundingType: "puc",
     searchQuery,
-    limit: 200,
+    limit: 5000,
     enabled: topTab === "puc",
   })
 
@@ -215,7 +215,7 @@ export default function PUCPSPPage() {
   const { leads: sfLeads, loading: sfLoading, refetch: sfRefetch } = useLeads({
     fundingType: "self_funded",
     searchQuery: sfSearchQuery,
-    limit: 200,
+    limit: 5000,
     enabled: topTab === "self_fund",
   })
 
