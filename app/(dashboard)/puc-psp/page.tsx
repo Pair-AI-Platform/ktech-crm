@@ -211,14 +211,15 @@ export default function PUCPSPPage() {
     enabled: topTab === "puc",
   })
 
-  // Self Fund leads — server-side stage filter so per-stage requests stay
-  // under Supabase's max_rows ceiling. The "all" tab still pulls up to limit,
-  // but individual stage tabs only fetch leads in that stage.
+  // Self Fund leads — server-side stage filter. The "all" tab is capped low
+  // because pulling 15k+ SF leads with embedded JOINs is too slow for this
+  // single-list view; users needing the full set are routed to /leads via
+  // the banner below.
   const { leads: sfLeads, loading: sfLoading, refetch: sfRefetch } = useLeads({
     fundingType: "self_funded",
     searchQuery: sfSearchQuery,
     stage: sfStageFilter !== "all" ? (sfStageFilter as PipelineStage) : "all",
-    limit: 5000,
+    limit: sfStageFilter === "all" ? 200 : 2000,
     enabled: topTab === "self_fund",
   })
 
@@ -981,13 +982,18 @@ export default function PUCPSPPage() {
           </div>
         </div>
 
-        {/* Truncation banner — visible on SF tab when the response likely hit the
-            Supabase max_rows ceiling. Points users at the canonical /leads
-            page which uses real pagination. */}
-        {topTab === "self_fund" && sfLeads.length >= 1000 && (
+        {/* Banner: routes users to /leads when this single-list view can't show
+            the full SF dataset. Shown on "all" (capped at 200 for speed) and on
+            any stage that returned >= 2000 leads (likely truncated). */}
+        {topTab === "self_fund" && !sfLoading && (
+          (sfStageFilter === "all" && sfLeads.length >= 200) ||
+          (sfStageFilter !== "all" && sfLeads.length >= 2000)
+        ) && (
           <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between">
             <span>
-              Showing the first {sfLeads.length.toLocaleString()} leads in this stage. The full list is too large for this view.
+              {sfStageFilter === "all"
+                ? `Showing ${sfLeads.length} of 15,000+ self-funded leads. Use the Leads page for the full paginated list.`
+                : `Showing the first ${sfLeads.length.toLocaleString()} leads in this stage. The full list is too large for this view.`}
             </span>
             <a
               href={`/leads?fundingType=self_funded${sfStageFilter !== "all" ? `&stage=${sfStageFilter}` : ""}`}
