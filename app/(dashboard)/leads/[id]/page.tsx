@@ -2,6 +2,7 @@
 
 import { useState, use, useRef, useEffect, useMemo } from "react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
@@ -50,31 +51,72 @@ import { useLeadAppointments, useAppointmentMutations } from "@/lib/hooks/use-ap
 import { useUser } from "@/lib/hooks/use-user"
 
 import { useLeadShortcuts } from "@/lib/hooks/use-lead-shortcuts"
-import { LeadForm } from "@/components/leads/lead-form"
 import { StudentInfoForm } from "@/components/leads/student-info-form"
-import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
-import { EnrollmentPaymentDialog } from "@/components/leads/enrollment-payment-dialog"
-import { FileFeePaymentDialog } from "@/components/leads/file-fee-payment-dialog"
-import { SFDownPaymentCard } from "@/components/leads/sf-down-payment-card"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { InlineTagSelect } from "@/components/ui/notion-tag-select"
-import { FollowUpReminders } from "@/components/leads/follow-up-reminders"
-import { CallbackScheduler } from "@/components/leads/callback-scheduler"
-import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
-import { LeadDocuments } from "@/components/leads/lead-documents"
-import { SFDocumentManager } from "@/components/leads/sf-document-manager"
-import { PUCDocumentUpload } from "@/components/leads/puc-document-upload"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
-import { PSPSubmissionWizard } from "@/components/leads/psp-submission-wizard"
-import { SendPspSelfServiceDialog } from "@/components/leads/send-psp-self-service-dialog"
-import { FileStageRequirementsDialog } from "@/components/leads/file-stage-requirements-dialog"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
 import { checkStageTransition } from "@/lib/lead-stage-guards"
+import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
+
+const LeadForm = dynamic(
+  () => import("@/components/leads/lead-form").then(m => m.LeadForm),
+  { ssr: false }
+)
+const MarkLostDialog = dynamic(
+  () => import("@/components/leads/mark-lost-dialog").then(m => m.MarkLostDialog),
+  { ssr: false }
+)
+const EnrollmentPaymentDialog = dynamic(
+  () => import("@/components/leads/enrollment-payment-dialog").then(m => m.EnrollmentPaymentDialog),
+  { ssr: false }
+)
+const FileFeePaymentDialog = dynamic(
+  () => import("@/components/leads/file-fee-payment-dialog").then(m => m.FileFeePaymentDialog),
+  { ssr: false }
+)
+const SFDownPaymentCard = dynamic(
+  () => import("@/components/leads/sf-down-payment-card").then(m => m.SFDownPaymentCard),
+  { ssr: false }
+)
+const CallbackScheduler = dynamic(
+  () => import("@/components/leads/callback-scheduler").then(m => m.CallbackScheduler),
+  { ssr: false }
+)
+const SendRSVPDialog = dynamic(
+  () => import("@/components/leads/send-rsvp-dialog").then(m => m.SendRSVPDialog),
+  { ssr: false }
+)
+const LeadDocuments = dynamic(
+  () => import("@/components/leads/lead-documents").then(m => m.LeadDocuments),
+  { ssr: false }
+)
+const SFDocumentManager = dynamic(
+  () => import("@/components/leads/sf-document-manager").then(m => m.SFDocumentManager),
+  { ssr: false }
+)
+const PUCDocumentUpload = dynamic(
+  () => import("@/components/leads/puc-document-upload").then(m => m.PUCDocumentUpload),
+  { ssr: false }
+)
+const PSPSubmissionWizard = dynamic(
+  () => import("@/components/leads/psp-submission-wizard").then(m => m.PSPSubmissionWizard),
+  { ssr: false }
+)
+const SendPspSelfServiceDialog = dynamic(
+  () => import("@/components/leads/send-psp-self-service-dialog").then(m => m.SendPspSelfServiceDialog),
+  { ssr: false }
+)
+const FileStageRequirementsDialog = dynamic(
+  () => import("@/components/leads/file-stage-requirements-dialog").then(m => m.FileStageRequirementsDialog),
+  { ssr: false }
+)
 
 // Simplified stage order for the pipeline
 const STAGE_ORDER = ["new", "contacted", "visit", "test", "application", "puc_document_submission", "puc_application_submission", "applicant", "enrolled", "withdraw", "lost"] as const
+const PUC_ONLY_STAGE_VALUES = new Set<PipelineStage>(["puc_document_submission", "puc_application_submission"])
 
 
 // Note types for activity feed
@@ -294,6 +336,17 @@ const STAGE_GRADIENT: Record<string, { from: string; to: string; text: string }>
   puc_decision: { from: 'var(--success)', to: 'var(--success)', text: 'white' },
 }
 
+function getLowGpaValue(lead: Lead): number | null {
+  const gpaValues = [
+    lead.actual_gpa,
+    lead.gpa_grade_10,
+    lead.gpa_grade_11,
+    lead.gpa_grade_12_expected,
+  ]
+
+  return gpaValues.find((gpa): gpa is number => gpa !== undefined && gpa !== null && gpa < GPA_SELF_FUNDED_THRESHOLD) ?? null
+}
+
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const searchParams = useSearchParams()
@@ -318,6 +371,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const statusDropdownRef = useRef<HTMLDivElement>(null)
+  const autoSelfFundedLeadIdsRef = useRef<Set<string>>(new Set())
 
   // Get the stage filter from URL params for back navigation
   const stageFromUrl = searchParams.get('stage') as PipelineStage | null
@@ -348,6 +402,27 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [rescheduleDate, setRescheduleDate] = useState("")
   const [rescheduleTime, setRescheduleTime] = useState("")
   const [rescheduling, setRescheduling] = useState(false)
+
+  useEffect(() => {
+    if (!lead || lead.funding_type !== "puc" || autoSelfFundedLeadIdsRef.current.has(lead.id)) return
+
+    const lowGpa = getLowGpaValue(lead)
+    if (lowGpa === null) return
+
+    autoSelfFundedLeadIdsRef.current.add(lead.id)
+    const updates: Partial<Lead> = { funding_type: "self_funded" }
+    if (PUC_ONLY_STAGE_VALUES.has(lead.pipeline_stage)) {
+      updates.pipeline_stage = "application"
+    }
+
+    updateLead(lead.id, updates).then((result) => {
+      if (result.error) {
+        autoSelfFundedLeadIdsRef.current.delete(lead.id)
+        return
+      }
+      refetchLead()
+    })
+  }, [lead, updateLead, refetchLead])
   const { updateAppointment } = useAppointmentMutations()
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -748,13 +823,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       />
 
       <motion.div
-        className="w-full px-4 sm:px-6 pb-32"
+        className="w-full px-4 sm:px-6 pb-24"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
       >
         {/* Back Link */}
-        <div className="pt-3 pb-4">
+        <div className="pt-2 pb-3">
           <Link
             href={backUrl}
             className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors group"
@@ -766,81 +841,90 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Profile header */}
         <motion.div
-          data-lead-header-version="clean-profile-v1"
+          data-lead-header-version="clean-profile-v2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
           className={cn(
-            "relative rounded-lg bg-[var(--bg-surface)] border",
+            "relative overflow-hidden rounded-lg border bg-[var(--bg-surface)]",
             lead.priority === 'critical'
               ? "border-red-500/40 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]"
               : "border-[var(--border)]"
           )}
           style={{ boxShadow: lead.priority !== 'critical' ? 'var(--shadow-card)' : undefined }}
         >
-          <div className="relative px-5 py-5 sm:px-6 sm:py-6">
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-4">
+          <div className="relative p-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
                   <motion.div
                     className="relative shrink-0"
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 400, damping: 25 }}
                   >
                     <div
-                      data-lead-avatar-version="profile-bust-v4"
+                      data-lead-avatar-version="profile-bust-v5"
                       role="img"
                       aria-label={`${lead.gender?.toLowerCase() === 'female' ? 'Female' : lead.gender?.toLowerCase() === 'male' ? 'Male' : 'Lead'} profile`}
-                      className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-950/25 dark:text-blue-300"
+                      className={cn(
+                        "relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border shadow-sm sm:h-16 sm:w-16",
+                        lead.gender?.toLowerCase() === 'female'
+                          ? "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/25 dark:text-fuchsia-300"
+                          : "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/25 dark:text-blue-300"
+                      )}
                     >
                       <StickFigureAvatar gender={lead.gender} />
                     </div>
                   </motion.div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <motion.div
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.15 }}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                      className="space-y-1.5"
                     >
-                      <h1 className="text-2xl sm:text-[1.75rem] font-semibold text-[var(--text-primary)] leading-tight" dir="auto">
-                        {getLeadDisplayName(lead)}
-                      </h1>
-                      {lead.priority === 'critical' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide rounded bg-red-500/15 text-red-600 dark:text-red-400 ring-1 ring-red-500/25 animate-pulse">
-                          <Flame className="w-3.5 h-3.5" />
-                          CRITICAL
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <h1 className="text-2xl font-semibold leading-tight text-[var(--text-primary)]" dir="auto">
+                          {getLeadDisplayName(lead)}
+                        </h1>
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
+                          style={{
+                            background: stageGradient.from,
+                            color: stageGradient.text,
+                          }}
+                        >
+                          {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
+                          {stageInfo?.label}
                         </span>
-                      )}
-                      {lead.priority === 'important' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/25">
-                          <Star className="w-3.5 h-3.5" />
-                          Important
-                        </span>
-                      )}
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
-                        style={{
-                          background: stageGradient.from,
-                          color: stageGradient.text,
-                        }}
-                      >
-                        {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
-                        {stageInfo?.label}
-                      </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {lead.priority === 'critical' && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-500/20 dark:text-red-400">
+                            <Flame className="w-3.5 h-3.5" />
+                            Critical
+                          </span>
+                        )}
+                        {lead.priority === 'important' && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
+                            <Star className="w-3.5 h-3.5" />
+                            Important
+                          </span>
+                        )}
+                      </div>
                     </motion.div>
                   </div>
                 </div>
 
-                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="self-start">
+                <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="self-start">
                   <Button
-                    variant="ghost"
-                    size="icon"
+                    variant="outline"
                     onClick={() => setShowEditForm(true)}
-                    className="h-10 w-10 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sunken)]"
+                    className="h-9 gap-2 rounded-lg border-[var(--border)] px-3 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] hover:text-[var(--text-primary)]"
                   >
                     <Edit className="w-4 h-4" />
+                    <span>Edit Profile</span>
                   </Button>
                 </motion.div>
               </div>
@@ -850,16 +934,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.35 }}
-                className="flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-4 sm:flex-row sm:items-center"
+                className="grid grid-flow-col auto-cols-[minmax(160px,1fr)] gap-2 overflow-x-auto border-t border-[var(--border-subtle)] pt-3 [scrollbar-width:none] xl:grid-flow-row xl:grid-cols-5 xl:auto-cols-auto xl:overflow-visible [&::-webkit-scrollbar]:hidden"
               >
               {/* Primary CTA */}
               {lead.pipeline_stage === 'lost' && canChangeStage ? (
-                <div className="relative flex-1" ref={reactivateMenuRef}>
+                <div className="relative" ref={reactivateMenuRef}>
                   <motion.button
                     onClick={() => setShowReactivateMenu(!showReactivateMenu)}
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--text-primary)] px-4 text-sm font-medium text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--text-primary)] px-3 text-sm font-semibold text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>Reactivate To</span>
@@ -897,11 +981,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               ) : null}
 
               {/* Book Appointment button */}
-              <Link href={`/calendar?book=${lead.id}`} className="min-w-0 flex-1">
+              <Link href={`/calendar?book=${lead.id}`} className="min-w-0">
                 <motion.div
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
+                  className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Book Appointment</span>
@@ -913,7 +997,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setShowCallbackScheduler(true)}
-                className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
+                className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
               >
                 <PhoneForwarded className="w-4 h-4" />
                 <span>Schedule Callback</span>
@@ -925,7 +1009,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setShowPSPWizard(true)}
-                  className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
+                  className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
                 >
                   <FileText className="w-4 h-4" />
                   <span>PSP</span>
@@ -935,16 +1019,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               {/* PSP self-service link button — admin/agent generates a public link
                   the student fills out themselves. Only PUC-funded leads. */}
               {lead.funding_type !== 'self_funded' && (
-                <SimpleTooltip content="Send PSP self-service link" side="bottom">
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowPSPSelfService(true)}
-                    className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 sm:w-11 dark:hover:bg-purple-950/20"
-                  >
-                    <Send className="w-[18px] h-[18px]" />
-                  </motion.div>
-                </SimpleTooltip>
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowPSPSelfService(true)}
+                  className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Send PSP Link</span>
+                </motion.div>
               )}
 
               {/* RSVP button - only for applicants */}
@@ -954,9 +1037,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowRSVPDialog(true)}
-                    className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] text-[var(--text-secondary)] transition-all duration-200 hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 sm:w-11 dark:hover:bg-emerald-950/20"
+                    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
                   >
-                    <Send className="w-[18px] h-[18px]" />
+                    <Send className="w-4 h-4" />
+                    <span>Send RSVP</span>
                   </motion.div>
                 </SimpleTooltip>
               )}
@@ -1130,25 +1214,25 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mt-6 bg-[var(--bg-surface)] border border-[var(--border)] rounded-3xl overflow-hidden"
+          className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)]"
         >
           {/* Header */}
-          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+                className="flex h-8 w-8 items-center justify-center rounded-lg shadow-sm"
                 style={{ background: `linear-gradient(135deg, ${stageGradient.from}, ${stageGradient.to})` }}
               >
                 {updatingStage ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-white" />
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
                 ) : lead.pipeline_stage === 'lost' ? (
-                  <XCircle className="w-5 h-5 text-white" />
+                  <XCircle className="h-4 w-4 text-white" />
                 ) : (
-                  <span className="text-white font-bold">{currentStageIndex + 1}</span>
+                  <span className="text-sm font-bold text-white">{currentStageIndex + 1}</span>
                 )}
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--text-primary)]">{stageInfo?.label}</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{stageInfo?.label}</h3>
                 <p className="text-xs text-[var(--text-muted)]">
                   {lead.pipeline_stage === 'lost' ? 'Lead lost' :
                    `Stage ${currentStageIndex + 1} of ${activeStageOrder.length}`}
@@ -1166,10 +1250,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* Pipeline Steps */}
-          <div className="p-5">
+          <div className="px-4 py-4">
             <div className="relative">
               {/* Progress Line — spans center-to-center of first and last circles */}
-              <div className="absolute top-5 left-5 right-5 h-1 bg-[var(--bg-sunken)] rounded-full overflow-hidden">
+              <div className="absolute left-4 right-4 top-4 h-0.5 overflow-hidden rounded-full bg-[var(--bg-sunken)]">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: `linear-gradient(90deg, ${stageGradient.from}, ${stageGradient.to})` }}
@@ -1219,7 +1303,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                         {/* Node Circle */}
                         <div
                           className={cn(
-                            "relative w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                            "relative flex h-8 w-8 items-center justify-center rounded-full transition-all",
                             isCompleted || isCurrentStage
                               ? "shadow-lg"
                               : "bg-[var(--bg-sunken)] border-2 border-[var(--border)]"
@@ -1231,15 +1315,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           }}
                         >
                           {isCompleted ? (
-                            <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                            <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
                           ) : isCurrentStage ? (
                             <motion.div
-                              className="w-3 h-3 rounded-full bg-white"
+                              className="h-2.5 w-2.5 rounded-full bg-white"
                               animate={{ scale: [1, 1.2, 1] }}
                               transition={{ duration: 1.5, repeat: Infinity }}
                             />
                           ) : (
-                            <span className="text-xs font-medium text-[var(--text-muted)]">{idx + 1}</span>
+                            <span className="text-[10px] font-medium text-[var(--text-muted)]">{idx + 1}</span>
                           )}
 
                           {/* Drop-off indicator */}
@@ -1253,7 +1337,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                         {/* Stage Label */}
                         <span
                           className={cn(
-                            "mt-2 text-[10px] font-medium whitespace-nowrap transition-colors",
+                              "mt-1.5 whitespace-nowrap text-[9px] font-medium transition-colors",
                             isCompleted || isCurrentStage
                               ? "text-[var(--text-primary)]"
                               : "text-[var(--text-muted)]"
@@ -1271,7 +1355,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Status selector — linked to stage */}
           {availableStatuses.length > 0 && (
-            <div className="px-5 py-3 border-t border-[var(--border)]">
+            <div className="border-t border-[var(--border)] px-4 py-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-[var(--text-muted)] shrink-0">Status</span>
                 <div className="flex flex-wrap items-center gap-1.5" ref={statusDropdownRef}>
@@ -1351,7 +1435,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="mt-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-3xl overflow-hidden"
+          className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)]"
         >
           {/* Tab Headers */}
           <div className="flex border-b border-[var(--border)]">
@@ -1364,7 +1448,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-colors relative",
+                  "relative flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
                   activeTab === tab.id
                     ? "text-[var(--text-primary)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -1390,7 +1474,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
-                className="p-5"
+                className="p-4"
               >
                 <StudentInfoForm
                   lead={lead}
@@ -1407,7 +1491,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
-                className="p-5"
+                className="p-4"
               >
                 {lead.funding_type === 'self_funded' ? (
                   <SFDocumentManager lead={lead} onUpdate={() => refetchLead()} />
@@ -1433,7 +1517,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
-                className="p-5"
+                className="p-4"
               >
                 {/* Filter Pills */}
                 <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
@@ -1543,105 +1627,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </AnimatePresence>
         </motion.div>
 
-        {/* Follow-up Reminders */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="mt-4"
-        >
-          <FollowUpReminders leadId={lead.id} agentId={profile?.id} />
-        </motion.div>
-
-        {/* Quick Notes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-3xl overflow-hidden"
-        >
-          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <StickyNote className="w-5 h-5 text-amber-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-[var(--text-primary)]">Notes</h3>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {parsedNotes.length > 0 ? `${parsedNotes.length} note${parsedNotes.length !== 1 ? 's' : ''}` : 'No notes yet'}
-                </p>
-              </div>
-            </div>
-            {parsedNotes.length > 3 && (
-              <button
-                onClick={() => setActiveTab('activity')}
-                className="text-xs text-[var(--primary)] hover:underline font-medium"
-              >
-                View all
-              </button>
-            )}
-          </div>
-          <div className="p-5">
-            {/* Add Note Input */}
-            <div className="flex items-end gap-2 mb-4">
-              <Textarea
-                placeholder="Add a quick note..."
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="flex-1 min-h-[60px] resize-none text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    handleAddNote()
-                  }
-                }}
-              />
-              <Button
-                onClick={handleAddNote}
-                disabled={!newNote.trim() || mutationLoading}
-                size="sm"
-                className="shrink-0 h-10 w-10 p-0"
-              >
-                {mutationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
-            </div>
-
-            {/* Recent Notes */}
-            {parsedNotes.length > 0 ? (
-              <div className="space-y-2">
-                {parsedNotes.slice(0, 3).map((note) => {
-                  const config = NOTE_TYPE_CONFIG[note.type] || NOTE_TYPE_CONFIG.note
-                  const NoteIcon = config.icon
-                  return (
-                    <div
-                      key={note.id}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-[var(--bg-sunken)]"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-hover)] flex items-center justify-center shrink-0">
-                        <NoteIcon className={cn("w-3.5 h-3.5", config.color)} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] text-[var(--text-muted)]">{note.timestamp}</span>
-                          {note.createdByName && (
-                            <>
-                              <span className="text-[10px] text-[var(--text-muted)]">·</span>
-                              <span className="text-[10px] text-[var(--text-primary)] font-medium">{note.createdByName}</span>
-                            </>
-                          )}
-                        </div>
-                        <p className="text-sm text-[var(--text-primary)] line-clamp-2">{note.content}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-xs text-[var(--text-muted)]">Add your first note above</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
       </motion.div>
 
       {/* Edit Form Modal */}
@@ -1659,56 +1644,64 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       </AnimatePresence>
 
       {/* Mark Lost Dialog */}
-      <MarkLostDialog
-        open={showLostDialog}
-        onOpenChange={setShowLostDialog}
-        leadName={getLeadDisplayName(lead)}
-        onConfirm={async (reasonId, notes) => {
-          await updateLeadStage(lead.id, 'lost', reasonId, notes)
-          await refetchLead()
-        }}
-      />
+      {showLostDialog && (
+        <MarkLostDialog
+          open={showLostDialog}
+          onOpenChange={setShowLostDialog}
+          leadName={getLeadDisplayName(lead)}
+          onConfirm={async (reasonId, notes) => {
+            await updateLeadStage(lead.id, 'lost', reasonId, notes)
+            await refetchLead()
+          }}
+        />
+      )}
 
-      <FileStageRequirementsDialog
-        open={fileRequirementsMissingFields.length > 0}
-        onOpenChange={(open) => {
-          if (!open) setFileRequirementsMissingFields([])
-        }}
-        lead={lead}
-        missingFields={fileRequirementsMissingFields}
-        onFillRequiredFields={() => {
-          setFileRequirementsMissingFields([])
-          if (lead.funding_type === "self_funded") {
-            setShowEditForm(true)
-          } else {
-            setShowPSPWizard(true)
-          }
-        }}
-      />
+      {fileRequirementsMissingFields.length > 0 && (
+        <FileStageRequirementsDialog
+          open={fileRequirementsMissingFields.length > 0}
+          onOpenChange={(open) => {
+            if (!open) setFileRequirementsMissingFields([])
+          }}
+          lead={lead}
+          missingFields={fileRequirementsMissingFields}
+          onFillRequiredFields={() => {
+            setFileRequirementsMissingFields([])
+            if (lead.funding_type === "self_funded") {
+              setShowEditForm(true)
+            } else {
+              setShowPSPWizard(true)
+            }
+          }}
+        />
+      )}
 
       {/* File Fee Payment Dialog */}
-      <FileFeePaymentDialog
-        open={showFileFeeDialog}
-        onOpenChange={setShowFileFeeDialog}
-        lead={lead}
-        onSuccess={async () => {
-          await refetchLead()
-        }}
-      />
+      {showFileFeeDialog && (
+        <FileFeePaymentDialog
+          open={showFileFeeDialog}
+          onOpenChange={setShowFileFeeDialog}
+          lead={lead}
+          onSuccess={async () => {
+            await refetchLead()
+          }}
+        />
+      )}
 
       {/* Enrollment Payment Dialog */}
-      <EnrollmentPaymentDialog
-        open={showEnrollmentDialog}
-        onOpenChange={setShowEnrollmentDialog}
-        lead={lead}
-        mode="enrollment"
-        onSuccess={async () => {
-          await refetchLead()
-        }}
-      />
+      {showEnrollmentDialog && (
+        <EnrollmentPaymentDialog
+          open={showEnrollmentDialog}
+          onOpenChange={setShowEnrollmentDialog}
+          lead={lead}
+          mode="enrollment"
+          onSuccess={async () => {
+            await refetchLead()
+          }}
+        />
+      )}
 
       {/* PSP Submission Wizard - only for PUC-funded leads */}
-      {lead.funding_type !== 'self_funded' && (
+      {lead.funding_type !== 'self_funded' && showPSPWizard && (
         <PSPSubmissionWizard
           isOpen={showPSPWizard}
           onClose={() => setShowPSPWizard(false)}
@@ -1721,7 +1714,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       )}
 
       {/* PSP self-service link dialog */}
-      {lead.funding_type !== 'self_funded' && (
+      {lead.funding_type !== 'self_funded' && showPSPSelfService && (
         <SendPspSelfServiceDialog
           isOpen={showPSPSelfService}
           onClose={() => setShowPSPSelfService(false)}
@@ -1730,7 +1723,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       )}
 
       {/* Send RSVP Dialog */}
-      {lead && (
+      {showRSVPDialog && (
         <SendRSVPDialog
           isOpen={showRSVPDialog}
           onClose={() => setShowRSVPDialog(false)}
@@ -1740,15 +1733,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       )}
 
       {/* Callback Scheduler */}
-      <CallbackScheduler
-        isOpen={showCallbackScheduler}
-        onClose={() => setShowCallbackScheduler(false)}
-        lead={lead}
-        onUpdateLead={async (id, updates) => {
-          await updateLead(id, updates)
-        }}
-        onSuccess={() => refetchLead()}
-      />
+      {showCallbackScheduler && (
+        <CallbackScheduler
+          isOpen={showCallbackScheduler}
+          onClose={() => setShowCallbackScheduler(false)}
+          lead={lead}
+          onUpdateLead={async (id, updates) => {
+            await updateLead(id, updates)
+          }}
+          onSuccess={() => refetchLead()}
+        />
+      )}
 
     </div>
   )

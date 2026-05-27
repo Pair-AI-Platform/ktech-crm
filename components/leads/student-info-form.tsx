@@ -72,6 +72,7 @@ import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { formatDate } from "@/lib/utils"
 import { compareSchoolsBySearch, schoolMatchesSearch } from "@/lib/schools/search"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
+import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 
 const SOURCE_CATEGORIES: { value: string; label: string; description: string; icon: LucideIcon }[] = [
   { value: "direct", label: "Direct", description: "Walk-ins and calls", icon: Phone },
@@ -81,14 +82,14 @@ const SOURCE_CATEGORIES: { value: string; label: string; description: string; ic
   { value: "outreach", label: "Outreach", description: "Campaign follow-up", icon: Send },
 ]
 
-const sectionBodyClass = "space-y-5 border-t border-[var(--border-subtle)] px-4 py-5 sm:px-5"
-const fieldGridClass = "grid grid-cols-1 gap-4 xl:grid-cols-2"
+const sectionBodyClass = "space-y-3 border-t border-[var(--border-subtle)] px-3 py-4 sm:px-4"
+const fieldGridClass = "grid grid-cols-1 gap-3 lg:grid-cols-2"
 
 function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <section
       className={cn(
-        "rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)]",
+        "rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)]",
         "transition-colors duration-150 hover:border-[var(--border-emphasis)]",
         className
       )}
@@ -108,7 +109,7 @@ function SectionHeader({ icon: Icon, title, description, open, onToggle, trailin
   iconBg?: string
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 p-4 sm:p-5">
+    <div className="flex items-start justify-between gap-3 p-3 sm:p-4">
       <button
         type="button"
         onClick={onToggle}
@@ -152,19 +153,18 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
   const [nationalitySearch, setNationalitySearch] = useState("")
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
-  const [hasGpaError, setHasGpaError] = useState(false)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [declarationSent, setDeclarationSent] = useState(false)
 
   // Collapsible sections
-  const [placementOpen, setPlacementOpen] = useState(true)
+  const [placementOpen, setPlacementOpen] = useState(false)
   const [personalOpen, setPersonalOpen] = useState(true)
   const [contactOpen, setContactOpen] = useState(true)
-  const [sourceOpen, setSourceOpen] = useState(true)
+  const [sourceOpen, setSourceOpen] = useState(false)
   const [academicOpen, setAcademicOpen] = useState(true)
-  const [discountOpen, setDiscountOpen] = useState(true)
-  const [ministryOpen, setMinistryOpen] = useState(true)
-  const [notesOpen, setNotesOpen] = useState(true)
+  const [discountOpen, setDiscountOpen] = useState(false)
+  const [ministryOpen, setMinistryOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
 
   // Source change history from activities
   const sourceHistory = useMemo(() => {
@@ -323,20 +323,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     ? dbSources.filter(s => !formData.source_category || s.category === formData.source_category)
     : LEAD_SOURCES.filter(s => !formData.source_category || s.category === formData.source_category)
 
-  // Check GPA and set error state (only for PUC)
-  useEffect(() => {
-    if (formData.funding_type === 'puc') {
-      const gpaValue = parseFloat(formData.actual_gpa)
-      if (formData.actual_gpa && !isNaN(gpaValue) && gpaValue < 70) {
-        setHasGpaError(true)
-      } else {
-        setHasGpaError(false)
-      }
-    } else {
-      setHasGpaError(false)
-    }
-  }, [formData.actual_gpa, formData.funding_type])
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -374,8 +360,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         const gpaValue = parseFloat(formData.actual_gpa)
         if (isNaN(gpaValue) || gpaValue < 0 || gpaValue > 100) {
           newErrors.actual_gpa = "GPA must be between 0 and 100"
-        } else if (gpaValue < 70) {
-          newErrors.actual_gpa = "GPA must be 70% or higher for PUC"
         }
       }
     }
@@ -441,6 +425,14 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       ministry_blocked: formData.ministry_blocked,
       ministry_block_reasons: formData.ministry_blocked ? formData.ministry_block_reasons : [],
     } as Partial<Lead>
+
+    const actualGpa = leadData.actual_gpa
+    if (actualGpa !== undefined && actualGpa < GPA_SELF_FUNDED_THRESHOLD) {
+      leadData.funding_type = 'self_funded'
+      if (lead.pipeline_stage === 'puc_document_submission' || lead.pipeline_stage === 'puc_application_submission') {
+        leadData.pipeline_stage = 'application'
+      }
+    }
 
     const result = await updateLead(lead.id, leadData)
 
@@ -516,7 +508,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const requiredCompletedCount = requiredFields.filter(field => field.complete).length
 
   return (
-    <div className="mx-auto max-w-[1380px] space-y-4 pb-6">
+    <div className="mx-auto max-w-[1380px] space-y-3 pb-4">
       {errors.submit && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -525,23 +517,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
           {errors.submit}
-        </motion.div>
-      )}
-
-      {/* GPA Warning Banner (PUC only) */}
-      {hasGpaError && formData.funding_type === 'puc' && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
-        >
-          <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center shrink-0">
-            <AlertCircle className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="font-semibold text-red-700 dark:text-red-400">GPA Too Low</p>
-            <p className="text-sm text-red-600 dark:text-red-400">GPA must be 70% or higher to proceed with PUC scholarship. Current GPA: {formData.actual_gpa}%</p>
-          </div>
         </motion.div>
       )}
 
@@ -556,7 +531,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         />
       )}
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 shadow-[var(--shadow-card)] sm:px-5">
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5 shadow-[var(--shadow-card)] sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-sunken)] text-[var(--text-secondary)]">
@@ -776,7 +751,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     key={key}
                     onClick={() => setFormData(prev => ({ ...prev, [key]: !prev[key] }))}
                     className={cn(
-                      "group flex min-h-[68px] items-center gap-3 rounded-lg border p-3 cursor-pointer transition-all",
+                      "group flex min-h-[54px] items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-all",
                       formData[key]
                         ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
                         : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
@@ -937,7 +912,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         handleChange("source", categoryMap[cat.value] || "")
                       }}
                       className={cn(
-                        "flex min-h-[72px] items-center gap-3 rounded-lg border p-3 text-left transition-all",
+                        "flex min-h-[58px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all",
                         selected
                           ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
                           : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
@@ -1162,7 +1137,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                       }
                     }}
                     className={cn(
-                      "relative flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-lg border p-3 text-center transition-all",
+                      "relative flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center transition-all",
                       formData.education_type === type.value
                         ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
                         : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
@@ -1215,7 +1190,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     type="button"
                     onClick={() => handleChange("grade_level", formData.grade_level === grade.value ? "" : grade.value)}
                     className={cn(
-                      "flex items-center justify-center p-3 rounded-xl border transition-all text-sm font-bold",
+                      "flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold transition-all",
                       formData.grade_level === grade.value
                         ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
                         : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
@@ -1235,7 +1210,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   type="button"
                   onClick={() => handleChange("funding_type", "self_funded")}
                   className={cn(
-                    "flex min-h-[78px] items-center gap-3 rounded-lg border p-4 text-left transition-all",
+                    "flex min-h-[58px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all",
                     formData.funding_type === "self_funded"
                       ? "border-[var(--primary)] bg-[var(--primary-muted)]"
                       : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
@@ -1258,7 +1233,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   type="button"
                   onClick={() => handleChange("funding_type", "puc")}
                   className={cn(
-                    "flex min-h-[78px] items-center gap-3 rounded-lg border p-4 text-left transition-all",
+                    "flex min-h-[58px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all",
                     formData.funding_type === "puc"
                       ? "border-[var(--accent)] bg-[var(--accent)]/10"
                       : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
@@ -1389,9 +1364,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     value={formData.actual_gpa}
                     onChange={(e) => handleChange("actual_gpa", e.target.value)}
                     placeholder="e.g. 82"
-                    className={cn(
-                      hasGpaError && "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:ring-red-500/20"
-                    )}
                     error={errors.actual_gpa}
                   />
                   {errors.actual_gpa && <p className="text-xs text-[var(--error)]">{errors.actual_gpa}</p>}
@@ -1567,7 +1539,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     <div
                       key={level.value}
                       className={cn(
-                        "flex flex-col items-center gap-1 p-4 rounded-xl border text-center transition-all",
+                        "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-all",
                         isActive
                           ? "border-[var(--primary)] bg-[var(--primary-muted)] ring-2 ring-[var(--primary)]/20"
                           : "border-[var(--border)] opacity-50"
@@ -1894,7 +1866,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           </div>
         <Button
           onClick={handleSubmit}
-          disabled={loading || (hasGpaError && formData.funding_type === 'puc')}
+          disabled={loading}
           className="w-full sm:w-auto sm:min-w-[180px]"
         >
           {loading ? (
@@ -1910,11 +1882,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           )}
         </Button>
         </div>
-        {hasGpaError && formData.funding_type === 'puc' && (
-          <p className="text-xs text-center text-red-500 mt-2">
-            Cannot save - GPA must be 70% or higher for PUC
-          </p>
-        )}
       </div>
     </div>
   )

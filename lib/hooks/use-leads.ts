@@ -73,7 +73,6 @@ interface UseLeadsOptions {
   enabled?: boolean
 }
 
-type LeadStatsRow = Pick<Lead, "created_at" | "pipeline_stage" | "funding_type">
 type BulkStageLeadSnapshot = {
   pipeline_stage: PipelineStage
   first_name?: string | null
@@ -82,6 +81,7 @@ type BulkStageLeadSnapshot = {
   civil_id?: string | null
   education_type?: string | null
 }
+const PUC_ONLY_STAGES = new Set<PipelineStage>(["puc_document_submission", "puc_application_submission"])
 
 export function useLeads(options: UseLeadsOptions = {}) {
   const { stage = "all", fundingType = "all", searchQuery = "", limit = 50, page, pageSize = 25, filters: advancedFilters, enabled = true } = options
@@ -159,6 +159,9 @@ export function useLeads(options: UseLeadsOptions = {}) {
     },
     staleTime: 30_000,
     enabled,
+    // Keep showing the previous result during refetch so filter/page changes
+    // don't blank out the table — feels instant instead of "loading…".
+    placeholderData: (prev) => prev,
   })
 
   // Subscribe to real-time changes (only in non-demo mode)
@@ -182,8 +185,10 @@ export function useLeads(options: UseLeadsOptions = {}) {
           ...(filter ? { filter } : {}),
         },
         () => {
-          // Only invalidate on new leads — updates are handled in-place by mutations
-          queryClient.invalidateQueries({ queryKey: queryKeys.leads.all })
+          // Only invalidate list queries — leaves single-lead detail caches alone
+          // and avoids blowing away the stats query on every insert.
+          queryClient.invalidateQueries({ queryKey: queryKeys.leads.lists() })
+          queryClient.invalidateQueries({ queryKey: queryKeys.leads.stats() })
         }
       )
       .subscribe()
@@ -253,10 +258,12 @@ export function useLead(id: string) {
 
 // Helper function to check if lead should be automatically set to self-funded based on GPA
 function shouldBeAutoSelfFunded(leadData: Partial<Lead>): boolean {
+  const actualGpa = leadData.actual_gpa
   const gpa10 = leadData.gpa_grade_10
   const gpa11 = leadData.gpa_grade_11
   const gpa12 = leadData.gpa_grade_12_expected
 
+  if (actualGpa !== undefined && actualGpa !== null && actualGpa < GPA_SELF_FUNDED_THRESHOLD) return true
   if (gpa10 !== undefined && gpa10 !== null && gpa10 < GPA_SELF_FUNDED_THRESHOLD) return true
   if (gpa11 !== undefined && gpa11 !== null && gpa11 < GPA_SELF_FUNDED_THRESHOLD) return true
   if (gpa12 !== undefined && gpa12 !== null && gpa12 < GPA_SELF_FUNDED_THRESHOLD) return true
@@ -334,13 +341,14 @@ export function useLeadMutations() {
 
       // Auto-set funding_type to self_funded if any GPA is below 70
       const finalLeadData = { ...leadData }
-      if (shouldBeAutoSelfFunded(finalLeadData)) {
+      const shouldAutoSelfFund = shouldBeAutoSelfFunded(finalLeadData)
+      if (shouldAutoSelfFund) {
         finalLeadData.funding_type = 'self_funded'
       }
 
       // Auto-route to PUC PSP if all conditions are met
       const shouldRouteToPuc = shouldAutoRouteToPucPsp(finalLeadData)
-      if (shouldRouteToPuc && finalLeadData.funding_type !== 'puc') {
+      if (!shouldAutoSelfFund && shouldRouteToPuc && finalLeadData.funding_type !== 'puc') {
         finalLeadData.funding_type = 'puc'
       }
 
@@ -374,7 +382,7 @@ export function useLeadMutations() {
       if (error) throw new Error(error.message)
 
       // Log activity for auto PUC PSP routing
-      if (shouldRouteToPuc && data) {
+      if (!shouldAutoSelfFund && shouldRouteToPuc && data) {
         await supabase.from('activities').insert({
           lead_id: data.id,
           activity_type: 'funding_type_change',
@@ -423,6 +431,24 @@ export function useLeadMutations() {
       // Demo mode - save to localStorage and simulate success
       if (isDemoMode()) {
         await new Promise(resolve => setTimeout(resolve, 300))
+        const oldDemoLead = getDemoLeadById(id)
+        if (oldDemoLead && oldDemoLead.funding_type !== 'self_funded') {
+          const mergedDemoGpaData = {
+            actual_gpa: updates.actual_gpa ?? oldDemoLead.actual_gpa,
+            gpa_grade_10: updates.gpa_grade_10 ?? oldDemoLead.gpa_grade_10,
+            gpa_grade_11: updates.gpa_grade_11 ?? oldDemoLead.gpa_grade_11,
+            gpa_grade_12_expected: updates.gpa_grade_12_expected ?? oldDemoLead.gpa_grade_12_expected,
+          }
+          if (shouldBeAutoSelfFunded(mergedDemoGpaData)) {
+            updates.funding_type = 'self_funded'
+            if (PUC_ONLY_STAGES.has(oldDemoLead.pipeline_stage as PipelineStage)) {
+              updates.pipeline_stage = 'application'
+            }
+          }
+        }
+        if (oldDemoLead && updates.funding_type === 'self_funded' && PUC_ONLY_STAGES.has(oldDemoLead.pipeline_stage as PipelineStage)) {
+          updates.pipeline_stage = 'application'
+        }
         saveDemoLeadUpdate(id, updates)
         const updatedLead = getDemoLeadById(id)
         return { data: updatedLead || { id, ...updates } as Lead, error: null }
@@ -448,6 +474,7 @@ export function useLeadMutations() {
 
       // Auto-set funding_type to self_funded if any GPA (new or existing) is below 70
       const mergedGpaData = {
+        actual_gpa: updates.actual_gpa ?? oldLead?.actual_gpa,
         gpa_grade_10: updates.gpa_grade_10 ?? oldLead?.gpa_grade_10,
         gpa_grade_11: updates.gpa_grade_11 ?? oldLead?.gpa_grade_11,
         gpa_grade_12_expected: updates.gpa_grade_12_expected ?? oldLead?.gpa_grade_12_expected,
@@ -455,6 +482,13 @@ export function useLeadMutations() {
       const wasAutoSF = shouldBeAutoSelfFunded(mergedGpaData) && oldLead?.funding_type !== 'self_funded'
       if (wasAutoSF) {
         updates.funding_type = 'self_funded'
+        if (oldLead?.pipeline_stage && PUC_ONLY_STAGES.has(oldLead.pipeline_stage as PipelineStage)) {
+          updates.pipeline_stage = 'application'
+        }
+      }
+
+      if (updates.funding_type === 'self_funded' && oldLead?.pipeline_stage && PUC_ONLY_STAGES.has(oldLead.pipeline_stage as PipelineStage)) {
+        updates.pipeline_stage = 'application'
       }
 
       // Auto-route to PUC PSP if all conditions are met (merge updates with old lead data)
@@ -467,7 +501,7 @@ export function useLeadMutations() {
         is_employee: updates.is_employee ?? oldLead?.is_employee,
       }
       const currentFundingType = updates.funding_type ?? oldLead?.funding_type
-      const wasAutoRoutedToPuc = shouldAutoRouteToPucPsp(mergedLeadForPuc) && currentFundingType !== 'puc'
+      const wasAutoRoutedToPuc = !wasAutoSF && shouldAutoRouteToPucPsp(mergedLeadForPuc) && currentFundingType !== 'puc'
       if (wasAutoRoutedToPuc) {
         updates.funding_type = 'puc'
       }
@@ -640,6 +674,9 @@ export function useLeadMutations() {
       // Log activity for automatic funding type change due to low GPA
       if (wasAutoSF && oldLead) {
         const lowGpaValues: string[] = []
+        if (mergedGpaData.actual_gpa !== undefined && mergedGpaData.actual_gpa !== null && mergedGpaData.actual_gpa < GPA_SELF_FUNDED_THRESHOLD) {
+          lowGpaValues.push(`Actual GPA: ${mergedGpaData.actual_gpa}`)
+        }
         if (mergedGpaData.gpa_grade_10 !== undefined && mergedGpaData.gpa_grade_10 !== null && mergedGpaData.gpa_grade_10 < GPA_SELF_FUNDED_THRESHOLD) {
           lowGpaValues.push(`Grade 10: ${mergedGpaData.gpa_grade_10}`)
         }
@@ -659,6 +696,7 @@ export function useLeadMutations() {
             old_funding_type: oldLead.funding_type,
             new_funding_type: 'self_funded',
             reason: 'gpa_below_70',
+            actual_gpa: mergedGpaData.actual_gpa,
             gpa_grade_10: mergedGpaData.gpa_grade_10,
             gpa_grade_11: mergedGpaData.gpa_grade_11,
             gpa_grade_12_expected: mergedGpaData.gpa_grade_12_expected,
@@ -1077,52 +1115,57 @@ export function useLeadStats() {
 
       const supabase = createClient()
 
-      // Get all leads for stage counts
-      const { data: leads, error } = await supabase
-        .from("leads")
-        .select("pipeline_stage, created_at")
-
-      if (error) throw new Error(error.message)
-
-      const byStage: Record<string, number> = {}
-      // Initialize all pipeline stages to 0
       const stages: PipelineStage[] = [
         "new", "contacted", "visit", "test", "application", "applicant", "enrolled", "lost"
       ]
 
-      stages.forEach(stage => {
-        byStage[stage] = 0
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+
+      // Run every count query in parallel. Each one returns only a count, not rows —
+      // Postgres serves it from indexes instead of streaming the entire leads table back.
+      const stageCountPromises = stages.map(stage =>
+        supabase
+          .from("leads")
+          .select("*", { count: "exact", head: true })
+          .eq("pipeline_stage", stage)
+      )
+
+      const totalPromise = supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+
+      const thisMonthPromise = supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", startOfMonth.toISOString())
+
+      const [stageResults, totalResult, thisMonthResult] = await Promise.all([
+        Promise.all(stageCountPromises),
+        totalPromise,
+        thisMonthPromise,
+      ])
+
+      const byStage = {} as Record<PipelineStage, number>
+      stages.forEach((stage, i) => {
+        byStage[stage] = stageResults[i].count ?? 0
       })
 
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      let thisMonth = 0
-      let enrolled = 0
-
-      const rows = (leads ?? []) as LeadStatsRow[]
-      rows.forEach(lead => {
-        if (lead.pipeline_stage) {
-          byStage[lead.pipeline_stage] = (byStage[lead.pipeline_stage] || 0) + 1
-        }
-        if (new Date(lead.created_at) >= startOfMonth) {
-          thisMonth++
-        }
-        if (lead.pipeline_stage === "enrolled") {
-          enrolled++
-        }
-      })
-
-      const total = leads?.length || 0
+      const total = totalResult.count ?? 0
+      const thisMonth = thisMonthResult.count ?? 0
+      const enrolled = byStage.enrolled ?? 0
       const conversionRate = total > 0 ? Math.round((enrolled / total) * 100) : 0
 
       return {
         total,
-        byStage: byStage as Record<PipelineStage, number>,
+        byStage,
         thisMonth,
         conversionRate,
       }
     },
     staleTime: 30_000,
+    placeholderData: (prev) => prev,
   })
 
   return {

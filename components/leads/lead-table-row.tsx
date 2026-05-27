@@ -231,9 +231,8 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   return (
     <motion.tr
       key={lead.id}
-      initial={{ opacity: 0, y: 10 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.015 }}
       onClick={handleRowClick}
       className={cn(
         "border-b border-[var(--border)] transition-all duration-150 group/row",

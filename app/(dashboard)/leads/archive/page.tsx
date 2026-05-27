@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge, PipelineBadge } from "@/components/ui/badge"
@@ -40,12 +41,18 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/hooks/use-user"
 import { useReRegisterLeads, useActiveSemesters } from "@/lib/hooks/use-semesters"
 import { createClient } from "@/lib/supabase/client"
-import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
+import type { LeadFilters } from "@/components/leads/lead-filters"
+import { QuickFilters } from "@/components/leads/quick-filters"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { openCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
 import { useStageSettings } from "@/lib/hooks/use-stage-settings"
 import type { Lead, Semester, EducationCycle, Profile, PipelineStage } from "@/types"
 import { PIPELINE_STAGES } from "@/types"
+
+const LeadFiltersPanel = dynamic(
+  () => import("@/components/leads/lead-filters").then(m => m.LeadFiltersPanel),
+  { ssr: false }
+)
 
 const defaultFilters: LeadFilters = {
   searchQuery: "",
@@ -1241,12 +1248,14 @@ export default function ArchivePage() {
       />
 
       {/* Advanced Filters Panel */}
-      <LeadFiltersPanel
-        filters={filters}
-        onChange={setFilters}
-        onClose={() => setShowFiltersPanel(false)}
-        isOpen={showFiltersPanel}
-      />
+      {showFiltersPanel && (
+        <LeadFiltersPanel
+          filters={filters}
+          onChange={setFilters}
+          onClose={() => setShowFiltersPanel(false)}
+          isOpen={showFiltersPanel}
+        />
+      )}
     </div>
   )
 }

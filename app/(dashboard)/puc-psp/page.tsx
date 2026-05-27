@@ -3,14 +3,13 @@
 import { useState, useMemo, useEffect, useRef, startTransition, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSearchParams } from "next/navigation"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/layout/header"
 import { useLeads, useLeadMutations } from "@/lib/hooks/use-leads"
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
-import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
-import { BulkAssignModal, BulkDeleteModal, BulkStageModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
 import { getLeadDisplayName } from "@/lib/lead-utils"
@@ -23,10 +22,9 @@ import { computePUCDocumentStatus } from "@/lib/psp/document-status"
 import { getMissingPucDocumentStageRequirements } from "@/lib/psp/document-stage-requirements"
 import { checkStageTransition } from "@/lib/lead-stage-guards"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
-import { LeadFiltersPanel, type LeadFilters } from "@/components/leads/lead-filters"
+import type { LeadFilters } from "@/components/leads/lead-filters"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
-import { LeadForm } from "@/components/leads/lead-form"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import {
   Send,
@@ -35,6 +33,35 @@ import {
   SlidersHorizontal,
   Plus,
 } from "lucide-react"
+
+const AppointmentBooking = dynamic(
+  () => import("@/components/calendar/appointment-booking").then(m => m.AppointmentBooking),
+  { ssr: false }
+)
+const LeadForm = dynamic(
+  () => import("@/components/leads/lead-form").then(m => m.LeadForm),
+  { ssr: false }
+)
+const LeadFiltersPanel = dynamic(
+  () => import("@/components/leads/lead-filters").then(m => m.LeadFiltersPanel),
+  { ssr: false }
+)
+const BulkAssignModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkAssignModal),
+  { ssr: false }
+)
+const BulkDeleteModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkDeleteModal),
+  { ssr: false }
+)
+const BulkStageModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkStageModal),
+  { ssr: false }
+)
+const SuccessToast = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.SuccessToast),
+  { ssr: false }
+)
 
 type TopTab = "puc" | "self_fund"
 
@@ -1139,56 +1166,68 @@ export default function PUCPSPPage() {
       </div>
 
       {/* Appointment Booking Modal */}
-      <AppointmentBooking
-        isOpen={!!bookingLead}
-        onClose={() => setBookingLead(null)}
-        onSuccess={refetch}
-        preselectedLead={bookingLead ?? undefined}
-        singleFormMode
-      />
+      {bookingLead && (
+        <AppointmentBooking
+          isOpen={!!bookingLead}
+          onClose={() => setBookingLead(null)}
+          onSuccess={refetch}
+          preselectedLead={bookingLead ?? undefined}
+          singleFormMode
+        />
+      )}
 
       {/* Bulk Assign Modal */}
-      <BulkAssignModal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        selectedCount={selectedLeads.length}
-        onConfirm={handleBulkAssignConfirm}
-        loading={mutationLoading}
-      />
+      {showAssignModal && (
+        <BulkAssignModal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          selectedCount={selectedLeads.length}
+          onConfirm={handleBulkAssignConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Stage Modal */}
-      <BulkStageModal
-        isOpen={showStageModal}
-        onClose={() => setShowStageModal(false)}
-        selectedCount={selectedLeads.length}
-        options={bulkStageOptions}
-        onConfirm={handleBulkStageConfirm}
-        loading={mutationLoading}
-      />
+      {showStageModal && (
+        <BulkStageModal
+          isOpen={showStageModal}
+          onClose={() => setShowStageModal(false)}
+          selectedCount={selectedLeads.length}
+          options={bulkStageOptions}
+          onConfirm={handleBulkStageConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Delete Modal */}
-      <BulkDeleteModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        selectedCount={selectedLeads.length}
-        onConfirm={handleBulkDeleteConfirm}
-        loading={mutationLoading}
-      />
+      {showDeleteModal && (
+        <BulkDeleteModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          selectedCount={selectedLeads.length}
+          onConfirm={handleBulkDeleteConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Success Toast */}
-      <SuccessToast
-        show={showSuccessToast}
-        message={successMessage}
-        onHide={() => setShowSuccessToast(false)}
-      />
+      {showSuccessToast && (
+        <SuccessToast
+          show={showSuccessToast}
+          message={successMessage}
+          onHide={() => setShowSuccessToast(false)}
+        />
+      )}
 
       {/* Filters Panel */}
-      <LeadFiltersPanel
-        filters={filters}
-        onChange={setFilters}
-        onClose={() => setShowFiltersPanel(false)}
-        isOpen={showFiltersPanel}
-      />
+      {showFiltersPanel && (
+        <LeadFiltersPanel
+          filters={filters}
+          onChange={setFilters}
+          onClose={() => setShowFiltersPanel(false)}
+          isOpen={showFiltersPanel}
+        />
+      )}
 
       {/* Add Lead Form Modal */}
       {showAddForm && (

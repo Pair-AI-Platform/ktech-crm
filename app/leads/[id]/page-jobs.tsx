@@ -25,11 +25,7 @@ export default function LeadDetailJobs() {
     progress: 10,
     stage: 'New',
     created: 'Nov 17, 2025',
-    lastUpdated: '2 days ago',
-    reminders: [
-      { type: 'Call', text: 'Follow up on campus visit interest', date: 'Today, 10:00 AM' },
-      { type: 'Email', text: 'Send program brochure', date: 'Tomorrow' }
-    ]
+    lastUpdated: '2 days ago'
   };
 
   return (
@@ -176,72 +172,6 @@ export default function LeadDetailJobs() {
             <div className="mt-6 flex items-center justify-between">
               <span className="text-2xl font-light text-neutral-900">{lead.stage}</span>
               <span className="text-sm text-neutral-400">Created {lead.created}</span>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* What's Next - The Call to Action */}
-      <section className="py-24 px-8 bg-neutral-900 text-white">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-          >
-            <p className="text-sm uppercase tracking-[0.3em] text-neutral-500 mb-12 text-center">What&apos;s Next</p>
-
-            <div className="space-y-6">
-              {lead.reminders.map((reminder, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="group flex items-center justify-between py-6 border-b border-neutral-800 cursor-pointer hover:border-neutral-600 transition-colors"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center group-hover:bg-neutral-700 transition-colors">
-                      {reminder.type === 'Call' ? (
-                        <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                        </svg>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-lg font-light text-white">{reminder.text}</p>
-                      <p className="text-sm text-neutral-500 mt-1">{reminder.date}</p>
-                    </div>
-                  </div>
-                  <svg className="w-5 h-5 text-neutral-600 group-hover:text-white group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Primary Actions */}
-            <div className="mt-16 flex flex-wrap justify-center gap-4">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-8 py-4 bg-transparent text-white border border-neutral-700 rounded-full text-sm font-medium hover:border-neutral-500 transition-colors"
-              >
-                Send WhatsApp
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-8 py-4 bg-transparent text-white border border-neutral-700 rounded-full text-sm font-medium hover:border-neutral-500 transition-colors"
-              >
-                Book Appointment
-              </motion.button>
             </div>
           </motion.div>
         </div>

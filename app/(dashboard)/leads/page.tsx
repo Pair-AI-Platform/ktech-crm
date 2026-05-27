@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Plus,
   Download,
@@ -16,23 +14,77 @@ import {
   BookOpen,
 } from "lucide-react"
 import { type PipelineStage, type Lead, type LeadStatus, PIPELINE_STAGES } from "@/types"
-import { useLeads, useLeadStats, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
+import { useLeads, useLeadStats, useLostReasons } from "@/lib/hooks/use-leads-list"
+import { useLeadBulkActions } from "@/lib/hooks/use-lead-bulk-actions"
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
+import { useAfterInitialPaint } from "@/lib/hooks/use-after-initial-paint"
 import { useUser } from "@/lib/hooks/use-user"
-import { LeadForm } from "@/components/leads/lead-form"
-import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
-import { LeadFiltersPanel, QuickFilters, type LeadFilters } from "@/components/leads/lead-filters"
-import { BulkAssignModal, BulkDeleteModal, BulkStageModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
-import { CSVImportModal } from "@/components/leads/csv-import-modal"
-import { MinistryImportDialog } from "@/components/leads/ministry-import-dialog"
-import { PucImportDialog } from "@/components/leads/puc-import-dialog"
+import dynamic from "next/dynamic"
+import type { LeadFilters } from "@/components/leads/lead-filters"
+import { QuickFilters } from "@/components/leads/quick-filters"
 import { PucImportBadge } from "@/components/leads/puc-import-badge"
-import { EnrollFromListDialog } from "@/components/leads/enroll-from-list-dialog"
-import { PSPTransferModal } from "@/components/leads/psp-transfer-modal"
-import { SendRSVPDialog } from "@/components/leads/send-rsvp-dialog"
-import { MarkLostDialog } from "@/components/leads/mark-lost-dialog"
-import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
-import { openCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
-import { checkStageTransition } from "@/lib/lead-stage-guards"
+
+// Modal-only work stays out of the initial leads page bundle.
+const LeadForm = dynamic(
+  () => import("@/components/leads/lead-form").then(m => m.LeadForm),
+  { ssr: false }
+)
+const LeadFiltersPanel = dynamic(
+  () => import("@/components/leads/lead-filters").then(m => m.LeadFiltersPanel),
+  { ssr: false }
+)
+const BulkAssignModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkAssignModal),
+  { ssr: false }
+)
+const BulkDeleteModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkDeleteModal),
+  { ssr: false }
+)
+const BulkStageModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkStageModal),
+  { ssr: false }
+)
+const SuccessToast = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.SuccessToast),
+  { ssr: false }
+)
+const PSPTransferModal = dynamic(
+  () => import("@/components/leads/psp-transfer-modal").then(m => m.PSPTransferModal),
+  { ssr: false }
+)
+const SendRSVPDialog = dynamic(
+  () => import("@/components/leads/send-rsvp-dialog").then(m => m.SendRSVPDialog),
+  { ssr: false }
+)
+const MarkLostDialog = dynamic(
+  () => import("@/components/leads/mark-lost-dialog").then(m => m.MarkLostDialog),
+  { ssr: false }
+)
+const CSVImportModal = dynamic(
+  () => import("@/components/leads/csv-import-modal").then(m => m.CSVImportModal),
+  { ssr: false }
+)
+const MinistryImportDialog = dynamic(
+  () => import("@/components/leads/ministry-import-dialog").then(m => m.MinistryImportDialog),
+  { ssr: false }
+)
+const PucImportDialog = dynamic(
+  () => import("@/components/leads/puc-import-dialog").then(m => m.PucImportDialog),
+  { ssr: false }
+)
+const EnrollFromListDialog = dynamic(
+  () => import("@/components/leads/enroll-from-list-dialog").then(m => m.EnrollFromListDialog),
+  { ssr: false }
+)
+const LeadTable = dynamic(
+  () => import("@/components/leads/lead-table").then(m => m.LeadTable),
+  { ssr: false, loading: () => <FastLeadsTable leads={[]} loading /> }
+)
+const BulkActionsBar = dynamic(
+  () => import("@/components/leads/lead-table").then(m => m.BulkActionsBar),
+  { ssr: false }
+)
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -87,7 +139,7 @@ export default function LeadsPage() {
   const searchParamsString = searchParams.toString()
   const router = useRouter()
   const { profile, isAdmin } = useUser()
-  const { reasons: lostReasons } = useLostReasons()
+  const interactiveReady = useAfterInitialPaint()
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
@@ -95,6 +147,7 @@ export default function LeadsPage() {
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
   const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
   const [lostAtFilter, setLostAtFilter] = useState<PipelineStage | "all">("all")
+  const { reasons: lostReasons } = useLostReasons({ enabled: interactiveReady && stageFilter === "lost" })
   // Leads whose stage was just changed in the current view — snapshot so they
   // stay visible until the user navigates away from this stage filter.
   // Stored as a Map<id, Lead> because the server-side query no longer returns
@@ -118,7 +171,7 @@ export default function LeadsPage() {
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessToast, setShowSuccessToast] = useState(false)
 
-  const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
+  const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadBulkActions()
   const initialCheckDone = useRef(false)
   const pendingScrollRestore = useRef<number | null>(null)
   const viewStateRestored = useRef(false)
@@ -279,22 +332,28 @@ export default function LeadsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageFilter, filters.searchQuery, filters.fundingType, filters.statuses, filters.sources, filters.schools, filters.academicTrack, filters.dateRange, filters.assignedTo, filters.gpaMin, filters.gpaMax, filters.isKuwaiti, filters.blockReasons, filters.submissionSubstages, filters.submissionStatuses, filters.lostAtStages, filters.hasNotes, filters.lostReasonIds, filters.withdrawalReasons, filters.genders, filters.governorates, filters.paymentStatus, filters.paymentAmountMin, filters.paymentAmountMax, filters.appointmentTypes, lostAtFilter])
 
-  const { leads, loading, error, totalCount, totalPages, refetch } = useLeads({
+  // Debounce search input so each keystroke doesn't fire a Supabase query.
+  const debouncedSearchQuery = useDebouncedValue(filters.searchQuery, 300)
+
+  const { leads, loading, isPlaceholderData, error, totalCount, totalPages, refetch } = useLeads({
     stage: stageFilter,
     fundingType: filters.fundingType,
-    searchQuery: filters.searchQuery,
+    searchQuery: debouncedSearchQuery,
     page: currentPage,
     pageSize,
     filters: serverFilters,
+    includeCount: interactiveReady,
+    realtime: interactiveReady,
+    view: interactiveReady ? "full" : "compact",
   })
 
-  const { stats } = useLeadStats()
+  const { stats } = useLeadStats({ enabled: interactiveReady })
 
   // Check if payment range filter is active
   const isPaymentRangeActive = filters.paymentAmountMin > 0 || filters.paymentAmountMax < 5000
 
   // Track whether client-side-only filters are active (payment, appointments)
-  const hasClientSideFilters = filters.paymentStatus !== "all" || isPaymentRangeActive || filters.appointmentTypes.length > 0 || (stageFilter === "all")
+  const hasClientSideFilters = filters.paymentStatus !== "all" || isPaymentRangeActive || filters.appointmentTypes.length > 0
 
   // Restore scroll position after leads finish loading
   useEffect(() => {
@@ -493,6 +552,7 @@ export default function LeadsPage() {
     if (selectedLeadObjects.length === 0) return
 
     if (stage === "application") {
+      const { checkStageTransition } = await import("@/lib/lead-stage-guards")
       const blocked = selectedLeadObjects
         .filter((lead) => lead.pipeline_stage !== "application")
         .map((lead) => ({ lead, guard: checkStageTransition({ lead, newStage: "application" }) }))
@@ -556,7 +616,8 @@ export default function LeadsPage() {
     }
   }
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    const { exportLeadsToCSV, downloadCSV } = await import("@/lib/csv-utils")
     const csvContent = exportLeadsToCSV(filteredLeads)
     const filename = `leads_export_${new Date().toISOString().split("T")[0]}.csv`
     downloadCSV(csvContent, filename)
@@ -592,6 +653,17 @@ export default function LeadsPage() {
   const selectedLeadObjects = filteredLeads.filter((lead) =>
     selectedLeads.includes(lead.id)
   )
+
+  const handleLeadOpen = (lead: Lead) => {
+    const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
+    sessionStorage.setItem("leads-view-state", JSON.stringify({
+      searchQuery: filters.searchQuery,
+      stageFilter,
+      lostAtFilter,
+      scrollTop: scrollEl?.scrollTop ?? 0,
+    }))
+    router.push(`/leads/${lead.id}${stageFilter && stageFilter !== "all" ? `?stage=${stageFilter}` : ""}`)
+  }
 
   return (
     <div className="flex-1 bg-[var(--bg-base)] flex flex-col min-h-0 min-w-0">
@@ -740,60 +812,55 @@ export default function LeadsPage() {
         )}
 
         {/* Main Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="flex-1 flex flex-col min-h-0 min-w-0 h-full"
-        >
-          <LeadTable
-            leads={filteredLeads}
-            loading={loading}
-            selectedLeads={selectedLeads}
-            onSelectLead={toggleSelectLead}
-            onSelectAll={toggleSelectAll}
-            onLeadClick={(lead) => {
-              // Save view state so we can restore it on back navigation
-              const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
-              sessionStorage.setItem("leads-view-state", JSON.stringify({
-                searchQuery: filters.searchQuery,
-                stageFilter,
-                lostAtFilter,
-                scrollTop: scrollEl?.scrollTop ?? 0,
-              }))
-              router.push(`/leads/${lead.id}${stageFilter && stageFilter !== "all" ? `?stage=${stageFilter}` : ""}`)
-            }}
-            onEditLead={handleEditLead}
-            currentStageFilter={stageFilter}
-            fundingTypeFilter={filters.fundingType}
-            onStageChanged={(leadId, newStage, status) => {
-              // Only pin on a filtered view — on "all" the lead never disappears.
-              if (stageFilter === "all") return
-              // Snapshot the lead from current data with the new stage/status applied
-              // so it survives the refetch that drops it from the server response.
-              const existing = leads.find(l => l.id === leadId)
-              if (!existing) return
-              const snapshot: Lead = {
-                ...existing,
-                pipeline_stage: newStage,
-                status: status === undefined ? existing.status : (status ?? undefined),
-              }
-              setStickyLeads(prev => {
-                if (prev.get(leadId)?.pipeline_stage === newStage && prev.get(leadId)?.status === snapshot.status) {
-                  return prev
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 h-full">
+          {interactiveReady && !isPlaceholderData ? (
+            <LeadTable
+              leads={filteredLeads}
+              loading={loading}
+              selectedLeads={selectedLeads}
+              onSelectLead={toggleSelectLead}
+              onSelectAll={toggleSelectAll}
+              onLeadClick={handleLeadOpen}
+              onEditLead={handleEditLead}
+              currentStageFilter={stageFilter}
+              fundingTypeFilter={filters.fundingType}
+              onStageChanged={(leadId, newStage, status) => {
+                if (stageFilter === "all") return
+                const existing = leads.find(l => l.id === leadId)
+                if (!existing) return
+                const snapshot: Lead = {
+                  ...existing,
+                  pipeline_stage: newStage,
+                  status: status === undefined ? existing.status : (status ?? undefined),
                 }
-                const next = new Map(prev)
-                next.set(leadId, snapshot)
-                return next
-              })
-            }}
-            currentPage={currentPage}
-            totalPages={hasClientSideFilters ? Math.ceil(filteredLeads.length / pageSize) || 1 : totalPages}
-            totalCount={hasClientSideFilters ? filteredLeads.length : totalCount}
-            pageSize={pageSize}
-            onPageChange={setCurrentPage}
-          />
-        </motion.div>
+                setStickyLeads(prev => {
+                  if (prev.get(leadId)?.pipeline_stage === newStage && prev.get(leadId)?.status === snapshot.status) {
+                    return prev
+                  }
+                  const next = new Map(prev)
+                  next.set(leadId, snapshot)
+                  return next
+                })
+              }}
+              currentPage={currentPage}
+              totalPages={hasClientSideFilters ? Math.ceil(filteredLeads.length / pageSize) || 1 : totalPages}
+              totalCount={hasClientSideFilters ? filteredLeads.length : totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
+          ) : (
+            <FastLeadsTable
+              leads={filteredLeads}
+              loading={loading}
+              totalCount={totalCount}
+              currentPage={currentPage}
+              totalPages={hasClientSideFilters ? Math.ceil(filteredLeads.length / pageSize) || 1 : totalPages}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onLeadClick={handleLeadOpen}
+            />
+          )}
+        </div>
 
         {/* Error State */}
         {error && !loading && (
@@ -808,11 +875,7 @@ export default function LeadsPage() {
 
         {/* Empty State for No Leads */}
         {!loading && !error && filteredLeads.length === 0 && leads.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-20"
-          >
+          <div className="flex flex-col items-center justify-center py-20">
             <div className="w-20 h-20 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center mb-4">
               <Sparkles className="w-10 h-10 text-[var(--primary)]" />
             </div>
@@ -832,40 +895,41 @@ export default function LeadsPage() {
                 Add First Lead
               </Button>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Bulk Actions Bar */}
-        <AnimatePresence>
-          {selectedLeads.length > 0 && (
-            <BulkActionsBar
-              selectedCount={selectedLeads.length}
-              onAssign={handleBulkAssign}
-              onStage={() => setShowStageModal(true)}
-              onBook={handleBulkBook}
-              onLost={handleBulkLost}
-              onDelete={handleBulkDelete}
-              onClear={() => setSelectedLeads([])}
-              onSendRSVP={() => setShowRSVPModal(true)}
-              onCampaign={() => {
-                openCampaignPrefill({
-                  origin: "leads",
-                  contacts: selectedLeadObjects.map(leadToPrefillContact),
-                  createdAt: Date.now(),
-                })
-              }}
-            />
-          )}
-        </AnimatePresence>
+        {selectedLeads.length > 0 && (
+          <BulkActionsBar
+            selectedCount={selectedLeads.length}
+            onAssign={handleBulkAssign}
+            onStage={() => setShowStageModal(true)}
+            onBook={handleBulkBook}
+            onLost={handleBulkLost}
+            onDelete={handleBulkDelete}
+            onClear={() => setSelectedLeads([])}
+            onSendRSVP={() => setShowRSVPModal(true)}
+            onCampaign={async () => {
+              const { openCampaignPrefill, leadToPrefillContact } = await import("@/lib/campaigns/prefill")
+              openCampaignPrefill({
+                origin: "leads",
+                contacts: selectedLeadObjects.map(leadToPrefillContact),
+                createdAt: Date.now(),
+              })
+            }}
+          />
+        )}
       </div>
 
       {/* Filters Panel */}
-      <LeadFiltersPanel
-        filters={filters}
-        onChange={setFilters}
-        onClose={() => setShowFiltersPanel(false)}
-        isOpen={showFiltersPanel}
-      />
+      {showFiltersPanel && (
+        <LeadFiltersPanel
+          filters={filters}
+          onChange={setFilters}
+          onClose={() => setShowFiltersPanel(false)}
+          isOpen={showFiltersPanel}
+        />
+      )}
 
       {/* Add/Edit Lead Form Modal */}
       {(showAddForm || editingLead) && (
@@ -882,103 +946,243 @@ export default function LeadsPage() {
       )}
 
       {/* Bulk Assign Modal */}
-      <BulkAssignModal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        selectedCount={selectedLeads.length}
-        onConfirm={handleBulkAssignConfirm}
-        loading={mutationLoading}
-      />
+      {showAssignModal && (
+        <BulkAssignModal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          selectedCount={selectedLeads.length}
+          onConfirm={handleBulkAssignConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Stage Modal */}
-      <BulkStageModal
-        isOpen={showStageModal}
-        onClose={() => setShowStageModal(false)}
-        selectedCount={selectedLeads.length}
-        options={PIPELINE_STAGES.filter((s) => s.value !== "lost").map((s) => ({ value: s.value, label: s.label }))}
-        onConfirm={handleBulkStageConfirm}
-        loading={mutationLoading}
-      />
+      {showStageModal && (
+        <BulkStageModal
+          isOpen={showStageModal}
+          onClose={() => setShowStageModal(false)}
+          selectedCount={selectedLeads.length}
+          options={PIPELINE_STAGES.filter((s) => s.value !== "lost").map((s) => ({ value: s.value, label: s.label }))}
+          onConfirm={handleBulkStageConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Delete Modal */}
-      <BulkDeleteModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        selectedCount={selectedLeads.length}
-        onConfirm={handleBulkDeleteConfirm}
-        loading={mutationLoading}
-      />
+      {showDeleteModal && (
+        <BulkDeleteModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          selectedCount={selectedLeads.length}
+          onConfirm={handleBulkDeleteConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Mark Lost Dialog */}
-      <MarkLostDialog
-        open={showLostModal}
-        onOpenChange={setShowLostModal}
-        onConfirm={handleBulkLostConfirm}
-        leadName={`${selectedLeads.length} lead${selectedLeads.length !== 1 ? "s" : ""}`}
-      />
+      {showLostModal && (
+        <MarkLostDialog
+          open={showLostModal}
+          onOpenChange={setShowLostModal}
+          onConfirm={handleBulkLostConfirm}
+          leadName={`${selectedLeads.length} lead${selectedLeads.length !== 1 ? "s" : ""}`}
+        />
+      )}
 
       {/* Success Toast */}
-      <SuccessToast
-        show={showSuccessToast}
-        message={successMessage}
-        onHide={() => setShowSuccessToast(false)}
-      />
+      {showSuccessToast && (
+        <SuccessToast
+          show={showSuccessToast}
+          message={successMessage}
+          onHide={() => setShowSuccessToast(false)}
+        />
+      )}
 
-      {/* CSV Import Modal */}
-      <CSVImportModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSuccess={handleImportSuccess}
-      />
+      {/* CSV Import Modal (lazy) */}
+      {showImportModal && (
+        <CSVImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={handleImportSuccess}
+        />
+      )}
 
-      {/* Ministry GPA Import Modal */}
-      <MinistryImportDialog
-        isOpen={showMinistryImportModal}
-        onClose={() => setShowMinistryImportModal(false)}
-        onSuccess={handleMinistryImportSuccess}
-      />
+      {/* Ministry GPA Import Modal (lazy) */}
+      {showMinistryImportModal && (
+        <MinistryImportDialog
+          isOpen={showMinistryImportModal}
+          onClose={() => setShowMinistryImportModal(false)}
+          onSuccess={handleMinistryImportSuccess}
+        />
+      )}
 
-      {/* PUC Import Modal */}
-      <PucImportDialog
-        isOpen={showPucImportModal}
-        onClose={() => setShowPucImportModal(false)}
-        onSuccess={handlePucImportSuccess}
-      />
+      {/* PUC Import Modal (lazy) */}
+      {showPucImportModal && (
+        <PucImportDialog
+          isOpen={showPucImportModal}
+          onClose={() => setShowPucImportModal(false)}
+          onSuccess={handlePucImportSuccess}
+        />
+      )}
 
-      {/* Enroll from List Modal */}
-      <EnrollFromListDialog
-        isOpen={showEnrollFromListModal}
-        onClose={() => setShowEnrollFromListModal(false)}
-        onSuccess={(count) => {
-          refetch()
-          setSuccessMessage(`Enrolled ${count} ${count === 1 ? "student" : "students"}`)
-          setShowSuccessToast(true)
-        }}
-      />
+      {/* Enroll from List Modal (lazy) */}
+      {showEnrollFromListModal && (
+        <EnrollFromListDialog
+          isOpen={showEnrollFromListModal}
+          onClose={() => setShowEnrollFromListModal(false)}
+          onSuccess={(count) => {
+            refetch()
+            setSuccessMessage(`Enrolled ${count} ${count === 1 ? "student" : "students"}`)
+            setShowSuccessToast(true)
+          }}
+        />
+      )}
 
       {/* PSP Transfer Modal */}
-      <PSPTransferModal
-        isOpen={showPSPTransferModal}
-        onClose={() => setShowPSPTransferModal(false)}
-        onSuccess={() => {
-          refetch()
-          setSuccessMessage("PUC leads transferred to Submission stage")
-          setShowSuccessToast(true)
-        }}
-      />
+      {showPSPTransferModal && (
+        <PSPTransferModal
+          isOpen={showPSPTransferModal}
+          onClose={() => setShowPSPTransferModal(false)}
+          onSuccess={() => {
+            refetch()
+            setSuccessMessage("PUC leads transferred to Submission stage")
+            setShowSuccessToast(true)
+          }}
+        />
+      )}
 
       {/* Send RSVP Modal */}
-      <SendRSVPDialog
-        isOpen={showRSVPModal}
-        onClose={() => setShowRSVPModal(false)}
-        selectedLeads={selectedLeadObjects}
-        onSuccess={() => {
-          refetch()
-          setSuccessMessage("RSVP links generated successfully")
-          setShowSuccessToast(true)
-        }}
-      />
+      {showRSVPModal && (
+        <SendRSVPDialog
+          isOpen={showRSVPModal}
+          onClose={() => setShowRSVPModal(false)}
+          selectedLeads={selectedLeadObjects}
+          onSuccess={() => {
+            refetch()
+            setSuccessMessage("RSVP links generated successfully")
+            setShowSuccessToast(true)
+          }}
+        />
+      )}
 
+    </div>
+  )
+}
+
+function FastLeadsTable({
+  leads,
+  loading,
+  totalCount,
+  currentPage = 1,
+  totalPages = 1,
+  pageSize = 50,
+  onPageChange,
+  onLeadClick,
+}: {
+  leads: Lead[]
+  loading?: boolean
+  totalCount?: number
+  currentPage?: number
+  totalPages?: number
+  pageSize?: number
+  onPageChange?: (page: number) => void
+  onLeadClick?: (lead: Lead) => void
+}) {
+  if (loading && leads.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] flex-1">
+        <div className="grid gap-0">
+          {Array.from({ length: 9 }).map((_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-4 border-b border-[var(--border-subtle)] px-4 py-4"
+            >
+              <div className="h-5 rounded bg-[var(--bg-hover)] animate-pulse" />
+              <div className="h-5 rounded bg-[var(--bg-hover)] animate-pulse" />
+              <div className="h-5 rounded bg-[var(--bg-hover)] animate-pulse" />
+              <div className="h-5 rounded bg-[var(--bg-hover)] animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (leads.length === 0) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] flex-1 flex items-center justify-center py-20">
+        <div className="text-center">
+          <Sparkles className="w-8 h-8 mx-auto mb-3 text-[var(--text-muted)]" />
+          <p className="text-sm font-medium text-[var(--text-primary)]">No leads found</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Try adjusting the search or filters.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] flex-1 flex flex-col min-h-0">
+      <div className="overflow-auto scrollbar-thin flex-1 min-h-0">
+        <table className="w-full min-w-[820px]">
+          <thead className="sticky top-0 bg-[var(--bg-canvas)] z-10">
+            <tr className="border-b border-[var(--border)]">
+              <th className="px-4 py-2 text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Lead</th>
+              <th className="px-4 py-2 text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Phone</th>
+              <th className="px-4 py-2 text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Stage</th>
+              <th className="px-4 py-2 text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Agent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads.map((lead) => {
+              const stage = PIPELINE_STAGES.find(s => s.value === lead.pipeline_stage)
+              return (
+                <tr
+                  key={lead.id}
+                  onClick={() => onLeadClick?.(lead)}
+                  className={cn(
+                    "border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]",
+                    onLeadClick && "cursor-pointer"
+                  )}
+                >
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-sm text-[var(--text-primary)] truncate max-w-[260px]">
+                      {getLeadDisplayName(lead)}
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)] truncate max-w-[260px]">
+                      {lead.civil_id || lead.source || "Lead"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{lead.phone}</td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+                      {stage?.label || lead.pipeline_stage}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    {lead.assigned_agent?.full_name || "Unassigned"}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--bg-canvas)] px-4 py-3">
+        <div className="text-xs text-[var(--text-muted)]">
+          Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalCount ?? leads.length)}
+          {totalCount !== undefined ? ` of ${totalCount}` : ""}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => onPageChange?.(currentPage - 1)}>
+            Previous
+          </Button>
+          <span className="text-xs text-[var(--text-muted)]">Page {currentPage} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => onPageChange?.(currentPage + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
