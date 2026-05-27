@@ -284,7 +284,7 @@ function getDemoSidebarProfile(): Profile | null {
   return {
     id: "agent-1",
     email: "demo-agent@ktech.edu.kw",
-    full_name: "Khalifa",
+    full_name: "Demo Agent",
     role: "agent",
     is_active: true,
     monthly_target: 40,

@@ -18,5 +18,5 @@ export function getDemoCredentials(role: "admin" | "agent"): { email: string; pa
   }
   const password = process.env.DEMO_AGENT_PASSWORD
   if (!password) return null
-  return { email: "demo-agent@ktech.edu.kw", password, full_name: "Khalifa" }
+  return { email: "demo-agent@ktech.edu.kw", password, full_name: "Demo Agent" }
 }
