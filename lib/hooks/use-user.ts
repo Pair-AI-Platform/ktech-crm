@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { createContext, createElement, useCallback, useContext, useEffect, type ReactNode } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode, getDemoRole, DEMO_AGENTS } from "@/lib/demo-data"
@@ -44,14 +44,29 @@ const DEMO_AGENT_PROFILE: Profile = {
 }
 
 const USER_QUERY_KEY = ['current-user'] as const
+const InitialProfileContext = createContext<Profile | null | undefined>(undefined)
+
+export function UserProfileProvider({
+  profile,
+  children,
+}: {
+  profile: Profile | null
+  children: ReactNode
+}) {
+  return createElement(InitialProfileContext.Provider, { value: profile }, children)
+}
 
 export function useUser() {
   const queryClient = useQueryClient()
   const demoMode = isDemoMode()
   const demoRole = demoMode ? getDemoRole() : null
+  const initialProfile = useContext(InitialProfileContext)
 
   const { data, isLoading: queryLoading } = useQuery({
     queryKey: [...USER_QUERY_KEY, demoMode ? demoRole : "auth"],
+    initialData: !demoMode && initialProfile !== undefined
+      ? { user: null, profile: initialProfile }
+      : undefined,
     queryFn: async (): Promise<{ user: User | null; profile: Profile | null }> => {
       if (demoMode) {
         return {
@@ -67,7 +82,7 @@ export function useUser() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, email, full_name, full_name_ar, role, avatar_url, phone, is_active, monthly_target, created_at, updated_at")
         .eq("id", user.id)
         .single()
 

@@ -41,7 +41,8 @@ type AgentHistoryAppointmentRow = {
   status: string | null
 }
 
-export function useAgentHistory(agentId?: string) {
+export function useAgentHistory(agentId?: string, options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true
   const { data: history = EMPTY_HISTORY, isLoading: loading } = useQuery({
     queryKey: agentId ? queryKeys.agentHistory.detail(agentId) : queryKeys.agentHistory.all,
     queryFn: async () => {
@@ -120,9 +121,9 @@ export function useAgentHistory(agentId?: string) {
         byStage,
       } satisfies AgentHistory
     },
-    enabled: !!agentId,
+    enabled: enabled && !!agentId,
     staleTime: 60_000,
   })
 
-  return { history, loading }
+  return { history, loading: !enabled || loading }
 }

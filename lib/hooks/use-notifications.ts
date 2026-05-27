@@ -56,8 +56,9 @@ const DEMO_NOTIFICATIONS: Notification[] = [
   },
 ]
 
-export function useNotifications(userId?: string | null) {
+export function useNotifications(userId?: string | null, options: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient()
+  const enabled = options.enabled ?? true
 
   const { data: notifications = [], isLoading: loading, refetch } = useQuery({
     queryKey: [...queryKeys.notifications.all, userId],
@@ -77,6 +78,7 @@ export function useNotifications(userId?: string | null) {
       if (error) throw new Error(error.message)
       return (data as Notification[]) ?? []
     },
+    enabled: enabled && !!userId,
     staleTime: 30_000,
   })
 
@@ -84,7 +86,7 @@ export function useNotifications(userId?: string | null) {
 
   // Real-time subscription for new notifications
   useEffect(() => {
-    if (isDemoMode() || !userId) return
+    if (isDemoMode() || !userId || !enabled) return
 
     const supabase = createClient()
     const channel = supabase
@@ -106,7 +108,7 @@ export function useNotifications(userId?: string | null) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, queryClient])
+  }, [userId, queryClient, enabled])
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
@@ -194,7 +196,7 @@ export function useNotifications(userId?: string | null) {
   return {
     notifications,
     unreadCount,
-    loading,
+    loading: !enabled || loading,
     markAsRead,
     markAllAsRead,
     refetch,
