@@ -4,6 +4,7 @@ import { toDateString } from "@/lib/utils"
 // Check if we're in demo mode
 export function isDemoMode(): boolean {
   if (typeof window === "undefined") return false
+  if (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE !== "true") return false
   return localStorage.getItem("ktech-demo-mode") === "true"
 }
 

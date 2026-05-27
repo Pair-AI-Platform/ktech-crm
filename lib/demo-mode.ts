@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 
 export function isDemoModeEnabled(): boolean {
-  return process.env.DEMO_MODE_ENABLED === "true"
+  return (
+    process.env.DEMO_MODE_ENABLED === "true" ||
+    process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true"
+  )
 }
 
 export function requireDemoMode(): NextResponse | null {

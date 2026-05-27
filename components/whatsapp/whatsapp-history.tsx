@@ -97,7 +97,11 @@ export function WhatsAppHistory({ leadId, studentId, limit = 20 }: WhatsAppHisto
     setLoading(true)
 
     // Check demo mode
-    if (typeof window !== "undefined" && localStorage.getItem("ktech-demo-mode") === "true") {
+    if (
+      typeof window !== "undefined" &&
+      process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true" &&
+      localStorage.getItem("ktech-demo-mode") === "true"
+    ) {
       setIsDemoMode(true)
       setMessages(DEMO_MESSAGES)
       setLoading(false)
