@@ -263,6 +263,7 @@ const emptySubscribe = () => () => {}
 
 function getDemoSidebarProfile(): Profile | null {
   if (typeof window === "undefined") return null
+  if (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE !== "true") return null
   if (localStorage.getItem("ktech-demo-mode") !== "true") return null
 
   const now = new Date().toISOString()

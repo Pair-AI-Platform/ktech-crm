@@ -1,11 +1,19 @@
 "use client"
 
 import { Plus } from "lucide-react"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
-import { AnnouncementButton } from "./announcement-button"
-import { NotificationDropdown } from "./notification-dropdown"
 import Link from "next/link"
 import type { Profile } from "@/lib/hooks/use-user"
+
+const AnnouncementButton = dynamic(
+  () => import("./announcement-button").then(m => m.AnnouncementButton),
+  { ssr: false }
+)
+const NotificationDropdown = dynamic(
+  () => import("./notification-dropdown").then(m => m.NotificationDropdown),
+  { ssr: false }
+)
 
 interface HeaderProps {
   user: Profile | null
@@ -66,7 +74,7 @@ export function Header({ user, title, subtitle, subtitleExtra, action, breadcrum
         {/* Right Section - Actions */}
         <div className="flex items-center gap-3">
           {/* Announcement (admin only) */}
-          <AnnouncementButton isAdmin={user?.role === "admin"} />
+          {user?.role === "admin" && <AnnouncementButton isAdmin />}
 
           {/* Notifications */}
           <NotificationDropdown userId={user?.id} />
