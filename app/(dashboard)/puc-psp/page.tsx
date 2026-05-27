@@ -69,7 +69,6 @@ type TopTab = "puc" | "self_fund"
 const SF_PAGE_SIZE = 50
 
 type PucPaymentLeadRow = { lead_id: string }
-type PucPaymentAmountRow = { lead_id: string; amount: number | null }
 type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: string | null }
 type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
 type RecentStageMove = { stage: PipelineStage; rank: number; lead: Lead }
@@ -254,7 +253,7 @@ export default function PUCPSPPage() {
     enabled: topTab === "puc",
   })
 
-  // Self Fund leads — server-side stage filter + server-side pagination.
+  // Self Fund leads: server-side stage filter + server-side pagination.
   // Pulling 15k+ SF leads with embedded JOINs is too slow for one list view,
   // so we page the result instead. Stage pill counts come from a separate
   // lightweight query below so the pills stay accurate across pages.
@@ -323,50 +322,20 @@ export default function PUCPSPPage() {
 
   const linkSentCount = linkSentLeadIds.size
 
-  // Payment stats (Amendment 2)
-  const [paymentStats, setPaymentStats] = useState<{
-    seatReservationCount: number
-    fullDownpaymentCount: number
-    totalPaid: number
-  }>({ seatReservationCount: 0, fullDownpaymentCount: 0, totalPaid: 0 })
-
-  useEffect(() => {
-    if (topTab !== "puc" || pucLeads.length === 0) {
-      startTransition(() => setPaymentStats({ seatReservationCount: 0, fullDownpaymentCount: 0, totalPaid: 0 }))
-      return
-    }
-    const supabase = createClient()
-    const ids = pucLeads.map((l) => l.id)
-    supabase
-      .from("payment_transactions")
-      .select("lead_id, amount")
-      .in("lead_id", ids)
-      .eq("status", "completed")
-      .eq("notes", "PSP Fee Payment")
-      .then(({ data }: { data: PucPaymentAmountRow[] | null }) => {
-        if (!data) return
-        const leadTotals = new Map<string, number>()
-        for (const tx of data) {
-          leadTotals.set(tx.lead_id, (leadTotals.get(tx.lead_id) || 0) + (tx.amount || 0))
-        }
-        let seatReservation = 0
-        let fullDownpayment = 0
-        let totalPaid = 0
-        for (const [, total] of leadTotals) {
-          totalPaid++
-          if (total >= 150) seatReservation++
-          if (total >= 400) fullDownpayment++
-        }
-        setPaymentStats({ seatReservationCount: seatReservation, fullDownpaymentCount: fullDownpayment, totalPaid })
-      })
-  }, [pucLeads, topTab])
-
-  // PUC payment completion + doc counts for doc status filtering
+  // PUC payment completion + doc counts for doc status filtering.
+  // Only needed when the doc-status filter is active or the bulk-stage modal is open.
+  // LeadTable fetches its own copy for the visible "0/?" row badges, so we keep this
+  // off the first-paint path.
   const [pucPaymentLeadIds, setPucPaymentLeadIds] = useState<Set<string>>(new Set())
   const [pucDocCounts, setPucDocCounts] = useState<Record<string, { uploaded: number; required: number }>>({})
 
+  // Pre-warm doc/payment data the moment the user has selected leads (bulk-stage
+  // validation needs it) or activates the doc-status filter. Without selection or
+  // that filter, the data is unused, so we skip the fetch entirely.
+  const needsPucDocData = topTab === "puc" && (filters.docStatuses.length > 0 || selectedLeads.length > 0)
+
   useEffect(() => {
-    if (topTab !== "puc" || pucLeads.length === 0) {
+    if (!needsPucDocData || pucLeads.length === 0) {
       startTransition(() => { setPucPaymentLeadIds(new Set()); setPucDocCounts({}) })
       return
     }
@@ -455,7 +424,7 @@ export default function PUCPSPPage() {
       }
       setPucDocCounts(result)
     })
-  }, [pucLeads, topTab])
+  }, [pucLeads, needsPucDocData])
 
   // Compute effective doc status for a lead (used in filtering)
   const getLeadDocStatus = useCallback((lead: Lead): PUCDocumentStatus | null => {
@@ -465,22 +434,6 @@ export default function PUCPSPPage() {
     const allDocsComplete = docInfo ? (docInfo.required > 0 && docInfo.uploaded >= docInfo.required) : false
     return computePUCDocumentStatus(lead.submission_substage, allDocsComplete, pucPaymentLeadIds.has(lead.id))
   }, [pucDocCounts, pucPaymentLeadIds])
-
-  // Placement test stats (Amendment 3)
-  const placementStats = useMemo(() => {
-    if (topTab !== "puc") return { foundation1: 0, foundation2: 0, directEntry: 0, total: 0 }
-    let foundation1 = 0
-    let foundation2 = 0
-    let directEntry = 0
-    for (const lead of pucLeads) {
-      const level = (lead as unknown as Record<string, unknown>).placement_level as string | undefined
-      if (!level) continue
-      if (level === "foundation_1") foundation1++
-      else if (level === "foundation_2") foundation2++
-      else if (level === "direct_entry") directEntry++
-    }
-    return { foundation1, foundation2, directEntry, total: foundation1 + foundation2 + directEntry }
-  }, [pucLeads, topTab])
 
   // Shared advanced filter logic applied to any lead array
   const applyAdvancedFilters = useCallback((leadsArr: Lead[]) => {
@@ -672,7 +625,7 @@ export default function PUCPSPPage() {
     return counts
   }, [pucLeads])
 
-  // SF stage counts — fetched independently of the paginated lead list so the
+  // SF stage counts: fetched independently of the paginated lead list so the
   // pill counts stay accurate even when the user is on page 2+ of a single stage.
   // We pull just the pipeline_stage column for all SF leads and tally client-side;
   // that's a single ~15k-row column scan and is much cheaper than the joined list
