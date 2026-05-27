@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { PIPELINE_STAGES, type PipelineStage, type LostReasonCategory } from "@/types"
 import { useLeads, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import { useUser } from "@/lib/hooks/use-user"
 import { cn, formatKuwaitPhone, getInitials } from "@/lib/utils"
 import { getLeadDisplayName } from "@/lib/lead-utils"
@@ -96,9 +97,12 @@ export default function LostLeadsPage() {
     campaignIds: [],
   }
 
+  // Debounce search so each keystroke doesn't fire a server query.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300)
+
   const { leads, loading, totalCount, totalPages, refetch } = useLeads({
     stage: "lost",
-    searchQuery,
+    searchQuery: debouncedSearchQuery,
     page: currentPage,
     pageSize,
     filters: serverFilters,

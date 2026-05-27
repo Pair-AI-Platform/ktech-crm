@@ -23,11 +23,11 @@ const typeConfig: Record<string, { icon: typeof Bell; color: string }> = {
 }
 
 export function NotificationDropdown({ userId }: NotificationDropdownProps) {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId)
-  const { appointments: noUpdatedAppointments, loading: noUpdatedLoading } = useNoUpdatedAppointments()
-  const noUpdatedCount = noUpdatedAppointments.length
-  const totalUnread = unreadCount + (noUpdatedCount > 0 ? 1 : 0)
   const [open, setOpen] = useState(false)
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId, { enabled: open })
+  const { appointments: noUpdatedAppointments, loading: noUpdatedLoading } = useNoUpdatedAppointments({ enabled: open })
+  const noUpdatedCount = open ? noUpdatedAppointments.length : 0
+  const totalUnread = unreadCount + (noUpdatedCount > 0 ? 1 : 0)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close on outside click

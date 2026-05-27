@@ -19,21 +19,21 @@ export default function WorkspacesPage() {
   const [workspaces] = useState([
     {
       id: 1,
-      name: "khalifa/holiday-promo-updates",
+      name: "omar/holiday-promo-updates",
       changes: 3,
       status: "active",
       description: "Adding holiday promotion handling to order journey",
       created: "2 hours ago",
-      author: "khalifa",
+      author: "omar",
     },
     {
       id: 2,
-      name: "khalifa/arabic-voice-improvements",
+      name: "omar/arabic-voice-improvements",
       changes: 1,
       status: "active",
       description: "Improving Kuwaiti dialect recognition",
       created: "1 day ago",
-      author: "khalifa",
+      author: "omar",
     },
   ]);
 

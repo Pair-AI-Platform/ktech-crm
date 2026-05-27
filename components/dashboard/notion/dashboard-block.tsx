@@ -65,7 +65,8 @@ export function DashboardBlock({
         "transition-all duration-200",
         isDragging && "opacity-50 shadow-lg z-50",
         isHovered && "shadow-md border-[var(--border-hover)]",
-        className
+        className,
+        isCollapsed && "!h-auto self-start"
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
@@ -74,7 +75,12 @@ export function DashboardBlock({
       }}
     >
       {/* Block Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)]">
+      <div
+        className={cn(
+          "flex items-center gap-2 px-4 py-3",
+          !isCollapsed && "border-b border-[var(--border-subtle)]"
+        )}
+      >
         {/* Drag Handle */}
         <div
           {...attributes}
@@ -226,11 +232,17 @@ export function StaticBlock({
       className={cn(
         "bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] shadow-sm",
         "hover:shadow-md hover:border-[var(--border-hover)] transition-all duration-200",
-        className
+        className,
+        isCollapsed && "!h-auto self-start"
       )}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)]">
+      <div
+        className={cn(
+          "flex items-center gap-2 px-4 py-3",
+          !isCollapsed && "border-b border-[var(--border-subtle)]"
+        )}
+      >
         {collapsible && (
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}

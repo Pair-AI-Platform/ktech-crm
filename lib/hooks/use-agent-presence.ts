@@ -36,6 +36,9 @@ function deriveStatus(
   return 'offline'
 }
 
+// Placeholder/system accounts that should not appear in agent listings
+const PLACEHOLDER_AGENT_NAMES = new Set(['admin', 'agent', 'demo'])
+
 // Stable demo statuses keyed by agent id — keeps Team Status populated in demo mode
 const DEMO_STATUS_CYCLE: AgentStatus[] = [
   'online', 'online', 'meeting', 'online', 'break',
@@ -55,8 +58,9 @@ interface PresenceRow {
  * Fetches all active agent profiles and derives their online/meeting/break/offline
  * status based on `last_activity_at` (heartbeat) and `manual_status`.
  */
-export function useAgentPresence() {
+export function useAgentPresence(options: { enabled?: boolean } = {}) {
   const supabase = createClient()
+  const enabled = options.enabled ?? true
 
   const { data, isLoading } = useQuery<PresenceRow[]>({
     queryKey: queryKeys.agentPresence.all,
@@ -97,18 +101,21 @@ export function useAgentPresence() {
 
       return (data ?? []) as PresenceRow[]
     },
+    enabled,
     staleTime: 30_000,
     refetchInterval: 60_000, // Poll less frequently to reduce load
   })
 
   const inDemo = isDemoMode()
-  const agents: AgentPresenceInfo[] = (data ?? []).map((p) => ({
-    id: p.id,
-    name: p.full_name ?? 'Unknown',
-    status: inDemo
-      ? ((p.manual_status as AgentStatus | null) ?? 'offline')
-      : deriveStatus(p.last_activity_at, p.manual_status),
-  }))
+  const agents: AgentPresenceInfo[] = (data ?? [])
+    .map((p) => ({
+      id: p.id,
+      name: p.full_name ?? 'Unknown',
+      status: inDemo
+        ? ((p.manual_status as AgentStatus | null) ?? 'offline')
+        : deriveStatus(p.last_activity_at, p.manual_status),
+    }))
+    .filter((a) => !PLACEHOLDER_AGENT_NAMES.has(a.name.trim().split(/\s+/)[0].toLowerCase()))
 
-  return { agents, loading: isLoading }
+  return { agents, loading: !enabled || isLoading }
 }

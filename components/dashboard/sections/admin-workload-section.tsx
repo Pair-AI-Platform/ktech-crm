@@ -58,10 +58,8 @@ export function AdminWorkloadSection({ agents, loading }: AdminWorkloadSectionPr
           </p>
         ) : (
           <div className="space-y-2">
-            {agents.map((agent, index) => {
+            {[...agents].sort((a, b) => b.activeLeads - a.activeLeads).map((agent, index) => {
               const barWidth = (agent.activeLeads / maxLeads) * 100
-              const isOverloaded = agent.activeLeads > avgLeads * 1.5
-              const isUnderloaded = agent.activeLeads < avgLeads * 0.5 && avgLeads > 0
               return (
                 <motion.div
                   key={agent.id}
@@ -78,20 +76,12 @@ export function AdminWorkloadSection({ agents, loading }: AdminWorkloadSectionPr
                       initial={{ width: 0 }}
                       animate={{ width: `${barWidth}%` }}
                       transition={{ duration: 0.5, delay: index * 0.03 }}
-                      className={cn(
-                        "absolute inset-y-0 left-0 rounded-lg flex items-center",
-                        isOverloaded
-                          ? "bg-gradient-to-r from-red-300/80 to-red-400/80"
-                          : isUnderloaded
-                          ? "bg-gradient-to-r from-amber-200/80 to-amber-300/80"
-                          : "bg-gradient-to-r from-blue-300/70 to-blue-400/70"
-                      )}
+                      className="absolute inset-y-0 left-0 rounded-lg flex items-center bg-gradient-to-r from-blue-300/70 to-blue-400/70"
                     />
                     <div className="absolute inset-y-0 left-0 right-0 flex items-center px-2 justify-between">
                       <span className={cn(
                         "text-[11px] font-semibold tabular-nums",
-                        barWidth > 20 ? "text-white/90" : "text-[var(--text-secondary)]",
-                        barWidth > 20 ? "drop-shadow-sm" : ""
+                        barWidth > 20 ? "text-white/90 drop-shadow-sm" : "text-[var(--text-secondary)]"
                       )}>
                         {agent.activeLeads} active
                       </span>
@@ -112,20 +102,6 @@ export function AdminWorkloadSection({ agents, loading }: AdminWorkloadSectionPr
                 </motion.div>
               )
             })}
-            {/* Avg line indicator */}
-            <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
-              <div className="flex items-center gap-3 text-[10px] text-[var(--text-tertiary)]">
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-2 rounded-sm bg-red-400/80" /> Overloaded (&gt;{Math.round(avgLeads * 1.5)})
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-2 rounded-sm bg-amber-300/80" /> Low (&lt;{Math.round(avgLeads * 0.5)})
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-2 rounded-sm bg-blue-400/70" /> Balanced
-                </span>
-              </div>
-            </div>
           </div>
         )}
       </StaticBlock>

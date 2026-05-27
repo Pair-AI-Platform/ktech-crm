@@ -3,13 +3,13 @@
 import { useState, useMemo, useEffect, useRef, startTransition, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSearchParams } from "next/navigation"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/layout/header"
 import { useLeads, useLeadMutations } from "@/lib/hooks/use-leads"
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
-import { AppointmentBooking } from "@/components/calendar/appointment-booking"
 import { LeadTable, BulkActionsBar } from "@/components/leads/lead-table"
-import { BulkAssignModal, BulkDeleteModal, BulkStageModal, SuccessToast } from "@/components/leads/bulk-operations-modal"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 import { stashCampaignPrefill, leadToPrefillContact } from "@/lib/campaigns/prefill"
 import { getLeadDisplayName } from "@/lib/lead-utils"
@@ -22,10 +22,9 @@ import { computePUCDocumentStatus } from "@/lib/psp/document-status"
 import { getMissingPucDocumentStageRequirements } from "@/lib/psp/document-stage-requirements"
 import { checkStageTransition } from "@/lib/lead-stage-guards"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
-import { LeadFiltersPanel, type LeadFilters } from "@/components/leads/lead-filters"
+import type { LeadFilters } from "@/components/leads/lead-filters"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
-import { LeadForm } from "@/components/leads/lead-form"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import {
   Send,
@@ -35,14 +34,46 @@ import {
   Plus,
 } from "lucide-react"
 
+const AppointmentBooking = dynamic(
+  () => import("@/components/calendar/appointment-booking").then(m => m.AppointmentBooking),
+  { ssr: false }
+)
+const LeadForm = dynamic(
+  () => import("@/components/leads/lead-form").then(m => m.LeadForm),
+  { ssr: false }
+)
+const LeadFiltersPanel = dynamic(
+  () => import("@/components/leads/lead-filters").then(m => m.LeadFiltersPanel),
+  { ssr: false }
+)
+const BulkAssignModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkAssignModal),
+  { ssr: false }
+)
+const BulkDeleteModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkDeleteModal),
+  { ssr: false }
+)
+const BulkStageModal = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.BulkStageModal),
+  { ssr: false }
+)
+const SuccessToast = dynamic(
+  () => import("@/components/leads/bulk-operations-modal").then(m => m.SuccessToast),
+  { ssr: false }
+)
+
 type TopTab = "puc" | "self_fund"
 
+// Self Fund tab page size (server-side paginated)
+const SF_PAGE_SIZE = 50
+
 type PucPaymentLeadRow = { lead_id: string }
-type PucPaymentAmountRow = { lead_id: string; amount: number | null }
 type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: string | null }
 type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
 type RecentStageMove = { stage: PipelineStage; rank: number; lead: Lead }
 type LeadStageChangedDetail = { leadId: string; stage: PipelineStage; status?: LeadStatus | null; lead: Lead }
+type SfStageRow = { pipeline_stage: string }
 
 // PUC pipeline stage pills (the stages a PUC lead progresses through)
 const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
@@ -132,6 +163,7 @@ export default function PUCPSPPage() {
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [sfStageFilter, setSfStageFilter] = useState<PipelineStage | "all">("all")
   const [sfSearchQuery, setSfSearchQuery] = useState("")
+  const [sfPage, setSfPage] = useState(1)
   // Lead IDs whose stage was just changed in the current view - keep them visible
   // until the user navigates away from this tab/stage filter.
   const [pucStickyLeadIds, setPucStickyLeadIds] = useState<Set<string>>(new Set())
@@ -146,6 +178,12 @@ export default function PUCPSPPage() {
   useEffect(() => {
     setSfStickyLeadIds(new Set())
   }, [sfStageFilter, topTab])
+
+  // Reset SF pagination when the stage filter or search query changes,
+  // otherwise users get stuck on an empty page after narrowing the result set.
+  useEffect(() => {
+    setSfPage(1)
+  }, [sfStageFilter, sfSearchQuery, topTab])
 
   useEffect(() => {
     const handleLeadStageChanged = (event: Event) => {
@@ -203,23 +241,34 @@ export default function PUCPSPPage() {
 
   const { bulkAssignLeads, bulkDeleteLeads, bulkUpdateStage, loading: mutationLoading } = useLeadMutations()
 
+  // Debounce search inputs so each keystroke doesn't fire a Supabase query.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300)
+  const debouncedSfSearchQuery = useDebouncedValue(sfSearchQuery, 300)
+
   // PUC leads - only fetch when PUC tab is active
   const { leads: pucLeads, loading: pucLoading, refetch: pucRefetch } = useLeads({
     fundingType: "puc",
-    searchQuery,
+    searchQuery: debouncedSearchQuery,
     limit: 5000,
     enabled: topTab === "puc",
   })
 
-  // Self Fund leads — server-side stage filter. The "all" tab is capped low
-  // because pulling 15k+ SF leads with embedded JOINs is too slow for this
-  // single-list view; users needing the full set are routed to /leads via
-  // the banner below.
-  const { leads: sfLeads, loading: sfLoading, refetch: sfRefetch } = useLeads({
+  // Self Fund leads: server-side stage filter + server-side pagination.
+  // Pulling 15k+ SF leads with embedded JOINs is too slow for one list view,
+  // so we page the result instead. Stage pill counts come from a separate
+  // lightweight query below so the pills stay accurate across pages.
+  const {
+    leads: sfLeads,
+    loading: sfLoading,
+    refetch: sfRefetch,
+    totalCount: sfTotalCount,
+    totalPages: sfTotalPages,
+  } = useLeads({
     fundingType: "self_funded",
-    searchQuery: sfSearchQuery,
+    searchQuery: debouncedSfSearchQuery,
     stage: sfStageFilter !== "all" ? (sfStageFilter as PipelineStage) : "all",
-    limit: sfStageFilter === "all" ? 200 : 2000,
+    page: sfPage,
+    pageSize: SF_PAGE_SIZE,
     enabled: topTab === "self_fund",
   })
 
@@ -273,50 +322,20 @@ export default function PUCPSPPage() {
 
   const linkSentCount = linkSentLeadIds.size
 
-  // Payment stats (Amendment 2)
-  const [paymentStats, setPaymentStats] = useState<{
-    seatReservationCount: number
-    fullDownpaymentCount: number
-    totalPaid: number
-  }>({ seatReservationCount: 0, fullDownpaymentCount: 0, totalPaid: 0 })
-
-  useEffect(() => {
-    if (topTab !== "puc" || pucLeads.length === 0) {
-      startTransition(() => setPaymentStats({ seatReservationCount: 0, fullDownpaymentCount: 0, totalPaid: 0 }))
-      return
-    }
-    const supabase = createClient()
-    const ids = pucLeads.map((l) => l.id)
-    supabase
-      .from("payment_transactions")
-      .select("lead_id, amount")
-      .in("lead_id", ids)
-      .eq("status", "completed")
-      .eq("notes", "PSP Fee Payment")
-      .then(({ data }: { data: PucPaymentAmountRow[] | null }) => {
-        if (!data) return
-        const leadTotals = new Map<string, number>()
-        for (const tx of data) {
-          leadTotals.set(tx.lead_id, (leadTotals.get(tx.lead_id) || 0) + (tx.amount || 0))
-        }
-        let seatReservation = 0
-        let fullDownpayment = 0
-        let totalPaid = 0
-        for (const [, total] of leadTotals) {
-          totalPaid++
-          if (total >= 150) seatReservation++
-          if (total >= 400) fullDownpayment++
-        }
-        setPaymentStats({ seatReservationCount: seatReservation, fullDownpaymentCount: fullDownpayment, totalPaid })
-      })
-  }, [pucLeads, topTab])
-
-  // PUC payment completion + doc counts for doc status filtering
+  // PUC payment completion + doc counts for doc status filtering.
+  // Only needed when the doc-status filter is active or the bulk-stage modal is open.
+  // LeadTable fetches its own copy for the visible "0/?" row badges, so we keep this
+  // off the first-paint path.
   const [pucPaymentLeadIds, setPucPaymentLeadIds] = useState<Set<string>>(new Set())
   const [pucDocCounts, setPucDocCounts] = useState<Record<string, { uploaded: number; required: number }>>({})
 
+  // Pre-warm doc/payment data the moment the user has selected leads (bulk-stage
+  // validation needs it) or activates the doc-status filter. Without selection or
+  // that filter, the data is unused, so we skip the fetch entirely.
+  const needsPucDocData = topTab === "puc" && (filters.docStatuses.length > 0 || selectedLeads.length > 0)
+
   useEffect(() => {
-    if (topTab !== "puc" || pucLeads.length === 0) {
+    if (!needsPucDocData || pucLeads.length === 0) {
       startTransition(() => { setPucPaymentLeadIds(new Set()); setPucDocCounts({}) })
       return
     }
@@ -405,7 +424,7 @@ export default function PUCPSPPage() {
       }
       setPucDocCounts(result)
     })
-  }, [pucLeads, topTab])
+  }, [pucLeads, needsPucDocData])
 
   // Compute effective doc status for a lead (used in filtering)
   const getLeadDocStatus = useCallback((lead: Lead): PUCDocumentStatus | null => {
@@ -415,22 +434,6 @@ export default function PUCPSPPage() {
     const allDocsComplete = docInfo ? (docInfo.required > 0 && docInfo.uploaded >= docInfo.required) : false
     return computePUCDocumentStatus(lead.submission_substage, allDocsComplete, pucPaymentLeadIds.has(lead.id))
   }, [pucDocCounts, pucPaymentLeadIds])
-
-  // Placement test stats (Amendment 3)
-  const placementStats = useMemo(() => {
-    if (topTab !== "puc") return { foundation1: 0, foundation2: 0, directEntry: 0, total: 0 }
-    let foundation1 = 0
-    let foundation2 = 0
-    let directEntry = 0
-    for (const lead of pucLeads) {
-      const level = (lead as unknown as Record<string, unknown>).placement_level as string | undefined
-      if (!level) continue
-      if (level === "foundation_1") foundation1++
-      else if (level === "foundation_2") foundation2++
-      else if (level === "direct_entry") directEntry++
-    }
-    return { foundation1, foundation2, directEntry, total: foundation1 + foundation2 + directEntry }
-  }, [pucLeads, topTab])
 
   // Shared advanced filter logic applied to any lead array
   const applyAdvancedFilters = useCallback((leadsArr: Lead[]) => {
@@ -622,14 +625,35 @@ export default function PUCPSPPage() {
     return counts
   }, [pucLeads])
 
-  // SF stage counts
-  const sfStageCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: sfLeads.length }
-    for (const lead of sfLeads) {
-      counts[lead.pipeline_stage] = (counts[lead.pipeline_stage] || 0) + 1
-    }
-    return counts
-  }, [sfLeads])
+  // SF stage counts: fetched independently of the paginated lead list so the
+  // pill counts stay accurate even when the user is on page 2+ of a single stage.
+  // We pull just the pipeline_stage column for all SF leads and tally client-side;
+  // that's a single ~15k-row column scan and is much cheaper than the joined list
+  // query used for the table itself.
+  const [sfStageCounts, setSfStageCounts] = useState<Record<string, number>>({ all: 0 })
+
+  useEffect(() => {
+    if (topTab !== "self_fund") return
+
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from("leads")
+      .select("pipeline_stage")
+      .eq("funding_type", "self_funded")
+      .limit(20000)
+      .then(({ data }: { data: SfStageRow[] | null }) => {
+        if (cancelled || !data) return
+        const counts: Record<string, number> = { all: data.length }
+        for (const row of data) {
+          if (!row.pipeline_stage) continue
+          counts[row.pipeline_stage] = (counts[row.pipeline_stage] || 0) + 1
+        }
+        setSfStageCounts(counts)
+      })
+
+    return () => { cancelled = true }
+  }, [topTab, sfTotalCount])
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -982,28 +1006,6 @@ export default function PUCPSPPage() {
           </div>
         </div>
 
-        {/* Banner: routes users to /leads when this single-list view can't show
-            the full SF dataset. Shown on "all" (capped at 200 for speed) and on
-            any stage that returned >= 2000 leads (likely truncated). */}
-        {topTab === "self_fund" && !sfLoading && (
-          (sfStageFilter === "all" && sfLeads.length >= 200) ||
-          (sfStageFilter !== "all" && sfLeads.length >= 2000)
-        ) && (
-          <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between">
-            <span>
-              {sfStageFilter === "all"
-                ? `Showing ${sfLeads.length} of 15,000+ self-funded leads. Use the Leads page for the full paginated list.`
-                : `Showing the first ${sfLeads.length.toLocaleString()} leads in this stage. The full list is too large for this view.`}
-            </span>
-            <a
-              href={`/leads?fundingType=self_funded${sfStageFilter !== "all" ? `&stage=${sfStageFilter}` : ""}`}
-              className="font-medium underline hover:no-underline whitespace-nowrap ml-3"
-            >
-              View all in Leads page →
-            </a>
-          </div>
-        )}
-
         {/* Lead Table (full width) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1017,6 +1019,11 @@ export default function PUCPSPPage() {
             selectedLeads={selectedLeads}
             onSelectLead={toggleSelectLead}
             onSelectAll={toggleSelectAll}
+            currentPage={topTab === "self_fund" ? sfPage : 1}
+            totalPages={topTab === "self_fund" ? (sfTotalPages || 1) : 1}
+            totalCount={topTab === "self_fund" ? sfTotalCount : undefined}
+            pageSize={SF_PAGE_SIZE}
+            onPageChange={topTab === "self_fund" ? setSfPage : undefined}
             onLeadClick={(lead) => {
               // Save view state so we can restore it on back navigation
               const scrollEl = document.querySelector('.overflow-auto.scrollbar-thin')
@@ -1112,56 +1119,68 @@ export default function PUCPSPPage() {
       </div>
 
       {/* Appointment Booking Modal */}
-      <AppointmentBooking
-        isOpen={!!bookingLead}
-        onClose={() => setBookingLead(null)}
-        onSuccess={refetch}
-        preselectedLead={bookingLead ?? undefined}
-        singleFormMode
-      />
+      {bookingLead && (
+        <AppointmentBooking
+          isOpen={!!bookingLead}
+          onClose={() => setBookingLead(null)}
+          onSuccess={refetch}
+          preselectedLead={bookingLead ?? undefined}
+          singleFormMode
+        />
+      )}
 
       {/* Bulk Assign Modal */}
-      <BulkAssignModal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        selectedCount={selectedLeads.length}
-        onConfirm={handleBulkAssignConfirm}
-        loading={mutationLoading}
-      />
+      {showAssignModal && (
+        <BulkAssignModal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          selectedCount={selectedLeads.length}
+          onConfirm={handleBulkAssignConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Stage Modal */}
-      <BulkStageModal
-        isOpen={showStageModal}
-        onClose={() => setShowStageModal(false)}
-        selectedCount={selectedLeads.length}
-        options={bulkStageOptions}
-        onConfirm={handleBulkStageConfirm}
-        loading={mutationLoading}
-      />
+      {showStageModal && (
+        <BulkStageModal
+          isOpen={showStageModal}
+          onClose={() => setShowStageModal(false)}
+          selectedCount={selectedLeads.length}
+          options={bulkStageOptions}
+          onConfirm={handleBulkStageConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Bulk Delete Modal */}
-      <BulkDeleteModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        selectedCount={selectedLeads.length}
-        onConfirm={handleBulkDeleteConfirm}
-        loading={mutationLoading}
-      />
+      {showDeleteModal && (
+        <BulkDeleteModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          selectedCount={selectedLeads.length}
+          onConfirm={handleBulkDeleteConfirm}
+          loading={mutationLoading}
+        />
+      )}
 
       {/* Success Toast */}
-      <SuccessToast
-        show={showSuccessToast}
-        message={successMessage}
-        onHide={() => setShowSuccessToast(false)}
-      />
+      {showSuccessToast && (
+        <SuccessToast
+          show={showSuccessToast}
+          message={successMessage}
+          onHide={() => setShowSuccessToast(false)}
+        />
+      )}
 
       {/* Filters Panel */}
-      <LeadFiltersPanel
-        filters={filters}
-        onChange={setFilters}
-        onClose={() => setShowFiltersPanel(false)}
-        isOpen={showFiltersPanel}
-      />
+      {showFiltersPanel && (
+        <LeadFiltersPanel
+          filters={filters}
+          onChange={setFilters}
+          onClose={() => setShowFiltersPanel(false)}
+          isOpen={showFiltersPanel}
+        />
+      )}
 
       {/* Add Lead Form Modal */}
       {showAddForm && (

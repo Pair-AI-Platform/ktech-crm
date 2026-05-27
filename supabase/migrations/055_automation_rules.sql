@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS automation_executions (
   executed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Follow-up Reminders table (if not using the existing one in-memory)
+-- Reminder table (if not using the existing one in-memory)
 CREATE TABLE IF NOT EXISTS follow_up_reminders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
@@ -79,7 +79,7 @@ CREATE POLICY "System can insert executions"
   TO authenticated
   WITH CHECK (true);
 
--- Follow-up reminders: users can manage their own, admins can manage all
+-- Reminders: users can manage their own, admins can manage all
 CREATE POLICY "Users can view own reminders"
   ON follow_up_reminders FOR SELECT
   TO authenticated

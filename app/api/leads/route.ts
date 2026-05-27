@@ -14,6 +14,8 @@ export const GET = withApiHandler(
     const limit = parseInt(url.searchParams.get('limit') || '50', 10)
     const page = url.searchParams.get('page') ? parseInt(url.searchParams.get('page')!, 10) : undefined
     const pageSize = parseInt(url.searchParams.get('pageSize') || '25', 10)
+    const includeCount = url.searchParams.get('includeCount') !== 'false'
+    const view = url.searchParams.get('view') === 'compact' ? 'compact' : 'full'
 
     // Advanced filters from JSON param
     let advancedFilters: Record<string, any> = {}
@@ -77,29 +79,61 @@ export const GET = withApiHandler(
       }
     }
 
+    const compactColumns = `
+      id,
+      first_name,
+      last_name,
+      first_name_ar,
+      last_name_ar,
+      civil_id,
+      phone,
+      pipeline_stage,
+      contact_status,
+      funding_type,
+      source,
+      priority,
+      quality_tier,
+      actual_gpa,
+      gpa_grade_12_expected,
+      assigned_to,
+      position_in_stage,
+      created_at,
+      updated_at,
+      school:schools(id, name_en, name_ar),
+      assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url)
+    `
+
+    const fullColumns = `
+      *,
+      school:schools(id, name_en, name_ar),
+      assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
+      lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category)
+    `
+
     const buildQuery = (forCount: boolean) => {
       let q = supabase
         .from('leads')
         .select(
           forCount
-            ? '*'
-            : `
-              *,
-              school:schools(id, name_en, name_ar),
-              assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
-              lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category)
-            `,
+            ? 'id'
+            : view === 'compact' ? compactColumns : fullColumns,
           forCount ? { count: 'exact', head: true } : undefined
         )
 
       if (!forCount) {
-        q = q
-          .order('position_in_stage', { ascending: true })
-          .order('created_at', { ascending: false })
+        if (stage === 'all') {
+          q = q.order('created_at', { ascending: false })
+        } else {
+          q = q
+            .order('position_in_stage', { ascending: true })
+            .order('created_at', { ascending: false })
+        }
       }
 
       if (stage !== 'all') {
         q = q.eq('pipeline_stage', stage)
+      } else {
+        q = q.neq('pipeline_stage', 'lost')
       }
 
       if (fundingType !== 'all') {
@@ -235,7 +269,7 @@ export const GET = withApiHandler(
       const offset = (page! - 1) * pageSize
       const [dataResult, countResult] = await Promise.all([
         buildQuery(false).range(offset, offset + pageSize - 1),
-        buildQuery(true),
+        includeCount ? buildQuery(true) : Promise.resolve({ count: null, error: null }),
       ])
 
       if (dataResult.error) {
@@ -245,7 +279,7 @@ export const GET = withApiHandler(
 
       return NextResponse.json({
         leads: dataResult.data || [],
-        totalCount: countResult.count ?? 0,
+        totalCount: includeCount ? countResult.count ?? 0 : undefined,
       })
     } else {
       const dataResult = await buildQuery(false).limit(limit)

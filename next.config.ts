@@ -1,7 +1,22 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: process.cwd(),
+  },
+
+  outputFileTracingRoot: process.cwd(),
+  outputFileTracingExcludes: {
+    "/**": [
+      "./thekstocks-automation/**",
+      "./imports/**",
+      "./old req/**",
+      "./*.pdf",
+      "./*.xlsx",
+      "./*.png",
+    ],
+  },
+
   async redirects() {
     return [
       {
@@ -49,7 +64,7 @@ const nextConfig: NextConfig = {
               // is unavoidable today. Tighten with nonces in a follow-up.
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' data: https://fonts.gstatic.com",
+              "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.twilio.com https://*.twilio.com https://*.myfatoorah.com https://*.sentry.io https://*.ingest.sentry.io",
@@ -70,15 +85,18 @@ const nextConfig: NextConfig = {
 // and PR previews without Sentry creds don't fail.
 const sentryWrapped =
   process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-    ? withSentryConfig(nextConfig, {
-        org: process.env.SENTRY_ORG,
-        project: process.env.SENTRY_PROJECT,
-        silent: !process.env.CI,
-        widenClientFileUpload: true,
-        tunnelRoute: "/monitoring",
-        disableLogger: true,
-        automaticVercelMonitors: true,
-      })
+    ? (() => {
+        const { withSentryConfig } = require("@sentry/nextjs")
+        return withSentryConfig(nextConfig, {
+          org: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
+          silent: !process.env.CI,
+          widenClientFileUpload: true,
+          tunnelRoute: "/monitoring",
+          disableLogger: true,
+          automaticVercelMonitors: true,
+        })
+      })()
     : nextConfig;
 
 export default sentryWrapped;

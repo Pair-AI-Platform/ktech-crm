@@ -31,6 +31,7 @@ interface UseAppointmentsOptions {
   needsAttention?: boolean // Filter for past appointments still in "scheduled" status
   noUpdated?: boolean // Filter for past appointments with no status update (same as needsAttention, clearer name)
   limit?: number
+  enabled?: boolean
 }
 
 type AppointmentIdRow = { appointment_id: string }
@@ -50,7 +51,7 @@ export function isAppointmentNeedsAttention(apt: Appointment): boolean {
 let channelCounter = 0
 
 export function useAppointments(options: UseAppointmentsOptions = {}) {
-  const { date, startDate, endDate, type = "all", status = "all", leadId, studentId, agentId, needsAttention, noUpdated, limit = 100 } = options
+  const { date, startDate, endDate, type = "all", status = "all", leadId, studentId, agentId, needsAttention, noUpdated, limit = 100, enabled = true } = options
   // noUpdated is an alias for needsAttention - both filter past appointments with no status update
   const filterNoUpdated = needsAttention || noUpdated
   const channelIdRef = useRef(`appointments-${++channelCounter}-${Date.now()}`)
@@ -183,6 +184,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
 
       return filteredData
     },
+    enabled,
     staleTime: 30_000,
   })
 
@@ -193,7 +195,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
   }, [queryClient])
 
   useEffect(() => {
-    if (isDemoMode()) return
+    if (!enabled || isDemoMode()) return
 
     const supabase = createClient()
     const id = channelIdRef.current
@@ -224,19 +226,19 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       supabase.removeChannel(channel)
       supabase.removeChannel(junctionChannel)
     }
-  }, [invalidate])
+  }, [enabled, invalidate])
 
   return {
     appointments: queryResult.data ?? [],
-    loading: queryResult.isLoading,
+    loading: !enabled || queryResult.isLoading,
     error: queryResult.error?.message ?? null,
     refetch: queryResult.refetch,
   }
 }
 
-export function useTodayAppointments() {
+export function useTodayAppointments(options: { enabled?: boolean; agentId?: string } = {}) {
   const today = toDateString(new Date())
-  return useAppointments({ date: today })
+  return useAppointments({ date: today, enabled: options.enabled, agentId: options.agentId })
 }
 
 export function useLeadAppointments(leadId: string) {
@@ -254,8 +256,8 @@ export function useNeedsAttentionAppointments() {
 
 // Hook to get appointments with no update (past + still scheduled) - clearer name
 // غير محدث - مواعيد فاتت ولم يتم تحديث حالتها
-export function useNoUpdatedAppointments() {
-  return useAppointments({ noUpdated: true, limit: 200 })
+export function useNoUpdatedAppointments(options: { enabled?: boolean; agentId?: string } = {}) {
+  return useAppointments({ noUpdated: true, limit: 200, enabled: options.enabled, agentId: options.agentId })
 }
 
 export function useAppointmentMutations() {
@@ -598,7 +600,8 @@ export function useAppointmentMutations() {
   }
 }
 
-export function useAppointmentStats() {
+export function useAppointmentStats(options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true
   const queryResult = useQuery({
     queryKey: appointmentKeys.stats(),
     queryFn: async () => {
@@ -714,6 +717,7 @@ export function useAppointmentStats() {
         noShow: na + cantReach, // NA + Can't Reach = No Show
       }
     },
+    enabled,
     staleTime: 30_000,
   })
 
@@ -734,7 +738,7 @@ export function useAppointmentStats() {
 
   return {
     stats: queryResult.data ?? defaultStats,
-    loading: queryResult.isLoading,
+    loading: !enabled || queryResult.isLoading,
   }
 }
 

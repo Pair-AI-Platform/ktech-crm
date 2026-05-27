@@ -1,14 +1,56 @@
 "use client"
 
 import { useState, createContext, useContext, useSyncExternalStore, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import { Sidebar } from "@/components/layout/sidebar"
-import { MobileNav, QuickActions } from "@/components/layout/mobile-nav"
-import { QuickFind, useQuickFind } from "@/components/layout/quick-find"
-import { AIChatButton } from "@/components/ai-chat/ai-chat-button"
-import { AIChatPanel } from "@/components/ai-chat/ai-chat-panel"
+import { useQuickFind } from "@/components/layout/use-quick-find"
 import { cn } from "@/lib/utils"
 import type { Profile } from "@/types"
+
+const Sidebar = dynamic(
+  () => import("@/components/layout/sidebar").then(m => m.Sidebar),
+  { ssr: false, loading: () => <SidebarSkeleton /> }
+)
+const MobileNav = dynamic(
+  () => import("@/components/layout/mobile-nav").then(m => m.MobileNav),
+  { ssr: false }
+)
+const QuickActions = dynamic(
+  () => import("@/components/layout/mobile-nav").then(m => m.QuickActions),
+  { ssr: false }
+)
+const AIChatButton = dynamic(
+  () => import("@/components/ai-chat/ai-chat-button").then(m => m.AIChatButton),
+  { ssr: false }
+)
+const QuickFind = dynamic(
+  () => import("@/components/layout/quick-find").then(m => m.QuickFind),
+  { ssr: false }
+)
+
+// Lazy-load AI chat panel: pulls in the AI SDK + chat hooks (~hundreds of KB).
+// We only need it when the user opens the chat for the first time.
+const AIChatPanel = dynamic(
+  () => import("@/components/ai-chat/ai-chat-panel").then(m => m.AIChatPanel),
+  { ssr: false }
+)
+
+function SidebarSkeleton() {
+  return (
+    <aside className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-[264px] bg-[var(--bg-surface)] border-r border-[var(--border)] p-4">
+      <div className="w-full space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-[var(--bg-hover)] animate-pulse" />
+          <div className="h-5 w-16 rounded bg-[var(--bg-hover)] animate-pulse" />
+        </div>
+        <div className="h-px bg-[var(--border)]" />
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="h-10 rounded-lg bg-[var(--bg-sunken)] animate-pulse" />
+        ))}
+      </div>
+    </aside>
+  )
+}
 
 function getDemoShellUser(): Profile {
   const now = new Date().toISOString()
@@ -30,7 +72,7 @@ function getDemoShellUser(): Profile {
   return {
     id: "agent-1",
     email: "demo-agent@ktech.edu.kw",
-    full_name: "Khalifa",
+    full_name: "Demo Agent",
     role: "agent",
     avatar_url: undefined,
     is_active: true,
@@ -58,6 +100,7 @@ function useDemoMode() {
   }, [])
 
   const getSnapshot = useCallback(() => {
+    if (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE !== "true") return false
     return localStorage.getItem("ktech-demo-mode") === "true"
   }, [])
 
@@ -75,6 +118,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [aiChatOpen, setAiChatOpen] = useState(false)
+  // Track first open so the AI chat chunk is fetched on demand, then kept mounted
+  // (preserves conversation state without rebuilding once the user starts using it).
+  const [aiChatEverOpened, setAiChatEverOpened] = useState(false)
   const quickFind = useQuickFind()
   const router = useRouter()
   const isDemoMode = useDemoMode()
@@ -115,14 +161,23 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         />
 
         {/* Quick Find Modal (⌘K) */}
-        <QuickFind
-          isOpen={quickFind.isOpen}
-          onClose={quickFind.close}
-        />
+        {quickFind.isOpen && (
+          <QuickFind
+            isOpen={quickFind.isOpen}
+            onClose={quickFind.close}
+          />
+        )}
 
         {/* AI Chat */}
-        <AIChatButton onClick={() => setAiChatOpen(true)} />
-        <AIChatPanel open={aiChatOpen} onOpenChange={setAiChatOpen} />
+        <AIChatButton
+          onClick={() => {
+            setAiChatEverOpened(true)
+            setAiChatOpen(true)
+          }}
+        />
+        {aiChatEverOpened && (
+          <AIChatPanel open={aiChatOpen} onOpenChange={setAiChatOpen} />
+        )}
       </div>
     </SidebarContext.Provider>
   )

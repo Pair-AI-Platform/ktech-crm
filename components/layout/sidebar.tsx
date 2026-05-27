@@ -263,6 +263,7 @@ const emptySubscribe = () => () => {}
 
 function getDemoSidebarProfile(): Profile | null {
   if (typeof window === "undefined") return null
+  if (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE !== "true") return null
   if (localStorage.getItem("ktech-demo-mode") !== "true") return null
 
   const now = new Date().toISOString()
@@ -284,7 +285,7 @@ function getDemoSidebarProfile(): Profile | null {
   return {
     id: "agent-1",
     email: "demo-agent@ktech.edu.kw",
-    full_name: "Khalifa",
+    full_name: "Demo Agent",
     role: "agent",
     is_active: true,
     monthly_target: 40,

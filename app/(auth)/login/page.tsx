@@ -2,9 +2,8 @@
 
 export const dynamic = "force-dynamic"
 
-import { useState, useSyncExternalStore } from "react"
+import { useState, useSyncExternalStore, type HTMLAttributes } from "react"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +11,19 @@ import { Label } from "@/components/ui/label"
 import { Mail, Lock, ArrowRight, Sparkles, Shield, Zap, Users, Play, ShieldCheck } from "lucide-react"
 
 const emptySubscribe = () => () => {}
+
+type MotionDivProps = HTMLAttributes<HTMLDivElement> & {
+  animate?: unknown
+  initial?: unknown
+  transition?: unknown
+  whileHover?: unknown
+}
+
+function MotionDiv({ animate, initial, transition, whileHover, ...props }: MotionDivProps) {
+  return <div {...props} />
+}
+
+const motion = { div: MotionDiv }
 
 export default function LoginPage() {
   const router = useRouter()
@@ -51,15 +63,15 @@ export default function LoginPage() {
     }
   }
 
-  const isDemoAllowed = true
+  const isDemoAllowed = process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true"
 
   const handleDemoMode = (role: "admin" | "agent") => {
     setDemoLoading(role)
     setError("")
 
-    // Demo mode is fully client-side: no Supabase auth required. The proxy
-    // checks the ktech-demo-mode cookie to allow access; useUser() and the
-    // data hooks read localStorage to serve mock profiles + demo data.
+    // Demo mode is fully client-side: no Supabase auth required. The dashboard
+    // layout checks the ktech-demo-mode cookie; client hooks read localStorage
+    // to serve mock profiles + demo data.
     localStorage.setItem("ktech-demo-mode", "true")
     localStorage.setItem("ktech-demo-role", role)
     document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; samesite=lax"

@@ -3282,7 +3282,8 @@ function computeWeeklyTargets(
   })
 }
 
-export function useAgentTargetProgress(agentId?: string) {
+export function useAgentTargetProgress(agentId?: string, options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true
   const { data: queryData, isLoading: loading } = useQuery<{ allProgress: AgentTargetProgress[] }>({
     queryKey: ['agent-target-progress', agentId],
     queryFn: async () => {
@@ -3404,6 +3405,7 @@ export function useAgentTargetProgress(agentId?: string) {
 
       return { allProgress }
     },
+    enabled,
     staleTime: 60_000,
   })
 
@@ -3413,7 +3415,7 @@ export function useAgentTargetProgress(agentId?: string) {
     return allAgentsProgress.find(p => p.agentId === agentId) ?? null
   }, [agentId, allAgentsProgress])
 
-  return { progress, allAgentsProgress, loading }
+  return { progress, allAgentsProgress, loading: !enabled || loading }
 }
 
 // =============================================
@@ -3429,7 +3431,8 @@ export interface MonthlyTargetHistory {
   weeklyTargets: WeeklyTarget[]
 }
 
-export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) {
+export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6, options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true
   const { data: history = [], isLoading: loading } = useQuery<MonthlyTargetHistory[]>({
     queryKey: ['agent-target-history', agentId, monthsBack],
     queryFn: async () => {
@@ -3539,9 +3542,9 @@ export function useAgentTargetHistory(agentId?: string, monthsBack: number = 6) 
 
       return monthlyHistory
     },
-    enabled: !!agentId,
+    enabled: enabled && !!agentId,
     staleTime: 60_000,
   })
 
-  return { history, loading }
+  return { history, loading: !enabled || loading }
 }

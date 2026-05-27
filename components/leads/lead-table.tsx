@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -57,6 +57,7 @@ interface LeadTableProps {
 }
 
 type PaymentLeadRow = { lead_id: string }
+const PRIORITY_WEIGHT: Record<string, number> = { critical: 0, important: 1, normal: 2 }
 
 export function LeadTable({
   leads,
@@ -130,6 +131,16 @@ export function LeadTable({
   const isPucContactedView = isPucSrjView && currentStageFilter === 'contacted'
   const isPucAppSubmissionView = currentStageFilter === 'puc_application_submission'
 
+  // Stable key for the current lead set. Most renders pass an unchanged set of
+  // lead IDs (parent re-renders for unrelated reasons); using this key in the
+  // side-effect deps avoids re-firing the SF/PUC/Doc fetches every render.
+  const leadIdsKey = useMemo(() => {
+    if (leads.length === 0) return ""
+    const ids = leads.map(l => l.id)
+    ids.sort()
+    return ids.join(",")
+  }, [leads])
+
   // Function to refresh document completion status
   const refreshDocumentStatus = React.useCallback(() => {
     const submissionLeads = leads.filter(
@@ -153,9 +164,11 @@ export function LeadTable({
 
   // Check document completion status for leads in submission stage
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
     refreshDocumentStatus()
-  }, [refreshDocumentStatus])
+    // Only refire when the actual lead-id set changes, not on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIdsKey])
 
   // Fetch student data for SF leads to check payment > 150 KD + documents done
   const refreshSfGreenStatus = useCallback(async () => {
@@ -248,9 +261,10 @@ export function LeadTable({
   }, [leads])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggers data fetch on mount
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshSfGreenStatus()
-  }, [refreshSfGreenStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIdsKey])
 
   // Fetch PUC payment status for PUC leads
   const refreshPucPaymentStatus = useCallback(async () => {
@@ -286,9 +300,10 @@ export function LeadTable({
   }, [leads, isPucSrjView])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggers data fetch on mount
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshPucPaymentStatus()
-  }, [refreshPucPaymentStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIdsKey, isPucSrjView])
 
   // Fetch PUC document counts from psp_documents table + DB configs for required counts
   const refreshPucDocCounts = useCallback(async () => {
@@ -394,9 +409,10 @@ export function LeadTable({
   }, [leads])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggers data fetch on mount
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshPucDocCounts()
-  }, [refreshPucDocCounts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIdsKey])
 
   // Check which SF leads have been sent to registration (localStorage flag)
   const refreshRegistrationStatus = useCallback(() => {
@@ -411,6 +427,7 @@ export function LeadTable({
   }, [leads])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const refreshTimer = window.setTimeout(refreshRegistrationStatus, 0)
     // Listen for storage events (from sf-document-manager dispatching)
     const handler = () => refreshRegistrationStatus()
@@ -419,7 +436,8 @@ export function LeadTable({
       window.clearTimeout(refreshTimer)
       window.removeEventListener('storage', handler)
     }
-  }, [refreshRegistrationStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIdsKey])
 
   // Optimistic updates - store pending changes locally
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, Partial<Lead>>>({})
@@ -465,65 +483,69 @@ export function LeadTable({
     }
   }
 
-  const PRIORITY_WEIGHT: Record<string, number> = { critical: 0, important: 1, normal: 2 }
+  const sortedLeads = useMemo(() => {
+    const stageOrder = stageSettings.length > 0
+      ? stageSettings.map(s => s.stage)
+      : PIPELINE_STAGES.map(s => s.value)
 
-  const sortedLeads = [...leads].sort((a, b) => {
-    const aIsTopPinned = topPinnedLeadId === a.id
-    const bIsTopPinned = topPinnedLeadId === b.id
-    if (aIsTopPinned !== bIsTopPinned) return aIsTopPinned ? -1 : 1
+    return [...leads].sort((a, b) => {
+      const aIsTopPinned = topPinnedLeadId === a.id
+      const bIsTopPinned = topPinnedLeadId === b.id
+      if (aIsTopPinned !== bIsTopPinned) return aIsTopPinned ? -1 : 1
 
-    const aPinRank = pinnedLeadRanks?.[a.id] ?? 0
-    const bPinRank = pinnedLeadRanks?.[b.id] ?? 0
-    if (aPinRank !== bPinRank) return bPinRank - aPinRank
+      const aPinRank = pinnedLeadRanks?.[a.id] ?? 0
+      const bPinRank = pinnedLeadRanks?.[b.id] ?? 0
+      if (aPinRank !== bPinRank) return bPinRank - aPinRank
 
-    if (!sortField) {
-      const aPosition = a.position_in_stage ?? Number.MAX_SAFE_INTEGER
-      const bPosition = b.position_in_stage ?? Number.MAX_SAFE_INTEGER
-      if (aPosition !== bPosition) return aPosition - bPosition
-      return 0
-    }
+      if (!sortField) {
+        const aPosition = a.position_in_stage ?? Number.MAX_SAFE_INTEGER
+        const bPosition = b.position_in_stage ?? Number.MAX_SAFE_INTEGER
+        if (aPosition !== bPosition) return aPosition - bPosition
+        return 0
+      }
 
-    // Always sort by priority first (critical > important > normal/undefined)
-    const aPriority = PRIORITY_WEIGHT[a.priority || 'normal'] ?? 2
-    const bPriority = PRIORITY_WEIGHT[b.priority || 'normal'] ?? 2
-    if (aPriority !== bPriority) return aPriority - bPriority
+      // Always sort by priority first (critical > important > normal/undefined)
+      const aPriority = PRIORITY_WEIGHT[a.priority || 'normal'] ?? 2
+      const bPriority = PRIORITY_WEIGHT[b.priority || 'normal'] ?? 2
+      if (aPriority !== bPriority) return aPriority - bPriority
 
-    let comparison = 0
-    switch (sortField) {
-      case "name":
-        comparison = getLeadDisplayName(a).localeCompare(getLeadDisplayName(b), 'ar')
-        break
-      case "pipeline_stage":
-        const stageOrder = stageSettings.length > 0
-          ? stageSettings.map(s => s.stage)
-          : PIPELINE_STAGES.map(s => s.value)
-        comparison = stageOrder.indexOf(a.pipeline_stage) - stageOrder.indexOf(b.pipeline_stage)
-        break
-      case "source":
-        comparison = a.source.localeCompare(b.source)
-        break
-      case "school":
-        comparison = (a.school || "").localeCompare(b.school || "")
-        break
-      case "expected_gpa":
-        // nulls last: leads without value go to bottom regardless of direction
-        if (a.expected_gpa == null && b.expected_gpa == null) { comparison = 0; break }
-        if (a.expected_gpa == null) { return 1 }
-        if (b.expected_gpa == null) { return -1 }
-        comparison = a.expected_gpa - b.expected_gpa
-        break
-      case "actual_gpa":
-        if (a.actual_gpa == null && b.actual_gpa == null) { comparison = 0; break }
-        if (a.actual_gpa == null) { return 1 }
-        if (b.actual_gpa == null) { return -1 }
-        comparison = a.actual_gpa - b.actual_gpa
-        break
-    }
-    return sortDirection === "asc" ? comparison : -comparison
-  })
+      let comparison = 0
+      switch (sortField) {
+        case "name":
+          comparison = getLeadDisplayName(a).localeCompare(getLeadDisplayName(b), 'ar')
+          break
+        case "pipeline_stage":
+          comparison = stageOrder.indexOf(a.pipeline_stage) - stageOrder.indexOf(b.pipeline_stage)
+          break
+        case "source":
+          comparison = a.source.localeCompare(b.source)
+          break
+        case "school":
+          comparison = (a.school || "").localeCompare(b.school || "")
+          break
+        case "expected_gpa":
+          // nulls last: leads without value go to bottom regardless of direction
+          if (a.expected_gpa == null && b.expected_gpa == null) { comparison = 0; break }
+          if (a.expected_gpa == null) { return 1 }
+          if (b.expected_gpa == null) { return -1 }
+          comparison = a.expected_gpa - b.expected_gpa
+          break
+        case "actual_gpa":
+          if (a.actual_gpa == null && b.actual_gpa == null) { comparison = 0; break }
+          if (a.actual_gpa == null) { return 1 }
+          if (b.actual_gpa == null) { return -1 }
+          comparison = a.actual_gpa - b.actual_gpa
+          break
+      }
+      return sortDirection === "asc" ? comparison : -comparison
+    })
+  }, [leads, pinnedLeadRanks, sortDirection, sortField, stageSettings, topPinnedLeadId])
 
-  const showSubstageColumn = sortedLeads.some(
-    lead => !(lead.funding_type === 'self_funded' && lead.pipeline_stage === 'applicant')
+  const showSubstageColumn = useMemo(
+    () => sortedLeads.some(
+      lead => !(lead.funding_type === 'self_funded' && lead.pipeline_stage === 'applicant')
+    ),
+    [sortedLeads]
   )
 
   const handleStageChange = async (leadId: string, newStage: PipelineStage) => {

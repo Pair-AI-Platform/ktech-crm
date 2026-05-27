@@ -7,6 +7,11 @@ export const GET = withApiHandler(
   async (_ctx: AuthenticatedContext) => {
     const supabase = createServiceRoleClient()
 
+    const { data: grouped, error: rpcError } = await supabase.rpc('get_dashboard_dropoff_stats')
+    if (!rpcError && grouped) {
+      return NextResponse.json({ grouped })
+    }
+
     // Primary: leads with lost_at_stage populated
     const { data: leadsWithStage, error: e1 } = await supabase
       .from('leads')

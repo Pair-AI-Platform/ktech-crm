@@ -12,8 +12,9 @@ import { useUser } from './use-user'
  * Uses a server-side API route (service role) to bypass RLS and get
  * accurate org-wide drop-off data.
  */
-export function useStageDropoff() {
+export function useStageDropoff(options: { enabled?: boolean } = {}) {
   const { isAdmin } = useUser()
+  const enabled = options.enabled ?? true
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.stageDropoff.all,
@@ -35,11 +36,12 @@ export function useStageDropoff() {
       const res = await fetch('/api/dashboard/dropoff')
       if (!res.ok) throw new Error('Failed to fetch drop-off data')
       return res.json() as Promise<{
-        hasStage: Array<{ id: string; lost_at_stage: string | null }>
-        activityRows: Array<{ lead_id: string; metadata: Record<string, string> }>
+        grouped?: Array<{ stage: string | null; count?: number | string | null; dropoff_count?: number | string | null }>
+        hasStage?: Array<{ id: string; lost_at_stage: string | null }>
+        activityRows?: Array<{ lead_id: string; metadata: Record<string, string> }>
       }>
     },
-    enabled: isAdmin,
+    enabled: enabled && isAdmin,
   })
 
   const stageLabels: Record<string, string> = {
@@ -58,6 +60,13 @@ export function useStageDropoff() {
   const normalize = (s: string) => stageAliases[s] ?? s
 
   const countMap = new Map<string, number>()
+
+  for (const row of data?.grouped ?? []) {
+    if (!row.stage) continue
+    const stage = normalize(row.stage)
+    const count = Number(row.count ?? row.dropoff_count ?? 0) || 0
+    countMap.set(stage, (countMap.get(stage) ?? 0) + count)
+  }
 
   // Count from lost_at_stage column
   for (const row of data?.hasStage ?? []) {
@@ -91,5 +100,5 @@ export function useStageDropoff() {
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
     })
 
-  return { dropoffData, loading: isLoading }
+  return { dropoffData, loading: !enabled || isLoading }
 }
