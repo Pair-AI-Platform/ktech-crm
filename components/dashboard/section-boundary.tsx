@@ -1,7 +1,6 @@
 "use client"
 
 import { Component, ReactNode } from "react"
-import * as Sentry from "@sentry/nextjs"
 import { AlertTriangle } from "lucide-react"
 
 interface SectionBoundaryProps {
@@ -34,17 +33,6 @@ export class SectionBoundary extends Component<SectionBoundaryProps, SectionBoun
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
-    Sentry.captureException(error, {
-      tags: { boundary: "dashboard-section", section: this.props.name },
-      contexts: {
-        react: { componentStack: info.componentStack ?? "(none)" },
-      },
-      extra: {
-        section: this.props.name,
-        message: error.message,
-        stack: error.stack,
-      },
-    })
     console.error(`[SectionBoundary:${this.props.name}]`, {
       message: error.message,
       stack: error.stack,

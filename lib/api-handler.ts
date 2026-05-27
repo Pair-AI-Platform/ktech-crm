@@ -204,15 +204,6 @@ export function withApiHandler(
         stack: error instanceof Error ? error.stack : undefined,
         durationMs: Date.now() - startTime,
       })
-      try {
-        const Sentry = await import('@sentry/nextjs')
-        Sentry.captureException(error, {
-          tags: { context: options.context, route: req.nextUrl.pathname },
-          extra: { requestId: logger.requestId, method: req.method },
-        })
-      } catch {
-        // Sentry not configured — no-op
-      }
       return errorResponse('Internal server error', 500, logger)
     }
   }
