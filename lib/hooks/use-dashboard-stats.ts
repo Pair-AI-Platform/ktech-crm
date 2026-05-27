@@ -7,6 +7,12 @@ import { isDemoMode, getDemoLeads } from '@/lib/demo-data'
 import { useUser } from './use-user'
 import { queryKeys } from './query-keys'
 
+// Cap admin dashboard fetch to the most recent N leads.
+// This still covers all "active" workflow (heatmap, priority list, birthdays)
+// while preventing the dashboard from paging through years of historical data.
+// At 5k, the response is ~1–2 MB instead of the 10+ MB it would be unbounded.
+const ADMIN_DASHBOARD_MAX_LEADS = 1000
+
 /**
  * Lightweight lead shape — only the columns the dashboard page actually reads.
  * Fetching these instead of full Lead objects avoids transferring dozens of
@@ -44,11 +50,17 @@ const DASHBOARD_LEAD_COLUMNS =
  *
  * Now uses React Query for caching, deduplication, and retry.
  */
-export function useDashboardStats() {
+export function useDashboardStats(options: { enabled?: boolean } = {}) {
   const { profile, isAdmin } = useUser()
+  const enabled = options.enabled ?? true
+
+  const userId = profile?.id ?? null
+  const userReady = !!profile
 
   const { data: allLeads = [], isLoading: loading } = useQuery({
-    queryKey: queryKeys.dashboardStats.all,
+    // Keyed by user + role so admin/agent caches don't collide
+    queryKey: [...queryKeys.dashboardStats.all, isAdmin ? 'admin' : userId ?? 'anon'],
+    enabled: enabled && userReady, // wait for profile so non-admin filter is applied correctly
     queryFn: async (): Promise<DashboardLead[]> => {
       if (isDemoMode()) {
         const demoLeads = getDemoLeads()
@@ -74,38 +86,42 @@ export function useDashboardStats() {
 
       const supabase = createClient()
 
-      // Fetch in batches to avoid timeout on large datasets
-      const PAGE_SIZE = 1000
-      let allData: DashboardLead[] = []
-      let from = 0
-      let hasMore = true
-
-      while (hasMore) {
+      // Non-admin agents only need their own assigned leads — bypass the heatmap-scale
+      // fetch entirely. A single bounded query, almost always <500 rows.
+      if (!isAdmin && userId) {
         const { data, error } = await supabase
           .from('leads')
           .select(DASHBOARD_LEAD_COLUMNS)
-          .order('created_at', { ascending: false })
-          .range(from, from + PAGE_SIZE - 1)
+          .eq('assigned_to', userId)
+          .order('updated_at', { ascending: false })
+          .limit(2000)
 
         if (error) {
           console.error('[useDashboardStats] Supabase error:', error.message)
-          break
+          return []
         }
 
-        const mapped = (data || []).map((l: any) => ({ ...l, status: l.contact_status })) as DashboardLead[]
-        allData = allData.concat(mapped)
-
-        if (!data || data.length < PAGE_SIZE) {
-          hasMore = false
-        } else {
-          from += PAGE_SIZE
-        }
+        return (data || []).map((l: any) => ({ ...l, status: l.contact_status })) as DashboardLead[]
       }
 
-      return allData
+      // Admin path: most-recent N leads in a single round trip, ordered by updated_at
+      // so anything actively being worked on stays in scope.
+      const { data, error } = await supabase
+        .from('leads')
+        .select(DASHBOARD_LEAD_COLUMNS)
+        .order('updated_at', { ascending: false })
+        .limit(ADMIN_DASHBOARD_MAX_LEADS)
+
+      if (error) {
+        console.error('[useDashboardStats] Supabase error:', error.message)
+        return []
+      }
+
+      return (data || []).map((l: any) => ({ ...l, status: l.contact_status })) as DashboardLead[]
     },
     staleTime: 60_000, // Cache for 1 minute
     gcTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
   })
 
   // ---------- Derived data (memoised) ----------
@@ -138,6 +154,6 @@ export function useDashboardStats() {
     sfLeads,
     pucLeads,
     attentionPool,
-    loading,
+    loading: !enabled || loading,
   }
 }

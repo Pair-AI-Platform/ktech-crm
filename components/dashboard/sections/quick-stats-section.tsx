@@ -13,6 +13,10 @@ interface QuickStatsSectionProps {
   appointmentStats: { today: number }
   myLeads: DashboardLead[]
   isLoading: boolean
+  fastStats?: {
+    todayAppointments: number
+    todayCallbacks: number
+  }
 }
 
 export function QuickStatsSection({
@@ -21,6 +25,7 @@ export function QuickStatsSection({
   appointmentStats,
   myLeads,
   isLoading,
+  fastStats,
 }: QuickStatsSectionProps) {
   const router = useRouter()
 
@@ -33,7 +38,7 @@ export function QuickStatsSection({
   const statItems = [
     {
       id: "today-appts",
-      value: appointmentsLoading ? "..." : appointmentStats.today,
+      value: appointmentsLoading ? "..." : (fastStats?.todayAppointments ?? appointmentStats.today),
       label: "Today's Appts",
       icon: <Calendar className="w-5 h-5 text-[var(--primary)]" />,
       iconBg: "bg-[var(--primary)]/10",
@@ -41,7 +46,7 @@ export function QuickStatsSection({
     },
     {
       id: "callbacks",
-      value: leadsLoading ? "..." : callbackLeads,
+      value: leadsLoading ? "..." : (fastStats?.todayCallbacks ?? callbackLeads),
       label: "Today's Callbacks",
       icon: <Clock className="w-5 h-5 text-[var(--warning)]" />,
       iconBg: "bg-[var(--warning)]/10",

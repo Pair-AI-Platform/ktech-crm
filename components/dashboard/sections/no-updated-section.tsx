@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import { AlertTriangle, Calendar, Clock, Users, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,8 +9,16 @@ import { APPOINTMENT_TYPES } from "@/types"
 import type { Appointment } from "@/types"
 import { cn } from "@/lib/utils"
 import { getLeadDisplayName } from "@/lib/lead-utils"
-import { AppointmentDetail } from "@/components/calendar/appointment-detail"
-import { NoUpdatedAppointments } from "@/components/calendar/no-updated-appointments"
+
+const AppointmentDetail = dynamic(
+  () => import("@/components/calendar/appointment-detail").then(m => m.AppointmentDetail),
+  { ssr: false }
+)
+
+const NoUpdatedAppointments = dynamic(
+  () => import("@/components/calendar/no-updated-appointments").then(m => m.NoUpdatedAppointments),
+  { ssr: false }
+)
 
 interface NoUpdatedSectionProps {
   noUpdatedAppointments: Appointment[]

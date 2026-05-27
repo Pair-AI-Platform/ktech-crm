@@ -13,16 +13,22 @@ interface AdminKpiSectionProps {
   todayAppointments: number
   todayCallbacks: number
   appointmentsLoading: boolean
+  fastStats?: {
+    activeLeads: number
+    totalFiles: number
+    pucFiles: number
+    sfFiles: number
+  }
 }
 
-export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCallbacks, appointmentsLoading }: AdminKpiSectionProps) {
+export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCallbacks, appointmentsLoading, fastStats }: AdminKpiSectionProps) {
   const router = useRouter()
 
   const stats = useMemo(() => {
-    const total = allLeads.length
-    const totalFiles = allLeads.filter((l) => l.pipeline_stage === "application").length
-    const pucFiles = allLeads.filter((l) => l.pipeline_stage === "application" && l.funding_type === "puc").length
-    const sfFiles = allLeads.filter((l) => l.pipeline_stage === "application" && l.funding_type === "self_funded").length
+    const total = fastStats?.activeLeads ?? allLeads.length
+    const totalFiles = fastStats?.totalFiles ?? allLeads.filter((l) => l.pipeline_stage === "application").length
+    const pucFiles = fastStats?.pucFiles ?? allLeads.filter((l) => l.pipeline_stage === "application" && l.funding_type === "puc").length
+    const sfFiles = fastStats?.sfFiles ?? allLeads.filter((l) => l.pipeline_stage === "application" && l.funding_type === "self_funded").length
 
     return [
       // Row 1: categories
@@ -73,7 +79,7 @@ export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCal
         onClick: () => router.push("/leads?status=callback"),
       },
     ]
-  }, [allLeads, todayAppointments, todayCallbacks, appointmentsLoading, router])
+  }, [allLeads, fastStats, todayAppointments, todayCallbacks, appointmentsLoading, router])
 
   return (
     <motion.div
