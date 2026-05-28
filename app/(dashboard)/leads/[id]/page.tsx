@@ -33,7 +33,6 @@ import {
   CalendarDays,
   UserCircle,
   ArrowUpRight,
-  ChevronRight,
   ArrowRightLeft,
   CircleDot,
   ClipboardList,
@@ -823,7 +822,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       />
 
       <motion.div
-        className="w-full px-4 sm:px-6 pb-24"
+        className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 pb-24"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
@@ -839,9 +838,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </Link>
         </div>
 
-        {/* Profile header */}
+        {/* Profile header — compact single row */}
         <motion.div
-          data-lead-header-version="clean-profile-v2"
+          data-lead-header-version="clean-profile-v3"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
@@ -853,358 +852,67 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
           style={{ boxShadow: lead.priority !== 'critical' ? 'var(--shadow-card)' : undefined }}
         >
-          <div className="relative p-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <motion.div
-                    className="relative shrink-0"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                  >
-                    <div
-                      data-lead-avatar-version="profile-bust-v5"
-                      role="img"
-                      aria-label={`${lead.gender?.toLowerCase() === 'female' ? 'Female' : lead.gender?.toLowerCase() === 'male' ? 'Male' : 'Lead'} profile`}
-                      className={cn(
-                        "relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border shadow-sm sm:h-16 sm:w-16",
-                        lead.gender?.toLowerCase() === 'female'
-                          ? "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/25 dark:text-fuchsia-300"
-                          : "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/25 dark:text-blue-300"
-                      )}
-                    >
-                      <StickFigureAvatar gender={lead.gender} />
-                    </div>
-                  </motion.div>
-
-                  <div className="min-w-0 flex-1">
-                    <motion.div
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.15 }}
-                      className="space-y-1.5"
-                    >
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                        <h1 className="text-2xl font-semibold leading-tight text-[var(--text-primary)]" dir="auto">
-                          {getLeadDisplayName(lead)}
-                        </h1>
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
-                          style={{
-                            background: stageGradient.from,
-                            color: stageGradient.text,
-                          }}
-                        >
-                          {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
-                          {stageInfo?.label}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {lead.priority === 'critical' && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-500/20 dark:text-red-400">
-                            <Flame className="w-3.5 h-3.5" />
-                            Critical
-                          </span>
-                        )}
-                        {lead.priority === 'important' && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
-                            <Star className="w-3.5 h-3.5" />
-                            Important
-                          </span>
-                        )}
-                      </div>
-                    </motion.div>
-                  </div>
-                </div>
-
-                <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="self-start">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowEditForm(true)}
-                    className="h-9 gap-2 rounded-lg border-[var(--border)] px-3 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] hover:text-[var(--text-primary)]"
-                  >
-                    <Edit className="w-4 h-4" />
-                    <span>Edit Profile</span>
-                  </Button>
-                </motion.div>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <motion.div
+              className="shrink-0"
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            >
+              <div
+                data-lead-avatar-version="profile-bust-v6"
+                role="img"
+                aria-label={`${lead.gender?.toLowerCase() === 'female' ? 'Female' : lead.gender?.toLowerCase() === 'male' ? 'Male' : 'Lead'} profile`}
+                className={cn(
+                  "relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border shadow-sm",
+                  lead.gender?.toLowerCase() === 'female'
+                    ? "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/25 dark:text-fuchsia-300"
+                    : "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/25 dark:text-blue-300"
+                )}
+              >
+                <StickFigureAvatar gender={lead.gender} />
               </div>
+            </motion.div>
 
-              {/* Action bar */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.35 }}
-                className="grid grid-flow-col auto-cols-[minmax(160px,1fr)] gap-2 overflow-x-auto border-t border-[var(--border-subtle)] pt-3 [scrollbar-width:none] xl:grid-flow-row xl:grid-cols-5 xl:auto-cols-auto xl:overflow-visible [&::-webkit-scrollbar]:hidden"
-              >
-              {/* Primary CTA */}
-              {lead.pipeline_stage === 'lost' && canChangeStage ? (
-                <div className="relative" ref={reactivateMenuRef}>
-                  <motion.button
-                    onClick={() => setShowReactivateMenu(!showReactivateMenu)}
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--text-primary)] px-3 text-sm font-semibold text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Reactivate To</span>
-                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showReactivateMenu && "rotate-180")} />
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {showReactivateMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-lg shadow-lg ring-1 ring-[var(--border)] overflow-hidden z-50"
-                      >
-                        <div className="p-1">
-                          {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
-                            <button
-                              key={stage.value}
-                              onClick={() => handleReactivateLead(stage.value)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
-                            >
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ background: STAGE_GRADIENT[stage.value].from }}
-                              />
-                              <span className="text-sm font-medium text-[var(--text-primary)]">{stage.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : null}
-
-              {/* Book Appointment button */}
-              <Link href={`/calendar?book=${lead.id}`} className="min-w-0">
-                <motion.div
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h1 className="text-lg font-semibold leading-tight text-[var(--text-primary)] sm:text-xl" dir="auto">
+                  {getLeadDisplayName(lead)}
+                </h1>
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{
+                    background: stageGradient.from,
+                    color: stageGradient.text,
+                  }}
                 >
-                  <Calendar className="w-4 h-4" />
-                  <span>Book Appointment</span>
-                </motion.div>
-              </Link>
-
-              {/* Schedule Callback button */}
-              <motion.div
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowCallbackScheduler(true)}
-                className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
-              >
-                <PhoneForwarded className="w-4 h-4" />
-                <span>Schedule Callback</span>
-              </motion.div>
-
-              {/* PSP Submission button - only for PUC-funded leads */}
-              {lead.funding_type !== 'self_funded' && (
-                <motion.div
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowPSPWizard(true)}
-                  className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>PSP</span>
-                </motion.div>
-              )}
-
-              {/* PSP self-service link button — admin/agent generates a public link
-                  the student fills out themselves. Only PUC-funded leads. */}
-              {lead.funding_type !== 'self_funded' && (
-                <motion.div
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowPSPSelfService(true)}
-                  className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Send PSP Link</span>
-                </motion.div>
-              )}
-
-              {/* RSVP button - only for applicants */}
-              {lead.pipeline_stage === 'applicant' && (
-                <SimpleTooltip content="Send RSVP link" side="bottom">
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowRSVPDialog(true)}
-                    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Send RSVP</span>
-                  </motion.div>
-                </SimpleTooltip>
-              )}
-              </motion.div>
-
-              {/* Upcoming Appointments */}
-              {upcomingAppointments.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="mt-3 space-y-2"
-                >
-                {upcomingAppointments.map((apt) => (
-                  <div key={apt.id}>
-                    <div
-                      className={cn(
-                        "flex items-center gap-3.5 px-4 py-3 rounded-lg ring-1 transition-all duration-200",
-                        apt.is_callback
-                          ? "bg-amber-50 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30"
-                          : "bg-[var(--info-bg)] ring-[var(--info)]/15"
-                      )}
-                    >
-                      <Link
-                        href={`/calendar?highlight=${apt.id}`}
-                        className="flex items-center gap-3.5 flex-1 min-w-0 group"
-                      >
-                        <div className={cn(
-                          "w-10 h-10 rounded-lg flex items-center justify-center shadow-sm",
-                          apt.is_callback ? "bg-amber-500" : "bg-[var(--info)]"
-                        )}>
-                          {apt.is_callback ? (
-                            <PhoneForwarded className="w-5 h-5 text-white" />
-                          ) : (
-                            <CalendarDays className="w-5 h-5 text-white" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-[var(--text-primary)] capitalize">
-                            {apt.is_callback ? "Callback" : apt.appointment_type.map(t => t.replace(/_/g, ' ')).join(', ')}
-                          </p>
-                          <p className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-1">
-                            <Clock className="w-3 h-3 opacity-50" />
-                            {formatDate(apt.scheduled_date)} at {apt.scheduled_time?.slice(0, 5)}
-                          </p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:translate-x-0.5 transition-all" />
-                      </Link>
-                      {/* Reschedule button for callbacks */}
-                      {apt.is_callback && (
-                        <SimpleTooltip content="Reschedule callback" side="top">
-                          <button
-                            onClick={() => {
-                              // Default to 1 hour from now
-                              const inOneHour = new Date()
-                              inOneHour.setHours(inOneHour.getHours() + 1)
-                              const mins = inOneHour.getMinutes()
-                              const roundedMins = mins < 15 ? "00" : mins < 45 ? "30" : "00"
-                              const roundedHrs = mins >= 45 ? inOneHour.getHours() + 1 : inOneHour.getHours()
-                              let timeStr = `${String(roundedHrs).padStart(2, "0")}:${roundedMins}`
-                              if (timeStr < "08:00") timeStr = "08:00"
-                              else if (timeStr > "21:30") timeStr = "21:30"
-                              setRescheduleDate(inOneHour.toISOString().split("T")[0])
-                              setRescheduleTime(timeStr)
-                              setRescheduleAppointmentId(apt.id)
-                            }}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                        </SimpleTooltip>
-                      )}
-                    </div>
-
-                    {/* Inline Reschedule Form */}
-                    <AnimatePresence>
-                      {rescheduleAppointmentId === apt.id && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="mt-2 p-4 rounded-lg bg-[var(--bg-surface)] ring-1 ring-amber-200 dark:ring-amber-800/40 space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
-                              <RefreshCw className="w-4 h-4" />
-                              Reschedule Callback
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Date</label>
-                                <input
-                                  type="date"
-                                  value={rescheduleDate}
-                                  onChange={(e) => setRescheduleDate(e.target.value)}
-                                  className="w-full h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Time</label>
-                                <select
-                                  value={rescheduleTime}
-                                  onChange={(e) => setRescheduleTime(e.target.value)}
-                                  className="w-full h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                >
-                                  {["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30"].map(t => (
-                                    <option key={t} value={t}>{t}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-end gap-2 pt-1">
-                              <button
-                                onClick={() => setRescheduleAppointmentId(null)}
-                                className="px-3 py-1.5 text-xs font-medium rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                disabled={!rescheduleDate || !rescheduleTime || rescheduling}
-                                onClick={async () => {
-                                  setRescheduling(true)
-                                  try {
-                                    await updateAppointment(apt.id, {
-                                      scheduled_date: rescheduleDate,
-                                      scheduled_time: rescheduleTime,
-                                      status: "scheduled",
-                                    })
-                                    if (lead) {
-                                      await updateLead(lead.id, { callback_date: rescheduleDate })
-                                    }
-                                    setRescheduleAppointmentId(null)
-                                    refetchLead()
-                                  } catch (err) {
-                                    console.error("Reschedule failed:", err)
-                                  } finally {
-                                    setRescheduling(false)
-                                  }
-                                }}
-                                className={cn(
-                                  "px-4 py-1.5 text-xs font-semibold rounded-md transition-colors",
-                                  "bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                )}
-                              >
-                                {rescheduling ? (
-                                  <span className="flex items-center gap-1.5">
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    Saving...
-                                  </span>
-                                ) : (
-                                  "Reschedule"
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))}
-                </motion.div>
-              )}
+                  {lead.pipeline_stage === 'lost' && <XCircle className="w-3 h-3" />}
+                  {stageInfo?.label}
+                </span>
+                {lead.priority === 'critical' && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-600 ring-1 ring-red-500/20 dark:text-red-400">
+                    <Flame className="w-3 h-3" />
+                    Critical
+                  </span>
+                )}
+                {lead.priority === 'important' && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
+                    <Star className="w-3 h-3" />
+                    Important
+                  </span>
+                )}
+              </div>
             </div>
+
+            <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setShowEditForm(true)}
+                className="h-8 gap-1.5 rounded-lg border-[var(--border)] px-2.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-sunken)] hover:text-[var(--text-primary)]"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -1415,27 +1123,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
         </motion.div>
 
-        {/* SF Down Payment Card */}
-        {lead.funding_type === 'self_funded' && (lead.pipeline_stage === 'application' || lead.pipeline_stage === 'applicant') && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="mt-4"
-          >
-            <SFDownPaymentCard
-              lead={lead}
-              onSuccess={() => refetchLead()}
-            />
-          </motion.div>
-        )}
+        {/* Main grid: tab content + sidebar */}
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
 
-        {/* Tabbed Content Section */}
+        {/* LEFT: Tabbed Content Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)]"
+          className="order-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] lg:order-1"
         >
           {/* Tab Headers */}
           <div className="flex border-b border-[var(--border)]">
@@ -1626,6 +1322,306 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           </AnimatePresence>
         </motion.div>
+
+        {/* RIGHT: Sidebar — actions, SF down payment, appointments */}
+        <aside className="order-1 space-y-3 lg:order-2">
+
+          {/* Quick Actions */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3"
+            style={{ boxShadow: 'var(--shadow-card)' }}
+          >
+            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              Quick Actions
+            </h3>
+            <div className="space-y-1.5">
+              {/* Reactivate dropdown for lost leads */}
+              {lead.pipeline_stage === 'lost' && canChangeStage && (
+                <div className="relative" ref={reactivateMenuRef}>
+                  <motion.button
+                    onClick={() => setShowReactivateMenu(!showReactivateMenu)}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[var(--text-primary)] px-3 text-xs font-semibold text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reactivate To</span>
+                    <ChevronDown className={cn("w-3 h-3 transition-transform", showReactivateMenu && "rotate-180")} />
+                  </motion.button>
+                  <AnimatePresence>
+                    {showReactivateMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-surface)] rounded-md shadow-lg ring-1 ring-[var(--border)] overflow-hidden z-50"
+                      >
+                        <div className="p-1">
+                          {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
+                            <button
+                              key={stage.value}
+                              onClick={() => handleReactivateLead(stage.value)}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-sm hover:bg-[var(--bg-hover)] transition-colors"
+                            >
+                              <div
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ background: STAGE_GRADIENT[stage.value].from }}
+                              />
+                              <span className="text-xs font-medium text-[var(--text-primary)]">{stage.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
+              {/* Book Appointment */}
+              <Link href={`/calendar?book=${lead.id}`}>
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex h-9 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Book Appointment</span>
+                </motion.div>
+              </Link>
+
+              {/* Schedule Callback */}
+              <motion.div
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowCallbackScheduler(true)}
+                className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
+              >
+                <PhoneForwarded className="w-3.5 h-3.5" />
+                <span>Schedule Callback</span>
+              </motion.div>
+
+              {/* PSP buttons - only PUC */}
+              {lead.funding_type !== 'self_funded' && (
+                <>
+                  <motion.div
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowPSPWizard(true)}
+                    className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>PSP Submission</span>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowPSPSelfService(true)}
+                    className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send PSP Link</span>
+                  </motion.div>
+                </>
+              )}
+
+              {/* RSVP — only applicants */}
+              {lead.pipeline_stage === 'applicant' && (
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowRSVPDialog(true)}
+                  className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send RSVP</span>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* SF Down Payment Card */}
+          {lead.funding_type === 'self_funded' && (lead.pipeline_stage === 'application' || lead.pipeline_stage === 'applicant') && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+            >
+              <SFDownPaymentCard
+                lead={lead}
+                onSuccess={() => refetchLead()}
+              />
+            </motion.div>
+          )}
+
+          {/* Upcoming Appointments */}
+          {upcomingAppointments.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3"
+              style={{ boxShadow: 'var(--shadow-card)' }}
+            >
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Upcoming
+              </h3>
+              <div className="space-y-2">
+                {upcomingAppointments.map((apt) => (
+                  <div key={apt.id}>
+                    <div
+                      className={cn(
+                        "flex items-center gap-2.5 px-2.5 py-2 rounded-md ring-1 transition-all duration-200",
+                        apt.is_callback
+                          ? "bg-amber-50 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30"
+                          : "bg-[var(--info-bg)] ring-[var(--info)]/15"
+                      )}
+                    >
+                      <Link
+                        href={`/calendar?highlight=${apt.id}`}
+                        className="flex items-center gap-2.5 flex-1 min-w-0 group"
+                      >
+                        <div className={cn(
+                          "w-8 h-8 rounded-md flex items-center justify-center shadow-sm shrink-0",
+                          apt.is_callback ? "bg-amber-500" : "bg-[var(--info)]"
+                        )}>
+                          {apt.is_callback ? (
+                            <PhoneForwarded className="w-4 h-4 text-white" />
+                          ) : (
+                            <CalendarDays className="w-4 h-4 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-[var(--text-primary)] capitalize truncate">
+                            {apt.is_callback ? "Callback" : apt.appointment_type.map(t => t.replace(/_/g, ' ')).join(', ')}
+                          </p>
+                          <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 opacity-50" />
+                            {formatDate(apt.scheduled_date)} · {apt.scheduled_time?.slice(0, 5)}
+                          </p>
+                        </div>
+                      </Link>
+                      {apt.is_callback && (
+                        <SimpleTooltip content="Reschedule" side="top">
+                          <button
+                            onClick={() => {
+                              const inOneHour = new Date()
+                              inOneHour.setHours(inOneHour.getHours() + 1)
+                              const mins = inOneHour.getMinutes()
+                              const roundedMins = mins < 15 ? "00" : mins < 45 ? "30" : "00"
+                              const roundedHrs = mins >= 45 ? inOneHour.getHours() + 1 : inOneHour.getHours()
+                              let timeStr = `${String(roundedHrs).padStart(2, "0")}:${roundedMins}`
+                              if (timeStr < "08:00") timeStr = "08:00"
+                              else if (timeStr > "21:30") timeStr = "21:30"
+                              setRescheduleDate(inOneHour.toISOString().split("T")[0])
+                              setRescheduleTime(timeStr)
+                              setRescheduleAppointmentId(apt.id)
+                            }}
+                            className="w-7 h-7 rounded-md flex items-center justify-center text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors shrink-0"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                        </SimpleTooltip>
+                      )}
+                    </div>
+
+                    {/* Inline reschedule */}
+                    <AnimatePresence>
+                      {rescheduleAppointmentId === apt.id && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-2 p-3 rounded-md bg-[var(--bg-surface)] ring-1 ring-amber-200 dark:ring-amber-800/40 space-y-2.5">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Reschedule
+                            </div>
+                            <div className="space-y-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Date</label>
+                                <input
+                                  type="date"
+                                  value={rescheduleDate}
+                                  onChange={(e) => setRescheduleDate(e.target.value)}
+                                  className="w-full h-8 px-2 text-xs rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Time</label>
+                                <select
+                                  value={rescheduleTime}
+                                  onChange={(e) => setRescheduleTime(e.target.value)}
+                                  className="w-full h-8 px-2 text-xs rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                >
+                                  {["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30"].map(t => (
+                                    <option key={t} value={t}>{t}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setRescheduleAppointmentId(null)}
+                                className="px-2.5 py-1 text-[11px] font-medium rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                                onClick={async () => {
+                                  setRescheduling(true)
+                                  try {
+                                    await updateAppointment(apt.id, {
+                                      scheduled_date: rescheduleDate,
+                                      scheduled_time: rescheduleTime,
+                                      status: "scheduled",
+                                    })
+                                    if (lead) {
+                                      await updateLead(lead.id, { callback_date: rescheduleDate })
+                                    }
+                                    setRescheduleAppointmentId(null)
+                                    refetchLead()
+                                  } catch (err) {
+                                    console.error("Reschedule failed:", err)
+                                  } finally {
+                                    setRescheduling(false)
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1 text-[11px] font-semibold rounded-md transition-colors",
+                                  "bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                )}
+                              >
+                                {rescheduling ? (
+                                  <span className="flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Saving
+                                  </span>
+                                ) : (
+                                  "Reschedule"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+        </aside>
+
+        </div>
 
       </motion.div>
 
