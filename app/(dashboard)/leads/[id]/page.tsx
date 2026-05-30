@@ -6,7 +6,7 @@ import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/header"
-import { getLeadDisplayName } from "@/lib/lead-utils"
+import { getLeadDisplayName, getLeadShortDisplayName } from "@/lib/lead-utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/input"
 import {
@@ -875,8 +875,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h1 className="text-lg font-semibold leading-tight text-[var(--text-primary)] sm:text-xl" dir="auto">
-                  {getLeadDisplayName(lead)}
+                <h1 className="text-lg font-semibold leading-tight text-[var(--text-primary)] sm:text-xl" dir="auto" title={getLeadDisplayName(lead)}>
+                  {getLeadShortDisplayName(lead)}
                 </h1>
                 <span
                   className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
