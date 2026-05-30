@@ -19,10 +19,6 @@ const QuickActions = dynamic(
   () => import("@/components/layout/mobile-nav").then(m => m.QuickActions),
   { ssr: false }
 )
-const AIChatButton = dynamic(
-  () => import("@/components/ai-chat/ai-chat-button").then(m => m.AIChatButton),
-  { ssr: false }
-)
 const QuickFind = dynamic(
   () => import("@/components/layout/quick-find").then(m => m.QuickFind),
   { ssr: false }
@@ -87,7 +83,8 @@ const SidebarContext = createContext<{
   collapsed: boolean
   setCollapsed: (collapsed: boolean) => void
   openQuickFind: () => void
-}>({ collapsed: false, setCollapsed: () => {}, openQuickFind: () => {} })
+  openAiChat: () => void
+}>({ collapsed: false, setCollapsed: () => {}, openQuickFind: () => {}, openAiChat: () => {} })
 
 export const useSidebar = () => useContext(SidebarContext)
 
@@ -139,8 +136,13 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
     }
   }
 
+  const openAiChat = useCallback(() => {
+    setAiChatEverOpened(true)
+    setAiChatOpen(true)
+  }, [])
+
   return (
-    <SidebarContext.Provider value={{ collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed, openQuickFind: quickFind.open }}>
+    <SidebarContext.Provider value={{ collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed, openQuickFind: quickFind.open, openAiChat }}>
       <div className="h-screen bg-[var(--background)] overflow-hidden">
         <Sidebar user={activeUser} />
         <main className={cn(
@@ -168,13 +170,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           />
         )}
 
-        {/* AI Chat */}
-        <AIChatButton
-          onClick={() => {
-            setAiChatEverOpened(true)
-            setAiChatOpen(true)
-          }}
-        />
+        {/* AI Chat panel (opened from header Ask Kadi button) */}
         {aiChatEverOpened && (
           <AIChatPanel open={aiChatOpen} onOpenChange={setAiChatOpen} />
         )}

@@ -1,10 +1,11 @@
 "use client"
 
-import { Plus } from "lucide-react"
+import { Plus, Sparkles } from "lucide-react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAfterInitialPaint } from "@/lib/hooks/use-after-initial-paint"
+import { useSidebar } from "@/components/layout/dashboard-shell"
 import type { Profile } from "@/lib/hooks/use-user"
 
 const AnnouncementButton = dynamic(
@@ -33,6 +34,7 @@ interface HeaderProps {
 
 export function Header({ user, title, subtitle, subtitleExtra, action, breadcrumbs }: HeaderProps) {
   const lazyWidgetsReady = useAfterInitialPaint()
+  const { openAiChat } = useSidebar()
 
   return (
     <header className="sticky top-0 z-20 bg-[var(--bg-surface)] border-b border-[var(--border)]">
@@ -76,6 +78,18 @@ export function Header({ user, title, subtitle, subtitleExtra, action, breadcrum
 
         {/* Right Section - Actions */}
         <div className="flex items-center gap-3">
+          {/* Ask Kadi (AI chat) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative text-[var(--primary)] hover:text-[var(--primary-hover)] hover:bg-[var(--primary)]/10"
+            onClick={openAiChat}
+            title="Ask Kadi"
+            aria-label="Ask Kadi"
+          >
+            <Sparkles className="w-5 h-5" />
+          </Button>
+
           {/* Announcement (admin only) */}
           {lazyWidgetsReady && user?.role === "admin" && <AnnouncementButton isAdmin />}
 
