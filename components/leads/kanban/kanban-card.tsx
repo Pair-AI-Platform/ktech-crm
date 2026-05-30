@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 import { cn, getInitials } from "@/lib/utils"
+import { getLeadShortDisplayName } from "@/lib/lead-utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { PucImportBadge } from "../puc-import-badge"
 import type { Lead, PipelineStage } from "@/types"
@@ -80,8 +81,9 @@ export const KanbanCard = memo(function KanbanCard({
 
   const displayDragging = isDragging || isSortableDragging
 
-  // Format the lead name (Arabic only)
+  // Format the lead name (Arabic only) — short in card, full in tooltip
   const fullName = [lead.first_name_ar, lead.last_name_ar].filter(Boolean).join(" ") || "Untitled Lead"
+  const shortName = getLeadShortDisplayName(lead) || fullName
   const initials = getInitials(lead.first_name_ar || '', lead.last_name_ar || '')
 
   // Get the highest GPA available
@@ -134,9 +136,9 @@ export const KanbanCard = memo(function KanbanCard({
             </Avatar>
           )}
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-[var(--text-primary)] truncate text-sm flex items-center gap-1">
+            <h4 className="font-medium text-[var(--text-primary)] truncate text-sm flex items-center gap-1" title={fullName}>
               {lead.puc_import_flagged && <PucImportBadge size="xs" />}
-              {fullName}
+              {shortName}
             </h4>
             {lead.school && (
               <p className="text-xs text-[var(--text-tertiary)] truncate flex items-center gap-1">

@@ -35,7 +35,7 @@ import { useLeads, useLeadMutations, useLostReasons } from "@/lib/hooks/use-lead
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import { useUser } from "@/lib/hooks/use-user"
 import { cn, formatKuwaitPhone, getInitials } from "@/lib/utils"
-import { getLeadDisplayName } from "@/lib/lead-utils"
+import { getLeadDisplayName, getLeadShortDisplayName } from "@/lib/lead-utils"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
 
 const LOST_REASON_CATEGORIES: { value: LostReasonCategory; label: string }[] = [
@@ -496,8 +496,8 @@ export default function LostLeadsPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-[var(--text-primary)] truncate" dir="rtl">
-                                  {getLeadDisplayName(lead)}
+                                <p className="text-sm font-medium text-[var(--text-primary)] truncate" dir="rtl" title={getLeadDisplayName(lead)}>
+                                  {getLeadShortDisplayName(lead)}
                                 </p>
                               </div>
                             </div>
