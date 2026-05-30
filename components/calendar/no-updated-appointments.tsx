@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { getLeadDisplayName } from "@/lib/lead-utils"
+import { getLeadShortDisplayName } from "@/lib/lead-utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import {
@@ -291,10 +291,10 @@ export function NoUpdatedAppointments({
                       const aptLeads = apt.appointment_leads?.map(al => al.lead).filter(Boolean) || []
                       const personName = aptLeads.length > 0
                         ? aptLeads.length === 1
-                          ? getLeadDisplayName(aptLeads[0]!)
-                          : `${getLeadDisplayName(aptLeads[0]!)} +${aptLeads.length - 1}`
+                          ? getLeadShortDisplayName(aptLeads[0]!)
+                          : `${getLeadShortDisplayName(aptLeads[0]!)} +${aptLeads.length - 1}`
                         : apt.lead
-                        ? getLeadDisplayName(apt.lead)
+                        ? getLeadShortDisplayName(apt.lead)
                         : apt.student
                         ? `${apt.student.first_name} ${apt.student.last_name}`
                         : "Unknown"
