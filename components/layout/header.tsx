@@ -4,6 +4,7 @@ import { Plus } from "lucide-react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useAfterInitialPaint } from "@/lib/hooks/use-after-initial-paint"
 import type { Profile } from "@/lib/hooks/use-user"
 
 const AnnouncementButton = dynamic(
@@ -31,6 +32,8 @@ interface HeaderProps {
 }
 
 export function Header({ user, title, subtitle, subtitleExtra, action, breadcrumbs }: HeaderProps) {
+  const lazyWidgetsReady = useAfterInitialPaint()
+
   return (
     <header className="sticky top-0 z-20 bg-[var(--bg-surface)] border-b border-[var(--border)]">
       <div className="flex items-center justify-between min-h-[4.5rem] md:min-h-[4rem] py-3 md:py-2 px-4 md:px-6">
@@ -74,10 +77,22 @@ export function Header({ user, title, subtitle, subtitleExtra, action, breadcrum
         {/* Right Section - Actions */}
         <div className="flex items-center gap-3">
           {/* Announcement (admin only) */}
-          {user?.role === "admin" && <AnnouncementButton isAdmin />}
+          {lazyWidgetsReady && user?.role === "admin" && <AnnouncementButton isAdmin />}
 
           {/* Notifications */}
-          <NotificationDropdown userId={user?.id} />
+          {lazyWidgetsReady ? (
+            <NotificationDropdown userId={user?.id} />
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative text-[var(--text-secondary)]"
+              aria-label="Notifications"
+              disabled
+            >
+              <span className="w-5 h-5 rounded-full border border-[var(--border)]" />
+            </Button>
+          )}
 
           {/* Divider */}
           <div className="hidden sm:block w-px h-6 bg-[var(--border)]" />

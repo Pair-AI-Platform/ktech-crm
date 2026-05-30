@@ -1,10 +1,7 @@
 "use client"
 
-export const dynamic = "force-dynamic"
-
 import { useState, useSyncExternalStore, type HTMLAttributes } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,7 +24,6 @@ const motion = { div: MotionDiv }
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -39,6 +35,9 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
+
+    const { createClient } = await import("@/lib/supabase/client")
+    const supabase = createClient()
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -63,7 +62,9 @@ export default function LoginPage() {
     }
   }
 
-  const isDemoAllowed = process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true"
+  const isDemoAllowed =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true"
 
   const handleDemoMode = (role: "admin" | "agent") => {
     setDemoLoading(role)

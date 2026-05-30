@@ -92,6 +92,7 @@ export function useDashboardStats(options: { enabled?: boolean } = {}) {
         const { data, error } = await supabase
           .from('leads')
           .select(DASHBOARD_LEAD_COLUMNS)
+          .eq('actual_lead', true)
           .eq('assigned_to', userId)
           .order('updated_at', { ascending: false })
           .limit(2000)
@@ -109,6 +110,7 @@ export function useDashboardStats(options: { enabled?: boolean } = {}) {
       const { data, error } = await supabase
         .from('leads')
         .select(DASHBOARD_LEAD_COLUMNS)
+        .eq('actual_lead', true)
         .order('updated_at', { ascending: false })
         .limit(ADMIN_DASHBOARD_MAX_LEADS)
 

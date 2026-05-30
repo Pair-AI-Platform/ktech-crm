@@ -10,14 +10,16 @@ import { Badge } from "@/components/ui/badge"
 import { StaticBlock, ListBlock } from "@/components/dashboard/notion"
 import { APPOINTMENT_TYPES } from "@/types"
 import { getLeadDisplayName } from "@/lib/lead-utils"
+import { cn } from "@/lib/utils"
 import type { Appointment } from "@/types"
 
 interface AdminAppointmentsSectionProps {
   todayAppointments: Appointment[]
   loading: boolean
+  className?: string
 }
 
-export function AdminAppointmentsSection({ todayAppointments, loading }: AdminAppointmentsSectionProps) {
+export function AdminAppointmentsSection({ todayAppointments, loading, className }: AdminAppointmentsSectionProps) {
   const router = useRouter()
   const [agentFilter, setAgentFilter] = useState<string | null>(null)
 
@@ -83,10 +85,13 @@ export function AdminAppointmentsSection({ todayAppointments, loading }: AdminAp
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.15 }}
+      className="h-full"
     >
       <StaticBlock
         title="Team Appointments Today"
         icon={<Calendar className="w-4 h-4 text-[var(--primary)]" />}
+        className={cn("h-full flex flex-col overflow-hidden", className)}
+        contentClassName="p-3"
         headerActions={
           <div className="flex items-center gap-2">
             {agents.length > 1 && (
@@ -113,9 +118,10 @@ export function AdminAppointmentsSection({ todayAppointments, loading }: AdminAp
         <ListBlock
           items={appointmentItems}
           loading={loading}
-          maxItems={10}
+          maxItems={4}
           emptyMessage="No team appointments today"
-          emptyIcon={<Calendar className="w-8 h-8 text-[var(--text-muted)]" />}
+          emptyIcon={<Calendar className="w-6 h-6 text-[var(--text-muted)]" />}
+          emptyClassName="min-h-[96px] py-0"
           showMoreHref="/calendar"
           onShowMore={() => router.push("/calendar")}
         />

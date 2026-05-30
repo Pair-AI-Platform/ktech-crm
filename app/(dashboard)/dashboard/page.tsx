@@ -6,6 +6,7 @@ import type { ReactNode } from "react"
 import { Calendar, Clock, FileText, FolderOpen, Users } from "lucide-react"
 import { SectionBoundary } from "@/components/dashboard/section-boundary"
 import { useAfterInitialPaint } from "@/lib/hooks/use-after-initial-paint"
+import { useAdminDashboardBootstrap } from "@/lib/hooks/use-admin-dashboard-bootstrap"
 import { useDashboardCriticalStats, type DashboardCriticalStats } from "@/lib/hooks/use-dashboard-critical-stats"
 import { useUser } from "@/lib/hooks/use-user"
 import { cn } from "@/lib/utils"
@@ -33,11 +34,14 @@ export default function DashboardPage() {
   const isAdminView = !!profile && isAdmin
   const isAgentView = !!profile && !isAdmin
   const role: DashboardRole | null = isAdminView ? "admin" : isAgentView ? "agent" : null
-  const { stats: criticalStats, loading: criticalStatsLoading } = useDashboardCriticalStats({
-    enabled: !!profile,
+  const adminBootstrap = useAdminDashboardBootstrap({ enabled: isAdminView })
+  const { stats: agentCriticalStats, loading: agentCriticalStatsLoading } = useDashboardCriticalStats({
+    enabled: !!profile && !isAdminView,
     isAdmin: isAdminView,
     profileId: profile?.id,
   })
+  const criticalStats = isAdminView ? adminBootstrap.criticalStats : agentCriticalStats
+  const criticalStatsLoading = isAdminView ? adminBootstrap.loading : agentCriticalStatsLoading
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">
@@ -56,7 +60,15 @@ export default function DashboardPage() {
           </SectionBoundary>
         )}
 
-        {dashboardReady && isAdminView && <AdminDashboardContent />}
+        {dashboardReady && isAdminView && (
+          <AdminDashboardContent
+            bootstrap={adminBootstrap}
+            loading={adminBootstrap.loading}
+            refetchNoUpdated={() => {
+              void adminBootstrap.refetch()
+            }}
+          />
+        )}
         {dashboardReady && isAgentView && <AgentDashboardContent profileId={profile?.id} />}
       </div>
     </div>
@@ -78,7 +90,7 @@ function DashboardFastStats({
         {
           id: "total-leads",
           value: stats.activeLeads,
-          label: "Active Leads",
+          label: "All Leads",
           icon: <Users className="w-5 h-5 text-[var(--primary)]" />,
           iconBg: "bg-[var(--primary)]/10",
         },

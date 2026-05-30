@@ -8,6 +8,7 @@ import {
 import { namesMatch } from "@/lib/string-utils"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
+import { assertArabicLeadNameFields, getArabicLeadDisplayName } from "@/lib/lead-name-policy"
 
 type SchoolRow = { id: string; name_en: string | null; name_ar: string | null }
 
@@ -15,6 +16,8 @@ type ExistingLeadRow = {
   id: string
   first_name: string | null
   last_name: string | null
+  first_name_ar: string | null
+  last_name_ar: string | null
   civil_id: string | null
   phone: string | null
   actual_gpa: number | null
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
       .map(r => r.civil_id as string)
 
     const leadSelect = `
-      id, first_name, last_name, civil_id, phone, actual_gpa, funding_type, pipeline_stage,
+      id, first_name, last_name, first_name_ar, last_name_ar, civil_id, phone, actual_gpa, funding_type, pipeline_stage,
       school_id, school_name_custom, seat_number, academic_track, education_type, graduation_year, grade_level,
       school:schools(id, name_en, name_ar)
     ` as const
@@ -187,7 +190,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Name similarity required
-        const leadName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+        const leadName = getArabicLeadDisplayName(lead)
         if (!leadName) continue
         if (namesMatch(recName, leadName)) {
           candidates.push(lead)
@@ -226,7 +229,7 @@ export async function POST(request: NextRequest) {
       if (existingLead.actual_gpa !== null && existingLead.actual_gpa !== undefined && !overwriteExisting) {
         result.alreadyHasGPA.push({
           leadId: existingLead.id,
-          name: `${existingLead.first_name} ${existingLead.last_name}`,
+          name: getArabicLeadDisplayName(existingLead),
           existingGPA: existingLead.actual_gpa,
           newGPA: record.gpa,
         })
@@ -235,6 +238,7 @@ export async function POST(request: NextRequest) {
 
       const updatePayload: Record<string, unknown> = {
         actual_gpa: record.gpa,
+        actual_lead: true,
         moe_fetch_status: "success",
         moe_fetched_at: new Date().toISOString(),
       }
@@ -300,7 +304,7 @@ export async function POST(request: NextRequest) {
 
       result.updated.push({
         leadId: existingLead.id,
-        name: `${existingLead.first_name} ${existingLead.last_name}`,
+        name: getArabicLeadDisplayName(existingLead),
         gpa: record.gpa,
         matchedBy,
       })
@@ -342,7 +346,7 @@ export async function POST(request: NextRequest) {
 
           result.convertedToSelfFunded.push({
             leadId: existingLead.id,
-            name: `${existingLead.first_name} ${existingLead.last_name}`,
+            name: getArabicLeadDisplayName(existingLead),
             ...(record.civil_id && { civilId: record.civil_id }),
             gpa: record.gpa,
             previousFundingType: "puc",
@@ -378,7 +382,7 @@ export async function POST(request: NextRequest) {
         if (candidates.length > 1) {
           const reviewCandidates: MinistryReviewCandidate[] = candidates.map(c => ({
             id: c.id,
-            full_name: `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+            full_name: getArabicLeadDisplayName(c),
             civil_id: c.civil_id,
             school_name: c.school?.name_en || c.school?.name_ar || c.school_name_custom || null,
             graduation_year: c.graduation_year,
@@ -389,6 +393,10 @@ export async function POST(request: NextRequest) {
         }
 
         // No match — create new lead, routed by GPA
+        const normalizedName = assertArabicLeadNameFields(
+          { first_name: record.first_name, last_name: record.last_name || "" },
+          { requireFirstName: true },
+        )
         const matchedSchoolId = recordSchoolIds.get(record)
         const isLowGpa = record.gpa < GPA_SELF_FUNDED_THRESHOLD
         const routedTo: 'puc' | 'self_funded' = isLowGpa ? 'self_funded' : 'puc'
@@ -396,8 +404,10 @@ export async function POST(request: NextRequest) {
         const { data: newLead, error: createError } = await supabase
           .from("leads")
           .insert({
-            first_name: record.first_name,
-            last_name: record.last_name || "",
+            first_name: normalizedName.first_name,
+            last_name: normalizedName.last_name || "",
+            first_name_ar: normalizedName.first_name,
+            last_name_ar: normalizedName.last_name || "",
             ...(record.civil_id && { civil_id: record.civil_id }),
             actual_gpa: record.gpa,
             moe_fetch_status: "success",
@@ -411,6 +421,7 @@ export async function POST(request: NextRequest) {
             grade_level: record.grade_level || "12th",
             phone: "",
             funding_type: routedTo,
+            actual_lead: true,
             ...(record.seat_number && { seat_number: record.seat_number }),
             ...(record.academic_track && { academic_track: record.academic_track }),
             ...(record.education_type && { education_type: record.education_type }),
@@ -443,7 +454,7 @@ export async function POST(request: NextRequest) {
 
         result.created.push({
           leadId: newLead.id,
-          name: `${record.first_name} ${record.last_name || ""}`.trim(),
+          name: getArabicLeadDisplayName(newLead),
           gpa: record.gpa,
           routedTo,
         })

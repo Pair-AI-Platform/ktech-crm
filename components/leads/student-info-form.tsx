@@ -63,6 +63,7 @@ import {
 } from "@/types"
 import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
+import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useSemesters } from "@/lib/hooks/use-semesters"
 import { useActiveSources } from "@/lib/hooks/use-sources"
@@ -242,10 +243,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     })
   }
 
+  const initialArabicName = getArabicLeadNameParts(lead)
+
   const [formData, setFormData] = useState({
     // Personal
-    first_name: lead.first_name || "",
-    last_name: lead.last_name || "",
+    first_name: initialArabicName.firstName,
+    last_name: initialArabicName.lastName,
     gender: lead.gender || "",
     nationality: lead.nationality || "",
     address: lead.address || "",

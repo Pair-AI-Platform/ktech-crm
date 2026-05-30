@@ -2,6 +2,7 @@ import { createBrowserClient } from '@supabase/ssr'
 
 function isDemoMode(): boolean {
   if (typeof window === 'undefined') return false
+  if (process.env.NODE_ENV === 'production') return false
   if (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE !== 'true') return false
   return window.localStorage?.getItem('ktech-demo-mode') === 'true'
 }

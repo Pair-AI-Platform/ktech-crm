@@ -8,6 +8,7 @@
 // had been uploaded via CSV, so no new audience pipeline is needed.
 
 import type { Lead } from "@/types"
+import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 
 export const CAMPAIGN_PREFILL_KEY = "campaign-prefill-contacts:v1"
 
@@ -35,10 +36,12 @@ export function leadToPrefillContact(lead: Pick<Lead,
   | "phone"
   | "email"
 >): CampaignPrefillContact {
+  const { firstName, lastName } = getArabicLeadNameParts(lead)
+
   return {
     leadId: lead.id,
-    firstName: lead.first_name_ar || lead.first_name || "",
-    lastName: lead.last_name_ar || lead.last_name || "",
+    firstName,
+    lastName,
     phone: lead.phone || undefined,
     email: lead.email || undefined,
   }

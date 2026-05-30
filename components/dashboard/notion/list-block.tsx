@@ -30,6 +30,8 @@ interface ListBlockProps {
   onShowMore?: () => void
   loading?: boolean
   compact?: boolean
+  className?: string
+  emptyClassName?: string
 }
 
 export function ListBlock({
@@ -41,13 +43,15 @@ export function ListBlock({
   onShowMore,
   loading = false,
   compact = false,
+  className,
+  emptyClassName,
 }: ListBlockProps) {
   const displayItems = items.slice(0, maxItems)
   const hasMore = items.length > maxItems
 
   if (loading) {
     return (
-      <div className="space-y-2">
+      <div className={cn("space-y-2", className)}>
         {[...Array(3)].map((_, i) => (
           <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-sunken)]">
             <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)]" />
@@ -63,7 +67,7 @@ export function ListBlock({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className={cn("flex flex-col items-center justify-center py-8 text-center", emptyClassName)}>
         {emptyIcon && (
           <div className="mb-3 text-[var(--text-tertiary)]">{emptyIcon}</div>
         )}
@@ -73,7 +77,7 @@ export function ListBlock({
   }
 
   return (
-    <div className="space-y-1">
+    <div className={cn("space-y-1", className)}>
       <AnimatePresence mode="popLayout">
         {displayItems.map((item, index) => (
           <ListItemRow key={item.id} item={item} index={index} compact={compact} />
@@ -134,6 +138,7 @@ function ListItemRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span
+            dir="auto"
             className={cn(
               "font-medium text-[var(--text-primary)] truncate",
               compact ? "text-sm" : "text-sm"
@@ -144,13 +149,13 @@ function ListItemRow({
           {item.badge}
         </div>
         {item.subtitle && (
-          <p className="text-xs text-[var(--text-tertiary)] truncate">{item.subtitle}</p>
+          <p dir="auto" className="text-xs text-[var(--text-tertiary)] truncate">{item.subtitle}</p>
         )}
       </div>
 
       {/* Metadata */}
       {item.metadata && (
-        <span className="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
+        <span className="max-w-[45%] truncate text-right text-xs text-[var(--text-tertiary)] whitespace-nowrap">
           {item.metadata}
         </span>
       )}

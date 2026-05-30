@@ -4,6 +4,9 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
 import { validateUpload, sanitizeFilename } from "@/lib/upload-validation"
+import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
+
+export const maxDuration = 30
 
 // Public, token-gated student uploader. Validation is strict because this
 // route accepts uploads without an authenticated session.
@@ -113,6 +116,17 @@ export async function POST(request: NextRequest) {
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
+  const extraction = await extractDocumentExpirationDate({
+    buffer,
+    mimeType: file.type,
+    fileName: safeName,
+    documentType,
+    graduateType,
+  })
+  if (extraction.error) {
+    logger.warn("Document expiration AI extraction skipped/failed", { error: extraction.error })
+  }
+  const finalExpirationDate = expirationDate || extraction.expirationDate
 
   const { error: uploadErr } = await service.storage
     .from("documents")
@@ -151,7 +165,8 @@ export async function POST(request: NextRequest) {
         file_size: file.size,
         storage_path: storagePath,
         public_url: urlData?.signedUrl,
-        expiration_date: expirationDate || null,
+        expiration_date: finalExpirationDate || null,
+        is_expired: isDocumentExpired(finalExpirationDate),
         uploaded_by: null,
         uploaded_at: new Date().toISOString(),
         is_verified: false,
@@ -173,5 +188,6 @@ export async function POST(request: NextRequest) {
     document: doc,
     public_url: urlData?.signedUrl,
     storage_path: storagePath,
+    expiration_extraction: extraction,
   })
 }

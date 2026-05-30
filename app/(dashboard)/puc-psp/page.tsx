@@ -73,7 +73,6 @@ type PspDocumentRow = { lead_id: string; document_type: string; graduate_type: s
 type PspDocumentConfigRow = { graduate_type: string; document_id: string; required: boolean | null }
 type RecentStageMove = { stage: PipelineStage; rank: number; lead: Lead }
 type LeadStageChangedDetail = { leadId: string; stage: PipelineStage; status?: LeadStatus | null; lead: Lead }
-type SfStageRow = { pipeline_stage: string }
 
 // PUC pipeline stage pills (the stages a PUC lead progresses through)
 const PUC_STAGE_CONFIG: Record<string, { label: string }> = {
@@ -627,9 +626,8 @@ export default function PUCPSPPage() {
 
   // SF stage counts: fetched independently of the paginated lead list so the
   // pill counts stay accurate even when the user is on page 2+ of a single stage.
-  // We pull just the pipeline_stage column for all SF leads and tally client-side;
-  // that's a single ~15k-row column scan and is much cheaper than the joined list
-  // query used for the table itself.
+  // Keep this query aligned with /api/leads: only real leads, same search filter,
+  // and "All" excludes lost because lost has its own pill.
   const [sfStageCounts, setSfStageCounts] = useState<Record<string, number>>({ all: 0 })
 
   useEffect(() => {
@@ -637,23 +635,45 @@ export default function PUCPSPPage() {
 
     let cancelled = false
     const supabase = createClient()
-    supabase
-      .from("leads")
-      .select("pipeline_stage")
-      .eq("funding_type", "self_funded")
-      .limit(20000)
-      .then(({ data }: { data: SfStageRow[] | null }) => {
-        if (cancelled || !data) return
-        const counts: Record<string, number> = { all: data.length }
-        for (const row of data) {
-          if (!row.pipeline_stage) continue
-          counts[row.pipeline_stage] = (counts[row.pipeline_stage] || 0) + 1
-        }
-        setSfStageCounts(counts)
+
+    const search = debouncedSfSearchQuery.trim()
+
+    const countSelfFundedStage = async (stage?: PipelineStage) => {
+      let query = supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("actual_lead", true)
+        .eq("funding_type", "self_funded")
+
+      query = stage ? query.eq("pipeline_stage", stage) : query.neq("pipeline_stage", "lost")
+
+      if (search) {
+        query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%,civil_id.ilike.%${search}%`)
+      }
+      if (profile?.role === "agent") {
+        query = query.eq("assigned_to", profile.id)
+      }
+
+      const { count, error } = await query
+      if (error) throw error
+      return count ?? 0
+    }
+
+    Promise.all(
+      SF_STAGE_CONFIG.map(async ({ value }) => {
+        const count = value === "all" ? await countSelfFundedStage() : await countSelfFundedStage(value)
+        return [value, count] as const
+      })
+    )
+      .then((entries) => {
+        if (!cancelled) setSfStageCounts(Object.fromEntries(entries))
+      })
+      .catch((error) => {
+        if (!cancelled) console.warn("Unable to load self-funded stage counts", error)
       })
 
     return () => { cancelled = true }
-  }, [topTab, sfTotalCount])
+  }, [topTab, sfTotalCount, debouncedSfSearchQuery, profile?.id, profile?.role])
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -984,7 +1004,6 @@ export default function PUCPSPPage() {
               <>
                 {SF_STAGE_CONFIG.map(({ value, label }) => {
                   const count = value === "all" ? sfStageCounts.all || 0 : sfStageCounts[value] || 0
-                  if (value !== "all" && count === 0 && sfStageFilter !== value) return null
                   return (
                     <Button
                       key={value}

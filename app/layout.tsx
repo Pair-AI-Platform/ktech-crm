@@ -1,7 +1,5 @@
 import type { Metadata } from "next"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { QueryProvider } from "@/lib/query-client"
 
 export const metadata: Metadata = {
   title: "ADL",
@@ -35,11 +33,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <QueryProvider>
-          <ThemeProvider defaultTheme="system" storageKey="ktech-theme">
-            {children}
-          </ThemeProvider>
-        </QueryProvider>
+        {children}
       </body>
     </html>
   )

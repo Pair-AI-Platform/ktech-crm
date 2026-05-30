@@ -19,7 +19,7 @@ function deriveStatus(
 ): AgentStatus {
   // Manual status overrides heartbeat-derived status (only if agent is active)
   if (manualStatus === 'meeting' || manualStatus === 'break') {
-    // Still check heartbeat — if truly offline (>15 min), show offline
+    // Still check heartbeat; if truly offline (>15 min), show offline
     if (!lastActivityAt) return 'offline'
     const diffMs = Date.now() - new Date(lastActivityAt).getTime()
     const diffMin = diffMs / 60_000
@@ -36,10 +36,12 @@ function deriveStatus(
   return 'offline'
 }
 
-// Placeholder/system accounts that should not appear in agent listings
-const PLACEHOLDER_AGENT_NAMES = new Set(['admin', 'agent', 'demo'])
+// Placeholder/system accounts that should not appear in agent listings.
+// Khalifa was a non-real account removed by migration 182; keep the client
+// guard so older databases stop showing it immediately.
+const PLACEHOLDER_AGENT_NAMES = new Set(['admin', 'agent', 'demo', 'khalifa', 'test'])
 
-// Stable demo statuses keyed by agent id — keeps Team Status populated in demo mode
+// Stable demo statuses keyed by agent id; keeps Team Status populated in demo mode
 const DEMO_STATUS_CYCLE: AgentStatus[] = [
   'online', 'online', 'meeting', 'online', 'break',
   'online', 'meeting', 'offline', 'online', 'break',
@@ -59,7 +61,6 @@ interface PresenceRow {
  * status based on `last_activity_at` (heartbeat) and `manual_status`.
  */
 export function useAgentPresence(options: { enabled?: boolean } = {}) {
-  const supabase = createClient()
   const enabled = options.enabled ?? true
 
   const { data, isLoading } = useQuery<PresenceRow[]>({
@@ -67,7 +68,7 @@ export function useAgentPresence(options: { enabled?: boolean } = {}) {
     queryFn: async (): Promise<PresenceRow[]> => {
       if (isDemoMode()) {
         return DEMO_AGENTS
-          .filter((a) => a.is_active)
+          .filter((a) => a.is_active && a.role === 'agent')
           .map((a, i) => ({
             id: a.id,
             full_name: a.full_name,
@@ -77,17 +78,22 @@ export function useAgentPresence(options: { enabled?: boolean } = {}) {
           }))
       }
 
+      const supabase = createClient()
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, last_activity_at, manual_status, is_active')
         .neq('is_active', false)
+        .eq('role', 'agent')
+        .order('full_name', { ascending: true })
 
       if (error) {
-        // Column doesn't exist yet — fetch without it
+        // Column doesn't exist yet; fetch without it
         const { data: fallback, error: fbErr } = await supabase
           .from('profiles')
           .select('id, full_name, last_activity_at, is_active')
           .neq('is_active', false)
+          .eq('role', 'agent')
+          .order('full_name', { ascending: true })
         if (fbErr) throw new Error(fbErr.message)
         type FallbackRow = { id: string; full_name: string | null; last_activity_at: string | null; is_active: boolean | null }
         return ((fallback ?? []) as FallbackRow[]).map((p): PresenceRow => ({

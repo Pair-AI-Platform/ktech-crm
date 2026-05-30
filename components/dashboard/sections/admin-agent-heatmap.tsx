@@ -27,6 +27,7 @@ interface AdminAgentHeatmapProps {
 }
 
 export function AdminAgentHeatmap({ agents, loading }: AdminAgentHeatmapProps) {
+  const gridClassName = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3"
   const statusConfig: Record<AgentStatus, {
     dot: string
     label: string
@@ -112,8 +113,8 @@ export function AdminAgentHeatmap({ agents, loading }: AdminAgentHeatmapProps) {
           <span className="flex items-center gap-2">
             Team Status
             {!loading && agents.length > 0 && (
-              <Badge variant="outline" size="sm" title="Total changes today across all agents">
-                {agents.reduce((sum, a) => sum + a.todayChanges, 0)}
+              <Badge variant="outline" size="sm" title="Active team members">
+                {agents.length}
               </Badge>
             )}
           </span>
@@ -121,8 +122,8 @@ export function AdminAgentHeatmap({ agents, loading }: AdminAgentHeatmapProps) {
         icon={<Users className="w-4 h-4 text-[var(--primary)]" />}
       >
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(4)].map((_, i) => (
+          <div className={gridClassName}>
+            {[...Array(8)].map((_, i) => (
               <div
                 key={i}
                 className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-sunken)]"
@@ -140,7 +141,7 @@ export function AdminAgentHeatmap({ agents, loading }: AdminAgentHeatmapProps) {
             No agents found
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className={gridClassName}>
             {agents.map((agent, index) => {
               const config = statusConfig[agent.status]
               const trend = getTrendInfo(agent.filesOpenedThisMonth, agent.lastMonthFiles)

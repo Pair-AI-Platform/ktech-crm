@@ -824,9 +824,9 @@ export default function LeadsPage() {
               onEditLead={handleEditLead}
               currentStageFilter={stageFilter}
               fundingTypeFilter={filters.fundingType}
-              onStageChanged={(leadId, newStage, status) => {
+              onStageChanged={(leadId, newStage, status, leadSnapshot) => {
                 if (stageFilter === "all") return
-                const existing = leads.find(l => l.id === leadId)
+                const existing = leadSnapshot ?? leads.find(l => l.id === leadId)
                 if (!existing) return
                 const snapshot: Lead = {
                   ...existing,

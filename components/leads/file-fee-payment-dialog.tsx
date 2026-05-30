@@ -84,7 +84,7 @@ export function FileFeePaymentDialog({
   }
 
   const openWhatsAppLink = (paymentUrl: string) => {
-    const leadName = lead.first_name_ar || lead.first_name
+    const leadName = getLeadDisplayName(lead)
     const message = `مرحباً ${leadName}،\n\nلإتمام ملف التسجيل في كلية الكويت التقنية، يرجى دفع الرسوم التالية:\n- رسوم الطلب: ${applicationFee} د.ك\n- رسوم الاختبار: ${testFee} د.ك\n- الإجمالي: ${totalFee} د.ك\n\nمن خلال الرابط التالي:\n${paymentUrl}\n\n---\n\nHello ${leadName},\n\nTo complete your registration file at Kuwait Technical College, please pay the following fees:\n- Application Fee: ${applicationFee} KD\n- Test Fee: ${testFee} KD\n- Total: ${totalFee} KD\n\nUsing the following link:\n${paymentUrl}\n\nشكراً لكم / Thank you`
 
     let phone = (lead.phone || "").replace(/\D/g, "")

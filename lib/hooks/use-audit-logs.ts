@@ -15,6 +15,8 @@ interface UseAuditLogsOptions {
   search?: string
   filterTable?: string
   filterAction?: string
+  dateFrom?: string
+  dateTo?: string
 }
 
 interface AuditLogsResult {
@@ -27,10 +29,10 @@ interface AuditLogsResult {
 type LeadIdRow = { id: string }
 
 export function useAuditLogs(options: UseAuditLogsOptions): AuditLogsResult {
-  const { isAdmin, userId, page, pageSize, search, filterTable, filterAction } = options
+  const { isAdmin, userId, page, pageSize, search, filterTable, filterAction, dateFrom, dateTo } = options
   const queryClient = useQueryClient()
 
-  const queryKey = [...queryKeys.activities.all, "audit-logs", { isAdmin, userId, page, pageSize, search, filterTable, filterAction }] as const
+  const queryKey = [...queryKeys.activities.all, "audit-logs", { isAdmin, userId, page, pageSize, search, filterTable, filterAction, dateFrom, dateTo }] as const
 
   const { data, isLoading, refetch } = useQuery({
     queryKey,
@@ -85,6 +87,14 @@ export function useAuditLogs(options: UseAuditLogsOptions): AuditLogsResult {
       if (filterAction && filterAction !== "all") {
         dataQuery = dataQuery.eq("action", filterAction)
         countQuery = countQuery.eq("action", filterAction)
+      }
+      if (dateFrom) {
+        dataQuery = dataQuery.gte("created_at", dateFrom)
+        countQuery = countQuery.gte("created_at", dateFrom)
+      }
+      if (dateTo) {
+        dataQuery = dataQuery.lte("created_at", dateTo)
+        countQuery = countQuery.lte("created_at", dateTo)
       }
       if (search) {
         const searchFilter = `user_email.ilike.%${search}%,record_id::text.ilike.%${search}%,table_name.ilike.%${search}%`

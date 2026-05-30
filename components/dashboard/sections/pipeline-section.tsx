@@ -7,9 +7,20 @@ import { PipelineFunnelVisual } from "@/components/reports/sections/pipeline-fun
 import type { DashboardLead } from "@/lib/hooks/use-dashboard-stats"
 
 interface PipelineSectionProps {
-  sfLeads: DashboardLead[]
-  pucLeads: DashboardLead[]
+  sfLeads?: DashboardLead[]
+  pucLeads?: DashboardLead[]
+  sfFunnelData?: PipelineStageData[]
+  pucFunnelData?: PipelineStageData[]
   loading: boolean
+}
+
+interface PipelineStageData {
+  stage: string
+  label: string
+  count: number
+  percent: number
+  movesIn: number
+  movesOut: number
 }
 
 const SF_STAGES = [
@@ -50,11 +61,19 @@ function buildFunnelData(leads: DashboardLead[], stages: { key: string; label: s
   })
 }
 
-export function PipelineSection({ sfLeads, pucLeads, loading }: PipelineSectionProps) {
+export function PipelineSection({
+  sfLeads = [],
+  pucLeads = [],
+  sfFunnelData: precomputedSfFunnelData,
+  pucFunnelData: precomputedPucFunnelData,
+  loading,
+}: PipelineSectionProps) {
   const router = useRouter()
 
-  const sfFunnelData = useMemo(() => buildFunnelData(sfLeads, SF_STAGES), [sfLeads])
-  const pucFunnelData = useMemo(() => buildFunnelData(pucLeads, PUC_STAGES), [pucLeads])
+  const derivedSfFunnelData = useMemo(() => buildFunnelData(sfLeads, SF_STAGES), [sfLeads])
+  const derivedPucFunnelData = useMemo(() => buildFunnelData(pucLeads, PUC_STAGES), [pucLeads])
+  const sfFunnelData = precomputedSfFunnelData ?? derivedSfFunnelData
+  const pucFunnelData = precomputedPucFunnelData ?? derivedPucFunnelData
 
   if (loading) {
     return (

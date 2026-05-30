@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server"
 import { calculateLeadQuality } from "@/lib/lead-scoring"
+import { assertArabicLeadNameFields } from "@/lib/lead-name-policy"
 
 type IncomingLead = Record<string, unknown> & {
   civil_id?: string | null
@@ -150,9 +151,19 @@ export async function POST(request: NextRequest) {
       continue
     }
 
-    // Always recompute scoring server-side
-    const scoring = recomputeScoring(raw)
-    const patched: IncomingLead = { ...raw, ...scoring }
+    let patched: IncomingLead
+    let scoring: ReturnType<typeof recomputeScoring>
+    try {
+      const normalized = assertArabicLeadNameFields(raw, { requireFirstName: true })
+      scoring = recomputeScoring(normalized)
+      patched = { ...normalized, ...scoring }
+    } catch (error) {
+      result.errors.push({
+        row: i,
+        reason: error instanceof Error ? error.message : "Lead name must be in Arabic",
+      })
+      continue
+    }
 
     const hit =
       (raw.civil_id && existing.get(`civil:${raw.civil_id}`)) ||
@@ -161,18 +172,22 @@ export async function POST(request: NextRequest) {
 
     if (hit) {
       // Upsert rules: keep the higher pipeline stage, append notes, refresh scoring.
-      const incomingStageRank = stageRank(raw.pipeline_stage as string | undefined)
+      const incomingStageRank = stageRank(patched.pipeline_stage as string | undefined)
       const existingStageRank = stageRank(hit.pipeline_stage)
       const finalStage = incomingStageRank > existingStageRank
-        ? (raw.pipeline_stage as string)
-        : hit.pipeline_stage ?? raw.pipeline_stage
+        ? (patched.pipeline_stage as string)
+        : hit.pipeline_stage ?? patched.pipeline_stage
 
-      const incomingNotes = typeof raw.notes === "string" ? raw.notes : null
+      const incomingNotes = typeof patched.notes === "string" ? patched.notes : null
       const mergedNotes = [hit.notes, incomingNotes].filter(Boolean).join(" || ").slice(0, 4000)
 
       updates.push({
         id: hit.id,
         patch: {
+          first_name: patched.first_name,
+          last_name: patched.last_name,
+          first_name_ar: patched.first_name_ar,
+          last_name_ar: patched.last_name_ar,
           quality_tier: scoring.quality_tier,
           final_weighted_score: scoring.final_weighted_score,
           gpa_auto_score: scoring.gpa_auto_score,

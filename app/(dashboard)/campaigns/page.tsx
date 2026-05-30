@@ -36,6 +36,7 @@ import {
   ChevronLeft,
   ArrowRight,
   Loader2,
+  Link2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { RoleGuard } from "@/components/auth/role-guard"
@@ -109,14 +110,16 @@ const CAMPAIGN_STATUS_CONFIG: Record<CampaignStatus, { label: string; color: str
 }
 
 const CAMPAIGN_TEMPLATE_CATEGORY_CONFIG = {
-  welcome: { label: "Welcome", color: "bg-emerald-500", text: "text-emerald-600" },
-  follow_up: { label: "Follow up", color: "bg-amber-500", text: "text-amber-600" },
-  appointment: { label: "Appointment", color: "bg-blue-500", text: "text-blue-600" },
-  documents: { label: "Documents", color: "bg-violet-500", text: "text-violet-600" },
-  payment: { label: "Payment", color: "bg-rose-500", text: "text-rose-600" },
+  welcome: { label: "Welcome", color: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300" },
+  follow_up: { label: "Follow up", color: "bg-amber-500", text: "text-amber-700 dark:text-amber-300" },
+  appointment: { label: "Appointment", color: "bg-blue-500", text: "text-blue-700 dark:text-blue-300" },
+  documents: { label: "Documents", color: "bg-violet-500", text: "text-violet-700 dark:text-violet-300" },
+  payment: { label: "Payment", color: "bg-rose-500", text: "text-rose-700 dark:text-rose-300" },
+  self_service: { label: "Self-service", color: "bg-cyan-500", text: "text-cyan-700 dark:text-cyan-300" },
 } as const
 
 type CampaignTemplateCategory = keyof typeof CAMPAIGN_TEMPLATE_CATEGORY_CONFIG
+type CampaignTemplateCategoryFilter = CampaignTemplateCategory | "all"
 
 interface CampaignPresetTemplate {
   id: string
@@ -169,6 +172,14 @@ const CAMPAIGN_PRESET_TEMPLATES: CampaignPresetTemplate[] = [
     body: "Hi {{first_name}}, your KTECH file is missing required documents. Please send the documents as soon as possible so we can continue your application.",
   },
   {
+    id: "student_self_service_link",
+    title: "Student Self-Service Link",
+    description: "Send the secure student link for info and document upload.",
+    category: "self_service",
+    icon: Link2,
+    body: "Hi {{first_name}}, please complete your KTECH student self-service form and upload your required documents using this secure link: {{self_service_link}}\n\nThe link is valid for 7 days.",
+  },
+  {
     id: "payment_reminder",
     title: "Payment Reminder",
     description: "Friendly reminder for pending payment steps.",
@@ -177,6 +188,34 @@ const CAMPAIGN_PRESET_TEMPLATES: CampaignPresetTemplate[] = [
     body: "Hi {{first_name}}, this is a reminder that your payment step is still pending. Please complete it so we can continue processing your application.",
   },
 ]
+
+const CAMPAIGN_STEPS = [
+  { step: 1, label: "Channel" },
+  { step: 2, label: "Details" },
+  { step: 3, label: "Audience" },
+  { step: 4, label: "Template" },
+] as const
+
+const CAMPAIGN_TEMPLATE_FILTERS: { id: CampaignTemplateCategoryFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  ...Object.entries(CAMPAIGN_TEMPLATE_CATEGORY_CONFIG).map(([id, config]) => ({
+    id: id as CampaignTemplateCategory,
+    label: config.label,
+  })),
+]
+
+function getCampaignTemplatePreview(body: string) {
+  return body
+    .replace(/\{\{first_name\}\}/g, 'Ahmed')
+    .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
+    .replace(/\{\{phone\}\}/g, '+965 1234 5678')
+    .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')
+    .replace(/\{\{self_service_link\}\}/g, 'https://ktech-adl.vercel.app/psp/example')
+}
+
+function getTemplateVariables(body: string) {
+  return Array.from(new Set(body.match(/\{\{[^}]+\}\}/g) ?? []))
+}
 
 // ============================================================================
 // CSV Parser Utility
@@ -412,6 +451,7 @@ function NewCampaignModal({
   const hasPrefill = !!initialContacts && initialContacts.length > 0
   const [step, setStep] = useState(hasPrefill ? 2 : 1)
   const [isDragging, setIsDragging] = useState(false)
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState<CampaignTemplateCategoryFilter>("all")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createCampaign = useCreateCampaign()
 
@@ -446,6 +486,18 @@ function NewCampaignModal({
   const validContacts = formData.uploadedContacts.filter(c => c.valid)
   const invalidContacts = formData.uploadedContacts.filter(c => !c.valid)
   const selectedTemplate = CAMPAIGN_PRESET_TEMPLATES.find(template => template.id === formData.templateId)
+  const selectedTemplateCategory = selectedTemplate
+    ? CAMPAIGN_TEMPLATE_CATEGORY_CONFIG[selectedTemplate.category]
+    : undefined
+  const filteredPresetTemplates = templateCategoryFilter === "all"
+    ? CAMPAIGN_PRESET_TEMPLATES
+    : CAMPAIGN_PRESET_TEMPLATES.filter(template => template.category === templateCategoryFilter)
+  const selectedTemplatePreview = selectedTemplate
+    ? getCampaignTemplatePreview(selectedTemplate.body)
+    : ""
+  const selectedTemplateVariables = selectedTemplate
+    ? getTemplateVariables(selectedTemplate.body)
+    : []
 
   const totalSteps = 4
 
@@ -561,14 +613,14 @@ function NewCampaignModal({
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-3xl bg-[var(--bg-surface)] border border-[var(--border)] shadow-2xl flex flex-col"
+        className="w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-[28px] bg-[var(--bg-surface)] border border-[var(--border)] shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center justify-between mb-4">
+        <div className="px-5 sm:px-8 py-5 border-b border-[var(--border)] shrink-0 bg-[var(--bg-surface)]">
+          <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Create New Campaign</h2>
+              <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Create New Campaign</h2>
               <p className="text-sm text-[var(--text-muted)] mt-1">
                 {step === 1 && "Choose your campaign channel"}
                 {step === 2 && "Name your campaign"}
@@ -576,36 +628,48 @@ function NewCampaignModal({
                 {step === 4 && "Choose a preset template"}
               </p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-muted)]">
+            <button
+              onClick={onClose}
+              className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-colors"
+              aria-label="Close campaign modal"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Progress Steps */}
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((s) => (
-              <div key={s} className="flex items-center gap-2 flex-1">
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-                  s < step ? "bg-emerald-500 text-white" :
-                  s === step ? "bg-[var(--primary)] text-white" :
-                  "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
-                )}>
-                  {s < step ? <Check className="w-4 h-4" /> : s}
-                </div>
-                {s < 4 && (
-                  <div className={cn(
-                    "flex-1 h-1 rounded-full transition-all",
-                    s < step ? "bg-emerald-500" : "bg-[var(--bg-elevated)]"
-                  )} />
+          <div className="grid grid-cols-4 gap-2 rounded-2xl bg-[var(--bg-sunken)] p-1.5">
+            {CAMPAIGN_STEPS.map(({ step: s, label }) => (
+              <div
+                key={s}
+                className={cn(
+                  "min-w-0 rounded-xl px-2.5 py-2 transition-all",
+                  s === step ? "bg-[var(--bg-surface)] shadow-sm" : "bg-transparent"
                 )}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all shrink-0",
+                    s < step ? "bg-emerald-500 text-white" :
+                    s === step ? "bg-[var(--primary)] text-white" :
+                    "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                  )}>
+                    {s < step ? <Check className="w-4 h-4" /> : s}
+                  </div>
+                  <span className={cn(
+                    "truncate text-xs font-medium",
+                    s <= step ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                  )}>
+                    {label}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-8">
           {/* Step 1: Channel Selection */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-4">
@@ -901,25 +965,54 @@ function NewCampaignModal({
 
           {/* Step 4: Preset Template Selection */}
           {step === 4 && (
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-[var(--text-primary)]">
-                      Preset templates
-                    </h3>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">
-                      Select one approved template for this campaign.
-                    </p>
-                  </div>
-                  <Badge variant="secondary">{CAMPAIGN_PRESET_TEMPLATES.length} presets</Badge>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">Message template</h3>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Pick one approved WhatsApp message for this campaign.
+                  </p>
                 </div>
+                <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">
+                  {CAMPAIGN_PRESET_TEMPLATES.length} presets
+                </Badge>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {CAMPAIGN_PRESET_TEMPLATES.map((template) => {
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {CAMPAIGN_TEMPLATE_FILTERS.map((filter) => {
+                  const isActive = templateCategoryFilter === filter.id
+                  const category = filter.id === "all"
+                    ? undefined
+                    : CAMPAIGN_TEMPLATE_CATEGORY_CONFIG[filter.id]
+
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      onClick={() => setTemplateCategoryFilter(filter.id)}
+                      className={cn(
+                        "h-8 shrink-0 rounded-full border px-3 text-xs font-medium transition-all",
+                        isActive
+                          ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50 hover:bg-[var(--bg-hover)]"
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        {category && <span className={cn("h-2 w-2 rounded-full", category.color)} />}
+                        {filter.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {filteredPresetTemplates.map((template) => {
                     const Icon = template.icon
                     const category = CAMPAIGN_TEMPLATE_CATEGORY_CONFIG[template.category]
                     const isSelected = formData.templateId === template.id
+                    const variables = getTemplateVariables(template.body)
 
                     return (
                       <button
@@ -936,70 +1029,130 @@ function NewCampaignModal({
                           mediaFileName: undefined,
                         }))}
                         className={cn(
-                          "text-left rounded-2xl border p-4 transition-all min-h-[150px]",
+                          "group relative text-left rounded-xl border p-3 transition-all min-h-[142px] overflow-hidden",
                           isSelected
-                            ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
-                            : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50 hover:bg-[var(--bg-hover)]"
+                            ? "border-[var(--primary)] bg-[var(--primary-subtle)] shadow-md shadow-black/5 ring-2 ring-[var(--primary-muted)]"
+                            : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50 hover:bg-[var(--bg-hover)] hover:shadow-sm"
                         )}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className={cn(
-                            "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                            isSelected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                            isSelected
+                              ? "bg-[var(--primary)] text-white"
+                              : "bg-[var(--bg-elevated)] text-[var(--text-muted)] group-hover:text-[var(--primary)]"
                           )}>
-                            <Icon className="h-5 w-5" />
+                            <Icon className="h-4 w-4" />
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-2.5 py-1">
                             <span className={cn("h-2 w-2 rounded-full", category.color)} />
-                            <span className={cn("text-xs font-medium", category.text)}>
+                            <span className={cn("text-xs font-semibold", category.text)}>
                               {category.label}
                             </span>
-                            {isSelected && <Check className="h-4 w-4 text-[var(--primary)]" />}
                           </div>
                         </div>
-                        <div className="mt-3">
-                          <h4 className="font-semibold text-[var(--text-primary)]">{template.title}</h4>
+
+                        <div className="mt-3 pr-6">
+                          <h4 className="font-semibold text-[var(--text-primary)] leading-snug">{template.title}</h4>
                           <p className="text-sm text-[var(--text-muted)] mt-1 leading-relaxed">
                             {template.description}
                           </p>
                         </div>
-                        <p className="mt-3 text-xs text-[var(--text-secondary)] line-clamp-2">
+
+                        <p className="mt-2 text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
                           {template.body}
                         </p>
+
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {template.body.length} chars
+                          </span>
+                          {variables.length > 0 && (
+                            <span className="text-xs font-medium text-[var(--text-secondary)]">
+                              {variables.length} variable{variables.length === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </div>
+
+                        <span className={cn(
+                          "absolute right-4 bottom-4 h-6 w-6 rounded-full border flex items-center justify-center transition-all",
+                          isSelected
+                            ? "border-[var(--primary)] bg-[var(--primary)] text-white opacity-100"
+                            : "border-[var(--border)] bg-[var(--bg-surface)] text-transparent opacity-0 group-hover:opacity-100"
+                        )}>
+                          <Check className="h-3.5 w-3.5" />
+                        </span>
                       </button>
                     )
                   })}
                 </div>
-              </div>
 
-              {selectedTemplate && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                    Preview
-                  </label>
-                  <div className="rounded-2xl border border-emerald-200 bg-[#DCF8C6] overflow-hidden">
-                    <div className="px-4 py-3 border-b border-emerald-200/70 bg-white/35">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-800">{selectedTemplate.title}</span>
-                        <span className="text-xs text-gray-600">WhatsApp preset</span>
+                <aside className="xl:sticky xl:top-0">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                          Preview
+                        </p>
+                        <h4 className="mt-1 truncate font-semibold text-[var(--text-primary)]">
+                          {selectedTemplate?.title ?? "No template selected"}
+                        </h4>
                       </div>
+                      {selectedTemplateCategory && (
+                        <span className={cn("shrink-0 rounded-full bg-[var(--bg-sunken)] px-2.5 py-1 text-xs font-semibold", selectedTemplateCategory.text)}>
+                          {selectedTemplateCategory.label}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm whitespace-pre-wrap p-4 text-gray-800 leading-relaxed">
-                      {selectedTemplate.body
-                        .replace(/\{\{first_name\}\}/g, 'Ahmed')
-                        .replace(/\{\{last_name\}\}/g, 'Al-Rashid')
-                        .replace(/\{\{phone\}\}/g, '+965 1234 5678')
-                        .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')}
-                    </p>
+
+                    <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-sunken)] p-3">
+                      {selectedTemplate ? (
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">
+                          {selectedTemplatePreview}
+                        </p>
+                      ) : (
+                        <div className="flex min-h-[160px] items-center justify-center text-center text-sm text-[var(--text-muted)]">
+                          Select a template to preview the message.
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedTemplate?.body.includes("{{self_service_link}}") && (
+                      <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-900 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-cyan-100">
+                        <div className="flex items-start gap-2">
+                          <Link2 className="mt-0.5 h-4 w-4 shrink-0" />
+                          <p>
+                            Uses <span className="font-semibold">{"{{self_service_link}}"}</span> for each student secure upload link.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTemplate && (
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-[var(--bg-sunken)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                          {selectedTemplate.body.length} chars
+                        </span>
+                        {selectedTemplateVariables.length > 0 ? selectedTemplateVariables.map(variable => (
+                          <span key={variable} className="rounded-full bg-[var(--primary-muted)] px-2.5 py-1 text-xs font-medium text-[var(--primary)]">
+                            {variable}
+                          </span>
+                        )) : (
+                          <span className="rounded-full bg-[var(--bg-sunken)] px-2.5 py-1 text-xs text-[var(--text-muted)]">
+                            No variables
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                </aside>
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-surface)]/50 shrink-0">
+        <div className="px-5 sm:px-8 py-5 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-surface)]/50 shrink-0 gap-3">
           <Button variant="ghost" onClick={() => step === 1 ? onClose() : setStep(step - 1)}>
             <ChevronLeft className="w-4 h-4 mr-2" />
             {step === 1 ? "Cancel" : "Back"}

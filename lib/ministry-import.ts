@@ -1,6 +1,8 @@
 // Ministry GPA Import Utility
 // Parses Excel files from the Ministry graduate list and matches against existing leads
 
+import { isArabicText } from './string-utils'
+
 export interface MinistryRecord {
   civil_id?: string
   first_name: string
@@ -294,6 +296,8 @@ export function validateMinistryRecords(records: MinistryRecord[]): {
   for (const record of records) {
     if (!record.first_name) {
       invalid.push({ record, reason: 'Missing name' })
+    } else if (!isArabicText(record.first_name) || (record.last_name && !isArabicText(record.last_name))) {
+      invalid.push({ record, reason: 'Student name must be in Arabic' })
     } else if (record.gpa < 0 || record.gpa > 100) {
       invalid.push({ record, reason: `Invalid GPA: ${record.gpa}` })
     } else {
