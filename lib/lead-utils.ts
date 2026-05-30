@@ -1,6 +1,6 @@
 import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES } from '@/types'
 import type { PipelineStage } from '@/types'
-import { getArabicLeadDisplayName, getArabicLeadInitials } from '@/lib/lead-name-policy'
+import { getArabicLeadDisplayName, getArabicLeadInitials, getArabicLeadShortDisplayName } from '@/lib/lead-name-policy'
 
 /**
  * Returns the full display name for a lead.
@@ -9,6 +9,14 @@ import { getArabicLeadDisplayName, getArabicLeadInitials } from '@/lib/lead-name
  */
 export function getLeadDisplayName(lead: { first_name?: string | null; last_name?: string | null; first_name_ar?: string | null; last_name_ar?: string | null; phone?: string | null }): string {
   return getArabicLeadDisplayName(lead)
+}
+
+/**
+ * Returns a short display name (first token of first name + first token of last name).
+ * Used in dense list/table contexts where long multi-token Arabic names get truncated.
+ */
+export function getLeadShortDisplayName(lead: { first_name?: string | null; last_name?: string | null; first_name_ar?: string | null; last_name_ar?: string | null; phone?: string | null }): string {
+  return getArabicLeadShortDisplayName(lead)
 }
 
 /**

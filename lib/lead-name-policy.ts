@@ -55,6 +55,14 @@ export function getArabicLeadDisplayName(lead: LeadNameFields): string {
   return getArabicLeadNameParts(lead).fullName || MISSING_ARABIC_NAME_LABEL
 }
 
+export function getArabicLeadShortDisplayName(lead: LeadNameFields): string {
+  const { firstName, lastName } = getArabicLeadNameParts(lead)
+  const firstToken = firstName.split(/\s+/).filter(Boolean)[0] ?? ""
+  const secondToken = lastName.split(/\s+/).filter(Boolean)[0] ?? ""
+  const short = [firstToken, secondToken].filter(Boolean).join(" ")
+  return short || MISSING_ARABIC_NAME_LABEL
+}
+
 export function getArabicLeadInitials(lead: LeadNameFields): string {
   const { firstName, lastName } = getArabicLeadNameParts(lead)
   return [firstName, lastName].filter(Boolean).map((part) => part.charAt(0)).join("") || "؟"
