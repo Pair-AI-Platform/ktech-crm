@@ -4,6 +4,7 @@ import { Suspense } from "react"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { getUserProfile } from "@/lib/supabase/server"
+import { AppProviders } from "@/components/app-providers"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { HeartbeatProvider } from "@/components/layout/heartbeat-provider"
 import { UserProfileProvider } from "@/lib/hooks/use-user"
@@ -43,8 +44,9 @@ export default async function DashboardLayout({
 }) {
   const cookieStore = await cookies()
   const demoModeAllowed =
-    process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true" ||
-    process.env.DEMO_MODE_ENABLED === "true"
+    process.env.NODE_ENV !== "production" &&
+    (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true" ||
+      process.env.DEMO_MODE_ENABLED === "true")
   const isDemoMode = demoModeAllowed && cookieStore.get("ktech-demo-mode")?.value === "true"
   const demoRole = cookieStore.get("ktech-demo-role")?.value
   const profile = isDemoMode ? getDemoProfile(demoRole) : await getUserProfile()
@@ -61,13 +63,15 @@ export default async function DashboardLayout({
 
   return (
     <Suspense>
-      <UserProfileProvider profile={profile}>
-        <DashboardShell user={profile}>
-          <HeartbeatProvider>
-            {children}
-          </HeartbeatProvider>
-        </DashboardShell>
-      </UserProfileProvider>
+      <AppProviders>
+        <UserProfileProvider profile={profile}>
+          <DashboardShell user={profile}>
+            <HeartbeatProvider>
+              {children}
+            </HeartbeatProvider>
+          </DashboardShell>
+        </UserProfileProvider>
+      </AppProviders>
     </Suspense>
   )
 }

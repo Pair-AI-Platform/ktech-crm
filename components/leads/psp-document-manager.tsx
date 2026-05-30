@@ -130,7 +130,25 @@ export function PSPDocumentManager({
   const [verifying, setVerifying] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expirationDates, setExpirationDates] = useState<Record<string, string>>({})
+  const [extractingExpiration, setExtractingExpiration] = useState<Record<string, boolean>>({})
+  const [expirationExtractionAttempts, setExpirationExtractionAttempts] = useState<Set<string>>(new Set())
+  const manualExpirationOverridesRef = useRef<Set<string>>(new Set())
+  const mountedRef = useRef(true)
+  const extractionScopeRef = useRef(`${leadId}:${graduateType}`)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    extractionScopeRef.current = `${leadId}:${graduateType}`
+    setExtractingExpiration({})
+    setExpirationExtractionAttempts(new Set())
+    manualExpirationOverridesRef.current.clear()
+  }, [leadId, graduateType])
 
   // Load documents from database on mount
   useEffect(() => {
@@ -285,6 +303,11 @@ export function PSPDocumentManager({
 
       const { document: savedDoc, public_url, storage_path: storagePath } = await response.json()
 
+      const savedExpirationDate = savedDoc.expiration_date || null
+      if (savedExpirationDate) {
+        setExpirationDates((prev) => ({ ...prev, [docId]: savedExpirationDate }))
+      }
+
       // Update local state
       const uploadedFile: UploadedFile = {
         id: savedDoc.id,
@@ -295,8 +318,8 @@ export function PSPDocumentManager({
         uploaded_at: new Date().toISOString(),
         storage_path: storagePath || savedDoc.storage_path,
         is_verified: false,
-        expiration_date: expirationDates[docId] || null,
-        is_expired: false,
+        expiration_date: savedExpirationDate,
+        is_expired: savedDoc.is_expired || false,
       }
 
       const updatedDocs = documents.map((doc) =>
@@ -397,6 +420,7 @@ export function PSPDocumentManager({
   }
 
   const handleExpirationChange = async (docId: string, date: string) => {
+    manualExpirationOverridesRef.current.add(docId)
     setExpirationDates((prev) => ({ ...prev, [docId]: date }))
 
     const doc = documents.find((d) => d.id === docId)
@@ -431,6 +455,85 @@ export function PSPDocumentManager({
       console.error("Failed to update expiration date:", err)
     }
   }
+
+  useEffect(() => {
+    const target = documents.find((doc) =>
+      doc.hasExpiration &&
+      doc.file &&
+      !doc.file.expiration_date &&
+      !expirationDates[doc.id] &&
+      !expirationExtractionAttempts.has(doc.file.id)
+    )
+
+    if (!target?.file) return
+
+    const docId = target.id
+    const documentId = target.file.id
+    const scope = extractionScopeRef.current
+
+    setExpirationExtractionAttempts((prev) => {
+      const next = new Set(prev)
+      next.add(documentId)
+      return next
+    })
+    setExtractingExpiration((prev) => ({ ...prev, [documentId]: true }))
+
+    void fetch("/api/psp/documents/extract-expiration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: documentId }),
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(payload.error || "Failed to extract expiration date")
+        return payload as { expiration_date?: string | null }
+      })
+      .then((payload) => {
+        const extractedDate = payload.expiration_date
+        if (
+          !mountedRef.current ||
+          extractionScopeRef.current !== scope ||
+          !extractedDate ||
+          manualExpirationOverridesRef.current.has(docId)
+        ) {
+          return
+        }
+
+        setExpirationDates((prev) => ({ ...prev, [docId]: extractedDate }))
+        const updatedDocs = documents.map((doc) =>
+          doc.id === docId && doc.file
+            ? {
+                ...doc,
+                file: {
+                  ...doc.file,
+                  expiration_date: extractedDate,
+                  is_expired: new Date(`${extractedDate}T00:00:00`) < new Date(),
+                },
+              }
+            : doc
+        )
+        onDocumentsChange(updatedDocs)
+        invalidateDocumentCache(leadId, graduateType)
+      })
+      .catch((error) => {
+        console.warn("AI expiration extraction failed:", error)
+      })
+      .finally(() => {
+        if (!mountedRef.current || extractionScopeRef.current !== scope) return
+        setExtractingExpiration((prev) => {
+          const next = { ...prev }
+          delete next[documentId]
+          return next
+        })
+      })
+  }, [
+    documents,
+    expirationDates,
+    expirationExtractionAttempts,
+    graduateType,
+    leadId,
+    onDocumentsChange,
+  ])
 
   const handleDownload = (file: UploadedFile) => {
     const link = document.createElement("a")
@@ -580,6 +683,7 @@ export function PSPDocumentManager({
           )
           const docRule = graduateConfig?.documents.find((d) => d.id === doc.id)
           const hasExpirationField = docRule?.hasExpiration
+          const isExtractingExpiration = !!(doc.file && extractingExpiration[doc.file.id])
 
           return (
             <div
@@ -807,6 +911,9 @@ export function PSPDocumentManager({
                       }
                       className="flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]"
                     />
+                    {isExtractingExpiration && (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" />
+                    )}
                   </div>
                 </div>
               )}

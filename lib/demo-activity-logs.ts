@@ -363,12 +363,17 @@ export function getMockAuditLogs(): AuditLog[] {
 
 export function filterMockAuditLogs(
   logs: AuditLog[],
-  opts: { search?: string; filterTable?: string; filterAction?: string }
+  opts: { search?: string; filterTable?: string; filterAction?: string; dateFrom?: string; dateTo?: string }
 ): AuditLog[] {
   const search = opts.search?.trim().toLowerCase()
+  const fromTime = opts.dateFrom ? new Date(opts.dateFrom).getTime() : null
+  const toTime = opts.dateTo ? new Date(opts.dateTo).getTime() : null
   return logs.filter((log) => {
     if (opts.filterTable && opts.filterTable !== "all" && log.table_name !== opts.filterTable) return false
     if (opts.filterAction && opts.filterAction !== "all" && log.action !== opts.filterAction) return false
+    const createdTime = new Date(log.created_at).getTime()
+    if (fromTime !== null && createdTime < fromTime) return false
+    if (toTime !== null && createdTime > toTime) return false
     if (search) {
       const haystack = [
         log.user_email,

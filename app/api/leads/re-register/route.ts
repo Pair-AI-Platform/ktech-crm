@@ -1,5 +1,6 @@
 import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
+import { assertArabicLeadNameFields, getArabicLeadDisplayName } from '@/lib/lead-name-policy'
 
 export const POST = withApiHandler(
   { context: 're-register-leads', roles: ['admin'] },
@@ -80,57 +81,74 @@ export const POST = withApiHandler(
     const transferableLeads = sourceLeads.filter((l) => !l.civil_id || !existingCivilIds.has(l.civil_id))
 
     if (transferableLeads.length === 0) {
-      const names = skippedLeads.map((l) => `${l.first_name} ${l.last_name}`).join(', ')
+      const names = skippedLeads.map((l) => getArabicLeadDisplayName(l)).join(', ')
       return NextResponse.json(
         { error: `All selected leads already exist in the active cycle: ${names}` },
         { status: 409 }
       )
     }
 
-    // Build new leads with kept fields, reset pipeline fields
-    const newLeads = transferableLeads.map((lead) => ({
-      // Kept fields
-      first_name: lead.first_name,
-      last_name: lead.last_name,
-      civil_id: lead.civil_id,
-      phone: lead.phone,
-      phone_secondary: lead.phone_secondary,
-      email: lead.email,
-      date_of_birth: lead.date_of_birth,
-      gender: lead.gender,
-      nationality: lead.nationality,
-      is_kuwaiti: lead.is_kuwaiti,
-      is_transfer_student: lead.is_transfer_student,
-      is_special_needs: lead.is_special_needs,
-      is_diplomatic: lead.is_diplomatic,
-      is_athlete: lead.is_athlete,
-      is_married: lead.is_married,
-      is_employee: lead.is_employee,
-      school_id: lead.school_id,
-      school_name_custom: lead.school_name_custom,
-      education_type: lead.education_type,
-      education_type_custom: lead.education_type_custom,
-      grade_level: lead.grade_level,
-      academic_track: lead.academic_track,
-      funding_type: lead.funding_type,
-      source: lead.source,
-      source_category: lead.source_category,
-      // Reset fields
-      pipeline_stage: 'new',
-      status: null,
-      contact_status: null,
-      notes: null,
-      position_in_stage: null,
-      contact_count: 0,
-      lost_reason_id: null,
-      lost_reason_notes: null,
-      lost_at_stage: null,
-      // Set semester & provenance
-      semester_id: activeSemester.id,
-      re_registered_from: lead.id,
-      assigned_to: assigned_to || user.id,
-      assigned_at: new Date().toISOString(),
-    }))
+    let newLeads: Array<Record<string, unknown>>
+    try {
+      // Build new leads with kept fields, reset pipeline fields
+      newLeads = transferableLeads.map((lead) => {
+        const normalizedName = assertArabicLeadNameFields(lead, {
+          requireFirstName: true,
+          requireLastName: true,
+        })
+
+        return {
+          // Kept fields
+          first_name: normalizedName.first_name,
+          last_name: normalizedName.last_name,
+          first_name_ar: normalizedName.first_name,
+          last_name_ar: normalizedName.last_name,
+          civil_id: lead.civil_id,
+          phone: lead.phone,
+          phone_secondary: lead.phone_secondary,
+          email: lead.email,
+          date_of_birth: lead.date_of_birth,
+          gender: lead.gender,
+          nationality: lead.nationality,
+          is_kuwaiti: lead.is_kuwaiti,
+          is_transfer_student: lead.is_transfer_student,
+          is_special_needs: lead.is_special_needs,
+          is_diplomatic: lead.is_diplomatic,
+          is_athlete: lead.is_athlete,
+          is_married: lead.is_married,
+          is_employee: lead.is_employee,
+          school_id: lead.school_id,
+          school_name_custom: lead.school_name_custom,
+          education_type: lead.education_type,
+          education_type_custom: lead.education_type_custom,
+          grade_level: lead.grade_level,
+          academic_track: lead.academic_track,
+          funding_type: lead.funding_type,
+          source: lead.source,
+          source_category: lead.source_category,
+          // Reset fields
+          pipeline_stage: 'new',
+          status: null,
+          contact_status: null,
+          notes: null,
+          position_in_stage: null,
+          contact_count: 0,
+          lost_reason_id: null,
+          lost_reason_notes: null,
+          lost_at_stage: null,
+          // Set semester & provenance
+          semester_id: activeSemester.id,
+          re_registered_from: lead.id,
+          assigned_to: assigned_to || user.id,
+          assigned_at: new Date().toISOString(),
+        }
+      })
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Lead name must be in Arabic' },
+        { status: 400 }
+      )
+    }
 
     const { data: created, error: insertError } = await supabase
       .from('leads')
@@ -149,7 +167,7 @@ export const POST = withApiHandler(
     return NextResponse.json({
       count: created?.length ?? 0,
       skipped: skippedLeads.length,
-      skippedNames: skippedLeads.map((l) => `${l.first_name} ${l.last_name}`),
+      skippedNames: skippedLeads.map((l) => getArabicLeadDisplayName(l)),
     })
   }
 )

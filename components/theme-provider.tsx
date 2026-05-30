@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { createContext, useContext, useEffect, useState, useMemo, useSyncExternalStore, useRef } from "react"
+import { createContext, useContext, useEffect, useState, useMemo, useRef } from "react"
 
 type Theme = "light" | "dark" | "system"
 
@@ -19,14 +19,11 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const emptySubscribe = () => () => {}
-
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = "ktech-theme",
 }: ThemeProviderProps) {
-  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return defaultTheme
     return (localStorage.getItem(storageKey) as Theme | null) ?? defaultTheme
@@ -48,8 +45,6 @@ export function ThemeProvider({
   const prevResolvedRef = useRef(resolvedTheme)
 
   useEffect(() => {
-    if (!mounted) return
-
     const root = window.document.documentElement
 
     // Only update DOM if resolved theme changed
@@ -74,20 +69,11 @@ export function ThemeProvider({
       mediaQuery.addEventListener("change", handler)
       return () => mediaQuery.removeEventListener("change", handler)
     }
-  }, [theme, mounted, resolvedTheme])
+  }, [theme, resolvedTheme])
 
   const setTheme = (newTheme: Theme) => {
     localStorage.setItem(storageKey, newTheme)
     setThemeState(newTheme)
-  }
-
-  // Prevent flash by not rendering until mounted
-  if (!mounted) {
-    return (
-      <div style={{ visibility: "hidden" }}>
-        {children}
-      </div>
-    )
   }
 
   return (

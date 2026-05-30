@@ -38,21 +38,21 @@ interface PipelineFunnelVisualProps {
 const STAGE_CONFIG: Record<string, {
   icon: React.ComponentType<{ className?: string }>
   color: string
-  gradient: [string, string]
+  hoverColor: string
   glow: string
 }> = {
-  new:         { icon: UserPlus,       color: "#818CF8", gradient: ["#818CF8", "#6366F1"], glow: "rgba(99,102,241,0.25)" },
-  contacted:   { icon: Phone,          color: "#8B5CF6", gradient: ["#8B5CF6", "#7C3AED"], glow: "rgba(139,92,246,0.25)" },
-  appointment: { icon: Calendar,       color: "#A855F7", gradient: ["#A855F7", "#9333EA"], glow: "rgba(168,85,247,0.25)" },
-  visit:       { icon: MapPin,         color: "#D946EF", gradient: ["#D946EF", "#C026D3"], glow: "rgba(217,70,239,0.25)" },
-  test:        { icon: ClipboardCheck, color: "#EC4899", gradient: ["#EC4899", "#DB2777"], glow: "rgba(236,72,153,0.25)" },
-  application: { icon: FileText,       color: "#F43F5E", gradient: ["#F43F5E", "#E11D48"], glow: "rgba(244,63,94,0.25)" },
-  applicant:   { icon: GraduationCap,  color: "#F59E0B", gradient: ["#F59E0B", "#D97706"], glow: "rgba(245,158,11,0.25)" },
-  enrolled:    { icon: GraduationCap,  color: "#10B981", gradient: ["#10B981", "#059669"], glow: "rgba(16,185,129,0.25)" },
-  withdraw:    { icon: LogOut,         color: "#6B7280", gradient: ["#9CA3AF", "#6B7280"], glow: "rgba(107,114,128,0.25)" },
-  lost:        { icon: LogOut,         color: "#EF4444", gradient: ["#EF4444", "#DC2626"], glow: "rgba(239,68,68,0.25)" },
-  puc_document_submission:    { icon: FileText,       color: "#EC4899", gradient: ["#EC4899", "#DB2777"], glow: "rgba(236,72,153,0.25)" },
-  puc_application_submission: { icon: ClipboardCheck, color: "#06B6D4", gradient: ["#06B6D4", "#0891B2"], glow: "rgba(6,182,212,0.25)" },
+  new:         { icon: UserPlus,       color: "#2563EB", hoverColor: "#1D4ED8", glow: "rgba(37,99,235,0.22)" },
+  contacted:   { icon: Phone,          color: "#0EA5E9", hoverColor: "#0284C7", glow: "rgba(14,165,233,0.22)" },
+  appointment: { icon: Calendar,       color: "#14B8A6", hoverColor: "#0D9488", glow: "rgba(20,184,166,0.22)" },
+  visit:       { icon: MapPin,         color: "#2DD4BF", hoverColor: "#14B8A6", glow: "rgba(45,212,191,0.22)" },
+  test:        { icon: ClipboardCheck, color: "#F43F5E", hoverColor: "#E11D48", glow: "rgba(244,63,94,0.22)" },
+  application: { icon: FileText,       color: "#EF4444", hoverColor: "#DC2626", glow: "rgba(239,68,68,0.22)" },
+  applicant:   { icon: GraduationCap,  color: "#F59E0B", hoverColor: "#D97706", glow: "rgba(245,158,11,0.22)" },
+  enrolled:    { icon: GraduationCap,  color: "#10B981", hoverColor: "#059669", glow: "rgba(16,185,129,0.22)" },
+  withdraw:    { icon: LogOut,         color: "#6B7280", hoverColor: "#4B5563", glow: "rgba(107,114,128,0.22)" },
+  lost:        { icon: LogOut,         color: "#EF4444", hoverColor: "#DC2626", glow: "rgba(239,68,68,0.22)" },
+  puc_document_submission:    { icon: FileText,       color: "#22C55E", hoverColor: "#16A34A", glow: "rgba(34,197,94,0.22)" },
+  puc_application_submission: { icon: ClipboardCheck, color: "#06B6D4", hoverColor: "#0891B2", glow: "rgba(6,182,212,0.22)" },
 }
 
 function AnimatedCounter({ value, duration = 1200 }: { value: number; duration?: number }) {
@@ -129,7 +129,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <motion.div
-              className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20"
+              className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl"
               initial={{ rotate: -10, scale: 0.8 }}
               animate={isInView ? { rotate: 0, scale: 1 } : {}}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
@@ -169,20 +169,6 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
             preserveAspectRatio="xMidYMid meet"
           >
             <defs>
-              {data.map((stage, index) => {
-                const config = STAGE_CONFIG[stage.stage] || STAGE_CONFIG.new
-                return (
-                  <linearGradient
-                    key={`g-${stage.stage}`}
-                    id={`funnel-g-${index}`}
-                    x1="0%" y1="0%" x2="100%" y2="0%"
-                  >
-                    <stop offset="0%" stopColor={config.gradient[0]} stopOpacity="0.85" />
-                    <stop offset="50%" stopColor={config.gradient[1]} stopOpacity="1" />
-                    <stop offset="100%" stopColor={config.gradient[0]} stopOpacity="0.85" />
-                  </linearGradient>
-                )
-              })}
               <filter id="f-shadow" x="-10%" y="-10%" width="120%" height="130%">
                 <feDropShadow dx="0" dy="1" stdDeviation="3" floodColor="#000" floodOpacity="0.08" />
               </filter>
@@ -244,6 +230,11 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
                     scaleX: 1,
                     filter: isHovered ? `url(#funnel-glow-${index})` : 'url(#f-shadow)'
                   } : {}}
+                  whileHover={{
+                    scale: 1.025,
+                    y: -2,
+                    transition: { type: "spring", stiffness: 360, damping: 24 },
+                  }}
                   transition={{ delay: index * 0.06, duration: 0.5, ease: "easeOut" }}
                   style={{ transformOrigin: `${centerX}px ${y + segmentHeight / 2}px`, cursor: 'pointer' }}
                   onMouseEnter={() => setHoveredIndex(index)}
@@ -252,8 +243,10 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
                 >
                   <path
                     d={pathD}
-                    fill={`url(#funnel-g-${index})`}
-                    style={{ transition: 'all 0.3s ease' }}
+                    fill={isHovered ? config.hoverColor : config.color}
+                    stroke={isHovered ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)'}
+                    strokeWidth={isHovered ? 1.5 : 0.75}
+                    style={{ transition: 'fill 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease' }}
                   />
                   {/* Subtle top highlight */}
                   <line
@@ -444,10 +437,10 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
             label: "Conversion",
             value: null,
             displayValue: `${conversionRate}%`,
-            gradient: "from-indigo-500/10 to-indigo-500/3",
-            border: "border-indigo-200/50 dark:border-indigo-800/30",
-            textColor: "text-indigo-600 dark:text-indigo-400",
-            icon: <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />,
+            gradient: "from-sky-500/10 to-sky-500/3",
+            border: "border-sky-200/50 dark:border-sky-800/30",
+            textColor: "text-sky-600 dark:text-sky-400",
+            icon: <TrendingUp className="w-3.5 h-3.5 text-sky-400" />,
           },
         ].map((stat, i) => (
           <motion.div
@@ -455,7 +448,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
             initial={{ opacity: 0, y: 15 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.8 + i * 0.08, duration: 0.4 }}
-            className={`relative overflow-hidden text-center px-2 py-3 rounded-2xl bg-gradient-to-br ${stat.gradient} border ${stat.border} group hover:shadow-md transition-shadow duration-300`}
+            className={`relative overflow-hidden text-center px-2 py-3 rounded-2xl bg-gradient-to-br ${stat.gradient} border ${stat.border} group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--border-default)]`}
           >
             <div className="flex items-center justify-center gap-1 mb-2">
               {stat.icon}
@@ -498,7 +491,7 @@ export function PipelineFunnelHorizontal({ data }: PipelineFunnelVisualProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center shadow-sm shadow-[var(--primary)]/20">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="font-semibold text-[var(--text-primary)]">Sales Funnel Analytics</span>
@@ -541,9 +534,9 @@ export function PipelineFunnelHorizontal({ data }: PipelineFunnelVisualProps) {
         >
           <defs>
             <linearGradient id="h-funnel-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#818CF8" />
-              <stop offset="40%" stopColor="#A78BFA" />
-              <stop offset="70%" stopColor="#EC4899" />
+              <stop offset="0%" stopColor="#2563EB" />
+              <stop offset="40%" stopColor="#0EA5E9" />
+              <stop offset="70%" stopColor="#14B8A6" />
               <stop offset="100%" stopColor="#F59E0B" />
             </linearGradient>
           </defs>

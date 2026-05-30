@@ -5,6 +5,7 @@ import { withApiHandler } from "@/lib/api-handler"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { createServiceRoleClient } from "@/lib/supabase/server"
+import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 
 const TOKEN_TTL_DAYS = 7
 
@@ -96,8 +97,8 @@ export const POST = withApiHandler(
     const whatsappTo = `whatsapp:+${formattedPhone}`
     const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
-    const greetingNameAr = lead.first_name_ar || lead.first_name || ""
-    const greetingNameEn = lead.first_name || ""
+    const { firstName: greetingNameAr } = getArabicLeadNameParts(lead)
+    const greetingNameEn = greetingNameAr
     const message = `مرحباً ${greetingNameAr}،
 
 لإكمال طلبك في كلية الكويت التقنية، يرجى تعبئة بياناتك ورفع المستندات المطلوبة من الرابط التالي:

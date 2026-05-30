@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source ".";
+@source "../components";
+@source "../lib";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -215,9 +218,14 @@
   --foreground: var(--text-primary);
   --card: var(--bg-surface);
   --bg-card: var(--bg-surface);
+  --bg-primary: var(--bg-surface);
+  --bg-secondary: var(--bg-sunken);
+  --bg-muted: var(--bg-sunken);
   --card-foreground: var(--text-primary);
   --muted: var(--bg-sunken);
   --muted-foreground: var(--text-secondary);
+  --border-default: var(--border);
+  --border-hover: var(--border-emphasis);
 }
 
 /* ============================================
@@ -232,48 +240,48 @@ html.light, .light {
    True-black base, brand indigo, clear elevation
    ============================================ */
 html.dark, .dark {
-  /* Backgrounds - Graphite base with clear elevation steps */
-  --bg-base: #090b10;
-  --bg-surface: #10141d;
-  --bg-elevated: #161c28;
-  --bg-sunken: #06080c;
-  --bg-hover: #1d2533;
-  --bg-active: #273247;
-  --bg-canvas: #07090e;
+  /* Backgrounds - readable graphite with clear elevation steps */
+  --bg-base: #0b1018;
+  --bg-surface: #141b27;
+  --bg-elevated: #1b2533;
+  --bg-sunken: #080d14;
+  --bg-hover: #253144;
+  --bg-active: #33445f;
+  --bg-canvas: #090e16;
 
   /* Primary - ADL indigo tuned for dark surfaces */
-  --primary: #8196f3;
-  --primary-hover: #9aacff;
-  --primary-muted: rgba(129, 150, 243, 0.18);
-  --primary-subtle: rgba(129, 150, 243, 0.09);
-  --primary-rgb: 129, 150, 243;
+  --primary: #96a8ff;
+  --primary-hover: #b2c0ff;
+  --primary-muted: rgba(150, 168, 255, 0.20);
+  --primary-subtle: rgba(150, 168, 255, 0.11);
+  --primary-rgb: 150, 168, 255;
   --primary-foreground: #ffffff;
-  --primary-gradient: linear-gradient(135deg, #8196f3 0%, #5fc4d6 100%);
+  --primary-gradient: linear-gradient(135deg, #96a8ff 0%, #6ed8e4 100%);
 
   /* Accent - Teal counterpoint to keep the interface from becoming one-note */
-  --accent: #5fd3c7;
-  --accent-hover: #8be2da;
-  --accent-muted: rgba(95, 211, 199, 0.14);
-  --accent-subtle: rgba(95, 211, 199, 0.08);
+  --accent: #72dfd4;
+  --accent-hover: #9beae3;
+  --accent-muted: rgba(114, 223, 212, 0.16);
+  --accent-subtle: rgba(114, 223, 212, 0.09);
   --accent-foreground: #07100f;
 
   /* Secondary */
-  --secondary: #a6b1c4;
-  --secondary-hover: #d4dbea;
-  --secondary-muted: rgba(166, 177, 196, 0.12);
+  --secondary: #c1cadb;
+  --secondary-hover: #e1e7f2;
+  --secondary-muted: rgba(193, 202, 219, 0.14);
 
-  /* Text - Cool hierarchy, no harsh pure white */
-  --text-primary: #eef3fb;
-  --text-secondary: #aeb9cf;
-  --text-tertiary: #8290aa;
-  --text-muted: #62708a;
-  --text-disabled: #3f4a5f;
+  /* Text - high contrast hierarchy for dense dashboards */
+  --text-primary: #f6f8fc;
+  --text-secondary: #d8e0ee;
+  --text-tertiary: #b8c4d8;
+  --text-muted: #8a9bb5;
+  --text-disabled: #66758c;
   --text-inverse: #090b10;
 
   /* Borders - visible enough for dense data, never chalky */
-  --border: rgba(184, 198, 222, 0.13);
-  --border-subtle: rgba(184, 198, 222, 0.07);
-  --border-emphasis: rgba(184, 198, 222, 0.22);
+  --border: rgba(216, 226, 242, 0.20);
+  --border-subtle: rgba(216, 226, 242, 0.12);
+  --border-emphasis: rgba(216, 226, 242, 0.34);
   --border-focus: var(--primary);
 
   /* Semantic - readable on dark surfaces */
@@ -292,9 +300,9 @@ html.dark, .dark {
   --error-bg: rgba(255, 133, 133, 0.09);
   --error-foreground: #130606;
 
-  --info: #7bb7ff;
-  --info-muted: rgba(123, 183, 255, 0.14);
-  --info-bg: rgba(123, 183, 255, 0.09);
+  --info: #8cc2ff;
+  --info-muted: rgba(140, 194, 255, 0.16);
+  --info-bg: rgba(140, 194, 255, 0.10);
 
   /* Pipeline Stages - Vibrant, distinct */
   --stage-new: #9fb1d2;
@@ -325,17 +333,101 @@ html.dark, .dark {
   --foreground: var(--text-primary);
   --card: var(--bg-surface);
   --bg-card: var(--bg-surface);
+  --bg-primary: var(--bg-surface);
+  --bg-secondary: var(--bg-sunken);
+  --bg-muted: var(--bg-sunken);
   --card-foreground: var(--text-primary);
   --muted: var(--bg-sunken);
   --muted-foreground: var(--text-secondary);
+  --border-default: var(--border);
+  --border-hover: var(--border-emphasis);
 }
 
 /* Sidebar subtle gradient */
 html.dark .sidebar,
 html.dark [data-sidebar],
 html.dark nav[class*="sidebar"] {
-  background: linear-gradient(180deg, var(--bg-surface) 0%, #0c1018 100%);
+  background: linear-gradient(180deg, var(--bg-surface) 0%, #101722 100%);
   border-right: 1px solid var(--border);
+}
+
+/* Dark compatibility for legacy gray/white utility classes */
+html.dark .bg-white,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100,
+html.dark .bg-slate-50,
+html.dark .bg-slate-100 {
+  background-color: var(--bg-surface);
+}
+
+html.dark .bg-gray-200,
+html.dark .bg-slate-200 {
+  background-color: var(--bg-hover);
+}
+
+html.dark .bg-gray-300,
+html.dark .bg-slate-300 {
+  background-color: var(--bg-active);
+}
+
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: var(--bg-hover);
+}
+
+html.dark .text-gray-900,
+html.dark .text-slate-900,
+html.dark .text-gray-800,
+html.dark .text-slate-800,
+html.dark .text-black {
+  color: var(--text-primary);
+}
+
+html.dark .text-gray-700,
+html.dark .text-slate-700,
+html.dark .text-gray-600,
+html.dark .text-slate-600 {
+  color: var(--text-secondary);
+}
+
+html.dark .text-gray-500,
+html.dark .text-slate-500,
+html.dark .text-gray-400,
+html.dark .text-slate-400 {
+  color: var(--text-muted);
+}
+
+html.dark .text-gray-300,
+html.dark .text-slate-300 {
+  color: var(--text-tertiary);
+}
+
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-slate-100,
+html.dark .border-slate-200 {
+  border-color: var(--border);
+}
+
+html.dark .border-gray-300,
+html.dark .border-slate-300 {
+  border-color: var(--border-emphasis);
+}
+
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border);
+}
+
+html.dark .shadow,
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg {
+  box-shadow: var(--shadow-card);
 }
 
 /* RTL */
@@ -1416,6 +1508,31 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 /* ============================================
    Forms
    ============================================ */
+:where(html.dark) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
+:where(html.dark) :where(textarea),
+:where(html.dark) :where(select) {
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+:where(html.dark) input::placeholder,
+:where(html.dark) textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+:where(html.dark) :where(option) {
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+}
+
+:where(html.dark) input[type="date"]::-webkit-calendar-picker-indicator,
+:where(html.dark) input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.3);
+  opacity: 0.85;
+}
+
 .input-group {
   position: relative;
 }

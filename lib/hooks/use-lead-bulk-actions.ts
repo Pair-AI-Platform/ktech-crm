@@ -103,8 +103,16 @@ export function useLeadBulkActions() {
         return { error: null, count: leadIds.length }
       }
 
-      await supabase.rpc("shift_stage_positions", { target_stage: stage })
-      let nextPos = 0
+      const { data: topRow } = await supabase
+        .from("leads")
+        .select("position_in_stage")
+        .eq("pipeline_stage", stage)
+        .order("position_in_stage", { ascending: true, nullsFirst: false })
+        .limit(1)
+        .maybeSingle()
+
+      const currentTop = typeof topRow?.position_in_stage === "number" ? topRow.position_in_stage : 0
+      let nextPos = currentTop - leadIds.length
       const errors: string[] = []
 
       for (const id of leadIds) {

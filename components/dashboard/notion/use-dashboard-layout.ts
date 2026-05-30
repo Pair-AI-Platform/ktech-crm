@@ -16,7 +16,7 @@ const DEFAULT_LAYOUT: BlockConfig[] = [
   // Main column blocks
   { id: "stats-today", type: "stat", title: "Today's Appointments", column: 0, order: 0 },
   { id: "stats-attention", type: "stat", title: "Needs Attention", column: 0, order: 1 },
-  { id: "stats-active", type: "stat", title: "Active Leads", column: 0, order: 2 },
+  { id: "stats-active", type: "stat", title: "All Leads", column: 0, order: 2 },
   { id: "stats-applications", type: "stat", title: "Applications", column: 0, order: 3 },
   { id: "pipeline-progress", type: "pipeline", title: "Pipeline Progress", column: 0, order: 4 },
   { id: "appointments-list", type: "list", title: "Today's Appointments", column: 0, order: 5 },

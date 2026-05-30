@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+import { measureClientAsync } from "@/lib/performance"
 import { toDateString } from "@/lib/utils"
 
 interface DashboardCriticalStatsOptions {
@@ -61,11 +62,14 @@ export function useDashboardCriticalStats({
 
       const supabase = createClient()
       const today = toDateString(new Date())
-      const activeStages = "(lost,enrolled,withdraw)"
 
-      const { data: rpcRows, error: rpcError } = await supabase.rpc("get_dashboard_critical_stats", {
-        p_today: today,
-      })
+      const { data: rpcRows, error: rpcError } = await measureClientAsync(
+        "supabase.rpc.get_dashboard_critical_stats",
+        async () => await supabase.rpc("get_dashboard_critical_stats", {
+          p_today: today,
+        }),
+        { slowMs: 700, data: { surface: "dashboard-fast-stats", role: isAdmin ? "admin" : "agent" } }
+      )
 
       if (!rpcError && Array.isArray(rpcRows) && rpcRows.length > 0) {
         const row = rpcRows[0] as DashboardCriticalStatsRpcRow
@@ -81,6 +85,7 @@ export function useDashboardCriticalStats({
 
       const leadBase = () => {
         let query = supabase.from("leads").select("id", { count: "exact", head: true })
+        query = query.eq("actual_lead", true)
         if (!isAdmin && profileId) query = query.eq("assigned_to", profileId)
         return query
       }
@@ -103,7 +108,7 @@ export function useDashboardCriticalStats({
         todayAppointments,
         todayCallbacks,
       ] = await Promise.all([
-        leadBase().not("pipeline_stage", "in", activeStages),
+        leadBase(),
         leadBase().eq("pipeline_stage", "application"),
         leadBase().eq("pipeline_stage", "application").eq("funding_type", "puc"),
         leadBase().eq("pipeline_stage", "application").eq("funding_type", "self_funded"),

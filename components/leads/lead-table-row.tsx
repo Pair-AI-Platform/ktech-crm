@@ -49,6 +49,7 @@ import {
 import { computePUCDocumentStatus } from "@/lib/psp/document-status"
 import { formatKuwaitPhone, getInitials } from "@/lib/utils"
 import { LeadAppointmentsPopover } from "@/components/leads/lead-appointments-popover"
+import { ALL_REASON_LABELS } from "@/lib/config/withdrawal-reasons"
 import {
   getLeadTemperature,
   temperatureConfig,
@@ -982,26 +983,8 @@ export const LeadTableRow = React.memo(function LeadTableRow({
           {/* Reason column */}
           <td className="px-3 py-3 overflow-hidden">
             {(() => {
-              const WITHDRAWAL_REASON_LABELS: Record<string, string> = {
-                payment_issue: "Payment Issue",
-                far_away: "Far Away",
-                language_issues: "Language Issues",
-                academic_reason: "Academic Reason",
-                accepted_second_choice: "Second Choice",
-                personal_reasons: "Personal Reasons",
-                medical_travel_abroad: "Medical Travel",
-                traveling: "Traveling",
-                studying_abroad: "Studying Abroad",
-                competitor_acm: "ACM", competitor_aum: "AUM", competitor_auk: "AUK",
-                competitor_gust: "GUST", competitor_paaet: "PAAET", competitor_ku: "KU",
-                competitor_kilaw: "KILAW", competitor_iuk: "IUK", competitor_cat: "CAT",
-                competitor_kcst: "KCST", competitor_cck: "CCK", competitor_aou: "AOU",
-                competitor_aiu: "AIU", competitor_au: "AU", competitor_boxhill: "BOXHILL",
-                military: "Military", police: "Police", fire_force: "Fire Force",
-                army: "Army", national_guard: "National Guard",
-              }
               const reason = getEffectiveValue(lead.id, 'withdrawal_reason', lead.withdrawal_reason)
-              const label = reason ? WITHDRAWAL_REASON_LABELS[reason] || reason.replace(/_/g, ' ') : null
+              const label = reason ? ALL_REASON_LABELS[reason] || reason.replace(/_/g, ' ') : null
               return label ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); onEditWithdrawReason?.(lead) }}

@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import { Cake } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { StaticBlock, ListBlock } from "@/components/dashboard/notion"
+import { cn } from "@/lib/utils"
+import { getLeadDisplayName } from "@/lib/lead-utils"
 
 interface BirthdaySectionProps {
   birthdayLeads: Array<{
@@ -22,9 +24,18 @@ interface BirthdaySectionProps {
     isToday: boolean
   }>
   loading: boolean
+  className?: string
+  compact?: boolean
+  maxItems?: number
 }
 
-export function BirthdaySection({ birthdayLeads, loading }: BirthdaySectionProps) {
+export function BirthdaySection({
+  birthdayLeads,
+  loading,
+  className,
+  compact = false,
+  maxItems,
+}: BirthdaySectionProps) {
   const router = useRouter()
 
   const birthdayItems = useMemo(() => {
@@ -42,7 +53,7 @@ export function BirthdaySection({ birthdayLeads, loading }: BirthdaySectionProps
 
       return {
         id: item.lead.id,
-        title: `${item.lead.first_name_ar || ''} ${item.lead.last_name_ar || ''}`.trim() || item.lead.first_name,
+        title: getLeadDisplayName(item.lead),
         subtitle: item.isToday
           ? `Turns ${age} today!`
           : item.daysUntil === 1
@@ -72,16 +83,23 @@ export function BirthdaySection({ birthdayLeads, loading }: BirthdaySectionProps
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.18 }}
+      className="h-full"
     >
       <StaticBlock
         title={`Upcoming Birthdays${birthdayLeads.some(b => b.isToday) ? ' - Today!' : ''}`}
         icon={<Cake className="w-4 h-4 text-[#C026D3]" />}
+        className={cn("h-full flex flex-col overflow-hidden", className)}
+        contentClassName={compact ? "p-3" : undefined}
       >
         <ListBlock
           items={birthdayItems}
           loading={loading}
           emptyMessage="No upcoming birthdays"
-          emptyIcon={<Cake className="w-8 h-8 text-[var(--text-muted)]" />}
+          emptyIcon={<Cake className="w-6 h-6 text-[var(--text-muted)]" />}
+          maxItems={maxItems}
+          compact={compact}
+          className={compact ? "space-y-0.5" : undefined}
+          emptyClassName={compact ? "min-h-[96px] py-0" : undefined}
         />
       </StaticBlock>
     </motion.div>

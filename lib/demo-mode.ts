@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 export function isDemoModeEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false
   return (
     process.env.DEMO_MODE_ENABLED === "true" ||
     process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true"

@@ -85,9 +85,8 @@ const nextConfig: NextConfig = {
 // and PR previews without Sentry creds don't fail.
 const sentryWrapped =
   process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-    ? (() => {
-        const { withSentryConfig } = require("@sentry/nextjs")
-        return withSentryConfig(nextConfig, {
+    ? (() => import("@sentry/nextjs").then(({ withSentryConfig }) =>
+        withSentryConfig(nextConfig, {
           org: process.env.SENTRY_ORG,
           project: process.env.SENTRY_PROJECT,
           silent: !process.env.CI,
@@ -96,7 +95,7 @@ const sentryWrapped =
           disableLogger: true,
           automaticVercelMonitors: true,
         })
-      })()
+      ))()
     : nextConfig;
 
 export default sentryWrapped;

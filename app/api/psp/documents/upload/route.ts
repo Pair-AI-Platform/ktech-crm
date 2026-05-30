@@ -2,6 +2,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
+import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
+
+export const maxDuration = 30
 
 // POST - Upload file to storage and create document record
 export async function POST(request: NextRequest) {
@@ -74,6 +77,17 @@ export async function POST(request: NextRequest) {
     // Convert File to Buffer for upload
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+    const extraction = await extractDocumentExpirationDate({
+      buffer,
+      mimeType: file.type,
+      fileName: file.name,
+      documentType,
+      graduateType,
+    })
+    if (extraction.error) {
+      console.warn("Document expiration AI extraction skipped/failed:", extraction.error)
+    }
+    const finalExpirationDate = expirationDate || extraction.expirationDate
 
     // Upload to storage
     const { error: uploadError } = await serviceClient.storage
@@ -139,7 +153,8 @@ export async function POST(request: NextRequest) {
         file_size: file.size,
         storage_path: storagePath,
         public_url: urlData?.signedUrl,
-        expiration_date: expirationDate || null,
+        expiration_date: finalExpirationDate || null,
+        is_expired: isDocumentExpired(finalExpirationDate),
         uploaded_by: user.id,
         uploaded_at: new Date().toISOString(),
         is_verified: false,
@@ -171,7 +186,8 @@ export async function POST(request: NextRequest) {
           file_size: file.size,
           storage_path: storagePath,
           public_url: urlData?.signedUrl,
-          expiration_date: expirationDate || null,
+          expiration_date: finalExpirationDate || null,
+          is_expired: isDocumentExpired(finalExpirationDate),
           uploaded_by: user.id,
           uploaded_at: new Date().toISOString(),
           is_verified: false,
@@ -194,6 +210,7 @@ export async function POST(request: NextRequest) {
         document: fallbackData,
         public_url: urlData?.signedUrl,
         storage_path: storagePath,
+        expiration_extraction: extraction,
       })
     }
 
@@ -201,6 +218,7 @@ export async function POST(request: NextRequest) {
       document: data,
       public_url: urlData?.signedUrl,
       storage_path: storagePath,
+      expiration_extraction: extraction,
     })
   } catch (err) {
     console.error("Error uploading PSP document:", err)

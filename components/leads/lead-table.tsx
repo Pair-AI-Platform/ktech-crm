@@ -456,6 +456,7 @@ export function LeadTable({
     newStage: PipelineStage,
     status?: LeadStatus | null,
     leadSnapshot?: Lead,
+    leadPatch?: Partial<Lead>,
   ) => {
     const existing = leadSnapshot ?? leads.find((lead) => lead.id === leadId)
     const snapshot = existing
@@ -464,6 +465,7 @@ export function LeadTable({
           pipeline_stage: newStage,
           position_in_stage: 0,
           status: status === undefined ? existing.status : (status ?? undefined),
+          ...leadPatch,
         }
       : undefined
     onStageChanged?.(leadId, newStage, status, snapshot)
@@ -592,15 +594,18 @@ export function LeadTable({
     pinLeadToTop(leadId)
     setPendingUpdates(prev => ({
       ...prev,
-      [leadId]: { ...prev[leadId], pipeline_stage: newStage, status: undefined, contact_count: nextCount }
+      [leadId]: {
+        ...prev[leadId],
+        pipeline_stage: newStage,
+        status: null as unknown as Lead['status'],
+        contact_count: nextCount,
+      }
     }))
-    setEditingStage(leadId)
     notifyStageChanged(leadId, newStage, null, lead)
 
     // Update stage and clear status
     const result = await updateLead(leadId, { pipeline_stage: newStage, status: null as unknown as Lead['status'] })
 
-    setEditingStage(null)
     // Clear pending update after API call (whether success or failure)
     // On success, the real-time subscription will update with actual data
     // On failure, we revert by clearing the pending update
@@ -745,11 +750,25 @@ export function LeadTable({
 
     const leadId = withdrawDialogLead.id
     const nextCount = getNextCount(leadId)
+    const withdrawalNotes = notes || null
     // Optimistic update
     pinLeadToTop(leadId)
-    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], pipeline_stage: 'withdraw' as PipelineStage, contact_count: nextCount } }))
+    setPendingUpdates(prev => ({
+      ...prev,
+      [leadId]: {
+        ...prev[leadId],
+        pipeline_stage: 'withdraw' as PipelineStage,
+        withdrawal_reason: reason,
+        withdrawal_notes: withdrawalNotes,
+        contact_count: nextCount,
+      },
+    }))
     setEditingStage(leadId)
-    notifyStageChanged(leadId, 'withdraw' as PipelineStage, undefined, withdrawDialogLead)
+    notifyStageChanged(leadId, 'withdraw' as PipelineStage, undefined, withdrawDialogLead, {
+      withdrawal_reason: reason,
+      withdrawal_notes: withdrawalNotes,
+      contact_count: nextCount,
+    })
 
     const result = await updateLeadStage(leadId, 'withdraw' as PipelineStage, undefined, undefined, reason, notes)
 
@@ -760,6 +779,8 @@ export function LeadTable({
         const updated = { ...prev }
         if (updated[leadId]) {
           delete updated[leadId].pipeline_stage
+          delete updated[leadId].withdrawal_reason
+          delete updated[leadId].withdrawal_notes
           delete updated[leadId].contact_count
           if (Object.keys(updated[leadId]).length === 0) {
             delete updated[leadId]

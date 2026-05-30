@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
+import { isDocumentExpired } from "@/lib/ai/document-expiration"
 
 export interface PSPDocument {
   id: string
@@ -219,6 +220,7 @@ export const PATCH = withApiHandler(
 
     if (expiration_date !== undefined) {
       updateData.expiration_date = expiration_date
+      updateData.is_expired = isDocumentExpired(expiration_date)
     }
 
     if (Object.keys(updateData).length === 0) {

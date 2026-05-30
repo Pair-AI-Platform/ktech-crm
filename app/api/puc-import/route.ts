@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { PucImportRecord, PucImportResult } from "@/lib/puc-import"
+import { getArabicLeadDisplayName, splitArabicFullName } from "@/lib/lead-name-policy"
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,9 +101,7 @@ export async function POST(request: NextRequest) {
 
         if (lead) {
           // ── EXISTING LEAD ──
-          const leadName = lead.first_name_ar && lead.last_name_ar
-            ? `${lead.first_name_ar} ${lead.last_name_ar}`
-            : `${lead.first_name} ${lead.last_name}`
+          const leadName = getArabicLeadDisplayName(lead)
 
           // Skip if already in applicant or enrolled (don't move backwards)
           if (["applicant", "enrolled"].includes(lead.pipeline_stage)) {
@@ -123,6 +122,8 @@ export async function POST(request: NextRequest) {
                 pipeline_stage: "applicant",
                 position_in_stage: nextApplicantPosition,
                 puc_import_flagged: false,
+                actual_lead: true,
+                funding_type: "puc",
                 status: null,
               })
               .eq("id", lead.id)
@@ -163,6 +164,8 @@ export async function POST(request: NextRequest) {
                 pipeline_stage: "applicant",
                 position_in_stage: nextApplicantPosition,
                 puc_import_flagged: true,
+                actual_lead: true,
+                funding_type: "puc",
                 status: null,
                 // Clear lost fields if moving from lost
                 ...(lead.pipeline_stage === "lost" ? {
@@ -203,19 +206,32 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // ── NEW STUDENT (not in system at all) → create + flag with "2" badge ──
-          const nameParts = (record.student_name || "").split(/\s+/)
-          const firstName = nameParts[0] || "Unknown"
-          const lastName = nameParts.slice(1).join(" ") || ""
+          const arabicName = splitArabicFullName(record.student_name)
+
+          if (!arabicName?.first_name) {
+            result.errors.push({
+              civilId: record.civil_id,
+              name: record.student_name || "Missing name",
+              error: "Student name must be in Arabic before creating a new lead",
+            })
+            continue
+          }
+
+          const fullName = [arabicName.first_name, arabicName.last_name].filter(Boolean).join(" ")
 
           const { data: newLead, error: createError } = await supabase
             .from("leads")
             .insert({
-              first_name: firstName,
-              last_name: lastName,
+              first_name: arabicName.first_name,
+              last_name: arabicName.last_name,
+              first_name_ar: arabicName.first_name,
+              last_name_ar: arabicName.last_name,
               civil_id: record.civil_id,
               phone: "",
               pipeline_stage: "applicant",
               position_in_stage: nextApplicantPosition,
+              actual_lead: true,
+              funding_type: "puc",
               puc_import_flagged: true,
               source: "gpa_lists",
               source_category: "outreach",
@@ -227,7 +243,7 @@ export async function POST(request: NextRequest) {
           if (createError) {
             result.errors.push({
               civilId: record.civil_id,
-              name: record.student_name || "Unknown",
+              name: fullName,
               error: "Failed to create new lead",
             })
             continue
@@ -249,14 +265,14 @@ export async function POST(request: NextRequest) {
 
           result.createdNew.push({
             leadId: newLead.id,
-            name: record.student_name || "Unknown",
+            name: fullName,
             civilId: record.civil_id,
           })
         }
       } catch {
         result.errors.push({
           civilId: record.civil_id,
-          name: record.student_name || "Unknown",
+          name: record.student_name || "Missing name",
           error: "Failed to process record",
         })
       }

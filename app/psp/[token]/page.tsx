@@ -9,6 +9,7 @@ import {
   type ConditionalDocumentFlags,
 } from "@/lib/psp/document-rules"
 import { MAJORS, type IntendedMajor } from "@/types"
+import { getArabicLeadDisplayName, getArabicLeadNameParts } from "@/lib/lead-name-policy"
 
 type PageState = "verify" | "verifying" | "ready" | "submitted" | "expired" | "error"
 
@@ -176,11 +177,12 @@ export default function PspSelfServicePage() {
       setLead(json.lead)
       setDocs(json.documents || [])
       setPhone(trimmed)
+      const { firstName, lastName } = getArabicLeadNameParts(json.lead)
       setForm({
-        first_name: json.lead.first_name ?? "",
-        last_name: json.lead.last_name ?? "",
-        first_name_ar: json.lead.first_name_ar ?? "",
-        last_name_ar: json.lead.last_name_ar ?? "",
+        first_name: firstName,
+        last_name: lastName,
+        first_name_ar: firstName,
+        last_name_ar: lastName,
         civil_id: json.lead.civil_id ?? "",
         phone_secondary: json.lead.phone_secondary ?? "",
         email: json.lead.email ?? "",
@@ -417,8 +419,8 @@ export default function PspSelfServicePage() {
         <div className="p-6 sm:p-8 border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">PSP Application / تقديم الطلب</h1>
           <p className="text-sm text-slate-600 mt-1">
-            {lead?.first_name_ar || lead?.first_name
-              ? `Welcome, ${lead.first_name_ar || lead.first_name}`
+            {lead
+              ? `Welcome, ${getArabicLeadDisplayName(lead)}`
               : "Complete your KTECH application below"}
           </p>
           {submittedBadge && (

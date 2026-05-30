@@ -35,7 +35,7 @@ export function AdminKpiSection({ allLeads, loading, todayAppointments, todayCal
       {
         id: "total-leads",
         value: total,
-        label: "Active Leads",
+        label: "All Leads",
         icon: <Users className="w-5 h-5 text-[var(--primary)]" />,
         iconBg: "bg-[var(--primary)]/10",
       },

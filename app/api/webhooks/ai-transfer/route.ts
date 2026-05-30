@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications/create'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
+import { assertArabicLeadNameFields } from '@/lib/lead-name-policy'
 import crypto from 'crypto'
 
 interface AITransferBody {
@@ -67,6 +68,22 @@ export const POST = withApiHandler(
     if (phone.length < 7 || phone.length > 15) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
+
+    let normalizedName: { first_name?: unknown; last_name?: unknown }
+    try {
+      normalizedName = assertArabicLeadNameFields(
+        { first_name: body.first_name, last_name: body.last_name },
+        { requireFirstName: true, requireLastName: true },
+      )
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Lead name must be in Arabic' },
+        { status: 400 },
+      )
+    }
+
+    const leadFirstName = String(normalizedName.first_name || '').trim()
+    const leadLastName = String(normalizedName.last_name || '').trim()
 
     const supabase = createServiceRoleClient()
 
@@ -144,8 +161,10 @@ export const POST = withApiHandler(
       const { data: newLead, error: insertError } = await supabase
         .from('leads')
         .insert({
-          first_name: body.first_name.trim(),
-          last_name: body.last_name.trim(),
+          first_name: leadFirstName,
+          last_name: leadLastName,
+          first_name_ar: leadFirstName,
+          last_name_ar: leadLastName,
           phone,
           email: body.email?.trim() || null,
           source: 'whatsapp_ai',
@@ -178,7 +197,7 @@ export const POST = withApiHandler(
       userId: assignedAgent.agent_id,
       type: 'new_assignment',
       title: 'New AI Transfer',
-      body: `Lead ${body.first_name} ${body.last_name} transferred from WhatsApp AI${body.transfer_reason ? `: ${body.transfer_reason}` : ''}`,
+      body: `Lead ${leadFirstName} ${leadLastName} transferred from WhatsApp AI${body.transfer_reason ? `: ${body.transfer_reason}` : ''}`,
       leadId,
       actionUrl: `/leads?id=${leadId}`,
       metadata: {

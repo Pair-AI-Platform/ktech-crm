@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { unstable_cache } from 'next/cache'
 import type { Profile } from '@/types'
 
 export async function createServerSupabaseClient() {
@@ -46,17 +47,41 @@ export async function getUser() {
   return user
 }
 
+const getCachedProfileById = unstable_cache(
+  async (userId: string) => {
+    const supabase = createServiceRoleClient()
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, full_name_ar, role, avatar_url, phone, is_active, monthly_target, created_at, updated_at')
+      .eq('id', userId)
+      .single<Profile>()
+
+    return data ?? null
+  },
+  ['user-profile'],
+  { revalidate: 300 }
+)
+
 export async function getUserProfile() {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+    const userId = claimsData?.claims?.sub
 
-    if (!user) return null
+    if (claimsError || !userId) return null
+
+    try {
+      const cachedProfile = await getCachedProfileById(userId)
+      if (cachedProfile) return cachedProfile
+    } catch {
+      // Fall back to the request-scoped client when service-role caching is
+      // unavailable locally.
+    }
 
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, email, full_name, full_name_ar, role, avatar_url, phone, is_active, monthly_target, created_at, updated_at')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single<Profile>()
 
     return profile

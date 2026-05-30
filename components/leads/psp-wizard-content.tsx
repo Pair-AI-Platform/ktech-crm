@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getLeadDisplayName } from "@/lib/lead-utils"
+import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -202,8 +203,9 @@ export function PSPWizardContent({
   // Initialize form with lead data
   useEffect(() => {
     if (isActive && lead) {
-      setFirstName(lead.first_name || "")
-      setLastName(lead.last_name || "")
+      const { firstName, lastName } = getArabicLeadNameParts(lead)
+      setFirstName(firstName)
+      setLastName(lastName)
       setCivilId(lead.civil_id || "")
       setPhone(lead.phone || "")
       setPhoneSecondary(lead.phone_secondary || "")
@@ -884,8 +886,8 @@ Kuwait Technical College`
   const selfServiceDialogLead = lead
     ? {
         ...lead,
-        first_name: firstName.trim() || lead.first_name,
-        last_name: lastName.trim() || lead.last_name,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         civil_id: civilId.trim() || lead.civil_id,
         phone: phone.trim() || lead.phone,
         phone_secondary: phoneSecondary.trim() || lead.phone_secondary,

@@ -8,7 +8,7 @@ import type { Lead, PipelineStage, FundingType, LeadStatus, LostReason } from "@
 import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
 import { GPA_SELF_FUNDED_THRESHOLD, PUC_PSP_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
-import { isArabicText } from "@/lib/string-utils"
+import { assertArabicLeadNameFields, getArabicLeadDisplayName } from "@/lib/lead-name-policy"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { calculateLeadQuality } from "@/lib/lead-scoring"
 import { queryKeys } from "./query-keys"
@@ -77,6 +77,8 @@ type BulkStageLeadSnapshot = {
   pipeline_stage: PipelineStage
   first_name?: string | null
   last_name?: string | null
+  first_name_ar?: string | null
+  last_name_ar?: string | null
   phone?: string | null
   civil_id?: string | null
   education_type?: string | null
@@ -314,33 +316,37 @@ export function useLeadMutations() {
   const mutatingCount = useIsMutating({ mutationKey: ['lead-mutation'] })
   const loading = mutatingCount > 0
 
-  const getTopPosition = async (stage: PipelineStage): Promise<number> => {
-    // Shift all existing leads in the target stage down by 1
-    await supabase.rpc("shift_stage_positions", { target_stage: stage })
-    return 0
+  const getTopPosition = async (stage: PipelineStage, count = 1): Promise<number> => {
+    const { data } = await supabase
+      .from("leads")
+      .select("position_in_stage")
+      .eq("pipeline_stage", stage)
+      .order("position_in_stage", { ascending: true, nullsFirst: false })
+      .limit(1)
+      .maybeSingle()
+
+    const currentTop = typeof data?.position_in_stage === "number" ? data.position_in_stage : 0
+    return currentTop - count
   }
 
   const createLeadMutation = useMutation({
     mutationKey: ['lead-mutation'],
     mutationFn: async (leadData: Partial<Lead>) => {
-      // Validate Arabic names
-      if (leadData.first_name && !isArabicText(leadData.first_name)) {
-        throw new Error('First name must be in Arabic')
-      }
-      if (leadData.last_name && !isArabicText(leadData.last_name)) {
-        throw new Error('Last name must be in Arabic')
-      }
+      const normalizedLeadData = assertArabicLeadNameFields(leadData, {
+        requireFirstName: true,
+        requireLastName: true,
+      })
 
       // Demo mode - simulate success
       if (isDemoMode()) {
         await new Promise(resolve => setTimeout(resolve, 300))
-        return { data: { ...leadData, id: `lead-${Date.now()}` } as Lead, error: null }
+        return { data: { ...normalizedLeadData, id: `lead-${Date.now()}` } as Lead, error: null }
       }
 
       const { data: { user } } = await supabase.auth.getUser()
 
       // Auto-set funding_type to self_funded if any GPA is below 70
-      const finalLeadData = { ...leadData }
+      const finalLeadData = { ...normalizedLeadData }
       const shouldAutoSelfFund = shouldBeAutoSelfFunded(finalLeadData)
       if (shouldAutoSelfFund) {
         finalLeadData.funding_type = 'self_funded'
@@ -420,13 +426,7 @@ export function useLeadMutations() {
   const updateLeadMutation = useMutation({
     mutationKey: ['lead-mutation'],
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Lead> }) => {
-      // Validate Arabic names if being updated
-      if (updates.first_name && !isArabicText(updates.first_name)) {
-        throw new Error('First name must be in Arabic')
-      }
-      if (updates.last_name && !isArabicText(updates.last_name)) {
-        throw new Error('Last name must be in Arabic')
-      }
+      updates = assertArabicLeadNameFields(updates)
 
       // Demo mode - save to localStorage and simulate success
       if (isDemoMode()) {
@@ -460,9 +460,10 @@ export function useLeadMutations() {
       // Get old values before update for activity logging
       const { data: oldLead } = await supabase
         .from("leads")
-        .select("pipeline_stage, contact_status, first_name, last_name, phone, civil_id, education_type, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college, source, gender, governorate, placement_english_score, placement_test_raw")
+        .select("pipeline_stage, contact_status, first_name, last_name, first_name_ar, last_name_ar, phone, civil_id, education_type, funding_type, gpa_grade_10, gpa_grade_11, gpa_grade_12_expected, gpa_grade_10_override, gpa_grade_11_override, gpa_grade_12_expected_override, gpa_overridden_by, nationality, is_kuwaiti, actual_gpa, graduation_year, date_of_birth, is_employee, assigned_to, contact_count, puc_document_status_override, intended_major, preferred_major, ministry_accepted_major, preferred_college, source, gender, governorate, placement_english_score, placement_test_raw")
         .eq("id", id)
         .single()
+      const oldLeadName = oldLead ? getArabicLeadDisplayName(oldLead) : id
 
       if (updates.pipeline_stage === "application" && oldLead?.pipeline_stage !== "application") {
         const mergedLead = { ...oldLead, ...updates }
@@ -566,7 +567,7 @@ export function useLeadMutations() {
           lead_id: id,
           activity_type: 'gpa_override',
           title: 'GPA Override Applied',
-          description: `Agent manually overrode GPA values for ${oldLead.first_name} ${oldLead.last_name}`,
+          description: `Agent manually overrode GPA values for ${oldLeadName}`,
           metadata: {
             gpa_grade_10_override: updates.gpa_grade_10_override,
             gpa_grade_11_override: updates.gpa_grade_11_override,
@@ -584,11 +585,11 @@ export function useLeadMutations() {
         const oldStageLabel = PIPELINE_STAGES.find(s => s.value === oldLead.pipeline_stage)?.label || oldLead.pipeline_stage
         const newStageLabel = PIPELINE_STAGES.find(s => s.value === updates.pipeline_stage)?.label || updates.pipeline_stage
 
-        await supabase.from('activities').insert({
+        void supabase.from('activities').insert({
           lead_id: id,
           activity_type: 'stage_change',
           title: 'Stage Changed',
-          description: `${oldLead.first_name} ${oldLead.last_name}: ${oldStageLabel} → ${newStageLabel}`,
+          description: `${oldLeadName}: ${oldStageLabel} → ${newStageLabel}`,
           metadata: {
             old_stage: oldLead.pipeline_stage,
             new_stage: updates.pipeline_stage,
@@ -596,6 +597,8 @@ export function useLeadMutations() {
             new_stage_label: newStageLabel,
           },
           created_by: user?.id,
+        }).then(({ error }) => {
+          if (error) console.warn("[useLeadMutations] Failed to log stage change", error.message)
         })
 
         // Notify assigned agent of stage change (if changed by someone else)
@@ -604,7 +607,7 @@ export function useLeadMutations() {
             user_id: oldLead.assigned_to,
             type: 'stage_change',
             title: `Lead moved to ${newStageLabel}`,
-            body: `${oldLead.first_name} ${oldLead.last_name} was moved from ${oldStageLabel} to ${newStageLabel}`,
+            body: `${oldLeadName} was moved from ${oldStageLabel} to ${newStageLabel}`,
             lead_id: id,
             action_url: `/leads/${id}`,
             created_by: user?.id,
@@ -631,11 +634,11 @@ export function useLeadMutations() {
         const oldStatusLabel = oldStatus ? (LEAD_STATUSES.find(s => s.value === oldStatus)?.label || oldStatus) : 'None'
         const newStatusLabel = newStatus ? (LEAD_STATUSES.find(s => s.value === newStatus)?.label || newStatus) : 'None'
 
-        await supabase.from('activities').insert({
+        void supabase.from('activities').insert({
           lead_id: id,
           activity_type: 'status_change',
           title: 'Status Changed',
-          description: `${oldLead.first_name} ${oldLead.last_name}: ${oldStatusLabel} → ${newStatusLabel}`,
+          description: `${oldLeadName}: ${oldStatusLabel} → ${newStatusLabel}`,
           metadata: {
             old_status: oldStatus || null,
             new_status: newStatus || null,
@@ -643,6 +646,8 @@ export function useLeadMutations() {
             new_status_label: newStatusLabel,
           },
           created_by: user?.id,
+        }).then(({ error }) => {
+          if (error) console.warn("[useLeadMutations] Failed to log status change", error.message)
         })
       }
 
@@ -691,7 +696,7 @@ export function useLeadMutations() {
           lead_id: id,
           activity_type: 'funding_type_change',
           title: 'Auto Self-Funded (Low GPA)',
-          description: `${oldLead.first_name} ${oldLead.last_name} automatically set to Self-Funded due to GPA below ${GPA_SELF_FUNDED_THRESHOLD} (${lowGpaValues.join(', ')})`,
+          description: `${oldLeadName} automatically set to Self-Funded due to GPA below ${GPA_SELF_FUNDED_THRESHOLD} (${lowGpaValues.join(', ')})`,
           metadata: {
             old_funding_type: oldLead.funding_type,
             new_funding_type: 'self_funded',
@@ -717,7 +722,7 @@ export function useLeadMutations() {
             lead_id: id,
             activity_type: 'doc_status_change',
             title: isSystemChange ? 'Doc Status Updated (System)' : 'Doc Status Override',
-            description: `${oldLead.first_name} ${oldLead.last_name}: ${oldLabel} → ${newLabel}`,
+            description: `${oldLeadName}: ${oldLabel} → ${newLabel}`,
             metadata: {
               old_status: oldStatus,
               new_status: newStatus,
@@ -736,7 +741,7 @@ export function useLeadMutations() {
           lead_id: id,
           activity_type: 'funding_type_change',
           title: 'Auto-Routed to PUC PSP',
-          description: `${oldLead.first_name} ${oldLead.last_name} automatically routed to PUC PSP (Kuwaiti, GPA: ${mergedLeadForPuc.actual_gpa}, Grad Year: ${mergedLeadForPuc.graduation_year}, Not Employee)`,
+          description: `${oldLeadName} automatically routed to PUC PSP (Kuwaiti, GPA: ${mergedLeadForPuc.actual_gpa}, Grad Year: ${mergedLeadForPuc.graduation_year}, Not Employee)`,
           metadata: {
             old_funding_type: oldLead.funding_type,
             new_funding_type: 'puc',
@@ -757,7 +762,7 @@ export function useLeadMutations() {
           lead_id: id,
           activity_type: 'source_change',
           title: 'Lead Source Changed',
-          description: `${oldLead.first_name} ${oldLead.last_name}: ${oldSource || 'None'} → ${updates.source || 'None'}`,
+          description: `${oldLeadName}: ${oldSource || 'None'} → ${updates.source || 'None'}`,
           metadata: {
             old_source: oldSource || null,
             new_source: updates.source || null,
@@ -895,7 +900,7 @@ export function useLeadMutations() {
       }
 
       // Place bulk-moved leads at top of target stage
-      let nextPos = await getTopPosition(stage)
+      let nextPos = await getTopPosition(stage, leadIds.length)
 
       // Update each lead individually with sequential positions
       const errors: string[] = []
@@ -905,7 +910,7 @@ export function useLeadMutations() {
         if (stage === 'lost' || stage === 'application') {
           const { data } = await supabase
             .from("leads")
-            .select("pipeline_stage, first_name, last_name, phone, civil_id, education_type")
+            .select("pipeline_stage, first_name, last_name, first_name_ar, last_name_ar, phone, civil_id, education_type")
             .eq("id", id)
             .single()
           oldLead = data as BulkStageLeadSnapshot | null
@@ -914,7 +919,7 @@ export function useLeadMutations() {
         if (stage === 'application' && oldLead?.pipeline_stage !== 'application') {
           const missingFields = getMissingPspSelfServiceFields(oldLead ?? {})
           if (missingFields.length > 0) {
-            const leadName = `${oldLead?.first_name ?? ""} ${oldLead?.last_name ?? ""}`.trim() || id
+            const leadName = oldLead ? getArabicLeadDisplayName(oldLead) : id
             errors.push(`${leadName}: missing ${missingFields.join(", ")}`)
             continue
           }
@@ -1116,7 +1121,9 @@ export function useLeadStats() {
       const supabase = createClient()
 
       const stages: PipelineStage[] = [
-        "new", "contacted", "visit", "test", "application", "applicant", "enrolled", "lost"
+        "new", "contacted", "visit", "test", "application",
+        "puc_document_submission", "puc_application_submission",
+        "applicant", "enrolled", "lost", "withdraw"
       ]
 
       const startOfMonth = new Date()
@@ -1129,16 +1136,19 @@ export function useLeadStats() {
         supabase
           .from("leads")
           .select("*", { count: "exact", head: true })
+          .eq("actual_lead", true)
           .eq("pipeline_stage", stage)
       )
 
       const totalPromise = supabase
         .from("leads")
         .select("*", { count: "exact", head: true })
+        .eq("actual_lead", true)
 
       const thisMonthPromise = supabase
         .from("leads")
         .select("*", { count: "exact", head: true })
+        .eq("actual_lead", true)
         .gte("created_at", startOfMonth.toISOString())
 
       const [stageResults, totalResult, thisMonthResult] = await Promise.all([

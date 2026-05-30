@@ -3,6 +3,7 @@ import { createLogger } from "@/lib/logger"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
+import { assertArabicLeadNameFields } from "@/lib/lead-name-policy"
 
 // Strict allow-list of fields a student may change via the public flow.
 // Anything else in the payload is silently dropped so a malicious caller
@@ -74,6 +75,15 @@ export async function POST(request: NextRequest) {
 
   if (Object.keys(filtered).length === 0) {
     return NextResponse.json({ error: "No editable fields in payload" }, { status: 400 })
+  }
+
+  try {
+    Object.assign(filtered, assertArabicLeadNameFields(filtered))
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Lead name must be in Arabic" },
+      { status: 400 },
+    )
   }
 
   const supabase = createServiceRoleClient()

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { MinistryAcceptanceRecord, MinistryAcceptanceResult } from "@/lib/ministry-acceptance-import"
 import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
+import { getArabicLeadDisplayName, splitArabicFullName } from "@/lib/lead-name-policy"
 
 export async function POST(request: NextRequest) {
   try {
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
 
         if (lead) {
           // ── EXISTING LEAD ──
-          const leadName = `${lead.first_name_ar || ""} ${lead.last_name_ar || ""}`
+          const leadName = getArabicLeadDisplayName(lead)
 
           // Skip if already at applicant/enrolled (don't move backwards)
           if (["applicant", "enrolled"].includes(lead.pipeline_stage)) {
@@ -132,6 +133,7 @@ export async function POST(request: NextRequest) {
               .update({
                 funding_type: "self_funded",
                 actual_gpa: record.gpa,
+                actual_lead: true,
               })
               .eq("id", lead.id)
 
@@ -167,7 +169,7 @@ export async function POST(request: NextRequest) {
           if (record.gpa !== undefined) {
             await supabase
               .from("leads")
-              .update({ actual_gpa: record.gpa })
+              .update({ actual_gpa: record.gpa, actual_lead: true })
               .eq("id", lead.id)
           }
 
@@ -181,6 +183,8 @@ export async function POST(request: NextRequest) {
               .update({
                 pipeline_stage: "applicant",
                 position_in_stage: nextApplicantPosition,
+                funding_type: "puc",
+                actual_lead: true,
                 status: null,
                 puc_choice: isSecondChoice ? "2" : "1",
                 puc_first_choice_college: isSecondChoice ? (record.accepted_college || null) : null,
@@ -249,6 +253,7 @@ export async function POST(request: NextRequest) {
               .update({
                 pipeline_stage: "lost",
                 position_in_stage: nextLostPosition,
+                actual_lead: true,
                 lost_reason_id: pucRejectedReason.id,
                 lost_reason_notes: record.accepted_college
                   ? `Accepted at ${record.accepted_college} instead`
@@ -294,20 +299,32 @@ export async function POST(request: NextRequest) {
           // ── NEW STUDENT (not in system) ──
           // Both first choice and second choice ktech students get created as applicants
           const isFirstChoice = record.is_first_choice
-          const nameParts = (record.student_name || "").split(/\s+/)
-          const firstName = nameParts[0] || "Unknown"
-          const lastName = nameParts.slice(1).join(" ") || ""
+          const arabicName = splitArabicFullName(record.student_name)
+
+          if (!arabicName?.first_name) {
+            result.errors.push({
+              civilId: record.civil_id,
+              name: record.student_name || "Missing name",
+              error: "Student name must be in Arabic before creating a new lead",
+            })
+            continue
+          }
+
+          const fullName = [arabicName.first_name, arabicName.last_name].filter(Boolean).join(" ")
 
           const { data: newLead, error: createError } = await supabase
             .from("leads")
             .insert({
-              first_name: firstName,
-              last_name: lastName,
+              first_name: arabicName.first_name,
+              last_name: arabicName.last_name,
+              first_name_ar: arabicName.first_name,
+              last_name_ar: arabicName.last_name,
               civil_id: record.civil_id,
               phone: "",
               pipeline_stage: "applicant",
               position_in_stage: nextApplicantPosition,
               funding_type: "puc",
+              actual_lead: true,
               source: "gpa_lists",
               source_category: "outreach",
               puc_choice: isFirstChoice ? "1" : "2",
@@ -327,7 +344,7 @@ export async function POST(request: NextRequest) {
           if (createError) {
             result.errors.push({
               civilId: record.civil_id,
-              name: record.student_name || "Unknown",
+              name: fullName,
               error: "Failed to create new lead",
             })
             continue
@@ -353,13 +370,13 @@ export async function POST(request: NextRequest) {
           if (isFirstChoice) {
             result.createdFirstChoice.push({
               leadId: newLead.id,
-              name: record.student_name || "Unknown",
+              name: fullName,
               civilId: record.civil_id,
             })
           } else {
             result.createdSecondChoice.push({
               leadId: newLead.id,
-              name: record.student_name || "Unknown",
+              name: fullName,
               civilId: record.civil_id,
             })
           }
@@ -367,7 +384,7 @@ export async function POST(request: NextRequest) {
           // All newly created leads are ministry-assigned (not in system before)
           result.ministryAssigned.push({
             leadId: newLead.id,
-            name: record.student_name || "Unknown",
+            name: fullName,
             civilId: record.civil_id,
             previousStage: "new (not in system)",
           })
@@ -375,7 +392,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         result.errors.push({
           civilId: record.civil_id,
-          name: record.student_name || "Unknown",
+          name: record.student_name || "Missing name",
           error: "Failed to process record",
         })
       }

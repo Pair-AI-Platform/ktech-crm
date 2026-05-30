@@ -13,6 +13,7 @@ export interface DashboardBlockProps {
   icon?: ReactNode
   children: ReactNode
   className?: string
+  contentClassName?: string
   collapsible?: boolean
   defaultCollapsed?: boolean
   onTitleChange?: (title: string) => void
@@ -27,6 +28,7 @@ export function DashboardBlock({
   icon,
   children,
   className,
+  contentClassName,
   collapsible = true,
   defaultCollapsed = false,
   onTitleChange,
@@ -207,7 +209,7 @@ export function DashboardBlock({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-4">{children}</div>
+            <div className={cn("p-4", contentClassName)}>{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -221,6 +223,7 @@ export function StaticBlock({
   icon,
   children,
   className,
+  contentClassName,
   collapsible = true,
   defaultCollapsed = false,
   headerActions,
@@ -271,7 +274,7 @@ export function StaticBlock({
             transition={{ duration: 0.2 }}
             className="overflow-hidden flex-1"
           >
-            <div className="p-4 h-full">{children}</div>
+            <div className={cn("p-4 h-full", contentClassName)}>{children}</div>
           </motion.div>
         )}
       </AnimatePresence>

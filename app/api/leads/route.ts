@@ -16,6 +16,7 @@ export const GET = withApiHandler(
     const pageSize = parseInt(url.searchParams.get('pageSize') || '25', 10)
     const includeCount = url.searchParams.get('includeCount') !== 'false'
     const view = url.searchParams.get('view') === 'compact' ? 'compact' : 'full'
+    const includeNonActual = profile.role === 'admin' && url.searchParams.get('includeNonActual') === 'true'
 
     // Advanced filters from JSON param
     let advancedFilters: Record<string, any> = {}
@@ -88,6 +89,8 @@ export const GET = withApiHandler(
       civil_id,
       phone,
       pipeline_stage,
+      withdrawal_reason,
+      withdrawal_notes,
       contact_status,
       funding_type,
       source,
@@ -119,6 +122,10 @@ export const GET = withApiHandler(
             : view === 'compact' ? compactColumns : fullColumns,
           forCount ? { count: 'exact', head: true } : undefined
         )
+
+      if (!includeNonActual) {
+        q = q.eq('actual_lead', true)
+      }
 
       if (!forCount) {
         if (stage === 'all') {

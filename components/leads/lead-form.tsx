@@ -16,6 +16,7 @@ import { useCampaigns } from "@/lib/hooks/use-campaigns"
 import { createClient } from "@/lib/supabase/client"
 import { isValidKuwaitPhone, isValidKuwaitCivilId } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
+import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useUser } from "@/lib/hooks/use-user"
 import { useDuplicateCheck } from "@/lib/hooks/use-duplicate-check"
@@ -53,10 +54,11 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const [semesters, setSemesters] = useState<LeadFormSemester[]>([])
   const formScrollRef = useRef<HTMLDivElement>(null)
   const isEditing = !!lead
+  const initialArabicName = getArabicLeadNameParts(lead ?? {})
 
   const [formData, setFormData] = useState<LeadFormData>({
-    first_name: lead?.first_name || "",
-    last_name: lead?.last_name || "",
+    first_name: initialArabicName.firstName,
+    last_name: initialArabicName.lastName,
     full_name_ar: lead?.full_name_ar || "",
     gender: lead?.gender || "",
     phone: lead?.phone || "",
@@ -83,7 +85,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     actual_gpa: lead?.actual_gpa?.toString() || "",
     grade_level: lead?.grade_level || "",
     academic_track: lead?.academic_track || "",
-    actual_lead: lead?.actual_lead || false,
+    actual_lead: lead?.actual_lead ?? true,
     seat_number: lead?.seat_number || "",
     notes: lead?.notes || "",
     source_detail: lead?.source_detail || "",

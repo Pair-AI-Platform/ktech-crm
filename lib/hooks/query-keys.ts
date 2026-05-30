@@ -37,6 +37,12 @@ export const queryKeys = {
   dashboardStats: {
     all: ['dashboard-stats'] as const,
   },
+  adminDashboardOverview: {
+    all: ['admin-dashboard-overview'] as const,
+  },
+  adminDashboardBootstrap: {
+    all: ['admin-dashboard-bootstrap'] as const,
+  },
   agentHistory: {
     all: ['agent-history'] as const,
     detail: (agentId: string) => [...queryKeys.agentHistory.all, agentId] as const,
@@ -60,9 +66,6 @@ export const queryKeys = {
     all: ['conversion-funnel'] as const,
     detail: (filters: Record<string, unknown>) => [...queryKeys.conversionFunnel.all, filters] as const,
   },
-  stageDropoff: {
-    all: ['stage-dropoff'] as const,
-  },
   agentPresence: {
     all: ['agent-presence'] as const,
   },
@@ -77,6 +80,9 @@ export const queryKeys = {
   },
   lastMonthLeadCounts: {
     all: ['last-month-lead-counts'] as const,
+  },
+  agentWorkloadStats: {
+    all: ['agent-workload-stats'] as const,
   },
   agentTargets: {
     all: ['agent-targets'] as const,

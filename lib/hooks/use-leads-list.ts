@@ -244,13 +244,16 @@ export function useLeadStats(options: { enabled?: boolean } = {}) {
       }
 
       const stages: PipelineStage[] = [
-        "new", "contacted", "visit", "test", "application", "applicant", "enrolled", "lost"
+        "new", "contacted", "visit", "test", "application",
+        "puc_document_submission", "puc_application_submission",
+        "applicant", "enrolled", "lost", "withdraw"
       ]
       const stageResults = await Promise.all(
         stages.map(stage =>
           supabase
             .from("leads")
             .select("id", { count: "exact", head: true })
+            .eq("actual_lead", true)
             .eq("pipeline_stage", stage)
         )
       )

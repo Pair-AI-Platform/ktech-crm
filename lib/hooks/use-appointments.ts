@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { toDateString } from "@/lib/utils"
 import { isDemoMode, getDemoAppointments, getDemoAppointmentStats, saveDemoAppointmentUpdate, getDemoLeadById, DEMO_AGENTS } from "@/lib/demo-data"
-import type { Appointment, AppointmentType, AppointmentStatus, AuditLog } from "@/types"
+import { measureClientAsync } from "@/lib/performance"
+import type { Appointment, AppointmentType, AppointmentStatus, AuditLog, Lead } from "@/types"
 import { queryKeys } from "@/lib/hooks/query-keys"
 
 // ---------------------------------------------------------------------------
@@ -32,12 +33,54 @@ interface UseAppointmentsOptions {
   noUpdated?: boolean // Filter for past appointments with no status update (same as needsAttention, clearer name)
   limit?: number
   enabled?: boolean
+  compact?: boolean
+  realtime?: boolean
 }
 
 type AppointmentIdRow = { appointment_id: string }
 type AppointmentStatsRow = Pick<Appointment, "scheduled_date" | "status">
 type NeedsAttentionAppointmentRow = Pick<Appointment, "scheduled_date" | "scheduled_time">
 type AppointmentAuditRow = Pick<AuditLog, "id" | "old_values" | "new_values" | "changed_fields" | "created_at" | "user_email">
+type AppointmentLeadRow = NonNullable<Appointment["appointment_leads"]>[number] & { lead?: Lead | null }
+type RawAppointmentRow = Appointment & {
+  appointment_leads?: AppointmentLeadRow[] | null
+  lead?: Lead | null
+}
+
+function leadIsReal(lead: Pick<Lead, "actual_lead"> | null | undefined): boolean {
+  return lead?.actual_lead !== false
+}
+
+function normalizeRealLeadAppointment(appointment: RawAppointmentRow): Appointment | null {
+  const rawAppointmentLeads = Array.isArray(appointment.appointment_leads)
+    ? appointment.appointment_leads
+    : []
+  const realAppointmentLeads = rawAppointmentLeads.filter(row => leadIsReal(row.lead))
+  const legacyLead = leadIsReal(appointment.lead) ? appointment.lead : null
+  const hasKnownNonRealLead =
+    rawAppointmentLeads.some(row => row.lead?.actual_lead === false) ||
+    appointment.lead?.actual_lead === false
+  const hasKnownRealLead =
+    realAppointmentLeads.some(row => Boolean(row.lead)) ||
+    Boolean(legacyLead)
+
+  if (hasKnownNonRealLead && !hasKnownRealLead) {
+    return null
+  }
+
+  const primaryLead = realAppointmentLeads.find(row => row.lead)?.lead ?? legacyLead ?? null
+
+  return {
+    ...appointment,
+    appointment_leads: realAppointmentLeads,
+    lead: primaryLead ?? undefined,
+    lead_id:
+      realAppointmentLeads.find(row => row.lead_id)?.lead_id ??
+      primaryLead?.id ??
+      (legacyLead ? appointment.lead_id : null) ??
+      undefined,
+  } as Appointment
+}
 
 // Helper to check if an appointment needs attention (past + still scheduled)
 export function isAppointmentNeedsAttention(apt: Appointment): boolean {
@@ -51,14 +94,29 @@ export function isAppointmentNeedsAttention(apt: Appointment): boolean {
 let channelCounter = 0
 
 export function useAppointments(options: UseAppointmentsOptions = {}) {
-  const { date, startDate, endDate, type = "all", status = "all", leadId, studentId, agentId, needsAttention, noUpdated, limit = 100, enabled = true } = options
+  const {
+    date,
+    startDate,
+    endDate,
+    type = "all",
+    status = "all",
+    leadId,
+    studentId,
+    agentId,
+    needsAttention,
+    noUpdated,
+    limit = 100,
+    enabled = true,
+    compact = false,
+    realtime = true,
+  } = options
   // noUpdated is an alias for needsAttention - both filter past appointments with no status update
   const filterNoUpdated = needsAttention || noUpdated
   const channelIdRef = useRef(`appointments-${++channelCounter}-${Date.now()}`)
   const queryClient = useQueryClient()
 
   // Stable filters object for the query key
-  const filters = { date, startDate, endDate, type, status, leadId, studentId, agentId, filterNoUpdated, limit }
+  const filters = { date, startDate, endDate, type, status, leadId, studentId, agentId, filterNoUpdated, limit, compact }
 
   const queryResult = useQuery({
     queryKey: appointmentKeys.list(filters),
@@ -106,16 +164,40 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       }
 
       const supabase = createClient()
-
-      let query = supabase
-        .from("appointments")
-        .select(`
+      const selectColumns = compact
+        ? `
+          id,
+          lead_id,
+          appointment_type,
+          modality,
+          scheduled_date,
+          scheduled_time,
+          duration_minutes,
+          status,
+          is_callback,
+          callback_reason,
+          assigned_agent,
+          notes,
+          created_by,
+          created_at,
+          updated_at,
+          lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, phone, contact_status, pipeline_stage, funding_type, actual_lead),
+          appointment_leads(id, appointment_id, lead_id, created_at, lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, phone, contact_status, pipeline_stage, funding_type, actual_lead)),
+          student:students(id, first_name, last_name, ktech_id),
+          assigned_agent_profile:profiles!assigned_agent(id, full_name, email)
+        `
+        : `
           *,
-          appointment_leads(id, lead_id, created_at, lead:leads(id, first_name, last_name, phone, contact_status, pipeline_stage)),
+          lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, phone, contact_status, pipeline_stage, funding_type, actual_lead),
+          appointment_leads(id, appointment_id, lead_id, created_at, lead:leads(id, first_name, last_name, first_name_ar, last_name_ar, phone, contact_status, pipeline_stage, funding_type, actual_lead)),
           student:students(id, first_name, last_name, ktech_id),
           assigned_agent_profile:profiles!assigned_agent(id, full_name, email),
           created_by_profile:profiles!created_by(id, full_name, email)
-        `)
+        `
+
+      let query = supabase
+        .from("appointments")
+        .select(selectColumns)
         .order("scheduled_date", { ascending: false })
         .order("scheduled_time", { ascending: false })
         .limit(limit)
@@ -164,17 +246,25 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
         query = query.eq("status", "scheduled").lte("scheduled_date", today)
       }
 
-      const { data, error } = await query
+      const { data, error } = await measureClientAsync(
+        compact ? "supabase.appointments.compact" : "supabase.appointments.full",
+        async () => await query,
+        {
+          slowMs: compact ? 700 : 1_200,
+          data: {
+            date: date ?? null,
+            filterNoUpdated,
+            compact,
+            limit,
+          },
+        }
+      )
 
       if (error) throw new Error(error.message)
 
-      // Backfill legacy lead/lead_id from junction table for backward compat
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const processedData = (data || []).map((apt: any) => ({
-        ...apt,
-        lead: apt.appointment_leads?.[0]?.lead || apt.lead || null,
-        lead_id: apt.appointment_leads?.[0]?.lead_id || apt.lead_id || null,
-      })) as Appointment[]
+      const processedData = (data || [])
+        .map(apt => normalizeRealLeadAppointment(apt as RawAppointmentRow))
+        .filter((apt): apt is Appointment => Boolean(apt))
 
       // For noUpdated/needsAttention, do additional client-side filtering for time
       let filteredData = processedData
@@ -195,7 +285,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
   }, [queryClient])
 
   useEffect(() => {
-    if (!enabled || isDemoMode()) return
+    if (!enabled || !realtime || isDemoMode()) return
 
     const supabase = createClient()
     const id = channelIdRef.current
@@ -226,7 +316,7 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
       supabase.removeChannel(channel)
       supabase.removeChannel(junctionChannel)
     }
-  }, [enabled, invalidate])
+  }, [enabled, realtime, invalidate])
 
   return {
     appointments: queryResult.data ?? [],
@@ -236,9 +326,22 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
   }
 }
 
-export function useTodayAppointments(options: { enabled?: boolean; agentId?: string } = {}) {
+export function useTodayAppointments(options: {
+  enabled?: boolean
+  agentId?: string
+  compact?: boolean
+  realtime?: boolean
+  limit?: number
+} = {}) {
   const today = toDateString(new Date())
-  return useAppointments({ date: today, enabled: options.enabled, agentId: options.agentId })
+  return useAppointments({
+    date: today,
+    enabled: options.enabled,
+    agentId: options.agentId,
+    compact: options.compact,
+    realtime: options.realtime,
+    limit: options.limit,
+  })
 }
 
 export function useLeadAppointments(leadId: string) {
@@ -256,8 +359,21 @@ export function useNeedsAttentionAppointments() {
 
 // Hook to get appointments with no update (past + still scheduled) - clearer name
 // غير محدث - مواعيد فاتت ولم يتم تحديث حالتها
-export function useNoUpdatedAppointments(options: { enabled?: boolean; agentId?: string } = {}) {
-  return useAppointments({ noUpdated: true, limit: 200, enabled: options.enabled, agentId: options.agentId })
+export function useNoUpdatedAppointments(options: {
+  enabled?: boolean
+  agentId?: string
+  compact?: boolean
+  realtime?: boolean
+  limit?: number
+} = {}) {
+  return useAppointments({
+    noUpdated: true,
+    limit: options.limit ?? 200,
+    enabled: options.enabled,
+    agentId: options.agentId,
+    compact: options.compact,
+    realtime: options.realtime,
+  })
 }
 
 export function useAppointmentMutations() {
@@ -320,6 +436,21 @@ export function useAppointmentMutations() {
       // Extract lead_ids from the payload (not a DB column)
       const leadIds = appointmentData.lead_ids ||
         (appointmentData.lead_id ? [appointmentData.lead_id] : [])
+      const uniqueLeadIds = [...new Set(leadIds)]
+
+      if (uniqueLeadIds.length > 0) {
+        const { data: realLeads, error: realLeadError } = await supabase
+          .from("leads")
+          .select("id")
+          .in("id", uniqueLeadIds)
+          .eq("actual_lead", true)
+
+        if (realLeadError) throw new Error(realLeadError.message)
+        if ((realLeads ?? []).length !== uniqueLeadIds.length) {
+          throw new Error("Appointments can only be created for real leads.")
+        }
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { lead_ids: _leadIds, ...insertData } = appointmentData
 
