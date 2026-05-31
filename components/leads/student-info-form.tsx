@@ -593,8 +593,8 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
               </div>
             </div>
 
-            {/* Gender + Nationality — side by side */}
-            <div className={fieldGridClass}>
+            {/* Gender + Nationality + Address — one row */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Gender */}
             <div className="space-y-2">
               <Label>Gender</Label>
@@ -682,8 +682,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 )}
               </div>
             </div>
-            </div>
-
             {/* Address */}
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
@@ -693,6 +691,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 value={formData.address}
                 onChange={(e) => handleChange("address", e.target.value)}
               />
+            </div>
             </div>
 
             {/* Student Profile — compact tap-to-toggle pills */}
