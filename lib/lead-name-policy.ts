@@ -118,6 +118,29 @@ export function getArabicLeadNameErrors(
   return errors
 }
 
+/**
+ * Guards a partial lead update against the "every lead must keep a valid Arabic
+ * first and last name" rule. Only name fields actually present in the update are
+ * checked, so unrelated updates pass straight through — but any attempt to set a
+ * name field to a blank or non-Arabic value is rejected, so a lead can never be
+ * edited into a state without an Arabic first and last name.
+ */
+export function assertArabicLeadNameUpdates<T extends LeadNameFields>(updates: T): T {
+  const errors: string[] = []
+
+  for (const key of ["first_name", "last_name", "first_name_ar", "last_name_ar"] as const) {
+    if (!(key in updates)) continue
+    if (!isArabicNameValue(updates[key])) {
+      errors.push(`${NAME_FIELD_LABELS[key]} must be a non-empty Arabic name`)
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors.join("; "))
+  }
+  return updates
+}
+
 export function assertArabicLeadNameFields<T extends LeadNameFields>(
   fields: T,
   options: { requireFirstName?: boolean; requireLastName?: boolean } = {},

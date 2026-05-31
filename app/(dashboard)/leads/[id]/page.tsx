@@ -85,10 +85,6 @@ const CallbackScheduler = dynamic(
   () => import("@/components/leads/callback-scheduler").then(m => m.CallbackScheduler),
   { ssr: false }
 )
-const SendRSVPDialog = dynamic(
-  () => import("@/components/leads/send-rsvp-dialog").then(m => m.SendRSVPDialog),
-  { ssr: false }
-)
 const LeadDocuments = dynamic(
   () => import("@/components/leads/lead-documents").then(m => m.LeadDocuments),
   { ssr: false }
@@ -309,9 +305,14 @@ function StickFigureAvatar({ gender }: { gender?: string | null }) {
         </>
       ) : (
         <>
-          <circle cx="40" cy="24" r="11" stroke="currentColor" strokeWidth="4.5" />
-          <path d="M24 63c0-12 7-20 16-20s16 8 16 20" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-          <path d="M31 45c5 4 13 4 18 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          {/* short hair on top */}
+          <path d="M29 20c2-6 20-6 22 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          {/* head */}
+          <circle cx="40" cy="27" r="11" stroke="currentColor" strokeWidth="4.5" />
+          {/* broad shoulders */}
+          <path d="M19 65c0-12 9.5-19 21-19s21 7 21 19" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+          {/* collar */}
+          <path d="M31 47c5 4 13 4 18 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
         </>
       )}
     </svg>
@@ -398,7 +399,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'activity'>('details')
   const [showPSPWizard, setShowPSPWizard] = useState(false)
   const [showPSPSelfService, setShowPSPSelfService] = useState(false)
-  const [showRSVPDialog, setShowRSVPDialog] = useState(false)
   const [showCallbackScheduler, setShowCallbackScheduler] = useState(false)
   const [rescheduleAppointmentId, setRescheduleAppointmentId] = useState<string | null>(null)
   const [rescheduleDate, setRescheduleDate] = useState("")
@@ -1283,16 +1283,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       </button>
                     </>
                   )}
-
-                  {lead.pipeline_stage === 'applicant' && (
-                    <button
-                      onClick={() => setShowRSVPDialog(true)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      Send RSVP
-                    </button>
-                  )}
                 </div>
 
                 <StudentInfoForm lead={lead} autosave={autosave} />
@@ -1716,16 +1706,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           isOpen={showPSPSelfService}
           onClose={() => setShowPSPSelfService(false)}
           lead={lead}
-        />
-      )}
-
-      {/* Send RSVP Dialog */}
-      {showRSVPDialog && (
-        <SendRSVPDialog
-          isOpen={showRSVPDialog}
-          onClose={() => setShowRSVPDialog(false)}
-          selectedLeads={[lead]}
-          onSuccess={() => refetchLead()}
         />
       )}
 
