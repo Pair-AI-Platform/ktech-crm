@@ -1370,14 +1370,14 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
         />
 
         {placementOpen && (
-          <div className={sectionBodyClass}>
-            {/* Placement Level */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+          <div className={cn(sectionBodyClass, "!space-y-3")}>
+            {/* Placement Level \u2014 compact segmented row */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-xs">
                 Placement Level
-                <span className="text-xs text-[var(--text-muted)] font-normal">(auto-calculated based on passed subjects)</span>
+                <span className="text-xs text-[var(--text-muted)] font-normal">(auto-calculated)</span>
               </Label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {PLACEMENT_LEVELS.map((level) => {
                   const isActive = hasAnyPlacementData
                     ? calculatedPlacementLevel === level.value
@@ -1386,20 +1386,20 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                     <div
                       key={level.value}
                       className={cn(
-                        "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-all",
+                        "flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-center transition-all",
                         isActive
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)] ring-2 ring-[var(--primary)]/20"
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] ring-1 ring-[var(--primary)]/20"
                           : "border-[var(--border)] opacity-50"
                       )}
                     >
                       <span className={cn(
-                        "text-lg font-bold",
+                        "text-sm font-bold",
                         isActive ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
                       )}>
                         {level.value === 'foundation_1' ? 'F1' : level.value === 'foundation_2' ? 'F2' : 'Major'}
                       </span>
                       <span className={cn(
-                        "text-xs",
+                        "text-[11px]",
                         isActive ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
                       )}>
                         {level.label.split(' - ')[1] || level.label}
@@ -1410,27 +1410,23 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
               </div>
             </div>
 
-            {/* IELTS/TOEFL */}
+            {/* IELTS/TOEFL \u2014 compact toggle row */}
             <div
               onClick={() => handlePlacementChange("has_ielts_toefl", !formData.has_ielts_toefl)}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-all",
                 formData.has_ielts_toefl
                   ? "border-green-500 bg-green-50 dark:bg-green-950/30"
                   : "border-[var(--border)] hover:border-green-300"
               )}
             >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                formData.has_ielts_toefl
-                  ? "bg-green-500 text-white"
-                  : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-              )}>
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
+              <CheckCircle2 className={cn(
+                "w-4 h-4 shrink-0",
+                formData.has_ielts_toefl ? "text-green-500" : "text-[var(--text-muted)]"
+              )} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--text-primary)]">IELTS/TOEFL Certificate</p>
-                <p className="text-xs text-[var(--text-muted)]">Automatically marks English as passed</p>
+                <p className="text-xs text-[var(--text-muted)]">Auto-marks English as passed</p>
               </div>
               <Switch
                 checked={formData.has_ielts_toefl}
@@ -1438,158 +1434,99 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
               />
             </div>
 
-            {/* Subject Scores */}
-            <div className="space-y-3">
+            {/* Subject Scores \u2014 one compact row per subject */}
+            <div className="space-y-2">
               <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-2">
                 Subject Scores
-                <span className="text-xs text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="text-[11px] text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full flex items-center gap-1 normal-case font-normal tracking-normal">
                   <RefreshCw className="w-3 h-3" /> From LMS
                 </span>
               </Label>
 
-              {/* English */}
-              <div className={cn(
-                "p-4 rounded-xl border transition-all",
-                englishPassed
-                  ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
-                  : "border-[var(--border)]"
-              )}>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">English</span>
-                      {englishPassed && (
-                        <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Passed
+              {([
+                {
+                  key: "english",
+                  name: "English",
+                  passed: englishPassed,
+                  score: lead.placement_english_score,
+                  attempts: lead.placement_english_attempts ?? 0,
+                  score1: lead.placement_english_score_1,
+                  score2: lead.placement_english_score_2,
+                  override: formData.placement_english_override,
+                  field: "placement_english_override" as const,
+                  disabled: formData.has_ielts_toefl,
+                  ielts: formData.has_ielts_toefl,
+                },
+                {
+                  key: "math",
+                  name: "Math",
+                  passed: mathPassed,
+                  score: lead.placement_math_score,
+                  attempts: lead.placement_math_attempts ?? 0,
+                  score1: lead.placement_math_score_1,
+                  score2: lead.placement_math_score_2,
+                  override: formData.placement_math_override,
+                  field: "placement_math_override" as const,
+                  disabled: false,
+                  ielts: false,
+                },
+                {
+                  key: "computer",
+                  name: "Computer",
+                  passed: computerPassed,
+                  score: lead.placement_computer_score,
+                  attempts: lead.placement_computer_attempts ?? 0,
+                  score1: lead.placement_computer_score_1,
+                  score2: lead.placement_computer_score_2,
+                  override: formData.placement_computer_override,
+                  field: "placement_computer_override" as const,
+                  disabled: false,
+                  ielts: false,
+                },
+              ]).map((s) => (
+                <div
+                  key={s.key}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 transition-all",
+                    s.passed
+                      ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                      : "border-[var(--border)]"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm font-medium text-[var(--text-primary)] w-20 shrink-0">{s.name}</span>
+                    <span className="flex items-center gap-1.5 text-sm">
+                      <span className="text-[var(--text-muted)]">Score</span>
+                      <span className="font-semibold text-[var(--text-primary)] tabular-nums">{s.score ?? "\u2014"}</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 ml-1">
+                      {s.passed && (
+                        <span className="text-[11px] text-green-600 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Pass
                         </span>
                       )}
-                      {formData.has_ielts_toefl && (
-                        <span className="text-xs text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                          IELTS/TOEFL
+                      {s.ielts && (
+                        <span className="text-[11px] text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
+                          IELTS
                         </span>
                       )}
-                      {(lead.placement_english_attempts ?? 0) >= 2 && (
-                        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <RefreshCw className="w-3 h-3" /> Retested
+                      {s.attempts >= 2 && (
+                        <span className="text-[11px] text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" /> {s.score1 ?? "\u2014"}/{s.score2 ?? "\u2014"}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
-                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        {lead.placement_english_score ?? "\u2014"}
-                      </span>
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs text-[var(--text-muted)]">Pass</span>
+                      <Switch
+                        checked={s.override}
+                        onCheckedChange={(checked) => handlePlacementChange(s.field, checked)}
+                        disabled={s.disabled}
+                      />
                     </div>
-                    {(lead.placement_english_attempts ?? 0) >= 2 && (
-                      <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
-                        <span>1st: {lead.placement_english_score_1 ?? "\u2014"}</span>
-                        <span>2nd: {lead.placement_english_score_2 ?? "\u2014"}</span>
-                        <span className="text-[var(--text-primary)] font-medium">Best: {lead.placement_english_score ?? "\u2014"}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-[var(--text-muted)]">Pass</span>
-                    <Switch
-                      checked={formData.placement_english_override}
-                      onCheckedChange={(checked) => handlePlacementChange("placement_english_override", checked)}
-                      disabled={formData.has_ielts_toefl}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Math */}
-              <div className={cn(
-                "p-4 rounded-xl border transition-all",
-                mathPassed
-                  ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
-                  : "border-[var(--border)]"
-              )}>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">Math</span>
-                      {mathPassed && (
-                        <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Passed
-                        </span>
-                      )}
-                      {(lead.placement_math_attempts ?? 0) >= 2 && (
-                        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <RefreshCw className="w-3 h-3" /> Retested
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
-                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        {lead.placement_math_score ?? "\u2014"}
-                      </span>
-                    </div>
-                    {(lead.placement_math_attempts ?? 0) >= 2 && (
-                      <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
-                        <span>1st: {lead.placement_math_score_1 ?? "\u2014"}</span>
-                        <span>2nd: {lead.placement_math_score_2 ?? "\u2014"}</span>
-                        <span className="text-[var(--text-primary)] font-medium">Best: {lead.placement_math_score ?? "\u2014"}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-[var(--text-muted)]">Pass</span>
-                    <Switch
-                      checked={formData.placement_math_override}
-                      onCheckedChange={(checked) => handlePlacementChange("placement_math_override", checked)}
-                    />
                   </div>
                 </div>
-              </div>
-
-              {/* Computer */}
-              <div className={cn(
-                "p-4 rounded-xl border transition-all",
-                computerPassed
-                  ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
-                  : "border-[var(--border)]"
-              )}>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">Computer</span>
-                      {computerPassed && (
-                        <span className="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Passed
-                        </span>
-                      )}
-                      {(lead.placement_computer_attempts ?? 0) >= 2 && (
-                        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <RefreshCw className="w-3 h-3" /> Retested
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)]">
-                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        {lead.placement_computer_score ?? "\u2014"}
-                      </span>
-                    </div>
-                    {(lead.placement_computer_attempts ?? 0) >= 2 && (
-                      <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
-                        <span>1st: {lead.placement_computer_score_1 ?? "\u2014"}</span>
-                        <span>2nd: {lead.placement_computer_score_2 ?? "\u2014"}</span>
-                        <span className="text-[var(--text-primary)] font-medium">Best: {lead.placement_computer_score ?? "\u2014"}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-[var(--text-muted)]">Pass</span>
-                    <Switch
-                      checked={formData.placement_computer_override}
-                      onCheckedChange={(checked) => handlePlacementChange("placement_computer_override", checked)}
-                    />
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         )}
@@ -1612,20 +1549,16 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
             <div
               onClick={() => handleMinistryBlockedChange(!formData.ministry_blocked)}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-all",
                 formData.ministry_blocked
                   ? "border-red-500 bg-red-50 dark:bg-red-950/30"
                   : "border-[var(--border)] hover:border-red-300"
               )}
             >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                formData.ministry_blocked
-                  ? "bg-red-500 text-white"
-                  : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-              )}>
-                <Ban className="w-4 h-4" />
-              </div>
+              <Ban className={cn(
+                "w-4 h-4 shrink-0",
+                formData.ministry_blocked ? "text-red-500" : "text-[var(--text-muted)]"
+              )} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--text-primary)]">Ministry Blocked</p>
                 <p className="text-xs text-[var(--text-muted)]">Block this lead from ministry submission</p>
