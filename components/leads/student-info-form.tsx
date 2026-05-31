@@ -925,6 +925,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
 
         {academicOpen && (
           <div className={sectionBodyClass}>
+            <div className={cn(fieldGridClass, "items-start")}>
             {/* School */}
             <div className="space-y-2">
               <Label>School</Label>
@@ -1034,7 +1035,9 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 )
               })()}
             </div>
+            </div>
 
+            <div className={cn(fieldGridClass, "items-start")}>
             {/* Grade Level */}
             <div className="space-y-2">
               <Label>Grade</Label>
@@ -1113,29 +1116,29 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 </button>
               </div>
             </div>
-
-            {/* Term */}
-            <div className="space-y-2">
-              <Label>Term</Label>
-              <Select
-                value={formData.semester_id}
-                onValueChange={(value) => handleChange("semester_id", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select term" />
-                </SelectTrigger>
-                <SelectContent>
-                  {semesters.filter(s => s.is_active).map((semester) => (
-                    <SelectItem key={semester.id} value={semester.id}>
-                      {semester.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
-            {/* Majors & Graduation */}
-            <div className={fieldGridClass}>
+            {/* Term, Intended Major & Graduation */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {/* Term */}
+              <div className="space-y-2">
+                <Label>Term</Label>
+                <Select
+                  value={formData.semester_id}
+                  onValueChange={(value) => handleChange("semester_id", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {semesters.filter(s => s.is_active).map((semester) => (
+                      <SelectItem key={semester.id} value={semester.id}>
+                        {semester.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>ktech Intended Major</Label>
                 <Select
