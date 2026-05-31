@@ -24,6 +24,7 @@ import {
   Check,
   Building2,
   Search,
+  Lock,
   CheckCircle2,
   ScanLine,
   ClipboardList,
@@ -990,21 +991,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
-
-            {/* Referrer — who referred this student (referrals only) */}
-            {formData.source_category === "referrals" && (
-              <div className="space-y-2">
-                <Label htmlFor="referred_by">Referred by</Label>
-                <Input
-                  id="referred_by"
-                  value={formData.source_detail || ""}
-                  onChange={(e) => handleChange("source_detail", e.target.value)}
-                  placeholder="Name of the person who referred them"
-                  icon={<Users className="w-4 h-4" />}
-                />
-                <p className="text-xs text-[var(--text-muted)]">Who told this student about us</p>
               </div>
             )}
 
