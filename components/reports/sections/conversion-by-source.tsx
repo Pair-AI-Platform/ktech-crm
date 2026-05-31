@@ -4,7 +4,6 @@ import { useSyncExternalStore } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ProgressBar } from "@/components/ui/progress"
 import {
   BarChart,
   Bar,
@@ -35,7 +34,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
         <p className="text-xs font-medium text-[var(--text-primary)] mb-1">{label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {entry.value}{entry.name === 'Conversion %' ? '%' : ''}
+            {entry.name}: {entry.value}
           </p>
         ))}
       </div>
@@ -53,15 +52,17 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
     .map(s => ({
       name: s.label,
       leads: s.count,
-      converted: s.converted,
-      conversionRate: s.conversionRate,
+      files: s.files,
+      enrolled: s.enrolled,
     }))
-    .sort((a, b) => b.conversionRate - a.conversionRate)
+    .sort((a, b) => {
+      if (b.enrolled !== a.enrolled) return b.enrolled - a.enrolled
+      return b.files - a.files
+    })
 
   const bestSource = chartData[0]
-  const totalConverted = data.bySource.reduce((sum, s) => sum + s.converted, 0)
-  const totalLeads = data.bySource.reduce((sum, s) => sum + s.count, 0)
-  const overallRate = totalLeads > 0 ? Math.round((totalConverted / totalLeads) * 100) : 0
+  const totalFiles = data.bySource.reduce((sum, s) => sum + s.files, 0)
+  const totalEnrolled = data.bySource.reduce((sum, s) => sum + s.enrolled, 0)
 
   return (
     <div className="space-y-6">
@@ -80,10 +81,10 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
                 </div>
                 <Badge variant="info" size="sm">Overall</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Overall Conversion Rate</p>
-              <p className="text-2xl font-bold text-[var(--text-primary)]">{overallRate}%</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Overall Enrollment</p>
+              <p className="text-2xl font-bold text-[var(--text-primary)]">{totalEnrolled}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {totalConverted} converted of {totalLeads} leads
+                From {totalFiles} files
               </p>
             </CardContent>
           </Card>
@@ -102,10 +103,10 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
                 </div>
                 <Badge variant="success" size="sm">Best</Badge>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Best Converting Source</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">Strongest Source</p>
               <p className="text-xl font-bold text-[var(--text-primary)]">{bestSource?.name || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {bestSource?.conversionRate || 0}% conversion rate
+                {bestSource?.enrolled || 0} enrolled from {bestSource?.files || 0} files
               </p>
             </CardContent>
           </Card>
@@ -134,7 +135,7 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
         </motion.div>
       </div>
 
-      {/* Conversion Chart */}
+      {/* Source Chart */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -144,9 +145,9 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
-              Conversion Rate by Source
+              Enrollment by Source
             </CardTitle>
-            <CardDescription>Leads vs converted per source, sorted by conversion rate</CardDescription>
+            <CardDescription>Leads, files, and enrolled per source</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[350px]" style={{ minWidth: 0 }}>
@@ -172,7 +173,8 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar dataKey="leads" name="Total Leads" fill="var(--border)" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="converted" name="Converted" fill="var(--success)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="files" name="Files" fill="var(--warning)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="enrolled" name="Enrolled" fill="var(--success)" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -194,7 +196,7 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
         <Card>
           <CardHeader>
             <CardTitle>Source Breakdown</CardTitle>
-            <CardDescription>Detailed conversion metrics per lead source</CardDescription>
+            <CardDescription>Lead, file, and enrollment metrics per source</CardDescription>
           </CardHeader>
           <CardContent>
             {chartData.length > 0 ? (
@@ -205,9 +207,8 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
                       <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
                       <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Source</th>
                       <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Leads</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Converted</th>
-                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Rate</th>
-                      <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-4 w-40">Progress</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Files</th>
+                      <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Enrolled</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -223,18 +224,10 @@ export function ConversionBySource({ data }: ConversionBySourceProps) {
                           <span className="text-sm font-semibold text-[var(--text-primary)]">{source.leads}</span>
                         </td>
                         <td className="py-3 px-3 text-center">
-                          <span className="text-sm font-semibold text-[var(--success)]">{source.converted}</span>
+                          <span className="text-sm font-semibold text-[var(--warning)]">{source.files}</span>
                         </td>
                         <td className="py-3 px-3 text-center">
-                          <Badge
-                            variant={source.conversionRate >= 30 ? 'success' : source.conversionRate >= 15 ? 'warning' : 'secondary'}
-                            size="sm"
-                          >
-                            {source.conversionRate}%
-                          </Badge>
-                        </td>
-                        <td className="py-3 pl-4">
-                          <ProgressBar value={source.conversionRate} max={100} size="sm" />
+                          <span className="text-sm font-semibold text-[var(--success)]">{source.enrolled}</span>
                         </td>
                       </tr>
                     ))}

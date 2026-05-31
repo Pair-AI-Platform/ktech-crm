@@ -112,7 +112,7 @@ export function ChannelPerformance({ data }: ChannelPerformanceProps) {
               <p className="text-sm text-[var(--text-secondary)] mb-1">Most Leads</p>
               <p className="text-xl font-bold text-[var(--text-primary)]">{topSource?.label || 'N/A'}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {topSource?.count || 0} leads, {topSource?.conversionRate || 0}% conversion
+                {topSource?.count || 0} leads
               </p>
             </CardContent>
           </Card>

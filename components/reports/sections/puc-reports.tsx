@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ProgressRing } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import {
-  Award,
   Users,
   CheckCircle2,
   XCircle,
@@ -336,66 +335,22 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
         </motion.div>
       </div>
 
-      {/* Conversion Rate & Funnel */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Conversion Rate */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-[var(--primary)]" />
-                PUC Conversion Rate
-              </CardTitle>
-              <CardDescription>Acceptance rate for PUC applications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center py-8">
-                <ProgressRing
-                  value={data.conversionRate}
-                  max={100}
-                  size={180}
-                  strokeWidth={16}
-                  showValue
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 mt-4">
-                <div className="text-center p-3 rounded-lg bg-[var(--success-bg)]">
-                  <p className="text-2xl font-bold text-[var(--success)]">{data.accepted}</p>
-                  <p className="text-xs text-[var(--text-muted)]">Accepted</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-[var(--warning-bg)]">
-                  <p className="text-2xl font-bold text-[var(--warning)]">{data.accepted2ndChoice}</p>
-                  <p className="text-xs text-[var(--text-muted)]">Accepted 2nd Choice</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-[var(--error-bg)]">
-                  <p className="text-2xl font-bold text-[var(--error)]">{data.rejected}</p>
-                  <p className="text-xs text-[var(--text-muted)]">Rejected</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* PUC Pipeline Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[var(--accent)]" />
-                PUC Pipeline Breakdown
-              </CardTitle>
-              <CardDescription>File opening, submissions & fee payment</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      {/* PUC Pipeline Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.4 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[var(--accent)]" />
+              PUC Pipeline Breakdown
+            </CardTitle>
+            <CardDescription>File opening, submissions & fee payment</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               {[
                 { label: 'Files Opened', labelAr: 'فتح ملف', value: data.filesOpened, icon: FolderOpen, color: 'var(--primary)' },
                 { label: 'Documents Submitted', labelAr: 'تسليم مستندات', value: data.documentsSubmitted, icon: FileText, color: 'var(--info)' },
@@ -403,22 +358,22 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
                 { label: 'Application Submitted', labelAr: 'قدم طلب', value: data.applicationSubmitted, icon: Send, color: 'var(--accent)' },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-sunken)]">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${item.color} 15%, transparent)` }}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${item.color} 15%, transparent)` }}>
                       <item.icon className="w-4 h-4" style={{ color: item.color }} />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{item.labelAr}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item.label}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate">{item.labelAr}</p>
                     </div>
                   </div>
-                  <p className="text-xl font-bold text-[var(--text-primary)]">{item.value}</p>
+                  <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{item.value}</p>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Where They Get Lost */}
       <motion.div
@@ -511,7 +466,7 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
         </Card>
       </motion.div>
 
-      {/* Converted to Self-Funded — per agent table */}
+      {/* Moved to Self-Funded — per agent table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -521,10 +476,10 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <RefreshCw className="w-5 h-5 text-[var(--info)]" />
-              Converted to Self-Funded
+              Moved to Self-Funded
             </CardTitle>
             <CardDescription>
-              Leads auto-converted to self-funded due to GPA below 70% — breakdown per agent
+              PUC leads moved to self-funded due to GPA below 70% — breakdown per agent
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -534,7 +489,7 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
                   <tr className="border-b border-[var(--border)]">
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">#</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pr-4">Agent</th>
-                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Converted</th>
+                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">Moved</th>
                     <th className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 px-3">% of Total</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide py-3 pl-4 w-40">Share</th>
                   </tr>
@@ -582,7 +537,7 @@ export function PUCReports({ data, periodInfo }: PUCReportsProps) {
             ) : (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--text-muted)]">
                 <RefreshCw className="w-8 h-8 opacity-30" />
-                <p className="text-sm">No conversions in selected period</p>
+                <p className="text-sm">No PUC-to-SF moves in selected period</p>
               </div>
             )}
           </CardContent>

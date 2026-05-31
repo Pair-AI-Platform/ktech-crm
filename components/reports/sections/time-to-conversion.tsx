@@ -180,9 +180,9 @@ export function TimeToConversion({ data }: TimeToConversionProps) {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
+                ) : (
                 <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
-                  No time-to-conversion data available
+                  No stage timing data available
                 </div>
               )}
             </div>
@@ -239,7 +239,7 @@ export function TimeToConversion({ data }: TimeToConversionProps) {
               </div>
             ) : (
               <div className="text-center py-8 text-[var(--text-muted)]">
-                No time-to-conversion data available
+                No stage timing data available
               </div>
             )}
           </CardContent>

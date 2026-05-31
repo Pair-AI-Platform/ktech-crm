@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { ProgressBar } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -11,7 +10,6 @@ import {
   Medal,
   Users,
   GraduationCap,
-  TrendingUp,
   ArrowUpDown,
   Crown,
 } from "lucide-react"
@@ -22,7 +20,7 @@ interface AgentLeaderboardProps {
   data: LeaderboardData[]
 }
 
-type SortKey = 'rank' | 'leads' | 'appointments' | 'pucFiles' | 'pucAppSubmission' | 'applicant' | 'enrolled' | 'sfFiles' | 'sf150' | 'sf550' | 'sfEnrolled' | 'statusChanges' | 'conversionRate'
+type SortKey = 'rank' | 'leads' | 'appointments' | 'pucFiles' | 'pucAppSubmission' | 'applicant' | 'enrolled' | 'sfFiles' | 'sf150' | 'sf550' | 'sfEnrolled' | 'statusChanges'
 
 export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortKey>('enrolled')
@@ -46,9 +44,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
   const topPerformers = sortedData.slice(0, 3)
   const totalLeads = data.reduce((sum, a) => sum + a.leads, 0)
   const totalEnrolled = data.reduce((sum, a) => sum + a.enrolled, 0)
-  const avgConversion = data.length > 0
-    ? Math.round(data.reduce((sum, a) => sum + a.conversionRate, 0) / data.length)
-    : 0
 
   return (
     <div className="space-y-6">
@@ -102,10 +97,9 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Stat label="Enrolled" value={agent.enrolled} />
                   <Stat label="Leads" value={agent.leads} />
-                  <Stat label="Conv %" value={`${agent.conversionRate}%`} />
                   <Stat label="PUC Files" value={agent.pucFiles} />
                   <Stat label="SF Files" value={agent.sfFiles} />
                 </div>
@@ -139,7 +133,7 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
       >
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
                 <Users className="w-5 h-5 mx-auto mb-2 text-[var(--primary)]" />
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{data.length}</p>
@@ -154,11 +148,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                 <GraduationCap className="w-5 h-5 mx-auto mb-2 text-[var(--success)]" />
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{totalEnrolled}</p>
                 <p className="text-xs text-[var(--text-muted)]">Total Enrolled</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-[var(--bg-sunken)]">
-                <TrendingUp className="w-5 h-5 mx-auto mb-2 text-[var(--accent)]" />
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{avgConversion}%</p>
-                <p className="text-xs text-[var(--text-muted)]">Avg Conversion</p>
               </div>
             </div>
           </CardContent>
@@ -192,7 +181,7 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                     <th colSpan={4} className="text-center py-2 px-1 text-xs font-semibold text-orange-600 uppercase tracking-wider border-x border-[var(--border)] bg-orange-500/5">
                       SF Funnel
                     </th>
-                    <th colSpan={3} />
+                    <th colSpan={1} />
                   </tr>
                   {/* Column headers */}
                   <tr className="border-b border-[var(--border)]">
@@ -214,7 +203,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                     <SortHeader label="550 KD" sortKey="sf550" currentSort={sortBy} onSort={handleSort} className="bg-orange-500/5" />
                     <SortHeader label="Enrolled" sortKey="sfEnrolled" currentSort={sortBy} onSort={handleSort} className="border-r border-[var(--border)] bg-orange-500/5" />
                     {/* Other */}
-                    <SortHeader label="Conv %" sortKey="conversionRate" currentSort={sortBy} onSort={handleSort} />
                     <th className="text-left py-3 px-3 text-sm font-medium text-[var(--text-muted)]">
                       Targets
                     </th>
@@ -256,14 +244,6 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
                         <span className="font-semibold text-[var(--text-primary)]">{agent.sfEnrolled}</span>
                       </td>
                       {/* Other */}
-                      <td className="py-3 px-3">
-                        <Badge
-                          variant={agent.conversionRate >= 40 ? 'success' : agent.conversionRate >= 20 ? 'warning' : 'secondary'}
-                          size="sm"
-                        >
-                          {agent.conversionRate}%
-                        </Badge>
-                      </td>
                       <td className="py-3 px-3">
                         <div className="space-y-1">
                           {agent.categories?.puc && agent.categories.puc.target > 0 && (
