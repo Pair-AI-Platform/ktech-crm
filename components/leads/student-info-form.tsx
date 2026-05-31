@@ -110,7 +110,7 @@ function SectionCard({ children, className }: { children: ReactNode; className?:
 function SectionHeader({ icon: Icon, title, description, open, onToggle, trailing, iconBg }: {
   icon: LucideIcon
   title: string
-  description?: string
+  description?: ReactNode
   open: boolean
   onToggle: () => void
   trailing?: ReactNode
@@ -346,6 +346,14 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const filteredSources = dbSources.length > 0
     ? dbSources.filter(s => !formData.source_category || s.category === formData.source_category)
     : LEAD_SOURCES.filter(s => !formData.source_category || s.category === formData.source_category)
+
+  // Compact summary of the chosen source, shown in the collapsed Lead Source header.
+  const sourceSummary = (() => {
+    const all = dbSources.length > 0 ? dbSources : LEAD_SOURCES
+    const sourceLabel = formData.source ? all.find(s => s.value === formData.source)?.label : null
+    const categoryLabel = SOURCE_CATEGORIES.find(c => c.value === formData.source_category)?.label
+    return sourceLabel || categoryLabel || null
+  })()
 
   // Map a form field to the correct Lead column(s) and queue it for auto-save.
   const queueField = (field: string, value: string) => {
@@ -899,162 +907,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 />
               </div>
             </div>
-          </div>
-        )}
-      </SectionCard>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* Section 3: Lead Source */}
-      {/* ═══════════════════════════════════════════ */}
-      <SectionCard>
-        <SectionHeader
-          icon={Sparkles}
-          title="Lead Source"
-          description="Where this student came from"
-          open={sourceOpen}
-          onToggle={() => setSourceOpen(!sourceOpen)}
-        />
-
-        {sourceOpen && (
-          <div className={sectionBodyClass}>
-            <div className="space-y-2">
-              <Label>Source</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {SOURCE_CATEGORIES.map((cat) => {
-                  const CatIcon = cat.icon
-                  const selected = formData.source_category === cat.value
-                  return (
-                    <button
-                      key={cat.value}
-                      type="button"
-                      onClick={() => {
-                        if (selected) {
-                          handleChange("source_category", "")
-                          handleChange("source", "")
-                          handleChange("source_detail", "")
-                          return
-                        }
-                        // Switching category — clear any stale detail (exhibition / referrer name)
-                        handleChange("source_detail", "")
-                        handleChange("source_category", cat.value)
-                        const categoryMap: Record<string, string> = {
-                          direct: "walk_in",
-                          events: "school_visit",
-                          marketing: "website_form",
-                          referrals: "current_student_referral",
-                          outreach: "old_contacts",
-                        }
-                        handleChange("source", categoryMap[cat.value] || "")
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                        selected
-                          ? "bg-[var(--primary-muted)] text-[var(--primary)]"
-                          : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
-                      )}
-                      title={cat.description}
-                    >
-                      <CatIcon className="h-3.5 w-3.5" />
-                      {cat.label}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {formData.source_category && filteredSources.length > 0 && (
-                <div className="mt-2.5 flex flex-wrap gap-1 border-t border-[var(--border)] pt-2.5">
-                  {filteredSources.map((source) => {
-                    const isSel = formData.source === source.value
-                    return (
-                      <button
-                        key={source.value}
-                        type="button"
-                        onClick={() => handleChange("source", source.value)}
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors",
-                          isSel
-                            ? "bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
-                            : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
-                        )}
-                      >
-                        {isSel && <Check className="h-3 w-3" />}
-                        {source.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Exhibition Name */}
-            {formData.source === "exhibitions" && (
-              <div className="space-y-2">
-                <Label>Exhibition Name</Label>
-                <Select
-                  value={formData.source_detail || ""}
-                  onValueChange={(value) => handleChange("source_detail", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select exhibition" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeExhibitions.map((exhibition) => (
-                      <SelectItem key={exhibition.id} value={exhibition.name}>
-                        {exhibition.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Source History */}
-            {sourceHistory.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-[var(--border)]">
-                <div className="flex items-center gap-2 mb-3">
-                  <History className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm font-medium text-[var(--text-secondary)]">Source History</span>
-                  <span className="text-xs text-[var(--text-muted)] ml-auto">{sourceHistory.length} change{sourceHistory.length !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="space-y-2">
-                  {sourceHistory.map((activity, index) => {
-                    const meta = activity.metadata as { old_source?: string; new_source?: string } | undefined
-                    const allSources = dbSources.length > 0 ? dbSources : LEAD_SOURCES
-                    const oldLabel = allSources.find(s => s.value === meta?.old_source)?.label || meta?.old_source || 'None'
-                    const newLabel = allSources.find(s => s.value === meta?.new_source)?.label || meta?.new_source || 'None'
-                    const changedBy = (activity as { created_by_profile?: { full_name?: string } }).created_by_profile?.full_name
-                    return (
-                      <div
-                        key={activity.id}
-                        className="flex items-center gap-3 p-2.5 rounded-lg bg-[var(--bg-sunken)] text-sm"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-medium text-[var(--primary)]">{sourceHistory.length - index}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[var(--text-muted)] line-through text-xs">{oldLabel}</span>
-                            <ArrowRight className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
-                            <span className="font-medium text-[var(--text-primary)] text-xs">{newLabel}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-xs text-[var(--text-muted)]">
-                              {formatDate(activity.created_at)}
-                            </span>
-                            {changedBy && (
-                              <>
-                                <span className="text-xs text-[var(--text-muted)]">&middot;</span>
-                                <span className="text-xs text-[var(--text-muted)]">{changedBy}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </SectionCard>
@@ -1830,6 +1682,170 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   </div>
                 </div>
               </motion.div>
+            )}
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Lead Source — kept last; stays out of the way until needed */}
+      {/* ═══════════════════════════════════════════ */}
+      <SectionCard>
+        <SectionHeader
+          icon={Sparkles}
+          title="Lead Source"
+          description={
+            !sourceOpen && sourceSummary ? (
+              <span className="inline-flex items-center rounded-full bg-[var(--primary-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--primary)]">
+                {sourceSummary}
+              </span>
+            ) : (
+              "Where this student came from"
+            )
+          }
+          open={sourceOpen}
+          onToggle={() => setSourceOpen(!sourceOpen)}
+        />
+
+        {sourceOpen && (
+          <div className={sectionBodyClass}>
+            <div className="space-y-2">
+              <Label>Source</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {SOURCE_CATEGORIES.map((cat) => {
+                  const CatIcon = cat.icon
+                  const selected = formData.source_category === cat.value
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => {
+                        if (selected) {
+                          handleChange("source_category", "")
+                          handleChange("source", "")
+                          handleChange("source_detail", "")
+                          return
+                        }
+                        // Switching category — clear any stale detail (exhibition / referrer name)
+                        handleChange("source_detail", "")
+                        handleChange("source_category", cat.value)
+                        const categoryMap: Record<string, string> = {
+                          direct: "walk_in",
+                          events: "school_visit",
+                          marketing: "website_form",
+                          referrals: "current_student_referral",
+                          outreach: "old_contacts",
+                        }
+                        handleChange("source", categoryMap[cat.value] || "")
+                      }}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                        selected
+                          ? "bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
+                      )}
+                      title={cat.description}
+                    >
+                      <CatIcon className="h-3.5 w-3.5" />
+                      {cat.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {formData.source_category && filteredSources.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-1 border-t border-[var(--border)] pt-2.5">
+                  {filteredSources.map((source) => {
+                    const isSel = formData.source === source.value
+                    return (
+                      <button
+                        key={source.value}
+                        type="button"
+                        onClick={() => handleChange("source", source.value)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors",
+                          isSel
+                            ? "bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
+                            : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
+                        )}
+                      >
+                        {isSel && <Check className="h-3 w-3" />}
+                        {source.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Exhibition Name */}
+            {formData.source === "exhibitions" && (
+              <div className="space-y-2">
+                <Label>Exhibition Name</Label>
+                <Select
+                  value={formData.source_detail || ""}
+                  onValueChange={(value) => handleChange("source_detail", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select exhibition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeExhibitions.map((exhibition) => (
+                      <SelectItem key={exhibition.id} value={exhibition.name}>
+                        {exhibition.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Source History */}
+            {sourceHistory.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm font-medium text-[var(--text-secondary)]">Source History</span>
+                  <span className="text-xs text-[var(--text-muted)] ml-auto">{sourceHistory.length} change{sourceHistory.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-2">
+                  {sourceHistory.map((activity, index) => {
+                    const meta = activity.metadata as { old_source?: string; new_source?: string } | undefined
+                    const allSources = dbSources.length > 0 ? dbSources : LEAD_SOURCES
+                    const oldLabel = allSources.find(s => s.value === meta?.old_source)?.label || meta?.old_source || 'None'
+                    const newLabel = allSources.find(s => s.value === meta?.new_source)?.label || meta?.new_source || 'None'
+                    const changedBy = (activity as { created_by_profile?: { full_name?: string } }).created_by_profile?.full_name
+                    return (
+                      <div
+                        key={activity.id}
+                        className="flex items-center gap-3 p-2.5 rounded-lg bg-[var(--bg-sunken)] text-sm"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-medium text-[var(--primary)]">{sourceHistory.length - index}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[var(--text-muted)] line-through text-xs">{oldLabel}</span>
+                            <ArrowRight className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
+                            <span className="font-medium text-[var(--text-primary)] text-xs">{newLabel}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-[var(--text-muted)]">
+                              {formatDate(activity.created_at)}
+                            </span>
+                            {changedBy && (
+                              <>
+                                <span className="text-xs text-[var(--text-muted)]">&middot;</span>
+                                <span className="text-xs text-[var(--text-muted)]">{changedBy}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </div>
         )}
