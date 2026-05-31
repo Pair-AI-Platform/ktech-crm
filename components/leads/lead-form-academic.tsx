@@ -15,7 +15,6 @@ import {
   Sparkles,
   Check,
   GraduationCap,
-  CreditCard,
   Search,
   Building2,
   Lock,
@@ -312,6 +311,7 @@ export function LeadFormAcademic({
         </div>
 
         <div className="space-y-4 pl-10">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
           {/* Searchable School Dropdown */}
           <div className="space-y-2">
             <Label>School</Label>
@@ -419,82 +419,48 @@ export function LeadFormAcademic({
               )
             })()}
           </div>
-
-          {/* Grade Level */}
-          <div className="space-y-2">
-            <Label>Grade</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: "10th", label: "10" },
-                { value: "11th", label: "11" },
-                { value: "12th", label: "12" },
-              ].map((grade) => (
-                <button
-                  key={grade.value}
-                  type="button"
-                  onClick={() => handleChange("grade_level", formData.grade_level === grade.value ? "" : grade.value)}
-                  className={cn(
-                    "flex items-center justify-center p-3 rounded-xl border transition-all text-sm font-bold",
-                    formData.grade_level === grade.value
-                      ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                      : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-primary)]"
-                  )}
-                >
-                  {grade.label}
-                </button>
-              ))}
-            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Funding Type</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleChange("funding_type", "self_funded")}
-                className={cn(
-                  "flex items-center gap-3 p-4 rounded-xl border transition-all",
-                  formData.funding_type === "self_funded"
-                    ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                    : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                )}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Grade Level */}
+            <div className="space-y-2">
+              <Label>Grade</Label>
+              <Select
+                value={formData.grade_level}
+                onValueChange={(value) => handleChange("grade_level", value)}
               >
-                <div className={cn(
-                  "w-10 h-10 rounded-lg flex items-center justify-center",
-                  formData.funding_type === "self_funded"
-                    ? "bg-[var(--primary)] text-white"
-                    : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                )}>
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-[var(--text-primary)]">Self-Funded</p>
-                  <p className="text-xs text-[var(--text-muted)]">Private payment</p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleChange("funding_type", "puc")}
-                className={cn(
-                  "flex items-center gap-3 p-4 rounded-xl border transition-all",
-                  formData.funding_type === "puc"
-                    ? "border-[var(--accent)] bg-[var(--accent)]/10"
-                    : "border-[var(--border)] hover:border-[var(--accent)]/50"
-                )}
+                <SelectTrigger>
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { value: "10th", label: "Grade 10" },
+                    { value: "11th", label: "Grade 11" },
+                    { value: "12th", label: "Grade 12" },
+                  ].map((grade) => (
+                    <SelectItem key={grade.value} value={grade.value}>
+                      {grade.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Funding Type */}
+            <div className="space-y-2">
+              <Label>Funding Type</Label>
+              <Select
+                value={formData.funding_type}
+                onValueChange={(value) => handleChange("funding_type", value)}
               >
-                <div className={cn(
-                  "w-10 h-10 rounded-lg flex items-center justify-center",
-                  formData.funding_type === "puc"
-                    ? "bg-[var(--accent)] text-white"
-                    : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                )}>
-                  <GraduationCap className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-[var(--text-primary)]">PUC</p>
-                  <p className="text-xs text-[var(--text-muted)]">Government scholarship</p>
-                </div>
-              </button>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select funding type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self_funded">Self-Funded — Private payment</SelectItem>
+                  <SelectItem value="puc">PUC — Government scholarship</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
