@@ -46,6 +46,7 @@ import {
 import { PIPELINE_STAGES, MINISTRY_BLOCK_REASONS, ORIENTATION_STATUSES, LEAD_STATUSES, APPLICANT_ONLY_STATUSES, type PipelineStage, type OrientationStatus, type Lead, type LeadStatus } from "@/types"
 import { formatDate, cn, getInitials } from "@/lib/utils"
 import { useLead, useLeadMutations } from "@/lib/hooks/use-leads"
+import { useAutoSaveLead } from "@/lib/hooks/use-autosave-lead"
 import { useLeadAppointments, useAppointmentMutations } from "@/lib/hooks/use-appointments"
 import { useUser } from "@/lib/hooks/use-user"
 
@@ -354,6 +355,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const { appointments } = useLeadAppointments(resolvedParams.id)
   const { activities } = useLeadActivities(resolvedParams.id)
   const { updateLeadStage, updateLead, loading: mutationLoading } = useLeadMutations()
+  // Live auto-save for the Details form, lifted here so its status shows in the header.
+  const autosave = useAutoSaveLead(resolvedParams.id)
   // Show all pipeline stages in the stepper (excluding 'lost' and 'withdraw' as they're handled separately)
   const activeStageOrder = useMemo(() => {
     return STAGE_ORDER.filter(s => {
@@ -430,6 +433,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     onEdit: () => setShowEditForm(true),
     onFocusNotes: () => notesInputRef.current?.focus(),
   })
+
+  // Refresh the lead after each successful auto-save so derived UI (name, funding) stays in sync
+  useEffect(() => {
+    if (autosave.status === "saved") refetchLead()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autosave.status])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -903,6 +912,34 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
 
+            {/* Auto-save status — always visible while editing the Details tab */}
+            {autosave.status !== 'idle' && (
+              <div className="shrink-0">
+                {autosave.status === 'saving' && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-sunken)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-tertiary)]">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving…
+                  </span>
+                )}
+                {autosave.status === 'saved' && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--success)]">
+                    <Check className="h-3 w-3" />
+                    Saved
+                  </span>
+                )}
+                {autosave.status === 'error' && (
+                  <button
+                    onClick={autosave.retry}
+                    title={autosave.error ?? 'Save failed'}
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--error-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--error)] hover:brightness-110"
+                  >
+                    <XCircle className="h-3 w-3" />
+                    Failed — retry
+                  </button>
+                )}
+              </div>
+            )}
+
             <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="shrink-0">
               <Button
                 variant="outline"
@@ -1123,15 +1160,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
         </motion.div>
 
-        {/* Main grid: tab content + sidebar */}
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Main content — single column, full width */}
+        <div className="mt-4 space-y-4">
 
-        {/* LEFT: Tabbed Content Section */}
+        {/* Tabbed Content Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="order-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] lg:order-1"
+          className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)]"
         >
           {/* Tab Headers */}
           <div className="flex border-b border-[var(--border)]">
@@ -1172,12 +1209,93 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 exit={{ opacity: 0, x: 10 }}
                 className="p-4"
               >
-                <StudentInfoForm
-                  lead={lead}
-                  onSuccess={() => {
-                    refetchLead()
-                  }}
-                />
+                {/* Quick actions bar */}
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  {/* Reactivate dropdown for lost leads */}
+                  {lead.pipeline_stage === 'lost' && canChangeStage && (
+                    <div className="relative" ref={reactivateMenuRef}>
+                      <button
+                        onClick={() => setShowReactivateMenu(!showReactivateMenu)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--text-primary)] px-3 text-xs font-semibold text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reactivate
+                        <ChevronDown className={cn("h-3 w-3 transition-transform", showReactivateMenu && "rotate-180")} />
+                      </button>
+                      <AnimatePresence>
+                        {showReactivateMenu && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute top-full left-0 z-50 mt-1 min-w-[160px] overflow-hidden rounded-md bg-[var(--bg-surface)] shadow-lg ring-1 ring-[var(--border)]"
+                          >
+                            <div className="p-1">
+                              {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
+                                <button
+                                  key={stage.value}
+                                  onClick={() => handleReactivateLead(stage.value)}
+                                  className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 transition-colors hover:bg-[var(--bg-hover)]"
+                                >
+                                  <div className="h-1.5 w-1.5 rounded-full" style={{ background: STAGE_GRADIENT[stage.value].from }} />
+                                  <span className="text-xs font-medium text-[var(--text-primary)]">{stage.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  <Link
+                    href={`/calendar?book=${lead.id}`}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    Book Appointment
+                  </Link>
+
+                  <button
+                    onClick={() => setShowCallbackScheduler(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
+                  >
+                    <PhoneForwarded className="h-3.5 w-3.5" />
+                    Schedule Callback
+                  </button>
+
+                  {lead.funding_type !== 'self_funded' && (
+                    <>
+                      <button
+                        onClick={() => setShowPSPWizard(true)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        PSP Submission
+                      </button>
+                      <button
+                        onClick={() => setShowPSPSelfService(true)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Send PSP Link
+                      </button>
+                    </>
+                  )}
+
+                  {lead.pipeline_stage === 'applicant' && (
+                    <button
+                      onClick={() => setShowRSVPDialog(true)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Send RSVP
+                    </button>
+                  )}
+                </div>
+
+                <StudentInfoForm lead={lead} autosave={autosave} />
               </motion.div>
             )}
 
@@ -1323,125 +1441,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </AnimatePresence>
         </motion.div>
 
-        {/* RIGHT: Sidebar — actions, SF down payment, appointments */}
-        <aside className="order-1 space-y-3 lg:order-2">
-
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3"
-            style={{ boxShadow: 'var(--shadow-card)' }}
-          >
-            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              Quick Actions
-            </h3>
-            <div className="space-y-1.5">
-              {/* Reactivate dropdown for lost leads */}
-              {lead.pipeline_stage === 'lost' && canChangeStage && (
-                <div className="relative" ref={reactivateMenuRef}>
-                  <motion.button
-                    onClick={() => setShowReactivateMenu(!showReactivateMenu)}
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[var(--text-primary)] px-3 text-xs font-semibold text-[var(--text-inverse)] shadow-sm transition-all hover:opacity-90"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reactivate To</span>
-                    <ChevronDown className={cn("w-3 h-3 transition-transform", showReactivateMenu && "rotate-180")} />
-                  </motion.button>
-                  <AnimatePresence>
-                    {showReactivateMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-surface)] rounded-md shadow-lg ring-1 ring-[var(--border)] overflow-hidden z-50"
-                      >
-                        <div className="p-1">
-                          {LOST_LEAD_REACTIVATE_STAGES.map((stage) => (
-                            <button
-                              key={stage.value}
-                              onClick={() => handleReactivateLead(stage.value)}
-                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-sm hover:bg-[var(--bg-hover)] transition-colors"
-                            >
-                              <div
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ background: STAGE_GRADIENT[stage.value].from }}
-                              />
-                              <span className="text-xs font-medium text-[var(--text-primary)]">{stage.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-
-              {/* Book Appointment */}
-              <Link href={`/calendar?book=${lead.id}`}>
-                <motion.div
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex h-9 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--info)]/35 hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>Book Appointment</span>
-                </motion.div>
-              </Link>
-
-              {/* Schedule Callback */}
-              <motion.div
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowCallbackScheduler(true)}
-                className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-amber-300/60 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/20"
-              >
-                <PhoneForwarded className="w-3.5 h-3.5" />
-                <span>Schedule Callback</span>
-              </motion.div>
-
-              {/* PSP buttons - only PUC */}
-              {lead.funding_type !== 'self_funded' && (
-                <>
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowPSPWizard(true)}
-                    className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>PSP Submission</span>
-                  </motion.div>
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowPSPSelfService(true)}
-                    className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-purple-300/60 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/20"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send PSP Link</span>
-                  </motion.div>
-                </>
-              )}
-
-              {/* RSVP — only applicants */}
-              {lead.pipeline_stage === 'applicant' && (
-                <motion.div
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowRSVPDialog(true)}
-                  className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-emerald-300/60 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Send RSVP</span>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
+        {/* Secondary cards — full width, below the tabs */}
+        <div className="space-y-4">
 
           {/* SF Down Payment Card */}
           {lead.funding_type === 'self_funded' && (lead.pipeline_stage === 'application' || lead.pipeline_stage === 'applicant') && (
@@ -1619,7 +1620,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </motion.div>
           )}
 
-        </aside>
+        </div>
 
         </div>
 
