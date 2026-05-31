@@ -137,9 +137,6 @@ export function AgentSourceBreakdown({ data }: AgentSourceBreakdownProps) {
                                     {s.enrolled > 0 && (
                                       <Badge variant="success" size="sm">{s.enrolled}</Badge>
                                     )}
-                                    {s.conversionRate > 0 && (
-                                      <span className="text-xs text-green-600">{s.conversionRate}%</span>
-                                    )}
                                   </div>
                                 ))}
                               </div>

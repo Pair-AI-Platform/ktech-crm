@@ -11,7 +11,6 @@ import {
   Calendar,
   FileText,
   GraduationCap,
-  TrendingUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LeaderboardData } from "@/lib/hooks/use-reports"
@@ -21,7 +20,7 @@ interface AgentDateRangePerformanceProps {
   dateLabel?: string
 }
 
-type SortKey = 'leads' | 'appointments' | 'pucFiles' | 'sfFiles' | 'enrolled' | 'conversionRate'
+type SortKey = 'leads' | 'appointments' | 'pucFiles' | 'sfFiles' | 'enrolled'
 
 const COLUMNS: { key: SortKey; label: string; shortLabel: string; icon: typeof Users; color: string }[] = [
   { key: 'leads', label: 'Leads', shortLabel: 'Leads', icon: Users, color: 'text-indigo-500' },
@@ -29,7 +28,6 @@ const COLUMNS: { key: SortKey; label: string; shortLabel: string; icon: typeof U
   { key: 'pucFiles', label: 'PUC Files', shortLabel: 'PUC', icon: FileText, color: 'text-emerald-500' },
   { key: 'sfFiles', label: 'SF Files', shortLabel: 'SF', icon: FileText, color: 'text-orange-500' },
   { key: 'enrolled', label: 'Enrolled', shortLabel: 'Enrl', icon: GraduationCap, color: 'text-green-500' },
-  { key: 'conversionRate', label: 'Conversion', shortLabel: 'Conv %', icon: TrendingUp, color: 'text-amber-500' },
 ]
 
 export function AgentDateRangePerformance({ data, dateLabel }: AgentDateRangePerformanceProps) {
@@ -54,9 +52,6 @@ export function AgentDateRangePerformance({ data, dateLabel }: AgentDateRangePer
   const totalLeads = data.reduce((s, a) => s + a.leads, 0)
   const totalEnrolled = data.reduce((s, a) => s + a.enrolled, 0)
   const totalFiles = data.reduce((s, a) => s + a.pucFiles + a.sfFiles, 0)
-  const avgConversion = data.length > 0
-    ? Math.round(data.reduce((s, a) => s + a.conversionRate, 0) / data.length)
-    : 0
 
   if (data.length === 0) return null
 
@@ -94,12 +89,11 @@ export function AgentDateRangePerformance({ data, dateLabel }: AgentDateRangePer
         </div>
 
         {/* Summary Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--border-subtle)]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[var(--border-subtle)]">
           {[
             { label: 'Total Leads', value: totalLeads, icon: Users, color: 'text-indigo-500' },
             { label: 'Total Files', value: totalFiles, icon: FileText, color: 'text-orange-500' },
             { label: 'Total Enrolled', value: totalEnrolled, icon: GraduationCap, color: 'text-green-500' },
-            { label: 'Avg Conversion', value: `${avgConversion}%`, icon: TrendingUp, color: 'text-amber-500' },
           ].map((stat) => (
             <div key={stat.label} className="bg-[var(--bg-surface)] px-5 py-4 flex items-center gap-3">
               <stat.icon className={cn("w-4.5 h-4.5", stat.color)} />
@@ -228,28 +222,6 @@ export function AgentDateRangePerformance({ data, dateLabel }: AgentDateRangePer
                       </span>
                     </td>
 
-                    {/* Conversion Rate */}
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className="w-10 h-1.5 rounded-full bg-[var(--bg-sunken)] overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-500",
-                              agent.conversionRate >= 20 ? "bg-green-500" :
-                              agent.conversionRate >= 10 ? "bg-amber-500" : "bg-red-400"
-                            )}
-                            style={{ width: `${Math.min(agent.conversionRate, 100)}%` }}
-                          />
-                        </div>
-                        <span className={cn(
-                          "text-sm font-bold tabular-nums",
-                          agent.conversionRate >= 20 ? "text-green-600 dark:text-green-400" :
-                          agent.conversionRate >= 10 ? "text-amber-600 dark:text-amber-400" : "text-red-500"
-                        )}>
-                          {agent.conversionRate}%
-                        </span>
-                      </div>
-                    </td>
                   </motion.tr>
                 )
               })}

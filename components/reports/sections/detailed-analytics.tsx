@@ -115,7 +115,7 @@ export function DetailedAnalytics({ data }: DetailedAnalyticsProps) {
                 <p className="text-sm text-[var(--text-secondary)] mb-1">Total Applications</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{enrollmentFromApplications.totalApplications}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {enrollmentFromApplications.totalEnrolled} enrolled ({enrollmentFromApplications.conversionRate}%)
+                  {enrollmentFromApplications.totalEnrolled} enrolled
                 </p>
               </CardContent>
             </Card>
@@ -133,7 +133,7 @@ export function DetailedAnalytics({ data }: DetailedAnalyticsProps) {
                 <p className="text-sm text-[var(--text-secondary)] mb-1">Self-Funded Apps</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{enrollmentFromApplications.sfApplications}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {enrollmentFromApplications.sfEnrolled} enrolled ({enrollmentFromApplications.sfConversionRate}%)
+                  {enrollmentFromApplications.sfEnrolled} enrolled
                 </p>
               </CardContent>
             </Card>
@@ -151,7 +151,7 @@ export function DetailedAnalytics({ data }: DetailedAnalyticsProps) {
                 <p className="text-sm text-[var(--text-secondary)] mb-1">PUC Apps</p>
                 <p className="text-2xl font-bold text-[var(--text-primary)]">{enrollmentFromApplications.pucApplications}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {enrollmentFromApplications.pucEnrolled} enrolled ({enrollmentFromApplications.pucConversionRate}%)
+                  {enrollmentFromApplications.pucEnrolled} enrolled
                 </p>
               </CardContent>
             </Card>

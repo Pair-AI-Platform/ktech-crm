@@ -521,18 +521,14 @@ export default function ReportsPage() {
 
     const totalLeads = data.executive.pipelineFunnel.reduce((sum, s) => sum + s.count, 0)
     const totalEnrolled = data.enrollment.totalEnrolled
-    const avgConversion = totalLeads > 0 ? Math.round((totalEnrolled / totalLeads) * 100) : 0
 
     const byFunding = data.executive.byFunding
-    const puc = byFunding?.puc ?? { totalLeads: 0, enrolled: 0, applicants: 0, periodLeads: 0, periodEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, dateTrend: [] }
-    const sf = byFunding?.sf ?? { totalLeads: 0, enrolled: 0, applicants: 0, periodLeads: 0, periodEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, dateTrend: [] }
-    const pucConversion = puc.totalLeads > 0 ? Math.round((puc.enrolled / puc.totalLeads) * 100) : 0
-    const sfConversion = sf.totalLeads > 0 ? Math.round((sf.enrolled / sf.totalLeads) * 100) : 0
+    const puc = byFunding?.puc ?? { totalLeads: 0, files: 0, enrolled: 0, applicants: 0, periodLeads: 0, periodEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, dateTrend: [] }
+    const sf = byFunding?.sf ?? { totalLeads: 0, files: 0, enrolled: 0, applicants: 0, periodLeads: 0, periodEnrolled: 0, targetCurrent: 0, targetTotal: 0, targetPercent: 0, leadsChange: null, dateTrend: [] }
 
     return {
       totalLeads,
       totalEnrolled,
-      avgConversion,
       periodLeads: data.executive.periodNumbers?.newLeads ?? 0,
       periodEnrollments: data.executive.periodNumbers?.enrolled ?? 0,
       leadsChange: data.executive.periodComparison?.leads?.change ?? null,
@@ -542,8 +538,8 @@ export default function ReportsPage() {
       targetCurrent: data.executive.targetProgress?.current ?? 0,
       targetTotal: data.executive.targetProgress?.target ?? 0,
       dateTrend: (data.executive.agentPerformance ?? []).map(a => a.leads),
-      puc: { ...puc, conversion: pucConversion },
-      sf: { ...sf, conversion: sfConversion },
+      puc,
+      sf,
     }
   }, [data])
 
@@ -649,7 +645,6 @@ export default function ReportsPage() {
           Appointments: a.appointments,
           Applications: a.applications,
           Enrolled: a.enrolled,
-          "Conversion (%)": a.conversionRate,
           "Progress (%)": a.progress,
         }))
         exportToCSV(rows, `report-agents-${new Date().toISOString().slice(0, 10)}`)
@@ -681,7 +676,6 @@ export default function ReportsPage() {
           Source: s.label,
           Leads: s.count,
           Converted: s.converted,
-          "Conversion (%)": s.conversionRate,
         }))
         exportToCSV(rows, `report-channels-${new Date().toISOString().slice(0, 10)}`)
         break
@@ -1193,9 +1187,8 @@ export default function ReportsPage() {
                       />
                       <QuickStatCard
                         label="Total Files"
-                        value={summaryMetrics.puc.enrolled}
+                        value={summaryMetrics.puc.files}
                         icon={Zap}
-                        subtext={`${summaryMetrics.puc.conversion}% conversion rate`}
                         mounted={mounted}
                         colorScheme="warning"
                       />
@@ -1210,7 +1203,6 @@ export default function ReportsPage() {
                         label="Enrolled"
                         value={summaryMetrics.puc.enrolled}
                         icon={GraduationCap}
-                        subtext={`${summaryMetrics.puc.conversion}% conversion rate`}
                         mounted={mounted}
                         colorScheme="success"
                         onClick={() => setActiveTab('enrollment')}
@@ -1235,9 +1227,8 @@ export default function ReportsPage() {
                       />
                       <QuickStatCard
                         label="Total Files"
-                        value={summaryMetrics.sf.enrolled}
+                        value={summaryMetrics.sf.files}
                         icon={Zap}
-                        subtext={`${summaryMetrics.sf.conversion}% conversion rate`}
                         mounted={mounted}
                         colorScheme="warning"
                       />
@@ -1252,7 +1243,6 @@ export default function ReportsPage() {
                         label="Enrolled"
                         value={summaryMetrics.sf.enrolled}
                         icon={GraduationCap}
-                        subtext={`${summaryMetrics.sf.conversion}% conversion rate`}
                         mounted={mounted}
                         colorScheme="success"
                         onClick={() => setActiveTab('enrollment')}

@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, useInView, AnimatePresence } from "framer-motion"
-import { useRef, useState, useEffect, useCallback } from "react"
+import { useRef, useState, useEffect } from "react"
 import {
   Sparkles,
   UserPlus,
@@ -11,7 +11,6 @@ import {
   FileText,
   ClipboardCheck,
   GraduationCap,
-  TrendingUp,
   LogOut,
   ArrowUpRight,
   ArrowDownRight,
@@ -92,15 +91,23 @@ function getFunnelWidths(data: PipelineStageData[]): number[] {
   })
 }
 
-export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subtitle, icon, onStageClick }: PipelineFunnelVisualProps) {
+function formatPercent(value: number) {
+  if (value <= 0) return "0%"
+  if (value < 0.1) return "<0.1%"
+  if (value < 10) return `${value.toFixed(1)}%`
+  return `${Math.round(value)}%`
+}
+
+export function PipelineFunnelVisual({ data, title, subtitle, icon, onStageClick }: PipelineFunnelVisualProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(containerRef, { once: true, margin: "-50px" })
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   const totalLeads = data.reduce((sum, s) => sum + s.count, 0)
-  const applications = data.find(s => s.stage === 'application')?.count || 0
+  const fileStageSet = new Set(['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled'])
+  const fileStageLeads = data.reduce((sum, s) => sum + (fileStageSet.has(s.stage) ? s.count : 0), 0)
   const enrolled = data.find(s => s.stage === 'enrolled')?.count || 0
-  const conversionRate = totalLeads > 0 ? ((applications / totalLeads) * 100).toFixed(1) : '0'
+  const hoveredStage = hoveredIndex !== null ? data[hoveredIndex] : null
 
   const stageWidths = getFunnelWidths(data)
   const targetFunnelHeight = 340
@@ -112,15 +119,6 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
 
   // Reserve space for left labels and right info
   const centerX = svgWidth / 2
-
-  const getDropoff = useCallback((index: number) => {
-    if (index >= data.length - 1) return null
-    const current = data[index].count
-    const next = data[index + 1].count
-    if (current === 0) return null
-    const dropPercent = Math.round(((current - next) / current) * 100)
-    return dropPercent
-  }, [data])
 
   return (
     <div ref={containerRef} className="relative">
@@ -142,20 +140,6 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
               </h3>
               <p className="text-xs text-[var(--text-muted)]">{subtitle || 'Lead progression funnel'}</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={isInView ? { opacity: 1, x: 0 } : {}}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
-            >
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-              <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                {conversionRate}%
-              </span>
-              <span className="text-xs text-emerald-500/70">conv.</span>
-            </motion.div>
           </div>
         </div>
       </div>
@@ -304,17 +288,17 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
                         color: 'rgba(255,255,255,0.55)',
                         whiteSpace: 'nowrap',
                       }}>
-                        {stage.percent}%
+                        {formatPercent(stage.percent)}
                       </span>
                     </div>
                   </foreignObject>
 
-                  {/* Moves data shown on hover as a tooltip-like element to the left */}
+                  {/* Lightweight movement hints on hover */}
                   {isHovered && hasMovesData && (
                     <foreignObject
-                      x={centerX - topHalf - 120}
+                      x={Math.min(centerX + topHalf + 10, svgWidth - 120)}
                       y={y + 2}
-                      width={110}
+                      width={120}
                       height={segmentHeight - 4}
                       style={{ pointerEvents: 'none' }}
                     >
@@ -323,7 +307,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
                         height: '100%',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'flex-end',
+                        justifyContent: 'flex-start',
                         gap: '6px',
                       }}>
                         {stage.movesIn > 0 && (
@@ -360,44 +344,69 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
                 </motion.g>
               )
             })}
-
-            {/* Drop-off indicators between stages */}
-            {data.map((_, index) => {
-              if (index >= data.length - 1) return null
-              const y1 = 10 + index * (segmentHeight + gap) + segmentHeight
-              const y2 = 10 + (index + 1) * (segmentHeight + gap)
-              const midY = (y1 + y2) / 2
-
-              const bottomWidth = stageWidths[index + 1]
-              const edgeX = centerX + (bottomWidth / 100) * maxHalfWidth
-
-              const drop = getDropoff(index)
-              const labelX = Math.min(edgeX + 14, svgWidth - 50)
-
-              return (
-                <motion.g
-                  key={`conn-${index}`}
-                  initial={{ opacity: 0 }}
-                  animate={isInView ? { opacity: 1 } : {}}
-                  transition={{ delay: index * 0.06 + 0.3, duration: 0.3 }}
-                >
-                  {drop !== null && drop !== 0 && (
-                    <text
-                      x={labelX}
-                      y={midY + 4}
-                      fontSize="10"
-                      fontWeight="600"
-                      fill={drop > 0 ? "#EF4444" : "#10B981"}
-                      textAnchor="start"
-                      opacity="0.7"
-                    >
-                      {drop > 0 ? `−${drop}%` : `+${Math.abs(drop)}%`}
-                    </text>
-                  )}
-                </motion.g>
-              )
-            })}
           </svg>
+
+          <AnimatePresence>
+            {hoveredStage && hoveredIndex !== null && (
+              <motion.div
+                key={hoveredStage.stage}
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                transition={{ duration: 0.14 }}
+                className="pointer-events-none absolute right-0 w-52 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/95 p-3 text-left shadow-xl backdrop-blur"
+                style={{
+                  top: Math.min(
+                    Math.max(4, 10 + hoveredIndex * (segmentHeight + gap) - 8),
+                    Math.max(4, totalHeight - 142)
+                  ),
+                }}
+              >
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {hoveredStage.label}
+                </p>
+                <div className="mt-2 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[var(--text-muted)]">Current leads</span>
+                    <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                      {hoveredStage.count.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[var(--text-muted)]">Share of funnel</span>
+                    <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                      {formatPercent(hoveredStage.percent)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[var(--text-muted)]">Total real leads</span>
+                    <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                      {totalLeads.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="rounded-lg bg-[var(--bg-sunken)] px-2 py-1.5">
+                      <span className="text-[var(--text-muted)]">Moved in</span>
+                      <p className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {hoveredStage.movesIn.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-[var(--bg-sunken)] px-2 py-1.5">
+                      <span className="text-[var(--text-muted)]">Moved out</span>
+                      <p className="font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                        {hoveredStage.movesOut.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {onStageClick && (
+                  <p className="mt-2 border-t border-[var(--border)] pt-2 text-[11px] font-medium text-[var(--text-muted)]">
+                    Click the stage to open matching leads.
+                  </p>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -406,7 +415,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
         initial={{ opacity: 0, y: 20 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.8, duration: 0.5 }}
-        className="relative z-10 grid grid-cols-4 gap-2 mt-4"
+        className="relative z-10 grid grid-cols-3 gap-2 mt-4"
       >
         {[
           {
@@ -418,8 +427,8 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
             icon: <UserPlus className="w-3.5 h-3.5 text-slate-400" />,
           },
           {
-            label: "Applications",
-            value: applications,
+            label: "Files",
+            value: fileStageLeads,
             gradient: "from-rose-500/10 to-rose-500/3",
             border: "border-rose-200/50 dark:border-rose-800/30",
             textColor: "text-rose-600 dark:text-rose-400",
@@ -432,15 +441,6 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
             border: "border-emerald-200/50 dark:border-emerald-800/30",
             textColor: "text-emerald-600 dark:text-emerald-400",
             icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />,
-          },
-          {
-            label: "Conversion",
-            value: null,
-            displayValue: `${conversionRate}%`,
-            gradient: "from-sky-500/10 to-sky-500/3",
-            border: "border-sky-200/50 dark:border-sky-800/30",
-            textColor: "text-sky-600 dark:text-sky-400",
-            icon: <TrendingUp className="w-3.5 h-3.5 text-sky-400" />,
           },
         ].map((stat, i) => (
           <motion.div
@@ -457,11 +457,7 @@ export function PipelineFunnelVisual({ data, totalStageChanges = 0, title, subti
               </p>
             </div>
             <p className={`text-xl font-bold ${stat.textColor} tabular-nums`}>
-              {stat.value !== null && stat.value !== undefined ? (
-                <AnimatedCounter value={stat.value} />
-              ) : (
-                (stat as { displayValue?: string }).displayValue
-              )}
+              <AnimatedCounter value={stat.value} />
             </p>
           </motion.div>
         ))}
@@ -476,8 +472,6 @@ export function PipelineFunnelHorizontal({ data }: PipelineFunnelVisualProps) {
   const isInView = useInView(containerRef, { once: true })
 
   const maxCount = data[0]?.count || 1
-  const applications = data.find(s => s.stage === 'application')?.count || 0
-  const conversionRate = maxCount > 0 ? ((applications / maxCount) * 100).toFixed(1) : '0'
 
   const svgWidth = 800
   const svgHeight = 200
@@ -496,9 +490,6 @@ export function PipelineFunnelHorizontal({ data }: PipelineFunnelVisualProps) {
           </div>
           <span className="font-semibold text-[var(--text-primary)]">Sales Funnel Analytics</span>
         </div>
-        <span className="text-sm px-3 py-1 rounded-full bg-[var(--success)]/10 text-[var(--success)] font-medium">
-          {conversionRate}% conversion
-        </span>
       </div>
 
       {/* Column headers with counts */}
@@ -519,7 +510,7 @@ export function PipelineFunnelHorizontal({ data }: PipelineFunnelVisualProps) {
                   : stage.count
                 }
               </p>
-              <p className="text-[10px] text-[var(--text-muted)]">{stage.percent}%</p>
+              <p className="text-[10px] text-[var(--text-muted)]">{formatPercent(stage.percent)}</p>
             </motion.div>
           )
         })}

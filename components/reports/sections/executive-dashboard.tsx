@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef } from "react"
+import { useRouter } from "next/navigation"
 import { motion, useInView } from "framer-motion"
 import {
   Layers,
@@ -18,8 +19,16 @@ interface ExecutiveDashboardProps {
 
 export function ExecutiveDashboard(props: ExecutiveDashboardProps) {
   const { data } = props
+  const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(containerRef, { once: true, margin: "-50px" })
+  const openLeadsForStage = (stage: string, fundingType: "self_funded" | "puc") => {
+    const params = new URLSearchParams({
+      stage,
+      funding_type: fundingType,
+    })
+    router.push(`/leads?${params.toString()}`)
+  }
 
   return (
     <div ref={containerRef} className="space-y-8">
@@ -37,6 +46,7 @@ export function ExecutiveDashboard(props: ExecutiveDashboardProps) {
               title="Self Funded"
               subtitle="SF lead progression funnel"
               icon={<Layers className="w-5 h-5 text-white" />}
+              onStageClick={(stage) => openLeadsForStage(stage, "self_funded")}
             />
           </div>
         </motion.div>
@@ -53,6 +63,7 @@ export function ExecutiveDashboard(props: ExecutiveDashboardProps) {
               title="PUC"
               subtitle="PUC lead progression funnel"
               icon={<GraduationCap className="w-5 h-5 text-white" />}
+              onStageClick={(stage) => openLeadsForStage(stage, "puc")}
             />
           </div>
         </motion.div>

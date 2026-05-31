@@ -310,8 +310,8 @@ export interface ExecutiveReportData {
   totalStageChanges: number
   dateTrend: Array<{ day: string; leads: number; enrolled: number }>
   byFunding: {
-    puc: { totalLeads: number; enrolled: number; applicants: number; periodLeads: number; periodEnrolled: number; targetCurrent: number; targetTotal: number; targetPercent: number; leadsChange: number | null; dateTrend: number[] }
-    sf: { totalLeads: number; enrolled: number; applicants: number; periodLeads: number; periodEnrolled: number; targetCurrent: number; targetTotal: number; targetPercent: number; leadsChange: number | null; dateTrend: number[] }
+    puc: { totalLeads: number; files: number; enrolled: number; applicants: number; periodLeads: number; periodEnrolled: number; targetCurrent: number; targetTotal: number; targetPercent: number; leadsChange: number | null; dateTrend: number[] }
+    sf: { totalLeads: number; files: number; enrolled: number; applicants: number; periodLeads: number; periodEnrolled: number; targetCurrent: number; targetTotal: number; targetPercent: number; leadsChange: number | null; dateTrend: number[] }
   }
 }
 
@@ -1780,14 +1780,28 @@ function calculateReports(
     }
   }).sort((a, b) => b.leads - a.leads)
 
-  // Count stage transitions (moves in / moves out per stage)
-  const movesInMap = new Map<string, number>()
-  const movesOutMap = new Map<string, number>()
-  for (const activity of stageChangesRaw) {
-    const newStage = activity.metadata?.new_stage
-    const oldStage = activity.metadata?.old_stage
-    if (newStage) movesInMap.set(newStage, (movesInMap.get(newStage) || 0) + 1)
-    if (oldStage) movesOutMap.set(oldStage, (movesOutMap.get(oldStage) || 0) + 1)
+  const buildPipelineFunnel = (stages: PipelineStage[], sourceLeads: Lead[]): PipelineFunnelItem[] => {
+    const funnelLeads = sourceLeads.filter(l => l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
+    const funnelTotal = funnelLeads.length
+    const leadIds = new Set(funnelLeads.map(l => l.id))
+    const stageChangesForLeads = stageChangesRaw.filter(activity => (
+      activity.lead_id && leadIds.has(activity.lead_id)
+    ))
+
+    return stages.map(stage => {
+      const count = funnelLeads.filter(l => l.pipeline_stage === stage).length
+      const movesIn = stageChangesForLeads.filter(activity => activity.metadata?.new_stage === stage).length
+      const movesOut = stageChangesForLeads.filter(activity => activity.metadata?.old_stage === stage).length
+
+      return {
+        stage,
+        label: stageLabels[stage],
+        count,
+        percent: funnelTotal > 0 ? (count / funnelTotal) * 100 : 0,
+        movesIn,
+        movesOut,
+      }
+    })
   }
 
   const executive: ExecutiveReportData = {
@@ -1796,59 +1810,23 @@ function calculateReports(
       target: totalTarget,
       percent: totalTarget > 0 ? Math.round((activeStudents.length / totalTarget) * 100) : 0
     },
-    pipelineFunnel: (() => {
-      const funnelStages = pipelineStages.filter(s => s !== 'lost' && s !== 'withdraw')
-      const funnelTotal = leads.filter(l => l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw').length
-      const stageCounts = funnelStages.map(stage => leads.filter(l => l.pipeline_stage === stage).length)
-      return funnelStages.map((stage, index) => {
-        const count = stageCounts[index]
-        // Cumulative: leads at this stage or beyond (sum from this index to end)
-        const cumulativeCount = stageCounts.slice(index).reduce((sum, c) => sum + c, 0)
-        return {
-          stage,
-          label: stageLabels[stage],
-          count,
-          percent: funnelTotal > 0 ? Math.round((cumulativeCount / funnelTotal) * 100) : 0,
-          movesIn: movesInMap.get(stage) || 0,
-          movesOut: movesOutMap.get(stage) || 0,
-        }
-      })
-    })(),
+    pipelineFunnel: buildPipelineFunnel(
+      pipelineStages.filter(s => s !== 'lost' && s !== 'withdraw'),
+      leads,
+    ),
     sfPipelineFunnel: (() => {
       const sfStages: PipelineStage[] = ['new', 'contacted', 'test', 'application', 'applicant', 'enrolled']
-      const sfLeads = leads.filter(l => l.funding_type === 'self_funded' && l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
-      const sfTotal = sfLeads.length
-      const sfCounts = sfStages.map(stage => sfLeads.filter(l => l.pipeline_stage === stage).length)
-      return sfStages.map((stage, index) => {
-        const count = sfCounts[index]
-        const cumulativeCount = sfCounts.slice(index).reduce((sum, c) => sum + c, 0)
-        return {
-          stage,
-          label: stageLabels[stage],
-          count,
-          percent: sfTotal > 0 ? Math.round((cumulativeCount / sfTotal) * 100) : 0,
-          movesIn: movesInMap.get(stage) || 0,
-          movesOut: movesOutMap.get(stage) || 0,
-        }
-      })
+      return buildPipelineFunnel(
+        sfStages,
+        leads.filter(l => l.funding_type === 'self_funded'),
+      )
     })(),
     pucPipelineFunnel: (() => {
       const pucStages: PipelineStage[] = ['new', 'contacted', 'visit', 'test', 'application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
-      const pucLeads = leads.filter(l => l.funding_type === 'puc' && l.pipeline_stage !== 'lost' && l.pipeline_stage !== 'withdraw')
-      const pucTotal = pucLeads.length
-      const pucCounts = pucStages.map(stage => pucLeads.filter(l => l.pipeline_stage === stage).length)
-      return pucStages.map((stage, index) => {
-        const count = pucCounts[index]
-        const cumulativeCount = pucCounts.slice(index).reduce((sum, c) => sum + c, 0)
-        return {
-          stage,
-          label: stageLabels[stage],
-          count,
-          percent: pucTotal > 0 ? Math.round((cumulativeCount / pucTotal) * 100) : 0,
-          movesIn: movesInMap.get(stage) || 0,
-          movesOut: movesOutMap.get(stage) || 0,
-        }
-      })
+      return buildPipelineFunnel(
+        pucStages,
+        leads.filter(l => l.funding_type === 'puc'),
+      )
     })(),
     periodNumbers: {
       newLeads: leads.length,
@@ -1900,9 +1878,12 @@ function calculateReports(
       const sfPrev = prevLeads.filter(l => l.funding_type === 'self_funded')
       const pucApplicants = pucLeads.filter(l => l.pipeline_stage === 'applicant').length
       const sfApplicants = sfLeads.filter(l => l.pipeline_stage === 'applicant').length
+      const pucFileStages: PipelineStage[] = ['application', 'puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled']
+      const sfFileStages: PipelineStage[] = ['application', 'applicant', 'enrolled']
       return {
         puc: {
           totalLeads: pucLeads.length,
+          files: pucLeads.filter(l => pucFileStages.includes(l.pipeline_stage)).length,
           enrolled: pucStudents.length,
           applicants: pucApplicants,
           periodLeads: pucLeads.length,
@@ -1917,6 +1898,7 @@ function calculateReports(
         },
         sf: {
           totalLeads: sfLeads.length,
+          files: sfLeads.filter(l => sfFileStages.includes(l.pipeline_stage)).length,
           enrolled: sfStudents.length,
           applicants: sfApplicants,
           periodLeads: sfLeads.length,

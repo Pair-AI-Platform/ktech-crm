@@ -632,11 +632,10 @@ function FilesTargetTab({ data, agentsWithTargets, dateRange }: {
                 </div>
 
                 {/* Extra stats row */}
-                <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-[var(--border)]">
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[var(--border)]">
                   <MiniStat label="Leads" value={agent.leads} />
                   <MiniStat label="Appts" value={agent.appointments} />
                   <MiniStat label="Enrolled" value={agent.enrolled} />
-                  <MiniStat label="Conv %" value={`${agent.conversionRate}%`} />
                 </div>
               </motion.div>
             )
@@ -927,9 +926,6 @@ function EnrolledTargetTab({ data, agentsWithTargets, dateRange }: {
                     </Avatar>
                     <div>
                       <p className="font-medium text-sm text-[var(--text-primary)]">{agent.agentName}</p>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                        Conv. Rate: {agent.conversionRate}%
-                      </p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -966,11 +962,10 @@ function EnrolledTargetTab({ data, agentsWithTargets, dateRange }: {
                 </div>
 
                 {/* Extra stats row */}
-                <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-[var(--border)]">
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[var(--border)]">
                   <MiniStat label="Leads" value={agent.leads} />
                   <MiniStat label="Appts" value={agent.appointments} />
                   <MiniStat label="Files" value={(agent.categories?.puc?.applications || 0) + (agent.categories?.sf?.applications || 0)} />
-                  <MiniStat label="Conv %" value={`${agent.conversionRate}%`} />
                 </div>
               </motion.div>
             )
