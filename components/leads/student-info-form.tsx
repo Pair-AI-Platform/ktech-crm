@@ -24,6 +24,7 @@ import {
   Check,
   Building2,
   Search,
+  Lock,
   CheckCircle2,
   ScanLine,
   ClipboardList,
@@ -54,6 +55,7 @@ import {
   MINISTRY_BLOCK_REASONS,
   type Lead,
   type SchoolEntity,
+  type EducationType,
   type PlacementLevel,
   type MinistryBlockReason,
 } from "@/types"
@@ -322,7 +324,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   })
 
   // Use database schools if available, fallback to hardcoded SCHOOLS
-  const schoolSource: { id: string; name_en: string; name_ar: string; gender?: string }[] = dbSchools.length > 0
+  const schoolSource: { id: string; name_en: string; name_ar: string; gender?: string; school_type?: string }[] = dbSchools.length > 0
     ? dbSchools
     : SCHOOLS.map(s => ({ id: s.value, name_en: s.labelEn, name_ar: s.labelAr || s.label, gender: s.gender }))
 
@@ -376,6 +378,16 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const computePlacementLevel = (english: boolean, math: boolean, computer: boolean): PlacementLevel =>
     english && math && computer ? "majors" : english && math ? "foundation_2" : "foundation_1"
 
+  // Education type is owned by the school (its school_type), edited only in School settings.
+  // Derive the lead's education_type from the selected school rather than letting the user pick it.
+  const SCHOOL_TYPE_TO_EDUCATION: Record<string, EducationType> = {
+    gov: "GOV", us: "US", uk: "UK", ksa: "KSA", others: "other",
+  }
+  const deriveEducationType = (schoolId: string): EducationType | "" => {
+    const schoolType = schoolSource.find(s => s.id === schoolId)?.school_type
+    return schoolType ? (SCHOOL_TYPE_TO_EDUCATION[schoolType] || "") : ""
+  }
+
   const handleChange = (field: string, value: string) => {
     // Names are required and Arabic-only — validate inline and block the save on invalid input.
     if (field === "first_name" || field === "last_name") {
@@ -402,8 +414,11 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
           ? (value === "male" && gender !== "boys" && gender !== "male" && gender !== "mixed")
             || (value === "female" && gender !== "girls" && gender !== "female" && gender !== "mixed")
           : false
-        if (genderMismatch) queueField("school", "")
-        return { ...prev, gender: value, school: genderMismatch ? "" : prev.school }
+        if (genderMismatch) {
+          queueField("school", "")
+          autosave.queueChange("education_type" as keyof Lead, undefined)
+        }
+        return { ...prev, gender: value, school: genderMismatch ? "" : prev.school, education_type: genderMismatch ? "" : prev.education_type }
       })
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
@@ -882,7 +897,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   onChange={(e) => handleChange("seat_number", e.target.value)}
                   placeholder="Enter seat number"
                 />
-                <p className="text-xs text-[var(--text-muted)]">Used to match Ministry GPA import results</p>
               </div>
             </div>
           </div>
@@ -994,21 +1008,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
               </div>
             )}
 
-            {/* Referrer — who referred this student (referrals only) */}
-            {formData.source_category === "referrals" && (
-              <div className="space-y-2">
-                <Label htmlFor="referred_by">Referred by</Label>
-                <Input
-                  id="referred_by"
-                  value={formData.source_detail || ""}
-                  onChange={(e) => handleChange("source_detail", e.target.value)}
-                  placeholder="Name of the person who referred them"
-                  icon={<Users className="w-4 h-4" />}
-                />
-                <p className="text-xs text-[var(--text-muted)]">Who told this student about us</p>
-              </div>
-            )}
-
             {/* Source History */}
             {sourceHistory.length > 0 && (
               <div className="mt-4 pt-4 border-t border-[var(--border)]">
@@ -1116,7 +1115,12 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                             key={school.id}
                             type="button"
                             onClick={() => {
-                              handleChange("school", school.id)
+                              const eduType = deriveEducationType(school.id)
+                              setFormData(prev => ({ ...prev, school: school.id, education_type: eduType, education_type_custom: "" }))
+                              queueField("school", school.id)
+                              autosave.queueChange("education_type" as keyof Lead, eduType || undefined)
+                              autosave.queueChange("education_type_custom" as keyof Lead, undefined)
+                              if (errors.education_type) setErrors(prev => ({ ...prev, education_type: "" }))
                               setIsSchoolDropdownOpen(false)
                               setSchoolSearch("")
                             }}
@@ -1138,67 +1142,45 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
               </div>
             </div>
 
-            {/* Education Type */}
+            {/* Education Type — derived from the selected school, edited only in School settings */}
             <div id="education_type" className="space-y-2">
-              <Label>Education Type <span className="text-[var(--error)]">*</span></Label>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                {EDUCATION_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => {
-                      const nextType = formData.education_type === type.value ? "" : type.value
-                      setFormData(prev => ({
-                        ...prev,
-                        education_type: nextType,
-                        education_type_custom: type.value !== 'other' ? "" : prev.education_type_custom,
-                      }))
-                      autosave.queueChange("education_type" as keyof Lead, nextType || undefined)
-                      if (type.value !== 'other') {
-                        autosave.queueChange("education_type_custom" as keyof Lead, undefined)
-                      }
-                      if (errors.education_type) {
-                        setErrors(prev => ({ ...prev, education_type: "" }))
-                      }
-                    }}
-                    className={cn(
-                      "relative flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center transition-all",
-                      formData.education_type === type.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
-                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
-                    )}
-                  >
-                    {formData.education_type === type.value && (
-                      <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)]">
-                        <Check className="h-3 w-3" />
-                      </span>
-                    )}
-                    <span className={cn(
-                      "text-sm font-bold",
-                      formData.education_type === type.value ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
-                    )}>
-                      {type.label}
-                    </span>
-                    <span className="text-[10px] text-[var(--text-muted)] leading-tight">{type.description}</span>
-                  </button>
-                ))}
+              <div className="flex items-center justify-between">
+                <Label>Education Type</Label>
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                  <Lock className="h-3 w-3" />
+                  Set by school
+                </span>
               </div>
-              {errors.education_type && (
-                <p className="text-xs text-[var(--error)]">{errors.education_type}</p>
-              )}
-              {formData.education_type === 'other' && (
-                <motion.div id="education_type_custom" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-2">
-                  <Input
-                    placeholder="Enter education type..."
-                    value={formData.education_type_custom}
-                    onChange={(e) => handleChange("education_type_custom", e.target.value)}
-                    className={cn(errors.education_type_custom && "border-[var(--error)]")}
-                  />
-                  {errors.education_type_custom && (
-                    <p className="text-xs text-[var(--error)] mt-1">{errors.education_type_custom}</p>
-                  )}
-                </motion.div>
-              )}
+              {(() => {
+                // Prefer the school's own type (authoritative); fall back to any stored value for legacy schools.
+                const eduType = (formData.school && deriveEducationType(formData.school)) || (formData.education_type as EducationType | "")
+                const meta = EDUCATION_TYPES.find(t => t.value === eduType)
+                if (!formData.school) {
+                  return (
+                    <div className="flex min-h-[58px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-muted)]">
+                      Select a school first to set the education type.
+                    </div>
+                  )
+                }
+                if (!meta) {
+                  return (
+                    <div className="flex min-h-[58px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-muted)]">
+                      No education type set for this school. Configure it in Settings → Schools.
+                    </div>
+                  )
+                }
+                return (
+                  <div className="flex min-h-[58px] items-center gap-3 rounded-lg border border-[var(--primary)] bg-[var(--primary-muted)] px-3 py-2">
+                    <span className="flex h-9 min-w-[44px] items-center justify-center rounded-md bg-[var(--primary)] px-2 text-sm font-bold text-[var(--primary-foreground)]">
+                      {meta.label}
+                    </span>
+                    <div className="leading-tight">
+                      <p className="text-sm font-semibold text-[var(--primary)]">{meta.description}</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">Determined by the school — change it in Settings → Schools.</p>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Grade Level */}

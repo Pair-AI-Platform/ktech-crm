@@ -45,7 +45,7 @@ import {
   School as SchoolIcon,
   type LucideIcon,
 } from "lucide-react"
-import { EDUCATION_TYPES, MAJORS, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type PipelineStage, type LeadStatus, type SchoolEntity } from "@/types"
+import { EDUCATION_TYPES, MAJORS, PIPELINE_STAGES, LEAD_SOURCES, LEAD_STATUSES, LOCKED_STAGES, MINISTRY_BLOCK_REASONS, type PipelineStage, type LeadStatus, type SchoolEntity, type EducationType } from "@/types"
 import { cn } from "@/lib/utils"
 import type { LeadFormData } from "./lead-form-types"
 import type { Dispatch, SetStateAction } from "react"
@@ -123,8 +123,8 @@ interface LeadFormAcademicProps {
   setSchoolSearch: Dispatch<SetStateAction<string>>
   isSchoolDropdownOpen: boolean
   setIsSchoolDropdownOpen: Dispatch<SetStateAction<boolean>>
-  filteredSchools: { id: string; name_en: string; name_ar: string; gender?: string }[]
-  schoolSource: { id: string; name_en: string; name_ar: string; gender?: string }[]
+  filteredSchools: { id: string; name_en: string; name_ar: string; gender?: string; school_type?: string }[]
+  schoolSource: { id: string; name_en: string; name_ar: string; gender?: string; school_type?: string }[]
   dbSchools: SchoolEntity[]
   isEditing: boolean
   filteredSources: typeof LEAD_SOURCES
@@ -378,65 +378,46 @@ export function LeadFormAcademic({
             </div>
           </div>
 
-          {/* Education Type */}
+          {/* Education Type — derived from the selected school, edited only in School settings */}
           <div id="education_type" className="space-y-2">
-            <Label>Education Type <span className="text-[var(--error)]">*</span></Label>
-            <div className="grid grid-cols-5 gap-2">
-              {EDUCATION_TYPES.map((type) => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      education_type: prev.education_type === type.value ? "" : type.value,
-                      education_type_custom: type.value !== 'other' ? "" : prev.education_type_custom,
-                    }))
-                    if (errors.education_type) {
-                      setErrors(prev => ({ ...prev, education_type: "" }))
-                    }
-                  }}
-                  className={cn(
-                    "flex flex-col items-center gap-1 p-3 rounded-xl border transition-all text-center",
-                    formData.education_type === type.value
-                      ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                  )}
-                >
-                  <span className={cn(
-                    "text-sm font-bold",
-                    formData.education_type === type.value
-                      ? "text-[var(--primary)]"
-                      : "text-[var(--text-primary)]"
-                  )}>
-                    {type.label}
-                  </span>
-                  <span className="text-[10px] text-[var(--text-muted)] leading-tight">{type.description}</span>
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <Label>Education Type</Label>
+              <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                <Lock className="h-3 w-3" />
+                Set by school
+              </span>
             </div>
-            {errors.education_type && (
-              <p className="text-xs text-[var(--error)]">{errors.education_type}</p>
-            )}
-            {formData.education_type === 'other' && (
-              <motion.div
-                id="education_type_custom"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-2"
-              >
-                <Input
-                  placeholder="Enter education type..."
-                  value={formData.education_type_custom}
-                  onChange={(e) => setFormData(prev => ({ ...prev, education_type_custom: e.target.value }))}
-                  className={cn("w-full", errors.education_type_custom && "border-[var(--error)]")}
-                />
-                {errors.education_type_custom && (
-                  <p className="text-xs text-[var(--error)] mt-1">{errors.education_type_custom}</p>
-                )}
-              </motion.div>
-            )}
+            {(() => {
+              const schoolType = schoolSource.find(s => s.id === formData.school)?.school_type
+              const map: Record<string, EducationType> = { gov: "GOV", us: "US", uk: "UK", ksa: "KSA", others: "other" }
+              const eduType = (schoolType ? map[schoolType] : undefined) || (formData.education_type as EducationType | "")
+              const meta = EDUCATION_TYPES.find(t => t.value === eduType)
+              if (!formData.school) {
+                return (
+                  <div className="flex min-h-[58px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-muted)]">
+                    Select a school first to set the education type.
+                  </div>
+                )
+              }
+              if (!meta) {
+                return (
+                  <div className="flex min-h-[58px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-muted)]">
+                    No education type set for this school. Configure it in Settings → Schools.
+                  </div>
+                )
+              }
+              return (
+                <div className="flex min-h-[58px] items-center gap-3 rounded-lg border border-[var(--primary)] bg-[var(--primary-muted)] px-3 py-2">
+                  <span className="flex h-9 min-w-[44px] items-center justify-center rounded-md bg-[var(--primary)] px-2 text-sm font-bold text-[var(--primary-foreground)]">
+                    {meta.label}
+                  </span>
+                  <div className="leading-tight">
+                    <p className="text-sm font-semibold text-[var(--primary)]">{meta.description}</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Determined by the school — change it in Settings → Schools.</p>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Grade Level */}

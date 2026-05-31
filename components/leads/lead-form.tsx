@@ -168,9 +168,19 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   }, [lead])
 
   // Use database schools if available, fallback to hardcoded SCHOOLS
-  const schoolSource: { id: string; name_en: string; name_ar: string; gender?: string }[] = dbSchools.length > 0
+  const schoolSource: { id: string; name_en: string; name_ar: string; gender?: string; school_type?: string }[] = dbSchools.length > 0
     ? dbSchools
     : SCHOOLS.map(s => ({ id: s.value, name_en: s.labelEn, name_ar: s.labelAr || s.label, gender: s.gender }))
+
+  // Education type is owned by the school (its school_type), edited only in School settings.
+  // Derive the lead's education_type from the selected school rather than letting the user pick it.
+  const SCHOOL_TYPE_TO_EDUCATION: Record<string, EducationType> = {
+    gov: "GOV", us: "US", uk: "UK", ksa: "KSA", others: "other",
+  }
+  const deriveEducationType = (schoolId: string): EducationType | "" => {
+    const schoolType = schoolSource.find(s => s.id === schoolId)?.school_type
+    return schoolType ? (SCHOOL_TYPE_TO_EDUCATION[schoolType] || "") : ""
+  }
 
   // Filter schools based on Arabic, English, compact text, and acronyms like BSK/NES/KES.
   const filteredSchools = schoolSource.filter(school => {
@@ -314,12 +324,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       newErrors.semester_id = "Enrollment cycle is required"
     }
 
-    // Academic validation
-    if (!formData.education_type) {
-      newErrors.education_type = "Education type is required"
-    } else if (formData.education_type === "other" && !formData.education_type_custom.trim()) {
-      newErrors.education_type_custom = "Please describe the curriculum"
-    }
+    // Academic validation — education type is derived from the school (set in School settings), not entered here
     if (!formData.academic_track) {
       newErrors.academic_track = "Type (Science/Art) is required"
     }
@@ -610,6 +615,15 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
         }
         return { ...prev, graduation_year: value }
       })
+    // If selecting a school, auto-derive the (locked) education type from the school
+    } else if (field === 'school') {
+      const eduType = deriveEducationType(value)
+      setFormData(prev => ({
+        ...prev,
+        school: value,
+        education_type: eduType,
+        education_type_custom: "",
+      }))
     // If changing gender, clear school if it doesn't match the new gender
     } else if (field === 'gender') {
       setFormData(prev => {
@@ -622,6 +636,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
           ...prev,
           gender: value,
           school: genderMismatch ? "" : prev.school,
+          education_type: genderMismatch ? "" : prev.education_type,
         }
       })
     } else {
