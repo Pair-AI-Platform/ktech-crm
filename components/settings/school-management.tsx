@@ -208,6 +208,11 @@ export function SchoolManagement() {
       return
     }
 
+    if (!newSchool.school_type) {
+      setError("School type is required — it sets the education type on leads")
+      return
+    }
+
     setSaving(true)
     setError("")
 
@@ -302,6 +307,11 @@ export function SchoolManagement() {
 
     if (!editForm.gender) {
       setError("Gender is required")
+      return
+    }
+
+    if (!editForm.school_type) {
+      setError("School type is required — it sets the education type on leads")
       return
     }
 
@@ -760,16 +770,19 @@ export function SchoolManagement() {
 
             {/* School Type Field */}
             <div className="space-y-2.5">
-              <Label className="text-[var(--text-primary)]">School Type</Label>
+              <Label required className="text-[var(--text-primary)]">School Type</Label>
               <Select
                 value={newSchool.school_type || "none"}
-                onValueChange={(value) => setNewSchool(prev => ({ ...prev, school_type: value === "none" ? "" : value as SchoolType }))}
+                onValueChange={(value) => {
+                  setNewSchool(prev => ({ ...prev, school_type: value === "none" ? "" : value as SchoolType }))
+                  setError("")
+                }}
               >
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No type</SelectItem>
+                  <SelectItem value="none" disabled>Select type</SelectItem>
                   {SCHOOL_TYPES.map((t) => (
                     <SelectItem key={t.value} value={t.value}>
                       {t.label} - {t.labelAr}
@@ -777,6 +790,10 @@ export function SchoolManagement() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+                <span className="inline-block w-1 h-1 rounded-full bg-[var(--text-muted)] opacity-50" />
+                Sets the education type automatically on every lead from this school
+              </p>
             </div>
 
             {/* Location Field */}
@@ -846,7 +863,7 @@ export function SchoolManagement() {
             </Button>
             <Button
               onClick={handleAddSchool}
-              disabled={saving || !newSchool.name_ar.trim() || !newSchool.gender}
+              disabled={saving || !newSchool.name_ar.trim() || !newSchool.gender || !newSchool.school_type}
               variant="gradient"
               className="min-w-[140px] shadow-md shadow-[var(--primary)]/15"
             >
@@ -1001,16 +1018,19 @@ export function SchoolManagement() {
 
             {/* School Type */}
             <div className="space-y-2.5">
-              <Label className="text-[var(--text-primary)]">School Type</Label>
+              <Label required className="text-[var(--text-primary)]">School Type</Label>
               <Select
                 value={editForm.school_type || "none"}
-                onValueChange={(value) => setEditForm(prev => ({ ...prev, school_type: value === "none" ? "" : value as SchoolType }))}
+                onValueChange={(value) => {
+                  setEditForm(prev => ({ ...prev, school_type: value === "none" ? "" : value as SchoolType }))
+                  setError("")
+                }}
               >
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No type</SelectItem>
+                  <SelectItem value="none" disabled>Select type</SelectItem>
                   {SCHOOL_TYPES.map((t) => (
                     <SelectItem key={t.value} value={t.value}>
                       {t.label} - {t.labelAr}
@@ -1018,6 +1038,10 @@ export function SchoolManagement() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+                <span className="inline-block w-1 h-1 rounded-full bg-[var(--text-muted)] opacity-50" />
+                Sets the education type automatically on every lead from this school
+              </p>
             </div>
 
             {/* Location */}
@@ -1080,7 +1104,7 @@ export function SchoolManagement() {
             </Button>
             <Button
               onClick={handleEditSchool}
-              disabled={saving || !editForm.name_ar.trim() || !editForm.gender}
+              disabled={saving || !editForm.name_ar.trim() || !editForm.gender || !editForm.school_type}
               variant="gradient"
               className="min-w-[140px] shadow-md shadow-[var(--primary)]/15"
             >
