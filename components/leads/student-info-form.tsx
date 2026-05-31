@@ -22,7 +22,6 @@ import {
   CreditCard,
   GraduationCap,
   Check,
-  AlertCircle,
   Building2,
   Search,
   CheckCircle2,
@@ -39,7 +38,6 @@ import {
   Sparkles,
   Percent,
   Send,
-  FileText,
   Ban,
   History,
   ArrowRight,
@@ -55,17 +53,14 @@ import {
   LEAD_SOURCES,
   MINISTRY_BLOCK_REASONS,
   type Lead,
-  type School,
-  type IntendedMajor,
   type SchoolEntity,
   type PlacementLevel,
   type MinistryBlockReason,
 } from "@/types"
-import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
 import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
-import { useLeadMutations } from "@/lib/hooks/use-leads"
-import { useAutoSaveLead, type AutoSaveStatus } from "@/lib/hooks/use-autosave-lead"
+import { useAutoSaveLead } from "@/lib/hooks/use-autosave-lead"
 import { useSemesters } from "@/lib/hooks/use-semesters"
 import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
@@ -74,7 +69,6 @@ import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { formatDate } from "@/lib/utils"
 import { compareSchoolsBySearch, schoolMatchesSearch } from "@/lib/schools/search"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
-import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 
 const SOURCE_CATEGORIES: { value: string; label: string; description: string; icon: LucideIcon }[] = [
   { value: "direct", label: "Direct", description: "Walk-ins and calls", icon: Phone },
@@ -86,37 +80,6 @@ const SOURCE_CATEGORIES: { value: string; label: string; description: string; ic
 
 const sectionBodyClass = "space-y-3 border-t border-[var(--border-subtle)] px-3 py-4 sm:px-4"
 const fieldGridClass = "grid grid-cols-1 gap-3 lg:grid-cols-2"
-
-function AutoSaveBadge({ status, error, onRetry }: { status: AutoSaveStatus; error: string | null; onRetry: () => void }) {
-  if (status === "idle") return null
-  if (status === "saving") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-tertiary)]">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Saving…
-      </span>
-    )
-  }
-  if (status === "saved") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
-        <Check className="h-3 w-3" />
-        Saved
-      </span>
-    )
-  }
-  return (
-    <button
-      type="button"
-      onClick={onRetry}
-      title={error ?? "Save failed"}
-      className="inline-flex items-center gap-1 rounded-full bg-[var(--error-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--error)] hover:brightness-110"
-    >
-      <AlertCircle className="h-3 w-3" />
-      Failed — retry
-    </button>
-  )
-}
 
 function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -172,11 +135,11 @@ function SectionHeader({ icon: Icon, title, description, open, onToggle, trailin
 
 interface StudentInfoFormProps {
   lead: Lead
-  onSuccess?: () => void
+  /** Auto-save controller, lifted to the page so save status shows in the header. */
+  autosave: ReturnType<typeof useAutoSaveLead>
 }
 
-export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
-  const { updateLead, loading } = useLeadMutations()
+export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const { semesters } = useSemesters()
   const { sources: dbSources } = useActiveSources()
   const { exhibitions: activeExhibitions } = useActiveExhibitions()
@@ -189,9 +152,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [declarationSent, setDeclarationSent] = useState(false)
 
-  // Live auto-save for every tracked field on this lead
-  const autosave = useAutoSaveLead(lead.id)
-
   // Collapsible sections
   const [placementOpen, setPlacementOpen] = useState(false)
   const [personalOpen, setPersonalOpen] = useState(true)
@@ -200,7 +160,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [academicOpen, setAcademicOpen] = useState(true)
   const [discountOpen, setDiscountOpen] = useState(false)
   const [ministryOpen, setMinistryOpen] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
 
   // Source change history from activities
   const sourceHistory = useMemo(() => {
@@ -276,6 +235,19 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
       }
       return updated
     })
+    // Persist extracted values through auto-save
+    for (const [key, value] of Object.entries(fieldsToUpdate)) {
+      if (value === undefined || value === null) continue
+      if ((key === 'first_name' || key === 'last_name') && typeof value === 'string') {
+        const trimmed = value.trim()
+        if (trimmed && !isArabicText(trimmed)) {
+          setErrors(prev => ({ ...prev, [key]: 'Name must be in Arabic' }))
+          continue
+        }
+        setErrors(prev => ({ ...prev, [key]: '' }))
+      }
+      autosave.queueChange(key as keyof Lead, value)
+    }
   }
 
   const initialArabicName = getArabicLeadNameParts(lead)
@@ -361,142 +333,70 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
     ? dbSources.filter(s => !formData.source_category || s.category === formData.source_category)
     : LEAD_SOURCES.filter(s => !formData.source_category || s.category === formData.source_category)
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {}
-
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = "First name is required"
-    } else if (!isArabicText(formData.first_name)) {
-      newErrors.first_name = "Name must be in Arabic"
-    }
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = "Last name is required"
-    } else if (!isArabicText(formData.last_name)) {
-      newErrors.last_name = "Name must be in Arabic"
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Mobile number is required"
-    } else if (!isValidKuwaitPhone(formData.phone)) {
-      newErrors.phone = "Mobile must be 8 digits starting with 5, 6, or 9"
-    }
-
-    if (formData.civil_id && !isValidKuwaitCivilId(formData.civil_id)) {
-      newErrors.civil_id = "Civil ID must be 12 digits starting with 2 or 3"
-    }
-
-    if (!formData.education_type) {
-      newErrors.education_type = "Education type is required"
-    } else if (formData.education_type === "other" && !formData.education_type_custom.trim()) {
-      newErrors.education_type_custom = "Please describe the curriculum"
-    }
-
-    if (formData.funding_type === 'puc') {
-      if (!formData.actual_gpa.trim()) {
-        newErrors.actual_gpa = "GPA is required for PUC"
-      } else {
-        const gpaValue = parseFloat(formData.actual_gpa)
-        if (isNaN(gpaValue) || gpaValue < 0 || gpaValue > 100) {
-          newErrors.actual_gpa = "GPA must be between 0 and 100"
+  // Map a form field to the correct Lead column(s) and queue it for auto-save.
+  const queueField = (field: string, value: string) => {
+    switch (field) {
+      case "graduation_year":
+        autosave.queueChange("graduation_year" as keyof Lead, value ? parseInt(value, 10) : undefined)
+        return
+      case "expected_gpa":
+        autosave.queueChange("expected_gpa" as keyof Lead, value ? parseFloat(value) : undefined)
+        return
+      case "actual_gpa": {
+        const gpa = value ? parseFloat(value) : undefined
+        autosave.queueChange("actual_gpa" as keyof Lead, gpa)
+        autosave.queueChange("gpa_grade_11" as keyof Lead, gpa)
+        return
+      }
+      case "school":
+        // DB schools persist to school_id; the legacy hardcoded list persists to `school`.
+        if (dbSchools.length > 0) {
+          autosave.queueChange("school_id" as keyof Lead, value || undefined)
+        } else {
+          autosave.queueChange("school" as keyof Lead, (value || undefined) as Lead["school"])
         }
-      }
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return
-
-    const leadData: Partial<Lead> = {
-      // Personal
-      first_name: formData.first_name,
-      last_name: formData.last_name,
-      gender: formData.gender || undefined,
-      nationality: formData.nationality || undefined as unknown as string,
-      address: formData.address || undefined,
-      is_transfer_student: formData.is_transfer_student,
-      is_special_needs: formData.is_special_needs,
-      is_diplomatic: formData.is_diplomatic,
-      is_athlete: formData.is_athlete,
-      is_married: formData.is_married,
-      is_employee: formData.is_employee,
-      is_marketing_student: formData.is_marketing_student,
-      // Contact
-      phone: formData.phone.replace(/\D/g, ""),
-      phone_secondary: formData.phone_secondary.replace(/\D/g, "") || undefined,
-      email: formData.email || undefined,
-      civil_id: formData.civil_id.replace(/\D/g, "") || undefined,
-      date_of_birth: formData.date_of_birth || undefined,
-      // Source
-      source_category: formData.source_category || undefined,
-      source: formData.source || undefined,
-      source_detail: formData.source_detail || undefined,
-      // Academic
-      school: dbSchools.length > 0 ? undefined : (formData.school || undefined) as School | undefined,
-      school_id: dbSchools.length > 0 && formData.school ? formData.school : undefined,
-      education_type: formData.education_type || undefined,
-      education_type_custom: formData.education_type_custom || undefined,
-      grade_level: formData.grade_level || undefined,
-      academic_track: formData.academic_track || undefined,
-      funding_type: formData.funding_type || undefined,
-      semester_id: formData.semester_id || undefined as unknown as string,
-      intended_major: formData.intended_major as IntendedMajor || undefined,
-      preferred_major: formData.preferred_major || undefined,
-      preferred_college: formData.preferred_college || undefined,
-      graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : undefined,
-      expected_gpa: formData.expected_gpa ? parseFloat(formData.expected_gpa) : undefined,
-      actual_gpa: formData.actual_gpa ? parseFloat(formData.actual_gpa) : undefined,
-      gpa_grade_11: formData.actual_gpa ? parseFloat(formData.actual_gpa) : undefined,
-      seat_number: formData.seat_number.trim() || undefined,
-      // Placement
-      has_ielts_toefl: formData.has_ielts_toefl,
-      placement_english_override: formData.placement_english_override,
-      placement_math_override: formData.placement_math_override,
-      placement_computer_override: formData.placement_computer_override,
-      placement_level: hasAnyPlacementData ? calculatedPlacementLevel : lead.placement_level,
-      // Discount (SF only)
-      discount_type: formData.funding_type === 'self_funded' ? formData.discount_type || undefined : undefined,
-      discount_notes: formData.funding_type === 'self_funded' ? formData.discount_notes || undefined : undefined,
-      // Ministry
-      ministry_blocked: formData.ministry_blocked,
-      ministry_block_reasons: formData.ministry_blocked ? formData.ministry_block_reasons : [],
-    } as Partial<Lead>
-
-    const actualGpa = leadData.actual_gpa
-    if (actualGpa !== undefined && actualGpa < GPA_SELF_FUNDED_THRESHOLD) {
-      leadData.funding_type = 'self_funded'
-      if (lead.pipeline_stage === 'puc_document_submission' || lead.pipeline_stage === 'puc_application_submission') {
-        leadData.pipeline_stage = 'application'
-      }
-    }
-
-    const result = await updateLead(lead.id, leadData)
-
-    if (result.error) {
-      setErrors({ submit: result.error })
-    } else {
-      onSuccess?.()
+        return
+      default:
+        autosave.queueChange(field as keyof Lead, value)
     }
   }
+
+  const computePlacementLevel = (english: boolean, math: boolean, computer: boolean): PlacementLevel =>
+    english && math && computer ? "majors" : english && math ? "foundation_2" : "foundation_1"
 
   const handleChange = (field: string, value: string) => {
-    if (field === 'gender') {
+    // Names are required and Arabic-only — validate inline and block the save on invalid input.
+    if (field === "first_name" || field === "last_name") {
+      setFormData(prev => ({ ...prev, [field]: value }))
+      const trimmed = value.trim()
+      if (!trimmed) {
+        setErrors(prev => ({ ...prev, [field]: field === "first_name" ? "First name is required" : "Last name is required" }))
+        return
+      }
+      if (!isArabicText(trimmed)) {
+        setErrors(prev => ({ ...prev, [field]: "Name must be in Arabic" }))
+        return
+      }
+      if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }))
+      queueField(field, value)
+      return
+    }
+
+    if (field === "gender") {
       setFormData(prev => {
         const currentSchool = schoolSource.find(s => s.id === prev.school)
         const gender = currentSchool?.gender
         const genderMismatch = gender
-          ? (value === 'male' && gender !== 'boys' && gender !== 'male' && gender !== 'mixed')
-            || (value === 'female' && gender !== 'girls' && gender !== 'female' && gender !== 'mixed')
+          ? (value === "male" && gender !== "boys" && gender !== "male" && gender !== "mixed")
+            || (value === "female" && gender !== "girls" && gender !== "female" && gender !== "mixed")
           : false
-        if (genderMismatch) autosave.queueChange('school' as keyof Lead, '')
+        if (genderMismatch) queueField("school", "")
         return { ...prev, gender: value, school: genderMismatch ? "" : prev.school }
       })
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
-    autosave.queueChange(field as keyof Lead, value)
+    queueField(field, value)
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
@@ -505,6 +405,30 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const handleToggleField = (field: string, value: boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     autosave.queueChange(field as keyof Lead, value)
+  }
+
+  // Placement toggles recompute and persist the derived placement level.
+  const handlePlacementChange = (
+    field: "has_ielts_toefl" | "placement_english_override" | "placement_math_override" | "placement_computer_override",
+    value: boolean,
+  ) => {
+    const next = { ...formData, [field]: value }
+    const english = next.has_ielts_toefl || next.placement_english_override || (lead.placement_english_passed ?? false)
+    const math = next.placement_math_override || (lead.placement_math_passed ?? false)
+    const computer = next.placement_computer_override || (lead.placement_computer_passed ?? false)
+    setFormData(prev => ({ ...prev, [field]: value }))
+    autosave.queueChange(field as keyof Lead, value)
+    autosave.queueChange("placement_level" as keyof Lead, computePlacementLevel(english, math, computer))
+  }
+
+  const handleMinistryBlockedChange = (value: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      ministry_blocked: value,
+      ministry_block_reasons: value ? prev.ministry_block_reasons : [],
+    }))
+    autosave.queueChange("ministry_blocked" as keyof Lead, value)
+    if (!value) autosave.queueChange("ministry_block_reasons" as keyof Lead, [])
   }
 
   // Auto-calculate placement level
@@ -554,17 +478,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
 
   return (
     <div className="mx-auto max-w-[1380px] space-y-3 pb-4">
-      {errors.submit && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 p-3 rounded-lg bg-[var(--error-bg)] text-[var(--error)] text-sm"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {errors.submit}
-        </motion.div>
-      )}
-
       {/* Civil ID Extraction Dialog */}
       {showExtractionDialog && extractedData && (
         <CivilIdExtractionDialog
@@ -583,10 +496,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               <ClipboardList className="h-4 w-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">File readiness</p>
-                <AutoSaveBadge status={autosave.status} error={autosave.error} onRetry={autosave.retry} />
-              </div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">File readiness</p>
               <p className="text-xs text-[var(--text-tertiary)]">{requiredCompletedCount} of {requiredFields.length} required fields complete</p>
             </div>
           </div>
@@ -683,10 +593,12 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
             </div>
 
+            {/* Gender + Nationality — side by side */}
+            <div className={fieldGridClass}>
             {/* Gender */}
             <div className="space-y-2">
               <Label>Gender</Label>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   { value: "male", label: "Male" },
                   { value: "female", label: "Female" },
@@ -770,6 +682,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 )}
               </div>
             </div>
+            </div>
 
             {/* Address */}
             <div className="space-y-2">
@@ -782,46 +695,38 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               />
             </div>
 
-            {/* Student Profile Checkboxes */}
+            {/* Student Profile — compact tap-to-toggle pills */}
             <div className="pt-2">
-              <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-3 block">Student Profile</Label>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-[var(--text-muted)]">Student Profile</Label>
+              <div className="flex flex-wrap gap-1.5">
                 {([
-                  { key: 'is_transfer_student', label: 'Transfer Student', icon: UserCheck },
+                  { key: 'is_transfer_student', label: 'Transfer', icon: UserCheck },
                   { key: 'is_special_needs', label: 'Special Needs', icon: Heart },
                   { key: 'is_diplomatic', label: 'Diplomatic', icon: Globe },
                   { key: 'is_athlete', label: 'Athlete', icon: Trophy },
                   { key: 'is_married', label: 'Married', icon: Users },
                   { key: 'is_employee', label: 'Employee', icon: Briefcase },
-                  { key: 'is_marketing_student', label: 'Marketing Student', icon: Megaphone },
-                ] as const).map(({ key, label, icon: ItemIcon }) => (
-                  <div
-                    key={key}
-                    onClick={() => handleToggleField(key, !formData[key])}
-                    className={cn(
-                      "group flex min-h-[54px] items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-all",
-                      formData[key]
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
-                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                      formData[key]
-                        ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                    )}>
-                      <ItemIcon className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
-                    </div>
-                    <Switch
-                      checked={formData[key]}
-                      onCheckedChange={(checked) => handleToggleField(key, checked)}
-                    />
-                  </div>
-                ))}
+                  { key: 'is_marketing_student', label: 'Marketing', icon: Megaphone },
+                ] as const).map(({ key, label, icon: ItemIcon }) => {
+                  const active = formData[key]
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => handleToggleField(key, !formData[key])}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                        active
+                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)] shadow-[var(--shadow-xs)]"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
+                      )}
+                    >
+                      {active ? <Check className="h-3.5 w-3.5" /> : <ItemIcon className="h-3.5 w-3.5" />}
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -952,6 +857,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         if (selected) {
                           handleChange("source_category", "")
                           handleChange("source", "")
+                          handleChange("source_detail", "")
                           return
                         }
                         handleChange("source_category", cat.value)
@@ -1164,11 +1070,16 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     key={type.value}
                     type="button"
                     onClick={() => {
+                      const nextType = formData.education_type === type.value ? "" : type.value
                       setFormData(prev => ({
                         ...prev,
-                        education_type: prev.education_type === type.value ? "" : type.value,
+                        education_type: nextType,
                         education_type_custom: type.value !== 'other' ? "" : prev.education_type_custom,
                       }))
+                      autosave.queueChange("education_type" as keyof Lead, nextType || undefined)
+                      if (type.value !== 'other') {
+                        autosave.queueChange("education_type_custom" as keyof Lead, undefined)
+                      }
                       if (errors.education_type) {
                         setErrors(prev => ({ ...prev, education_type: "" }))
                       }
@@ -1203,7 +1114,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                   <Input
                     placeholder="Enter education type..."
                     value={formData.education_type_custom}
-                    onChange={(e) => setFormData(prev => ({ ...prev, education_type_custom: e.target.value }))}
+                    onChange={(e) => handleChange("education_type_custom", e.target.value)}
                     className={cn(errors.education_type_custom && "border-[var(--error)]")}
                   />
                   {errors.education_type_custom && (
@@ -1457,6 +1368,8 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                           discount_type: isSelected ? "" : type.value,
                           discount_percentage: isSelected ? "" : (type.percentage?.toString() || prev.discount_percentage),
                         }))
+                        autosave.queueChange("discount_type" as keyof Lead, isSelected ? undefined : type.value)
+                        autosave.queueChange("discount_percentage" as keyof Lead, isSelected ? undefined : type.percentage)
                       }}
                       className={cn(
                         "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
@@ -1531,7 +1444,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 <Textarea
                   id="discount_notes"
                   value={formData.discount_notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, discount_notes: e.target.value }))}
+                  onChange={(e) => handleChange("discount_notes", e.target.value)}
                   placeholder="Notes about the discount..."
                   rows={2}
                 />
@@ -1602,7 +1515,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
 
             {/* IELTS/TOEFL */}
             <div
-              onClick={() => setFormData(prev => ({ ...prev, has_ielts_toefl: !prev.has_ielts_toefl }))}
+              onClick={() => handlePlacementChange("has_ielts_toefl", !formData.has_ielts_toefl)}
               className={cn(
                 "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
                 formData.has_ielts_toefl
@@ -1624,7 +1537,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
               <Switch
                 checked={formData.has_ielts_toefl}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_ielts_toefl: checked }))}
+                onCheckedChange={(checked) => handlePlacementChange("has_ielts_toefl", checked)}
               />
             </div>
 
@@ -1682,7 +1595,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     <span className="text-xs text-[var(--text-muted)]">Pass</span>
                     <Switch
                       checked={formData.placement_english_override}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, placement_english_override: checked }))}
+                      onCheckedChange={(checked) => handlePlacementChange("placement_english_override", checked)}
                       disabled={formData.has_ielts_toefl}
                     />
                   </div>
@@ -1729,7 +1642,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     <span className="text-xs text-[var(--text-muted)]">Pass</span>
                     <Switch
                       checked={formData.placement_math_override}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, placement_math_override: checked }))}
+                      onCheckedChange={(checked) => handlePlacementChange("placement_math_override", checked)}
                     />
                   </div>
                 </div>
@@ -1775,7 +1688,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     <span className="text-xs text-[var(--text-muted)]">Pass</span>
                     <Switch
                       checked={formData.placement_computer_override}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, placement_computer_override: checked }))}
+                      onCheckedChange={(checked) => handlePlacementChange("placement_computer_override", checked)}
                     />
                   </div>
                 </div>
@@ -1800,7 +1713,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         {ministryOpen && (
           <div className={sectionBodyClass}>
             <div
-              onClick={() => setFormData(prev => ({ ...prev, ministry_blocked: !prev.ministry_blocked }))}
+              onClick={() => handleMinistryBlockedChange(!formData.ministry_blocked)}
               className={cn(
                 "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
                 formData.ministry_blocked
@@ -1822,7 +1735,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               </div>
               <Switch
                 checked={formData.ministry_blocked}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ministry_blocked: checked }))}
+                onCheckedChange={(checked) => handleMinistryBlockedChange(checked)}
               />
             </div>
 
@@ -1838,12 +1751,11 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                           key={reason.value}
                           type="button"
                           onClick={() => {
-                            setFormData(prev => ({
-                              ...prev,
-                              ministry_block_reasons: isSelected
-                                ? prev.ministry_block_reasons.filter(r => r !== reason.value)
-                                : [...prev.ministry_block_reasons, reason.value],
-                            }))
+                            const nextReasons = isSelected
+                              ? formData.ministry_block_reasons.filter(r => r !== reason.value)
+                              : [...formData.ministry_block_reasons, reason.value]
+                            setFormData(prev => ({ ...prev, ministry_block_reasons: nextReasons }))
+                            autosave.queueChange("ministry_block_reasons" as keyof Lead, nextReasons)
                           }}
                           className={cn(
                             "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
@@ -1864,62 +1776,6 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         )}
       </SectionCard>
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* Section 8: Notes */}
-      {/* ═══════════════════════════════════════════ */}
-      <SectionCard>
-        <SectionHeader
-          icon={FileText}
-          title="Notes"
-          description="Internal notes for admissions follow-up"
-          open={notesOpen}
-          onToggle={() => setNotesOpen(!notesOpen)}
-        />
-
-        {notesOpen && (
-          <div className={sectionBodyClass}>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Additional Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => handleChange("notes", e.target.value)}
-                placeholder="Additional notes about this lead..."
-                rows={4}
-              />
-            </div>
-          </div>
-        )}
-      </SectionCard>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* Save Button */}
-      {/* ═══════════════════════════════════════════ */}
-      <div className="sticky bottom-0 z-20 -mx-1 bg-[var(--bg-base)]/90 py-3 backdrop-blur">
-        <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 shadow-[var(--shadow-lg)] sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Save student profile</p>
-            <p className="text-xs text-[var(--text-tertiary)]">{requiredCompletedCount}/{requiredFields.length} required fields complete</p>
-          </div>
-        <Button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full sm:w-auto sm:min-w-[180px]"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              Save Changes
-            </>
-          )}
-        </Button>
-        </div>
-      </div>
     </div>
   )
 }
