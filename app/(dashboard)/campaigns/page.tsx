@@ -187,6 +187,14 @@ const CAMPAIGN_PRESET_TEMPLATES: CampaignPresetTemplate[] = [
     icon: Clock,
     body: "Hi {{first_name}}, this is a reminder that your payment step is still pending. Please complete it so we can continue processing your application.",
   },
+  {
+    id: "rsvp_invite",
+    title: "RSVP Invite",
+    description: "Invite an applicant to confirm attendance with their RSVP link.",
+    category: "appointment",
+    icon: Send,
+    body: "Hi {{first_name}}, please confirm your attendance for your KTECH session by tapping your RSVP link: {{rsvp_link}}\n\nWe look forward to seeing you.",
+  },
 ]
 
 const CAMPAIGN_STEPS = [
@@ -211,6 +219,7 @@ function getCampaignTemplatePreview(body: string) {
     .replace(/\{\{phone\}\}/g, '+965 1234 5678')
     .replace(/\{\{school_name\}\}/g, 'Abdullah Al-Salem School')
     .replace(/\{\{self_service_link\}\}/g, 'https://ktech-adl.vercel.app/psp/example')
+    .replace(/\{\{rsvp_link\}\}/g, 'https://ktech-adl.vercel.app/rsvp/example')
 }
 
 function getTemplateVariables(body: string) {

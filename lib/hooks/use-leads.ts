@@ -8,7 +8,7 @@ import type { Lead, PipelineStage, FundingType, LeadStatus, LostReason } from "@
 import { PIPELINE_STAGES, LEAD_STATUSES, PUC_DOCUMENT_STATUSES } from "@/types"
 import { GPA_SELF_FUNDED_THRESHOLD, PUC_PSP_AUTO_ROUTE } from "@/lib/config/constants"
 import { executeAutomations } from "@/lib/automation/engine"
-import { assertArabicLeadNameFields, getArabicLeadDisplayName } from "@/lib/lead-name-policy"
+import { assertArabicLeadNameFields, assertArabicLeadNameUpdates, getArabicLeadDisplayName } from "@/lib/lead-name-policy"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { calculateLeadQuality } from "@/lib/lead-scoring"
 import { queryKeys } from "./query-keys"
@@ -426,7 +426,10 @@ export function useLeadMutations() {
   const updateLeadMutation = useMutation({
     mutationKey: ['lead-mutation'],
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Lead> }) => {
-      updates = assertArabicLeadNameFields(updates)
+      // Normalize + enforce the Arabic-name rule: any name field touched by this
+      // update must stay a non-empty Arabic value, so a lead can never be edited
+      // into a state without an Arabic first and last name.
+      updates = assertArabicLeadNameUpdates(assertArabicLeadNameFields(updates))
 
       // Demo mode - save to localStorage and simulate success
       if (isDemoMode()) {
