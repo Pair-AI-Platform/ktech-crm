@@ -882,7 +882,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   onChange={(e) => handleChange("seat_number", e.target.value)}
                   placeholder="Enter seat number"
                 />
-                <p className="text-xs text-[var(--text-muted)]">Used to match Ministry GPA import results</p>
               </div>
             </div>
           </div>
