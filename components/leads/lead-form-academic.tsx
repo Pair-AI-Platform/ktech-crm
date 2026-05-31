@@ -312,6 +312,7 @@ export function LeadFormAcademic({
         </div>
 
         <div className="space-y-4 pl-10">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
           {/* Searchable School Dropdown */}
           <div className="space-y-2">
             <Label>School</Label>
@@ -418,6 +419,7 @@ export function LeadFormAcademic({
                 </div>
               )
             })()}
+          </div>
           </div>
 
           {/* Grade Level */}
