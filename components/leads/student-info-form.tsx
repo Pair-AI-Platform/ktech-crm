@@ -65,6 +65,7 @@ import { isValidKuwaitPhone, isValidKuwaitCivilId, cn } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
 import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
+import { useAutoSaveLead, type AutoSaveStatus } from "@/lib/hooks/use-autosave-lead"
 import { useSemesters } from "@/lib/hooks/use-semesters"
 import { useActiveSources } from "@/lib/hooks/use-sources"
 import { useActiveExhibitions } from "@/lib/hooks/use-exhibitions"
@@ -85,6 +86,37 @@ const SOURCE_CATEGORIES: { value: string; label: string; description: string; ic
 
 const sectionBodyClass = "space-y-3 border-t border-[var(--border-subtle)] px-3 py-4 sm:px-4"
 const fieldGridClass = "grid grid-cols-1 gap-3 lg:grid-cols-2"
+
+function AutoSaveBadge({ status, error, onRetry }: { status: AutoSaveStatus; error: string | null; onRetry: () => void }) {
+  if (status === "idle") return null
+  if (status === "saving") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-tertiary)]">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Saving…
+      </span>
+    )
+  }
+  if (status === "saved") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
+        <Check className="h-3 w-3" />
+        Saved
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onRetry}
+      title={error ?? "Save failed"}
+      className="inline-flex items-center gap-1 rounded-full bg-[var(--error-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--error)] hover:brightness-110"
+    >
+      <AlertCircle className="h-3 w-3" />
+      Failed — retry
+    </button>
+  )
+}
 
 function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -156,6 +188,9 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [declarationSent, setDeclarationSent] = useState(false)
+
+  // Live auto-save for every tracked field on this lead
+  const autosave = useAutoSaveLead(lead.id)
 
   // Collapsible sections
   const [placementOpen, setPlacementOpen] = useState(false)
@@ -455,14 +490,21 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
           ? (value === 'male' && gender !== 'boys' && gender !== 'male' && gender !== 'mixed')
             || (value === 'female' && gender !== 'girls' && gender !== 'female' && gender !== 'mixed')
           : false
+        if (genderMismatch) autosave.queueChange('school' as keyof Lead, '')
         return { ...prev, gender: value, school: genderMismatch ? "" : prev.school }
       })
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
+    autosave.queueChange(field as keyof Lead, value)
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
+  }
+
+  const handleToggleField = (field: string, value: boolean) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    autosave.queueChange(field as keyof Lead, value)
   }
 
   // Auto-calculate placement level
@@ -541,7 +583,10 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
               <ClipboardList className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">File readiness</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">File readiness</p>
+                <AutoSaveBadge status={autosave.status} error={autosave.error} onRetry={autosave.retry} />
+              </div>
               <p className="text-xs text-[var(--text-tertiary)]">{requiredCompletedCount} of {requiredFields.length} required fields complete</p>
             </div>
           </div>
@@ -752,7 +797,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                 ] as const).map(({ key, label, icon: ItemIcon }) => (
                   <div
                     key={key}
-                    onClick={() => setFormData(prev => ({ ...prev, [key]: !prev[key] }))}
+                    onClick={() => handleToggleField(key, !formData[key])}
                     className={cn(
                       "group flex min-h-[54px] items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-all",
                       formData[key]
@@ -773,7 +818,7 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                     </div>
                     <Switch
                       checked={formData[key]}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, [key]: checked }))}
+                      onCheckedChange={(checked) => handleToggleField(key, checked)}
                     />
                   </div>
                 ))}
