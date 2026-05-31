@@ -598,7 +598,11 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
             {/* Gender */}
             <div className="space-y-2">
               <Label>Gender</Label>
-              <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] p-0.5">
+              <div
+                role="radiogroup"
+                aria-label="Gender"
+                className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] p-1"
+              >
                 {[
                   { value: "male", label: "Male" },
                   { value: "female", label: "Female" },
@@ -608,16 +612,17 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                     <button
                       key={option.value}
                       type="button"
-                      aria-pressed={active}
+                      role="radio"
+                      aria-checked={active}
                       onClick={() => handleChange("gender", active ? "" : option.value)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                        "inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all",
                         active
                           ? "bg-[var(--bg-surface)] text-[var(--primary)] shadow-[var(--shadow-xs)]"
                           : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
                     >
-                      <Users className="h-3.5 w-3.5" />
+                      <Users className="h-4 w-4" />
                       {option.label}
                     </button>
                   )
