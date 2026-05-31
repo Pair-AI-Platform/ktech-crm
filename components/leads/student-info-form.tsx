@@ -894,8 +894,8 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
         {sourceOpen && (
           <div className={sectionBodyClass}>
             <div className="space-y-2">
-              <Label>Source Category</Label>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              <Label>Source</Label>
+              <div className="flex flex-wrap gap-1.5">
                 {SOURCE_CATEGORIES.map((cat) => {
                   const CatIcon = cat.icon
                   const selected = formData.source_category === cat.value
@@ -904,6 +904,11 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                       key={cat.value}
                       type="button"
                       onClick={() => {
+                        if (selected) {
+                          handleChange("source_category", "")
+                          handleChange("source", "")
+                          return
+                        }
                         handleChange("source_category", cat.value)
                         const categoryMap: Record<string, string> = {
                           direct: "walk_in",
@@ -915,59 +920,43 @@ export function StudentInfoForm({ lead, onSuccess }: StudentInfoFormProps) {
                         handleChange("source", categoryMap[cat.value] || "")
                       }}
                       className={cn(
-                        "flex min-h-[58px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all",
+                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                         selected
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)] shadow-[var(--shadow-xs)]"
-                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
+                          ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] shadow-[var(--shadow-xs)]"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                       )}
+                      title={cat.description}
                     >
-                      <span className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                        selected
-                          ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                          : "bg-[var(--bg-sunken)] text-[var(--text-secondary)]"
-                      )}>
-                        <CatIcon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-[var(--text-primary)]">{cat.label}</span>
-                        <span className="block truncate text-xs text-[var(--text-tertiary)]">{cat.description}</span>
-                      </span>
+                      <CatIcon className="h-3.5 w-3.5" />
+                      {cat.label}
                     </button>
                   )
                 })}
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Source</Label>
-              <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-                {filteredSources.map((source) => (
-                  <button
-                    key={source.value}
-                    type="button"
-                    onClick={() => handleChange("source", source.value)}
-                    className={cn(
-                      "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
-                      formData.source === source.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                      formData.source === source.value
-                        ? "border-[var(--primary)] bg-[var(--primary)]"
-                        : "border-[var(--border)]"
-                    )}>
-                      {formData.source === source.value && (
-                        <Check className="w-2.5 h-2.5 text-white" />
-                      )}
-                    </div>
-                    {source.label}
-                  </button>
-                ))}
-              </div>
+              {formData.source_category && filteredSources.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-sunken)] p-2">
+                  {filteredSources.map((source) => {
+                    const isSel = formData.source === source.value
+                    return (
+                      <button
+                        key={source.value}
+                        type="button"
+                        onClick={() => handleChange("source", source.value)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all",
+                          isSel
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
+                            : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
+                        )}
+                      >
+                        {isSel && <Check className="h-3 w-3" />}
+                        {source.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Exhibition Name */}
