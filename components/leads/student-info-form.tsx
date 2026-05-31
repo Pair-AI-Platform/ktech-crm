@@ -1010,27 +1010,24 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 const meta = EDUCATION_TYPES.find(t => t.value === eduType)
                 if (!formData.school) {
                   return (
-                    <div className="flex min-h-[58px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-muted)]">
-                      Select a school first to set the education type.
+                    <div className="flex h-[42px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-xs text-[var(--text-muted)]">
+                      Select a school first.
                     </div>
                   )
                 }
                 if (!meta) {
                   return (
-                    <div className="flex min-h-[58px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-muted)]">
-                      No education type set for this school. Configure it in Settings → Schools.
+                    <div className="flex h-[42px] items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-surface)] px-3 text-xs text-[var(--text-muted)]">
+                      No type set — configure in Settings → Schools.
                     </div>
                   )
                 }
                 return (
-                  <div className="flex min-h-[58px] items-center gap-3 rounded-lg border border-[var(--primary)] bg-[var(--primary-muted)] px-3 py-2">
-                    <span className="flex h-9 min-w-[44px] items-center justify-center rounded-md bg-[var(--primary)] px-2 text-sm font-bold text-[var(--primary-foreground)]">
+                  <div className="flex h-[42px] items-center gap-2 rounded-lg border border-[var(--primary)] bg-[var(--primary-muted)] px-2.5">
+                    <span className="flex h-6 items-center justify-center rounded bg-[var(--primary)] px-1.5 text-[11px] font-bold text-[var(--primary-foreground)]">
                       {meta.label}
                     </span>
-                    <div className="leading-tight">
-                      <p className="text-sm font-semibold text-[var(--primary)]">{meta.description}</p>
-                      <p className="text-[11px] text-[var(--text-muted)]">Determined by the school — change it in Settings → Schools.</p>
-                    </div>
+                    <span className="truncate text-sm font-semibold text-[var(--primary)]" title={meta.description}>{meta.description}</span>
                   </div>
                 )
               })()}
@@ -1041,27 +1038,19 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
             {/* Grade Level */}
             <div className="space-y-2">
               <Label>Grade</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: "10th", label: "10" },
-                  { value: "11th", label: "11" },
-                  { value: "12th", label: "12" },
-                ].map((grade) => (
-                  <button
-                    key={grade.value}
-                    type="button"
-                    onClick={() => handleChange("grade_level", formData.grade_level === grade.value ? "" : grade.value)}
-                    className={cn(
-                      "flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold transition-all",
-                      formData.grade_level === grade.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                        : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                    )}
-                  >
-                    {grade.label}
-                  </button>
-                ))}
-              </div>
+              <Select
+                value={formData.grade_level}
+                onValueChange={(value) => handleChange("grade_level", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10th">Grade 10</SelectItem>
+                  <SelectItem value="11th">Grade 11</SelectItem>
+                  <SelectItem value="12th">Grade 12</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Funding Type */}
@@ -1072,47 +1061,41 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   type="button"
                   onClick={() => handleChange("funding_type", "self_funded")}
                   className={cn(
-                    "flex min-h-[58px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all",
+                    "flex h-[42px] items-center gap-2 rounded-lg border px-2.5 text-left transition-all",
                     formData.funding_type === "self_funded"
                       ? "border-[var(--primary)] bg-[var(--primary-muted)]"
                       : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                   )}
                 >
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    "w-7 h-7 shrink-0 rounded-md flex items-center justify-center",
                     formData.funding_type === "self_funded"
                       ? "bg-[var(--primary)] text-white"
                       : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                   )}>
-                    <CreditCard className="w-5 h-5" />
+                    <CreditCard className="w-4 h-4" />
                   </div>
-                  <div className="text-left">
-                    <p className="font-medium text-[var(--text-primary)]">Self-Funded</p>
-                    <p className="text-xs text-[var(--text-muted)]">Private payment</p>
-                  </div>
+                  <span className="truncate text-sm font-medium text-[var(--text-primary)]">Self-Funded</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleChange("funding_type", "puc")}
                   className={cn(
-                    "flex min-h-[58px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all",
+                    "flex h-[42px] items-center gap-2 rounded-lg border px-2.5 text-left transition-all",
                     formData.funding_type === "puc"
                       ? "border-[var(--accent)] bg-[var(--accent)]/10"
                       : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
                   )}
                 >
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    "w-7 h-7 shrink-0 rounded-md flex items-center justify-center",
                     formData.funding_type === "puc"
                       ? "bg-[var(--accent)] text-white"
                       : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                   )}>
-                    <GraduationCap className="w-5 h-5" />
+                    <GraduationCap className="w-4 h-4" />
                   </div>
-                  <div className="text-left">
-                    <p className="font-medium text-[var(--text-primary)]">PUC</p>
-                    <p className="text-xs text-[var(--text-muted)]">Government scholarship</p>
-                  </div>
+                  <span className="truncate text-sm font-medium text-[var(--text-primary)]">PUC</span>
                 </button>
               </div>
             </div>
