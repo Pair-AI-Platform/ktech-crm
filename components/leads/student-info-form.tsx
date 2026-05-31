@@ -78,6 +78,16 @@ const SOURCE_CATEGORIES: { value: string; label: string; description: string; ic
   { value: "outreach", label: "Outreach", description: "Campaign follow-up", icon: Send },
 ]
 
+const STUDENT_PROFILE_OPTIONS = [
+  { key: "is_transfer_student", label: "Transfer", icon: UserCheck },
+  { key: "is_special_needs", label: "Special Needs", icon: Heart },
+  { key: "is_diplomatic", label: "Diplomatic", icon: Globe },
+  { key: "is_athlete", label: "Athlete", icon: Trophy },
+  { key: "is_married", label: "Married", icon: Users },
+  { key: "is_employee", label: "Employee", icon: Briefcase },
+  { key: "is_marketing_student", label: "Marketing", icon: Megaphone },
+] as const
+
 const sectionBodyClass = "space-y-3 border-t border-[var(--border-subtle)] px-3 py-4 sm:px-4"
 const fieldGridClass = "grid grid-cols-1 gap-3 lg:grid-cols-2"
 
@@ -149,6 +159,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false)
   const [nationalitySearch, setNationalitySearch] = useState("")
   const [isNationalityDropdownOpen, setIsNationalityDropdownOpen] = useState(false)
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false)
   const [dbSchools, setDbSchools] = useState<SchoolEntity[]>([])
   const [declarationSent, setDeclarationSent] = useState(false)
 
@@ -183,6 +194,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
 
   const civilIdFileRef = useRef<HTMLInputElement>(null)
   const nationalityRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
   const [scanning, setScanning] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
   const [showExtractionDialog, setShowExtractionDialog] = useState(false)
@@ -467,6 +479,25 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [isNationalityDropdownOpen])
 
+  // Close student-profile dropdown on outside click
+  useEffect(() => {
+    if (!isProfileDropdownOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileDropdownOpen(false)
+      }
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsProfileDropdownOpen(false)
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("keydown", handleKey)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("keydown", handleKey)
+    }
+  }, [isProfileDropdownOpen])
+
   const requiredFields = [
     { label: "First name", complete: Boolean(formData.first_name.trim()) },
     { label: "Last name", complete: Boolean(formData.last_name.trim()) },
@@ -475,6 +506,8 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
     { label: "Education type", complete: Boolean(formData.education_type) },
   ]
   const requiredCompletedCount = requiredFields.filter(field => field.complete).length
+
+  const selectedProfiles = STUDENT_PROFILE_OPTIONS.filter((option) => formData[option.key])
 
   return (
     <div className="mx-auto max-w-[1380px] space-y-3 pb-4">
@@ -565,8 +598,8 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
 
         {personalOpen && (
           <div className={sectionBodyClass}>
-            {/* Name */}
-            <div className={fieldGridClass}>
+            {/* Name + Address — one row */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
                 <Input
@@ -591,9 +624,19 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 />
                 {errors.last_name && <p className="text-xs text-[var(--error)]">{errors.last_name}</p>}
               </div>
+              {/* Address */}
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  placeholder="Enter address..."
+                  value={formData.address}
+                  onChange={(e) => handleChange("address", e.target.value)}
+                />
+              </div>
             </div>
 
-            {/* Gender + Nationality + Address — one row */}
+            {/* Gender + Nationality + Student Profile — one row */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Gender */}
             <div className="space-y-2">
@@ -691,51 +734,66 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 )}
               </div>
             </div>
-            {/* Address */}
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                placeholder="Enter address..."
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-              />
-            </div>
-            </div>
+            {/* Student Profile — multi-select dropdown */}
+            <div ref={profileRef} className={cn("relative space-y-2", isProfileDropdownOpen && "z-50")}>
+              <Label>Student Profile</Label>
+              <button
+                type="button"
+                onClick={() => setIsProfileDropdownOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={isProfileDropdownOpen}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40",
+                  isProfileDropdownOpen
+                    ? "border-[var(--primary)] ring-2 ring-[var(--primary)]/20"
+                    : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                )}
+              >
+                <UserCheck className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                <span className={cn("flex-1 truncate text-sm", selectedProfiles.length ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]")}>
+                  {selectedProfiles.length === 0
+                    ? "None selected"
+                    : selectedProfiles.length <= 2
+                      ? selectedProfiles.map((option) => option.label).join(", ")
+                      : `${selectedProfiles.length} selected`}
+                </span>
+                {selectedProfiles.length > 0 && (
+                  <span className="rounded-full bg-[var(--primary-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--primary)]">
+                    {selectedProfiles.length}
+                  </span>
+                )}
+                <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform", isProfileDropdownOpen && "rotate-180")} />
+              </button>
 
-            {/* Student Profile — compact tap-to-toggle pills */}
-            <div className="pt-2">
-              <Label className="mb-2 block text-xs uppercase tracking-wide text-[var(--text-muted)]">Student Profile</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {([
-                  { key: 'is_transfer_student', label: 'Transfer', icon: UserCheck },
-                  { key: 'is_special_needs', label: 'Special Needs', icon: Heart },
-                  { key: 'is_diplomatic', label: 'Diplomatic', icon: Globe },
-                  { key: 'is_athlete', label: 'Athlete', icon: Trophy },
-                  { key: 'is_married', label: 'Married', icon: Users },
-                  { key: 'is_employee', label: 'Employee', icon: Briefcase },
-                  { key: 'is_marketing_student', label: 'Marketing', icon: Megaphone },
-                ] as const).map(({ key, label, icon: ItemIcon }) => {
-                  const active = formData[key]
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => handleToggleField(key, !formData[key])}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                        active
-                          ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)] shadow-[var(--shadow-xs)]"
-                          : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
-                      )}
-                    >
-                      {active ? <Check className="h-3.5 w-3.5" /> : <ItemIcon className="h-3.5 w-3.5" />}
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
+              {isProfileDropdownOpen && (
+                <div role="listbox" aria-label="Student profile" aria-multiselectable="true" className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl">
+                  <div className="max-h-60 overflow-y-auto p-1">
+                    {STUDENT_PROFILE_OPTIONS.map(({ key, label, icon: ItemIcon }) => {
+                      const active = formData[key]
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => handleToggleField(key, !formData[key])}
+                          className={cn(
+                            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:bg-[var(--bg-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)]/40",
+                            active ? "bg-[var(--primary-muted)] text-[var(--primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                          )}
+                        >
+                          <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded border", active ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)]")}>
+                            {active && <Check className="h-3 w-3" strokeWidth={3} />}
+                          </span>
+                          <ItemIcon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1">{label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             </div>
           </div>
         )}
@@ -862,6 +920,8 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                           handleChange("source_detail", "")
                           return
                         }
+                        // Switching category — clear any stale detail (exhibition / referrer name)
+                        handleChange("source_detail", "")
                         handleChange("source_category", cat.value)
                         const categoryMap: Record<string, string> = {
                           direct: "walk_in",
@@ -873,10 +933,10 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                         handleChange("source", categoryMap[cat.value] || "")
                       }}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                         selected
-                          ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] shadow-[var(--shadow-xs)]"
-                          : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
+                          ? "bg-[var(--primary-muted)] text-[var(--primary)]"
+                          : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
                       )}
                       title={cat.description}
                     >
@@ -888,7 +948,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
               </div>
 
               {formData.source_category && filteredSources.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-sunken)] p-2">
+                <div className="mt-2.5 flex flex-wrap gap-1 border-t border-[var(--border)] pt-2.5">
                   {filteredSources.map((source) => {
                     const isSel = formData.source === source.value
                     return (
@@ -897,10 +957,10 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                         type="button"
                         onClick={() => handleChange("source", source.value)}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all",
+                          "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors",
                           isSel
-                            ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
-                            : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
+                            ? "bg-[var(--primary-muted)] text-[var(--primary)] font-medium"
+                            : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
                         )}
                       >
                         {isSel && <Check className="h-3 w-3" />}
@@ -931,6 +991,21 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {/* Referrer — who referred this student (referrals only) */}
+            {formData.source_category === "referrals" && (
+              <div className="space-y-2">
+                <Label htmlFor="referred_by">Referred by</Label>
+                <Input
+                  id="referred_by"
+                  value={formData.source_detail || ""}
+                  onChange={(e) => handleChange("source_detail", e.target.value)}
+                  placeholder="Name of the person who referred them"
+                  icon={<Users className="w-4 h-4" />}
+                />
+                <p className="text-xs text-[var(--text-muted)]">Who told this student about us</p>
               </div>
             )}
 
