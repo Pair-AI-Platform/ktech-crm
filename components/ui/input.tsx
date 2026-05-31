@@ -17,10 +17,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, error, icon, iconPosition = 'left', suffix, prefix, variant = 'default', inputSize = 'default', ...props }, ref) => {
     const hasError = Boolean(error)
 
+    // Taller line-height fills the fixed-height box so Arabic descenders aren't clipped
     const sizeClasses = {
-      sm: "h-9 px-3 text-xs rounded-md leading-normal",
-      default: "h-11 px-4 text-sm rounded-lg leading-normal",
-      lg: "h-12 px-5 text-base rounded-lg leading-normal"
+      sm: "h-9 px-3 text-xs rounded-md leading-5",
+      default: "h-11 px-4 text-sm rounded-lg leading-6",
+      lg: "h-12 px-5 text-base rounded-lg leading-7"
     }
 
     const variantClasses = {
