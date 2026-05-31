@@ -598,26 +598,30 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
             {/* Gender */}
             <div className="space-y-2">
               <Label>Gender</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] p-0.5">
                 {[
                   { value: "male", label: "Male" },
                   { value: "female", label: "Female" },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleChange("gender", formData.gender === option.value ? "" : option.value)}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
-                      formData.gender === option.value
-                        ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
-                        : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--bg-hover)]"
-                    )}
-                  >
-                    <Users className="w-4 h-4" />
-                    {option.label}
-                  </button>
-                ))}
+                ].map((option) => {
+                  const active = formData.gender === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => handleChange("gender", active ? "" : option.value)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                        active
+                          ? "bg-[var(--bg-surface)] text-[var(--primary)] shadow-[var(--shadow-xs)]"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      )}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      {option.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -746,7 +750,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
 
         {contactOpen && (
           <div className={sectionBodyClass}>
-            <div className={fieldGridClass}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number *</Label>
                 <Input
@@ -771,9 +775,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   icon={<Phone className="w-4 h-4" />}
                 />
               </div>
-            </div>
-
-            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -797,9 +798,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 />
                 {errors.civil_id && <p className="text-xs text-[var(--error)]">{errors.civil_id}</p>}
               </div>
-            </div>
-
-            <div className={fieldGridClass}>
               <div className="space-y-2">
                 <Label htmlFor="date_of_birth">Date of Birth</Label>
                 <Input
