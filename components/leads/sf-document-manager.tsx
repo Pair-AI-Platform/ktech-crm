@@ -5,7 +5,6 @@ import { CheckSquare, Square, Paperclip, GraduationCap, Check, Upload, FileText,
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { type Lead, type EducationType } from "@/types"
-import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { GRADUATE_TYPE_CONFIGS, getDocumentsForGraduateType, type GraduateType, type ConditionalDocumentFlags } from "@/lib/psp/document-rules"
 import { createClient } from "@/lib/supabase/client"
 import { CivilIdExtractionDialog, type ExtractedCivilIdData } from "./civil-id-extraction-dialog"
@@ -60,10 +59,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
     if (stored === 'true') {
       setSentToRegistration(true)
     }
-    // Keep the lead profile as the source of truth for conditional documents.
-    setIsTransfer(!!lead.is_transfer_student)
-    setIsSpecialNeeds(!!lead.is_special_needs)
-  }, [lead.id, lead.is_transfer_student, lead.is_special_needs])
+  }, [lead.id])
 
   const handleSendToRegistration = async () => {
     setSendingRegistration(true)
@@ -151,37 +147,12 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
     setUploadedFiles(files)
   }, [lead.id, selectedType])
 
-  // Toggle conditional flags
-  const handleToggleTransfer = async () => {
-    const newVal = !isTransfer
-    setIsTransfer(newVal)
-    const flags = { isTransfer: newVal, isSpecialNeeds }
-    localStorage.setItem(`sf-flags-${lead.id}`, JSON.stringify(flags))
-    const result = await updateLead(lead.id, { is_transfer_student: newVal } as Partial<Lead>)
-    if (result.error) {
-      setIsTransfer(!newVal)
-      toast.error(result.error)
-      return
-    }
-    onUpdate?.()
+  // Conditional documents are driven entirely by the student profile set in the Details tab.
+  const conditionalFlags: ConditionalDocumentFlags = {
+    isTransfer: !!lead.is_transfer_student,
+    isSpecialNeeds: !!lead.is_special_needs,
+    isDiplomatic: !!lead.is_diplomatic,
   }
-
-  const handleToggleSpecialNeeds = async () => {
-    const newVal = !isSpecialNeeds
-    setIsSpecialNeeds(newVal)
-    const flags = { isTransfer, isSpecialNeeds: newVal }
-    localStorage.setItem(`sf-flags-${lead.id}`, JSON.stringify(flags))
-    const result = await updateLead(lead.id, { is_special_needs: newVal } as Partial<Lead>)
-    if (result.error) {
-      setIsSpecialNeeds(!newVal)
-      toast.error(result.error)
-      return
-    }
-    onUpdate?.()
-  }
-
-  // Get documents for selected type (with conditional flags)
-  const conditionalFlags: ConditionalDocumentFlags = { isTransfer, isSpecialNeeds }
   const typeConfig = selectedType
     ? GRADUATE_TYPE_CONFIGS.find(c => c.type === selectedType)
     : null
@@ -193,16 +164,6 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
 
   const requiredDocs = typeDocs.filter(d => d.required)
   const typeCheckedCount = typeDocs.filter(d => checkedDocs[d.id]).length
-
-  const handleTypeSelect = async (type: GraduateType) => {
-    setSelectedType(type)
-    // Also persist the education_type on the lead
-    const educationType: EducationType = type === 'OTHER' ? 'other' : type as EducationType
-    if (lead.education_type !== educationType) {
-      await updateLead(lead.id, { education_type: educationType } as Partial<Lead>)
-      onUpdate?.()
-    }
-  }
 
   const handleDocToggle = (docId: string) => {
     const updated = { ...checkedDocs, [docId]: !checkedDocs[docId] }
@@ -337,75 +298,40 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
         </div>
       </div>
 
-      {/* Graduate Type Selector */}
+      {/* Graduate Type (auto-derived from the lead's school, locked) */}
       <div>
         <p className="text-xs font-medium text-[var(--text-muted)] mb-2 uppercase tracking-wide">Graduate Type</p>
         <div className="grid grid-cols-5 gap-2">
-          {GRADUATE_TYPE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => handleTypeSelect(option.value)}
-              className={cn(
-                "p-3 rounded-xl border text-center transition-all",
-                selectedType === option.value
-                  ? "border-[var(--primary)] bg-[var(--primary-muted)]"
-                  : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
-              )}
-            >
-              <span className={cn(
-                "text-sm font-bold",
-                selectedType === option.value ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
-              )}>
-                {option.label}
-              </span>
-              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">
-                {option.description}
-              </p>
-            </button>
-          ))}
+          {GRADUATE_TYPE_OPTIONS.map((option) => {
+            const isActive = selectedType === option.value
+            return (
+              <div
+                key={option.value}
+                aria-disabled
+                className={cn(
+                  "p-3 rounded-xl border text-center transition-all cursor-default select-none",
+                  isActive
+                    ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                    : "border-[var(--border)] bg-[var(--bg-surface)] opacity-50"
+                )}
+              >
+                <span className={cn(
+                  "text-sm font-bold",
+                  isActive ? "text-[var(--primary)]" : "text-[var(--text-primary)]"
+                )}>
+                  {option.label}
+                </span>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">
+                  {option.description}
+                </p>
+              </div>
+            )
+          })}
         </div>
+        <p className="text-[11px] text-[var(--text-muted)] mt-2">
+          Set automatically from the lead&apos;s school. Change the school in the Details tab to update it.
+        </p>
       </div>
-
-      {/* Conditional Flags */}
-      {selectedType && (
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => void handleToggleTransfer()}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm",
-              isTransfer
-                ? "border-blue-400 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400"
-                : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-blue-300"
-            )}
-          >
-            {isTransfer ? (
-              <CheckSquare className="w-4 h-4 text-blue-600" />
-            ) : (
-              <Square className="w-4 h-4 text-[var(--text-muted)]" />
-            )}
-            Transfer
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleToggleSpecialNeeds()}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm",
-              isSpecialNeeds
-                ? "border-purple-400 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400"
-                : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-purple-300"
-            )}
-          >
-            {isSpecialNeeds ? (
-              <CheckSquare className="w-4 h-4 text-purple-600" />
-            ) : (
-              <Square className="w-4 h-4 text-[var(--text-muted)]" />
-            )}
-            Special Needs
-          </button>
-        </div>
-      )}
 
       {/* Type-specific Documents */}
       {selectedType && typeDocs.length > 0 && (
@@ -565,7 +491,7 @@ export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManag
         <div className="flex flex-col items-center justify-center py-6 text-center">
           <GraduationCap className="w-10 h-10 text-[var(--text-muted)] mb-2 opacity-40" />
           <p className="text-sm text-[var(--text-muted)]">
-            Select a graduate type to view required documents
+            Select a school in the Details tab to set the graduate type
           </p>
         </div>
       )}

@@ -111,6 +111,7 @@ interface SchoolEntity {
   id: string
   name_en: string
   name_ar: string
+  school_type?: string | null
 }
 
 export async function preloadSchools(): Promise<SchoolEntity[]> {
@@ -118,7 +119,7 @@ export async function preloadSchools(): Promise<SchoolEntity[]> {
     const supabase = createClient()
     const { data } = await supabase
       .from("schools")
-      .select("id, name_en, name_ar")
+      .select("id, name_en, name_ar, school_type")
       .eq("is_active", true)
       .order("name_ar")
     return (data || []) as SchoolEntity[]
