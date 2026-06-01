@@ -277,6 +277,24 @@ export interface WeeklyTarget {
 // LEADS
 // =============================================
 
+export interface IeltsToeflCertificate {
+  name: string
+  type: string
+  size: number
+  url: string
+  storage_path: string
+  uploaded_at: string
+}
+
+export interface WithdrawalFormDocument {
+  name: string
+  type: string
+  size: number
+  url: string
+  storage_path: string
+  uploaded_at: string
+}
+
 export interface Lead {
   id: string
 
@@ -358,6 +376,7 @@ export interface Lead {
   placement_computer_passed?: boolean
   placement_computer_override?: boolean
   has_ielts_toefl?: boolean
+  ielts_toefl_certificate?: IeltsToeflCertificate | null
   placement_lms_synced?: boolean
   placement_lms_synced_at?: string
   // Attempt tracking (max 2 attempts per subject, highest score used)
@@ -414,6 +433,7 @@ export interface Lead {
   // Ministry Submission Block
   ministry_blocked?: boolean
   ministry_block_reasons?: MinistryBlockReason[]
+  withdrawal_form?: WithdrawalFormDocument | null
   puc_import_flagged?: boolean
 
   // PUC Choice (from ministry acceptance import)

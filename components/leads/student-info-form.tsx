@@ -63,6 +63,8 @@ import {
   type EducationType,
   type PlacementLevel,
   type MinistryBlockReason,
+  type IeltsToeflCertificate,
+  type WithdrawalFormDocument,
 } from "@/types"
 import { cn } from "@/lib/utils"
 import { isArabicText } from "@/lib/string-utils"
@@ -206,19 +208,10 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
   const [showExtractionDialog, setShowExtractionDialog] = useState(false)
 
-  // IELTS/TOEFL certificate document (PDF or image)
-  type IeltsCert = { name: string; type: string; size: number; url: string; storage_path: string; uploaded_at: string }
-  const ieltsCertKey = `lead-ielts-cert-${lead.id}`
-  const [ieltsCert, setIeltsCert] = useState<IeltsCert | null>(null)
+  // IELTS/TOEFL certificate document (PDF or image) — persisted on the lead record
+  const [ieltsCert, setIeltsCert] = useState<IeltsToeflCertificate | null>(lead.ielts_toefl_certificate ?? null)
   const [ieltsCertUploading, setIeltsCertUploading] = useState(false)
   const ieltsCertInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const stored = localStorage.getItem(ieltsCertKey)
-    if (stored) {
-      try { setIeltsCert(JSON.parse(stored)) } catch { /* ignore */ }
-    }
-  }, [ieltsCertKey])
 
   const handleIeltsCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -250,7 +243,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
         return
       }
       const { data: urlData } = supabase.storage.from("documents").getPublicUrl(storagePath)
-      const cert: IeltsCert = {
+      const cert: IeltsToeflCertificate = {
         name: file.name,
         type: file.type,
         size: file.size,
@@ -258,8 +251,8 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
         storage_path: storagePath,
         uploaded_at: new Date().toISOString(),
       }
-      localStorage.setItem(ieltsCertKey, JSON.stringify(cert))
       setIeltsCert(cert)
+      autosave.queueChange("ielts_toefl_certificate" as keyof Lead, cert)
     } catch (err) {
       console.error("IELTS/TOEFL certificate upload failed:", err)
       alert("Failed to upload certificate. Please try again.")
@@ -278,8 +271,75 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
     } catch (err) {
       console.error("Failed to remove certificate from storage:", err)
     }
-    localStorage.removeItem(ieltsCertKey)
     setIeltsCert(null)
+    autosave.queueChange("ielts_toefl_certificate" as keyof Lead, null)
+  }
+
+  // Withdrawal Form document (PDF or image) — required when the lead is Ministry Blocked
+  const [withdrawalForm, setWithdrawalForm] = useState<WithdrawalFormDocument | null>(lead.withdrawal_form ?? null)
+  const [withdrawalFormUploading, setWithdrawalFormUploading] = useState(false)
+  const withdrawalFormInputRef = useRef<HTMLInputElement>(null)
+
+  const handleWithdrawalFormUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+    if (!allowed.includes(file.type)) {
+      alert("Please upload a PDF or image (JPG, PNG, WEBP).")
+      if (withdrawalFormInputRef.current) withdrawalFormInputRef.current.value = ""
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`File ${file.name} is too large. Maximum size is 10MB.`)
+      if (withdrawalFormInputRef.current) withdrawalFormInputRef.current.value = ""
+      return
+    }
+    setWithdrawalFormUploading(true)
+    try {
+      const supabase = createClient()
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      const storagePath = `leads/${lead.id}/withdrawal-form/${timestamp}-${safeName}`
+      const { error } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, { cacheControl: "3600", upsert: false })
+      if (error) {
+        alert(error.message.includes("Bucket not found")
+          ? "Document storage is not configured. Please contact your administrator."
+          : "Failed to upload withdrawal form. Please try again.")
+        return
+      }
+      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(storagePath)
+      const doc: WithdrawalFormDocument = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: urlData.publicUrl,
+        storage_path: storagePath,
+        uploaded_at: new Date().toISOString(),
+      }
+      setWithdrawalForm(doc)
+      autosave.queueChange("withdrawal_form" as keyof Lead, doc)
+    } catch (err) {
+      console.error("Withdrawal form upload failed:", err)
+      alert("Failed to upload withdrawal form. Please try again.")
+    } finally {
+      setWithdrawalFormUploading(false)
+      if (withdrawalFormInputRef.current) withdrawalFormInputRef.current.value = ""
+    }
+  }
+
+  const handleWithdrawalFormRemove = async () => {
+    if (!withdrawalForm) return
+    if (!confirm(`Remove "${withdrawalForm.name}"?`)) return
+    try {
+      const supabase = createClient()
+      await supabase.storage.from("documents").remove([withdrawalForm.storage_path])
+    } catch (err) {
+      console.error("Failed to remove withdrawal form from storage:", err)
+    }
+    setWithdrawalForm(null)
+    autosave.queueChange("withdrawal_form" as keyof Lead, null)
   }
 
   const handleCivilIdScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1727,6 +1787,66 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                       )
                     })}
                   </div>
+                </div>
+
+                {/* Withdrawal Form — required while a lead is Ministry Blocked */}
+                <div className="space-y-2">
+                  <Label>
+                    Withdrawal Form <span className="text-red-500">*</span>
+                  </Label>
+                  <input
+                    ref={withdrawalFormInputRef}
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    onChange={handleWithdrawalFormUpload}
+                    className="hidden"
+                  />
+                  {withdrawalForm ? (
+                    <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+                      {withdrawalForm.type === "application/pdf" ? (
+                        <FileText className="w-4 h-4 text-green-600 shrink-0" />
+                      ) : (
+                        <ImageIcon className="w-4 h-4 text-green-600 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">{withdrawalForm.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">Withdrawal form uploaded</p>
+                      </div>
+                      <a
+                        href={withdrawalForm.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+                        title="View withdrawal form"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleWithdrawalFormRemove}
+                        className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        title="Remove withdrawal form"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => withdrawalFormInputRef.current?.click()}
+                      disabled={withdrawalFormUploading}
+                      className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-amber-400 bg-amber-50/50 dark:bg-amber-950/20 text-sm font-medium text-amber-700 dark:text-amber-400 hover:border-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-60"
+                    >
+                      {withdrawalFormUploading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+                      ) : (
+                        <><Upload className="w-4 h-4" /> Upload withdrawal form (PDF or image)</>
+                      )}
+                    </button>
+                  )}
+                  {!withdrawalForm && !withdrawalFormUploading && (
+                    <p className="text-xs text-red-500">A withdrawal form is required while this lead is Ministry Blocked.</p>
+                  )}
                 </div>
               </motion.div>
             )}
