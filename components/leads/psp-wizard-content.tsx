@@ -28,6 +28,7 @@ import {
   MessageSquare,
   Phone,
   Upload,
+  Lock,
 } from "lucide-react"
 import { SCHOOLS, PREFERRED_COLLEGES } from "@/types"
 import type { Lead, FundingType, IntendedMajor, SubmissionSubstage, EducationType, PUCDocumentStatus } from "@/types"
@@ -1276,16 +1277,24 @@ Kuwait Technical College`
                   <label className="text-sm font-medium text-[var(--text-primary)]">
                     Document Education Type <span className="text-[var(--error)]">*</span>
                   </label>
-                  <Badge variant="destructive" size="sm">Required</Badge>
+                  {isGraduateTypeLocked ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                      <Lock className="w-3 h-3" /> Set by school
+                    </span>
+                  ) : (
+                    <Badge variant="destructive" size="sm">Required</Badge>
+                  )}
                 </div>
                 <div className="grid grid-cols-5 gap-2 mt-2" aria-describedby="graduate-type-error">
                   {GRADUATE_TYPE_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
+                      disabled={isGraduateTypeLocked}
                       aria-invalid={!graduateType && !!validationErrors.graduateType}
                       aria-pressed={graduateType === option.value}
                       onClick={() => {
+                        if (isGraduateTypeLocked) return
                         setGraduateType(option.value)
                         if (validationErrors.graduateType) {
                           setValidationErrors(prev => ({ ...prev, graduateType: "" }))
@@ -1297,7 +1306,9 @@ Kuwait Technical College`
                           ? "border-[var(--primary)] bg-[var(--primary-muted)]"
                           : validationErrors.graduateType
                             ? "border-[var(--error)] bg-[var(--error-bg)]"
-                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50"
+                          : "border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--primary)]/50",
+                        isGraduateTypeLocked && graduateType !== option.value && "opacity-40",
+                        isGraduateTypeLocked ? "cursor-not-allowed" : "cursor-pointer"
                       )}
                     >
                       <span className={cn(

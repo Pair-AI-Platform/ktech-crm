@@ -1248,7 +1248,7 @@ export function LeadTable({
                 setCallbackFromStage={setCallbackFromStage}
                 setLostDialogLead={setLostDialogLead}
                 openAssignReasonDialog={openAssignReasonDialog}
-                setPspWizardLead={setPspWizardLead}
+                setPspWizardLead={openPspWizard}
                 setViewingAppointment={setViewingAppointment}
                 getEffectiveValue={getEffectiveValue}
                 onEditWithdrawReason={setEditWithdrawReasonLead}
