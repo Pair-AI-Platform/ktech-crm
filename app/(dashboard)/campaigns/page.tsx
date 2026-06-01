@@ -11,7 +11,6 @@ import {
   Eye,
   Plus,
   Play,
-  Pause,
   ChevronRight,
   Clock,
   Users,
@@ -309,11 +308,9 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   )
 }
 
-function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
+function CampaignCard({ campaign, onView, onDelete }: {
   campaign: Campaign
   onView: () => void
-  onPause: () => void
-  onResume: () => void
   onDelete: () => void
 }) {
   const typeConfig = CAMPAIGN_TYPE_CONFIG[campaign.type]
@@ -413,18 +410,6 @@ function CampaignCard({ campaign, onView, onPause, onResume, onDelete }: {
       {/* Actions */}
       <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-surface)]/50">
         <div className="flex items-center gap-2">
-          {campaign.status === "active" && (
-            <Button variant="outline" size="sm" className="gap-2" onClick={onPause}>
-              <Pause className="w-4 h-4" />
-              Pause
-            </Button>
-          )}
-          {campaign.status === "paused" && (
-            <Button variant="outline" size="sm" className="gap-2" onClick={onResume}>
-              <Play className="w-4 h-4" />
-              Resume
-            </Button>
-          )}
           {(campaign.status === "scheduled" || campaign.status === "draft") && (
             <>
               <Button variant="outline" size="sm" className="gap-2" onClick={onView}>
@@ -1252,14 +1237,6 @@ export default function CampaignsPage() {
   const activeCampaigns = campaigns.filter(c => c.status === "active").length
   const scheduledCampaigns = campaigns.filter(c => c.status === "scheduled").length
 
-  const handlePause = (id: string) => {
-    updateCampaign.mutate({ id, status: 'paused' })
-  }
-
-  const handleResume = (id: string) => {
-    updateCampaign.mutate({ id, status: 'active' })
-  }
-
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this campaign?')) {
       deleteCampaign.mutate(id)
@@ -1398,8 +1375,6 @@ export default function CampaignsPage() {
                     key={campaign.id}
                     campaign={campaign}
                     onView={() => router.push(`/campaigns/${campaign.id}`)}
-                    onPause={() => handlePause(campaign.id)}
-                    onResume={() => handleResume(campaign.id)}
                     onDelete={() => handleDelete(campaign.id)}
                   />
                 ))}

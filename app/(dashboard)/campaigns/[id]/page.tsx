@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   MessageSquare,
   ArrowLeft,
-  Play,
-  Pause,
   Clock,
   TrendingUp,
   CheckCircle2,
@@ -28,7 +26,6 @@ import { cn } from "@/lib/utils"
 import { RoleGuard } from "@/components/auth/role-guard"
 import {
   useCampaign,
-  useUpdateCampaign,
   useDeleteCampaign,
   useCampaignRealtime,
   type CampaignType,
@@ -259,7 +256,6 @@ export default function CampaignDetailsPage() {
   const [selectedContact, setSelectedContact] = useState<CampaignContact | null>(null)
 
   const { data: campaign, isLoading, error } = useCampaign(campaignId)
-  const updateCampaign = useUpdateCampaign()
   const deleteCampaign = useDeleteCampaign()
   useCampaignRealtime(campaignId)
 
@@ -292,14 +288,6 @@ export default function CampaignDetailsPage() {
   const contacts = (Array.isArray(campaign.campaign_contacts)
     ? campaign.campaign_contacts
     : []) as CampaignContact[]
-
-  const handlePause = () => {
-    updateCampaign.mutate({ id: campaign.id, status: 'paused' })
-  }
-
-  const handleResume = () => {
-    updateCampaign.mutate({ id: campaign.id, status: 'active' })
-  }
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this campaign?')) {
@@ -334,18 +322,6 @@ export default function CampaignDetailsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {campaign.status === "active" && (
-              <Button variant="outline" className="gap-2" onClick={handlePause} disabled={updateCampaign.isPending}>
-                <Pause className="w-4 h-4" />
-                Pause
-              </Button>
-            )}
-            {campaign.status === "paused" && (
-              <Button variant="outline" className="gap-2" onClick={handleResume} disabled={updateCampaign.isPending}>
-                <Play className="w-4 h-4" />
-                Resume
-              </Button>
-            )}
             {campaign.status !== "active" && (
               <Button variant="ghost" size="icon" className="text-red-500" onClick={handleDelete} disabled={deleteCampaign.isPending}>
                 <Trash2 className="w-4 h-4" />
