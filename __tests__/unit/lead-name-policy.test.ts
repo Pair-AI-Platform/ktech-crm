@@ -6,12 +6,12 @@ import {
 } from "@/lib/lead-name-policy"
 
 describe("lead name policy", () => {
-  it("never displays an English fallback", () => {
+  it("transliterates an English name to Arabic for display", () => {
     expect(getArabicLeadDisplayName({
       first_name: "Noor",
       last_name: "Al-Mutairi",
       phone: "55030000",
-    })).toBe("الاسم العربي مفقود")
+    })).toBe("نور المطيري")
   })
 
   it("normalizes Arabic alternate names into primary names", () => {
