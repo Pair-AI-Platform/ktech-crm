@@ -95,7 +95,6 @@ export const GET = withApiHandler(
       funding_type,
       source,
       priority,
-      quality_tier,
       actual_gpa,
       gpa_grade_12_expected,
       assigned_to,

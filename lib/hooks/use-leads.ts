@@ -14,26 +14,13 @@ import { calculateLeadQuality } from "@/lib/lead-scoring"
 import { queryKeys } from "./query-keys"
 
 function applyQualityScoring<T extends Partial<Lead>>(lead: T): T {
-  const gpa = lead.gpa_grade_12_expected ?? lead.actual_gpa ?? null
   const placement = lead.placement_test_raw ?? lead.placement_english_score ?? null
-  // Only recompute when we have at least one scoring input
-  if (gpa == null && placement == null && !lead.gender && !lead.governorate) return lead
-  const scoring = calculateLeadQuality({
-    gpa,
-    placement_test_raw: placement,
-    gender: lead.gender ?? null,
-    governorate: lead.governorate ?? null,
-  })
+  // Only recompute when we have a placement input
+  if (placement == null) return lead
+  const scoring = calculateLeadQuality({ placement_test_raw: placement })
   return {
     ...lead,
-    gpa_auto_score: scoring.gpa_auto_score ?? lead.gpa_auto_score,
-    placement_test_auto_score: scoring.placement_test_auto_score ?? lead.placement_test_auto_score,
     foundation_level: scoring.foundation_level ?? lead.foundation_level,
-    gender_score: scoring.gender_score ?? lead.gender_score,
-    governorate_score: scoring.governorate_score ?? lead.governorate_score,
-    final_weighted_score: scoring.final_weighted_score ?? lead.final_weighted_score,
-    quality_tier: scoring.quality_tier ?? lead.quality_tier,
-    quality_score_updated_at: scoring.final_weighted_score != null ? new Date().toISOString() : lead.quality_score_updated_at,
   }
 }
 
@@ -534,25 +521,14 @@ export function useLeadMutations() {
         delete updates.status
       }
 
-      // Recompute quality tier if any scoring input changed
+      // Recompute foundation level if a placement input changed
       const scoringInputChanged =
-        'gpa_grade_12_expected' in updates ||
-        'actual_gpa' in updates ||
         'placement_test_raw' in updates ||
-        'placement_english_score' in updates ||
-        'gender' in updates ||
-        'governorate' in updates
+        'placement_english_score' in updates
       if (scoringInputChanged) {
         const merged = { ...(oldLead as Partial<Lead>), ...updates }
         const scored = applyQualityScoring(merged)
-        updates.gpa_auto_score = scored.gpa_auto_score
-        updates.placement_test_auto_score = scored.placement_test_auto_score
         updates.foundation_level = scored.foundation_level
-        updates.gender_score = scored.gender_score
-        updates.governorate_score = scored.governorate_score
-        updates.final_weighted_score = scored.final_weighted_score
-        updates.quality_tier = scored.quality_tier
-        updates.quality_score_updated_at = scored.quality_score_updated_at
       }
 
       const { data, error } = await supabase
