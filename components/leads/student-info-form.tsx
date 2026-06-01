@@ -42,6 +42,11 @@ import {
   Ban,
   History,
   ArrowRight,
+  Upload,
+  FileText,
+  Eye,
+  Trash2,
+  Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -200,6 +205,82 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const [scanning, setScanning] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
   const [showExtractionDialog, setShowExtractionDialog] = useState(false)
+
+  // IELTS/TOEFL certificate document (PDF or image)
+  type IeltsCert = { name: string; type: string; size: number; url: string; storage_path: string; uploaded_at: string }
+  const ieltsCertKey = `lead-ielts-cert-${lead.id}`
+  const [ieltsCert, setIeltsCert] = useState<IeltsCert | null>(null)
+  const [ieltsCertUploading, setIeltsCertUploading] = useState(false)
+  const ieltsCertInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(ieltsCertKey)
+    if (stored) {
+      try { setIeltsCert(JSON.parse(stored)) } catch { /* ignore */ }
+    }
+  }, [ieltsCertKey])
+
+  const handleIeltsCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+    if (!allowed.includes(file.type)) {
+      alert("Please upload a PDF or image (JPG, PNG, WEBP).")
+      if (ieltsCertInputRef.current) ieltsCertInputRef.current.value = ""
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`File ${file.name} is too large. Maximum size is 10MB.`)
+      if (ieltsCertInputRef.current) ieltsCertInputRef.current.value = ""
+      return
+    }
+    setIeltsCertUploading(true)
+    try {
+      const supabase = createClient()
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      const storagePath = `leads/${lead.id}/ielts-toefl/${timestamp}-${safeName}`
+      const { error } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, { cacheControl: "3600", upsert: false })
+      if (error) {
+        alert(error.message.includes("Bucket not found")
+          ? "Document storage is not configured. Please contact your administrator."
+          : "Failed to upload certificate. Please try again.")
+        return
+      }
+      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(storagePath)
+      const cert: IeltsCert = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: urlData.publicUrl,
+        storage_path: storagePath,
+        uploaded_at: new Date().toISOString(),
+      }
+      localStorage.setItem(ieltsCertKey, JSON.stringify(cert))
+      setIeltsCert(cert)
+    } catch (err) {
+      console.error("IELTS/TOEFL certificate upload failed:", err)
+      alert("Failed to upload certificate. Please try again.")
+    } finally {
+      setIeltsCertUploading(false)
+      if (ieltsCertInputRef.current) ieltsCertInputRef.current.value = ""
+    }
+  }
+
+  const handleIeltsCertRemove = async () => {
+    if (!ieltsCert) return
+    if (!confirm(`Remove "${ieltsCert.name}"?`)) return
+    try {
+      const supabase = createClient()
+      await supabase.storage.from("documents").remove([ieltsCert.storage_path])
+    } catch (err) {
+      console.error("Failed to remove certificate from storage:", err)
+    }
+    localStorage.removeItem(ieltsCertKey)
+    setIeltsCert(null)
+  }
 
   const handleCivilIdScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1421,6 +1502,65 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 onCheckedChange={(checked) => handlePlacementChange("has_ielts_toefl", checked)}
               />
             </div>
+
+            {/* IELTS/TOEFL certificate upload (PDF or image) — required when toggle is on */}
+            {formData.has_ielts_toefl && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <input
+                  ref={ieltsCertInputRef}
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={handleIeltsCertUpload}
+                  className="hidden"
+                />
+                {ieltsCert ? (
+                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+                    {ieltsCert.type === "application/pdf" ? (
+                      <FileText className="w-4 h-4 text-green-600 shrink-0" />
+                    ) : (
+                      <ImageIcon className="w-4 h-4 text-green-600 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{ieltsCert.name}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Certificate uploaded</p>
+                    </div>
+                    <a
+                      href={ieltsCert.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+                      title="View certificate"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleIeltsCertRemove}
+                      className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      title="Remove certificate"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => ieltsCertInputRef.current?.click()}
+                    disabled={ieltsCertUploading}
+                    className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-amber-400 bg-amber-50/50 dark:bg-amber-950/20 text-sm font-medium text-amber-700 dark:text-amber-400 hover:border-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-60"
+                  >
+                    {ieltsCertUploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><Upload className="w-4 h-4" /> Upload certificate (PDF or image)</>
+                    )}
+                  </button>
+                )}
+              </motion.div>
+            )}
 
             {/* Subject Scores \u2014 one compact row per subject */}
             <div className="space-y-2">
