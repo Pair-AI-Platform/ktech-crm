@@ -1,4 +1,5 @@
 import { isArabicText } from "@/lib/string-utils"
+import { transliterateNameToArabic } from "@/lib/arabic-transliteration"
 
 export const MISSING_ARABIC_NAME_LABEL = "الاسم العربي مفقود"
 
@@ -51,18 +52,38 @@ export function getArabicLeadNameParts(lead: LeadNameFields): {
   return { firstName, lastName, fullName }
 }
 
+/**
+ * Like {@link getArabicLeadNameParts} but, when an Arabic name part is missing,
+ * falls back to transliterating the English name. Display-only: this never
+ * touches the stored name fields, so it is safe to use anywhere a human-readable
+ * Arabic name should be shown instead of the "missing" placeholder.
+ */
+export function getArabicLeadDisplayParts(lead: LeadNameFields): {
+  firstName: string
+  lastName: string
+  fullName: string
+} {
+  const { firstName, lastName } = getArabicLeadNameParts(lead)
+
+  const displayFirst = firstName || transliterateNameToArabic(lead.first_name)
+  const displayLast = lastName || transliterateNameToArabic(lead.last_name)
+  const fullName = [displayFirst, displayLast].filter(Boolean).join(" ")
+
+  return { firstName: displayFirst, lastName: displayLast, fullName }
+}
+
 export function getArabicLeadDisplayName(lead: LeadNameFields): string {
-  return getArabicLeadNameParts(lead).fullName || MISSING_ARABIC_NAME_LABEL
+  return getArabicLeadDisplayParts(lead).fullName || MISSING_ARABIC_NAME_LABEL
 }
 
 export function getArabicLeadShortDisplayName(lead: LeadNameFields): string {
-  const { fullName } = getArabicLeadNameParts(lead)
+  const { fullName } = getArabicLeadDisplayParts(lead)
   const tokens = fullName.split(/\s+/).filter(Boolean).slice(0, 2)
   return tokens.join(" ") || MISSING_ARABIC_NAME_LABEL
 }
 
 export function getArabicLeadInitials(lead: LeadNameFields): string {
-  const { firstName, lastName } = getArabicLeadNameParts(lead)
+  const { firstName, lastName } = getArabicLeadDisplayParts(lead)
   return [firstName, lastName].filter(Boolean).map((part) => part.charAt(0)).join("") || "؟"
 }
 

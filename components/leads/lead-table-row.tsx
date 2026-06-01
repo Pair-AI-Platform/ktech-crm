@@ -1251,7 +1251,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               </Button>
             </SimpleTooltip>
           )}
-          {lead.funding_type === 'puc' && ['puc_document_submission', 'puc_application_submission', 'applicant', 'enrolled', 'withdraw'].includes(lead.pipeline_stage) && (
+          {lead.funding_type === 'puc' && ['application', 'puc_document_submission', 'puc_application_submission'].includes(lead.pipeline_stage) && (
             <Button
               variant="ghost"
               size="icon-sm"

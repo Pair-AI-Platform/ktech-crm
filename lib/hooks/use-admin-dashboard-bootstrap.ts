@@ -126,6 +126,21 @@ const EMPTY_AGENT_STATS: AgentWorkloadStats = {
 
 const PLACEHOLDER_AGENT_NAMES = new Set(["admin", "agent", "demo", "khalifa", "test"])
 
+// Seed/demo agents (created 2026-03-11). They still own historical leads so the
+// accounts are kept in the DB, but they are hidden from the Team Status grid.
+const DEMO_AGENT_IDS = new Set([
+  "4834428f-4e81-43de-80d8-86ee2c3239ed", // Sarah Jones
+  "0e68966e-b982-4f92-889e-e25dcbbb7e28", // Ahmed Hassan
+  "5fdadd43-0fa3-43da-9622-2d138f0df6f4", // Nora Khalid
+  "ec28d450-eda7-44b0-8bb6-cc0f95d9d284", // Omar Farid
+  "503af133-7977-4f3a-9ed6-7a3b7589fe7c", // Lina Mahmoud
+  "2268f9ac-3880-4506-92e4-7ede3a81df5b", // Khalid Nasser
+  "9305db3e-88f3-4d0d-8771-df0701511470", // Dana Ali
+  "1f976666-2f57-475c-ad5d-ee4c1c0004f3", // Faisal Khaled
+  "dd5d78bb-6f8b-43af-8330-197f55e39c49", // Reem Salem
+  "9d39bd25-2a09-4a9c-b737-ec1e1e0d2993", // Yousef Ward
+])
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -269,6 +284,7 @@ function buildBootstrap(payload: AdminDashboardBootstrapPayload): AdminDashboard
         totalAssigned: stats.totalAssigned,
       }
     })
+    .filter((agent) => !DEMO_AGENT_IDS.has(agent.id))
     .filter((agent) => !PLACEHOLDER_AGENT_NAMES.has(agent.name.trim().split(/\s+/)[0].toLowerCase()))
     .sort((a, b) => b.activeLeadCount - a.activeLeadCount || a.name.localeCompare(b.name))
 
