@@ -25,6 +25,7 @@ import {
   GraduationCap,
   UserPlus,
   Check,
+  Sparkles,
 } from "lucide-react"
 import {
   parseCSV,
@@ -36,10 +37,19 @@ import {
 } from "@/lib/csv-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useAgents } from "@/lib/hooks/use-user"
-import type { LeadFormData } from "@/types"
+import type { LeadFormData, LeadSource, LeadSourceCategory } from "@/types"
+import { LEAD_SOURCES } from "@/types"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+
+const SOURCE_CATEGORIES: { value: LeadSourceCategory; label: string; icon: string }[] = [
+  { value: "direct", label: "Direct", icon: "📞" },
+  { value: "events", label: "Events", icon: "🎪" },
+  { value: "marketing", label: "Marketing", icon: "📱" },
+  { value: "referrals", label: "Referrals", icon: "👥" },
+  { value: "outreach", label: "Outreach", icon: "📣" },
+]
 
 interface CSVImportModalProps {
   isOpen: boolean
@@ -47,7 +57,7 @@ interface CSVImportModalProps {
   onSuccess: (count: number) => void
 }
 
-type ImportStep = "upload" | "preview" | "assignment" | "importing" | "complete"
+type ImportStep = "upload" | "preview" | "source" | "assignment" | "importing" | "complete"
 
 type AssignmentMode = "none" | "single" | "distribute" | "school"
 
@@ -85,6 +95,11 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
   const [schoolAgentMappings, setSchoolAgentMappings] = useState<SchoolAgentMapping[]>([])
   const [schools, setSchools] = useState<SchoolEntity[]>([])
   const [loadingSchools, setLoadingSchools] = useState(false)
+
+  // Lead source state — applied to ALL imported leads
+  const [sourceCategory, setSourceCategory] = useState<LeadSourceCategory | "">("")
+  const [source, setSource] = useState<LeadSource | "">("")
+  const [sourceDetail, setSourceDetail] = useState<string>("")
 
   const { createLead } = useLeadMutations()
   const { agents, loading: loadingAgents } = useAgents()

@@ -23,7 +23,6 @@ import {
 } from "lucide-react"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { PucImportBadge } from "./puc-import-badge"
-import { QualityTierBadge } from "./quality-tier-badge"
 import { getLeadDisplayName, getLeadShortDisplayName } from "@/lib/lead-utils"
 import {
   PIPELINE_STAGES,
@@ -343,9 +342,6 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 <div className="flex items-center gap-1.5">
                   {lead.puc_import_flagged && (
                     <PucImportBadge size="sm" />
-                  )}
-                  {lead.quality_tier && (
-                    <QualityTierBadge tier={lead.quality_tier} score={lead.final_weighted_score} />
                   )}
                   {lead.ministry_assigned && (
                     <SimpleTooltip content="Ministry assigned (not 1st choice ktech)">
