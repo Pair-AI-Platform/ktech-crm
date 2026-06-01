@@ -483,6 +483,12 @@ export interface Lead {
   file_fee_exempted_by?: string
   file_fee_exempted_at?: string
 
+  // SF Tuition Payment Exemption (blanket waiver of the tuition payment gate)
+  payment_exempt?: boolean
+  payment_exempt_note?: string | null
+  payment_exempt_by?: string
+  payment_exempt_at?: string
+
   // Joined relations (from queries)
   appointments?: { id: string; appointment_type: AppointmentType[]; status: AppointmentStatus; scheduled_date: string }[]
 }

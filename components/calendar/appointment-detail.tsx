@@ -429,7 +429,7 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           setFileFeeDialogLead(guard.lead)
           return
         }
-        if (guard.kind === "enrollment_payment") {
+        if (guard.kind === "sf_payment") {
           setPaymentDialogLead(guard.lead)
           return
         }

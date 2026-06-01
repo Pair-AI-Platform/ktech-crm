@@ -34,6 +34,7 @@ import { checkAllDocumentsUploaded, type SortField, type SortDirection } from ".
 import { LeadTableHeader } from "./lead-table-columns"
 import { LeadTableRow } from "./lead-table-row"
 import { LeadTableDialogs } from "./lead-table-dialogs"
+import { PaymentGateDialog } from "./payment-gate-dialog"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import { checkStageTransition } from "@/lib/lead-stage-guards"
 
@@ -107,6 +108,7 @@ export function LeadTable({
   const [withdrawDialogLead, setWithdrawDialogLead] = useState<Lead | null>(null)
   const [editWithdrawReasonLead, setEditWithdrawReasonLead] = useState<Lead | null>(null)
   const [paymentDialogLead, setPaymentDialogLead] = useState<Lead | null>(null)
+  const [sfPaymentGate, setSfPaymentGate] = useState<{ lead: Lead; required: number; paid: number; targetStage: PipelineStage } | null>(null)
   const [fileRequirementsDialog, setFileRequirementsDialog] = useState<{ lead: Lead; missingFields: string[] } | null>(null)
   const [fileFeeDialogLead, setFileFeeDialogLead] = useState<Lead | null>(null)
   const [pspWizardLead, setPspWizardLead] = useState<Lead | null>(null)
@@ -586,8 +588,13 @@ export function LeadTable({
         case "file_fee":
           setFileFeeDialogLead(guard.lead)
           return
-        case "enrollment_payment":
-          setPaymentDialogLead(guard.lead)
+        case "sf_payment":
+          setSfPaymentGate({
+            lead: guard.lead,
+            required: guard.required,
+            paid: guard.paid,
+            targetStage: guard.targetStage,
+          })
           return
         case "puc_document_requirements":
           window.alert(`Complete ${guard.missingFields.join(", ")} before moving this lead to Documents.`)
@@ -1343,6 +1350,39 @@ export function LeadTable({
       refreshPucDocCounts={refreshPucDocCounts}
       refreshPucPaymentStatus={refreshPucPaymentStatus}
     />
+
+    {sfPaymentGate && (
+      <PaymentGateDialog
+        open={!!sfPaymentGate}
+        onOpenChange={(open) => { if (!open) setSfPaymentGate(null) }}
+        lead={sfPaymentGate.lead}
+        required={sfPaymentGate.required}
+        paid={sfPaymentGate.paid}
+        targetStage={sfPaymentGate.targetStage}
+        onRecordPayment={() => {
+          const lead = sfPaymentGate.lead
+          setSfPaymentGate(null)
+          setPaymentDialogLead(lead)
+        }}
+        onExempted={() => {
+          const { lead, targetStage } = sfPaymentGate
+          setSfPaymentGate(null)
+          // The API already moved the lead server-side — reflect it locally and
+          // refresh payment data so the badge/guard pick up the exemption.
+          pinLeadToTop(lead.id)
+          setPendingUpdates(prev => ({
+            ...prev,
+            [lead.id]: {
+              ...prev[lead.id],
+              pipeline_stage: targetStage,
+              status: null as unknown as Lead['status'],
+            }
+          }))
+          notifyStageChanged(lead.id, targetStage, null, lead)
+          refreshSfGreenStatus()
+        }}
+      />
+    )}
 
     </>
   )

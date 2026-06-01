@@ -1,6 +1,7 @@
 import type { Lead, PipelineStage } from "@/types"
 import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
+import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT } from "@/lib/config/constants"
 
 export type StageGuardResult =
   | { kind: "allow" }
@@ -9,7 +10,7 @@ export type StageGuardResult =
   | { kind: "contacted"; lead: Lead }
   | { kind: "file_requirements"; lead: Lead; missingFields: string[] }
   | { kind: "file_fee"; lead: Lead }
-  | { kind: "enrollment_payment"; lead: Lead }
+  | { kind: "sf_payment"; lead: Lead; required: number; paid: number; targetStage: PipelineStage }
   | { kind: "puc_document_requirements"; lead: Lead; missingFields: string[] }
 
 export interface StageGuardInput {
@@ -53,14 +54,31 @@ export function checkStageTransition({
     }
   }
 
-  if (newStage === "applicant" && !isPucSrjView) {
-    if (lead.funding_type !== "puc" && amountPaid < 150) {
-      return { kind: "enrollment_payment", lead }
+  // --- Self-funded tuition payment milestones ---
+  // SF leads must hit payment milestones before advancing, unless an admin has
+  // granted a tuition-payment exemption for this lead.
+  //   • Test → File      : at least the 150 KWD seat-reservation deposit
+  //   • File → Applicant : the full 550 KWD tuition
+  //   • → Enrolled       : the full 550 KWD tuition
+  if (
+    lead.funding_type === "self_funded" &&
+    !lead.payment_exempt &&
+    !isPucSrjView
+  ) {
+    if (
+      newStage === "application" &&
+      lead.pipeline_stage !== "application" &&
+      amountPaid < ENROLLMENT_PAYMENT_AMOUNT
+    ) {
+      return { kind: "sf_payment", lead, required: ENROLLMENT_PAYMENT_AMOUNT, paid: amountPaid, targetStage: newStage }
     }
-  }
 
-  if (lead.funding_type === "self_funded" && lead.pipeline_stage === "applicant" && amountPaid < 150) {
-    return { kind: "enrollment_payment", lead }
+    if (
+      (newStage === "applicant" || newStage === "enrolled") &&
+      amountPaid < FULL_TUITION_AMOUNT
+    ) {
+      return { kind: "sf_payment", lead, required: FULL_TUITION_AMOUNT, paid: amountPaid, targetStage: newStage }
+    }
   }
 
   return { kind: "allow" }
