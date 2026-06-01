@@ -1253,42 +1253,30 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
             <div className={sectionBodyClass}>
               <div className="space-y-2">
                 <Label>Discount Type</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {DISCOUNT_TYPES.map((type) => (
-                    <button
-                      key={type.value}
-                      type="button"
-                      onClick={() => {
-                        const isSelected = formData.discount_type === type.value
-                        setFormData(prev => ({
-                          ...prev,
-                          discount_type: isSelected ? "" : type.value,
-                          discount_percentage: isSelected ? "" : (type.percentage?.toString() || prev.discount_percentage),
-                        }))
-                        autosave.queueChange("discount_type" as keyof Lead, isSelected ? undefined : type.value)
-                        autosave.queueChange("discount_percentage" as keyof Lead, isSelected ? undefined : type.percentage)
-                      }}
-                      className={cn(
-                        "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
-                        formData.discount_type === type.value
-                          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
-                          : "border-[var(--border)] hover:border-emerald-300 text-[var(--text-secondary)]"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                        formData.discount_type === type.value
-                          ? "border-emerald-500 bg-emerald-500"
-                          : "border-[var(--border)]"
-                      )}>
-                        {formData.discount_type === type.value && (
-                          <Check className="w-2.5 h-2.5 text-white" />
-                        )}
-                      </div>
-                      {type.label}
-                    </button>
-                  ))}
-                </div>
+                <Select
+                  value={formData.discount_type || ""}
+                  onValueChange={(value) => {
+                    const type = DISCOUNT_TYPES.find(t => t.value === value)
+                    setFormData(prev => ({
+                      ...prev,
+                      discount_type: value,
+                      discount_percentage: type?.percentage?.toString() || prev.discount_percentage,
+                    }))
+                    autosave.queueChange("discount_type" as keyof Lead, value)
+                    autosave.queueChange("discount_percentage" as keyof Lead, type?.percentage)
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select discount type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DISCOUNT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Send Declaration on WhatsApp */}
