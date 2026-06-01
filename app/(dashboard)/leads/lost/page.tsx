@@ -33,7 +33,7 @@ import {
 import { PIPELINE_STAGES, type PipelineStage, type LostReasonCategory } from "@/types"
 import { useLeads, useLeadMutations, useLostReasons } from "@/lib/hooks/use-leads"
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
-import { useUser } from "@/lib/hooks/use-user"
+import { useUser, useAgents } from "@/lib/hooks/use-user"
 import { cn, formatKuwaitPhone, getInitials } from "@/lib/utils"
 import { getLeadDisplayName, getLeadShortDisplayName } from "@/lib/lead-utils"
 import { exportLeadsToCSV, downloadCSV } from "@/lib/csv-utils"
@@ -50,15 +50,26 @@ const LOST_REASON_CATEGORIES: { value: LostReasonCategory; label: string }[] = [
 type SortField = "name" | "lost_at" | "reason" | "date"
 type SortDirection = "asc" | "desc"
 
+const DATE_RANGES: { value: string; label: string }[] = [
+  { value: "all", label: "All Time" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "quarter", label: "This Quarter" },
+]
+
 export default function LostLeadsPage() {
   const router = useRouter()
   const { profile } = useUser()
   const { reasons: lostReasons } = useLostReasons()
+  const { agents } = useAgents()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [lostAtFilter, setLostAtFilter] = useState<PipelineStage | "all">("all")
   const [categoryFilter, setCategoryFilter] = useState<LostReasonCategory | "all">("all")
   const [reasonFilter, setReasonFilter] = useState<string[]>([])
+  const [agentFilter, setAgentFilter] = useState<string>("")
+  const [dateFilter, setDateFilter] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<SortField>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
@@ -75,10 +86,10 @@ export default function LostLeadsPage() {
     sources: [],
     schools: [],
     academicTrack: "all" as const,
-    dateRange: "all" as const,
+    dateRange: dateFilter,
     dateFrom: "",
     dateTo: "",
-    assignedTo: "",
+    assignedTo: agentFilter,
     gpaMin: null,
     gpaMax: null,
     isKuwaiti: null,
@@ -369,6 +380,49 @@ export default function LostLeadsPage() {
           ))}
         </div>
 
+        {/* Agent + Date Filters */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Agent Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+              Agent:
+            </span>
+            <select
+              value={agentFilter}
+              onChange={(e) => { setAgentFilter(e.target.value); setCurrentPage(1); setSelectedIds(new Set()) }}
+              className="px-2.5 py-1 text-[11px] font-medium bg-[var(--bg-surface)] border border-[var(--border)] rounded-md text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)] cursor-pointer max-w-[200px]"
+            >
+              <option value="">All Agents</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+              Date:
+            </span>
+            {DATE_RANGES.map((range) => (
+              <button
+                key={range.value}
+                onClick={() => { setDateFilter(range.value); setCurrentPage(1); setSelectedIds(new Set()) }}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
+                  dateFilter === range.value
+                    ? "bg-[var(--primary-muted)] text-[var(--primary)] border border-[var(--primary)]/30"
+                    : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border)]"
+                )}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -456,7 +510,7 @@ export default function LostLeadsPage() {
                       <td colSpan={9} className="px-3 py-16 text-center">
                         <Ban className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)] opacity-40" />
                         <p className="text-sm text-[var(--text-muted)]">No lost leads found</p>
-                        {(searchQuery || lostAtFilter !== "all" || categoryFilter !== "all") && (
+                        {(searchQuery || lostAtFilter !== "all" || categoryFilter !== "all" || agentFilter || dateFilter !== "all") && (
                           <p className="text-xs text-[var(--text-muted)] mt-1">Try adjusting your filters</p>
                         )}
                       </td>
