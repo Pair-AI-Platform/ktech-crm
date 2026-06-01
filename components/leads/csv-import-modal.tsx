@@ -25,6 +25,7 @@ import {
   GraduationCap,
   UserPlus,
   Check,
+  Sparkles,
 } from "lucide-react"
 import {
   parseCSV,
@@ -36,10 +37,19 @@ import {
 } from "@/lib/csv-utils"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useAgents } from "@/lib/hooks/use-user"
-import type { LeadFormData } from "@/types"
+import type { LeadFormData, LeadSource, LeadSourceCategory } from "@/types"
+import { LEAD_SOURCES } from "@/types"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { isDemoMode } from "@/lib/demo-data"
+
+const SOURCE_CATEGORIES: { value: LeadSourceCategory; label: string; icon: string }[] = [
+  { value: "direct", label: "Direct", icon: "📞" },
+  { value: "events", label: "Events", icon: "🎪" },
+  { value: "marketing", label: "Marketing", icon: "📱" },
+  { value: "referrals", label: "Referrals", icon: "👥" },
+  { value: "outreach", label: "Outreach", icon: "📣" },
+]
 
 interface CSVImportModalProps {
   isOpen: boolean
@@ -47,7 +57,7 @@ interface CSVImportModalProps {
   onSuccess: (count: number) => void
 }
 
-type ImportStep = "upload" | "preview" | "assignment" | "importing" | "complete"
+type ImportStep = "upload" | "preview" | "source" | "assignment" | "importing" | "complete"
 
 type AssignmentMode = "none" | "single" | "distribute" | "school"
 
@@ -85,6 +95,11 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
   const [schoolAgentMappings, setSchoolAgentMappings] = useState<SchoolAgentMapping[]>([])
   const [schools, setSchools] = useState<SchoolEntity[]>([])
   const [loadingSchools, setLoadingSchools] = useState(false)
+
+  // Lead source state — applied to ALL imported leads
+  const [sourceCategory, setSourceCategory] = useState<LeadSourceCategory | "">("")
+  const [source, setSource] = useState<LeadSource | "">("")
+  const [sourceDetail, setSourceDetail] = useState<string>("")
 
   const { createLead } = useLeadMutations()
   const { agents, loading: loadingAgents } = useAgents()
@@ -138,6 +153,10 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
     setSelectedAgents([])
     setSingleAgentId("")
     setSchoolAgentMappings([])
+    // Reset source state
+    setSourceCategory("")
+    setSource("")
+    setSourceDetail("")
   }, [])
 
   const handleClose = useCallback(() => {
@@ -223,6 +242,11 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
   const handleImport = useCallback(async () => {
     const validRows = parsedRows.filter(row => row.data !== null)
     if (validRows.length === 0) return
+    // A source must be chosen before any leads are imported
+    if (!sourceCategory || !source) {
+      setStep("source")
+      return
+    }
 
     setStep("importing")
     let imported = 0
@@ -263,15 +287,15 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
         const existingLead = row.data.phone ? existingLeadsMap.get(row.data.phone) : null
 
         if (existingLead) {
-          // Lead already exists — update source fields
+          // Lead already exists — update source fields with the selected batch source
           try {
             if (!isDemoMode()) {
               const sourceUpdates: Record<string, unknown> = {
-                source: row.data.source,
-                source_category: row.data.source_category,
+                source,
+                source_category: sourceCategory,
               }
-              if (row.data.source_detail) {
-                sourceUpdates.source_detail = row.data.source_detail
+              if (sourceDetail.trim()) {
+                sourceUpdates.source_detail = sourceDetail.trim()
               }
               const { error } = await supabase
                 .from("leads")
@@ -289,10 +313,13 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
             errors++
           }
         } else {
-          // New lead — create it
+          // New lead — create it, forcing the selected batch source on every lead
           const assignedTo = getAssignedAgent(row.data, i)
           const leadDataWithAssignment = {
             ...row.data,
+            source_category: sourceCategory as LeadSourceCategory,
+            source: source as LeadSource,
+            source_detail: sourceDetail.trim() || undefined,
             ...(assignedTo && {
               assigned_to: assignedTo,
               assigned_at: new Date().toISOString()
@@ -318,7 +345,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
     if (imported > 0 || updated > 0) {
       onSuccess(imported + updated)
     }
-  }, [parsedRows, createLead, onSuccess, getAssignedAgent])
+  }, [parsedRows, createLead, onSuccess, getAssignedAgent, source, sourceCategory, sourceDetail])
 
   const handleDownloadTemplate = useCallback(() => {
     const template = generateCSVTemplate()
@@ -528,6 +555,124 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {step === "source" && (
+              <motion.div
+                key="source"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {/* Header Info */}
+                <div className="p-4 bg-[var(--bg-sunken)] rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-[var(--primary)]" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-[var(--text-primary)]">Where did these {validCount} leads come from?</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        The source you pick applies to every lead in this file and shows on each lead profile.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Source Category */}
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">Source Category</p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {SOURCE_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat.value}
+                        type="button"
+                        onClick={() => {
+                          setSourceCategory(cat.value)
+                          // Reset the sub-source when the category changes
+                          setSource("")
+                          setSourceDetail("")
+                        }}
+                        className={cn(
+                          "flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all",
+                          sourceCategory === cat.value
+                            ? "border-[var(--primary)] bg-[var(--primary-muted)]"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                        )}
+                      >
+                        <span className="text-lg">{cat.icon}</span>
+                        <span className="text-xs font-medium text-[var(--text-primary)]">{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Source (subcategory) */}
+                {sourceCategory && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-[var(--text-secondary)]">Source</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {LEAD_SOURCES.filter(s => s.category === sourceCategory).map((s) => (
+                        <button
+                          key={s.value}
+                          type="button"
+                          onClick={() => setSource(s.value)}
+                          className={cn(
+                            "flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-all",
+                            source === s.value
+                              ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--primary)]"
+                              : "border-[var(--border)] hover:border-[var(--primary)]/50 text-[var(--text-secondary)]"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                            source === s.value
+                              ? "border-[var(--primary)] bg-[var(--primary)]"
+                              : "border-[var(--border)]"
+                          )}>
+                            {source === s.value && (
+                              <Check className="w-2.5 h-2.5 text-white" />
+                            )}
+                          </div>
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional source detail */}
+                {source && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-[var(--text-secondary)]">
+                      Source Detail <span className="font-normal text-[var(--text-muted)]">(optional)</span>
+                    </p>
+                    <input
+                      type="text"
+                      value={sourceDetail}
+                      onChange={(e) => setSourceDetail(e.target.value)}
+                      placeholder="e.g. exhibition name, campaign, or who referred them"
+                      className="w-full px-3 py-2 text-sm bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                    />
+                  </div>
+                )}
+
+                {/* Summary */}
+                {source && (
+                  <div className="p-3 bg-[var(--accent)]/10 rounded-lg border border-[var(--accent)]/20">
+                    <p className="text-sm text-[var(--accent)]">
+                      All {validCount} leads will be tagged as{" "}
+                      <span className="font-medium">
+                        {SOURCE_CATEGORIES.find(c => c.value === sourceCategory)?.label}
+                        {" → "}
+                        {LEAD_SOURCES.find(s => s.value === source)?.label}
+                      </span>
+                      {sourceDetail.trim() && <> ({sourceDetail.trim()})</>}
+                    </p>
                   </div>
                 )}
               </motion.div>
@@ -899,15 +1044,33 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
         </div>
 
         {/* Footer */}
-        {(step === "upload" || step === "preview" || step === "assignment") && (
+        {(step === "upload" || step === "preview" || step === "source" || step === "assignment") && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border)] flex-shrink-0 bg-[var(--bg-sunken)]">
-            <Button variant="outline" onClick={step === "assignment" ? () => setStep("preview") : handleClose}>
-              {step === "assignment" ? "Back" : "Cancel"}
+            <Button
+              variant="outline"
+              onClick={
+                step === "assignment"
+                  ? () => setStep("source")
+                  : step === "source"
+                  ? () => setStep("preview")
+                  : handleClose
+              }
+            >
+              {step === "assignment" || step === "source" ? "Back" : "Cancel"}
             </Button>
             {step === "preview" && (
               <Button
-                onClick={() => setStep("assignment")}
+                onClick={() => setStep("source")}
                 disabled={validCount === 0}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Next: Lead Source
+              </Button>
+            )}
+            {step === "source" && (
+              <Button
+                onClick={() => setStep("assignment")}
+                disabled={!sourceCategory || !source}
               >
                 <Users className="w-4 h-4 mr-2" />
                 Next: Assign Leads
