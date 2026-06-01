@@ -553,6 +553,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       return
     }
 
+    // Ministry-blocked leads must have a Withdrawal Form on file before advancing.
+    {
+      const targetIdx = STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number])
+      const currentIdx = STAGE_ORDER.indexOf(lead.pipeline_stage as typeof STAGE_ORDER[number])
+      const movingForward = targetIdx > currentIdx
+      if (movingForward && lead.ministry_blocked && !lead.withdrawal_form) {
+        window.alert('This lead is Ministry Blocked. Upload the Withdrawal Form (in the lead details, under Ministry Blocking) before advancing this lead.')
+        return
+      }
+    }
+
     // Intercept "application" (File) stage - require complete info and file fee first
     if (stage === 'application' && lead.pipeline_stage !== 'application') {
       const guard = checkStageTransition({ lead, newStage: "application" })

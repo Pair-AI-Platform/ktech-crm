@@ -60,6 +60,7 @@ interface SchoolEntity {
   id: string
   name_en: string
   name_ar: string
+  school_type?: string | null
 }
 
 type GraduateType = GraduateTypeFromRules
@@ -89,6 +90,20 @@ const GRADUATE_TYPE_OPTIONS: { value: GraduateType; label: string; description: 
   { value: "KSA", label: "KSA", description: "Saudi Arabian Curriculum" },
   { value: "OTHER", label: "Others", description: "Other Curriculum" },
 ]
+
+// Map a school's curriculum type to the Document Education Type.
+// Schools always carry a school_type (defaults to 'gov'), so a selected school
+// fully determines — and locks — the document education type.
+function schoolTypeToGraduateType(schoolType?: string | null): GraduateType | null {
+  switch ((schoolType || "").toLowerCase()) {
+    case "gov": return "GOV"
+    case "us": return "US"
+    case "uk": return "UK"
+    case "ksa": return "KSA"
+    case "others": return "OTHER"
+    default: return null
+  }
+}
 
 // Derive documents from the canonical document-rules config
 function getDocumentsForType(type: GraduateType, flags?: ConditionalDocumentFlags): DocumentItem[] {
@@ -305,6 +320,19 @@ export function PSPWizardContent({
   const filteredSchools = schools
     .filter(school => schoolMatchesSearch(school, schoolSearch))
     .sort(compareSchoolsBySearch(schoolSearch))
+
+  // The selected school determines (and locks) the Document Education Type.
+  const selectedSchool = schools.find(s => s.id === schoolId)
+  const schoolGraduateType = schoolTypeToGraduateType(selectedSchool?.school_type)
+  const isGraduateTypeLocked = !!schoolGraduateType
+
+  // Auto-select the education type from the chosen school and keep it in sync.
+  useEffect(() => {
+    if (schoolGraduateType && schoolGraduateType !== graduateType) {
+      setGraduateType(schoolGraduateType)
+      setValidationErrors(prev => (prev.graduateType ? { ...prev, graduateType: "" } : prev))
+    }
+  }, [schoolGraduateType]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Update documents when graduate type or conditional flags change
