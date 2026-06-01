@@ -1202,8 +1202,17 @@ Kuwait Technical College`
                     Funding Type
                   </label>
                   <div className="h-10 px-3 flex items-center bg-[var(--bg-sunken)] border border-[var(--border)] rounded-md">
-                    <Badge variant="info" size="sm">PUC</Badge>
-                    <span className="ml-2 text-sm text-[var(--text-secondary)]">Government Funded</span>
+                    {fundingType === "self_funded" ? (
+                      <>
+                        <Badge variant="success" size="sm">SF</Badge>
+                        <span className="ml-2 text-sm text-[var(--text-secondary)]">Self Funded</span>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="info" size="sm">PUC</Badge>
+                        <span className="ml-2 text-sm text-[var(--text-secondary)]">Government Funded</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -47,22 +47,12 @@ function stageRank(stage: string | null | undefined): number {
 
 function recomputeScoring(lead: IncomingLead) {
   const scoring = calculateLeadQuality({
-    gpa: (lead.gpa_grade_12_expected as number | null) ?? (lead.actual_gpa as number | null) ?? null,
     placement_test_raw: (lead.placement_test_raw as number | null)
       ?? (lead.placement_english_score as number | null)
       ?? null,
-    gender: (lead.gender as string | null) ?? null,
-    governorate: (lead.governorate as string | null) ?? null,
   })
   return {
-    gpa_auto_score: scoring.gpa_auto_score,
-    placement_test_auto_score: scoring.placement_test_auto_score,
     foundation_level: scoring.foundation_level,
-    gender_score: scoring.gender_score,
-    governorate_score: scoring.governorate_score,
-    final_weighted_score: scoring.final_weighted_score,
-    quality_tier: scoring.quality_tier,
-    quality_score_updated_at: new Date().toISOString(),
   }
 }
 
@@ -188,14 +178,7 @@ export async function POST(request: NextRequest) {
           last_name: patched.last_name,
           first_name_ar: patched.first_name_ar,
           last_name_ar: patched.last_name_ar,
-          quality_tier: scoring.quality_tier,
-          final_weighted_score: scoring.final_weighted_score,
-          gpa_auto_score: scoring.gpa_auto_score,
-          placement_test_auto_score: scoring.placement_test_auto_score,
           foundation_level: scoring.foundation_level,
-          gender_score: scoring.gender_score,
-          governorate_score: scoring.governorate_score,
-          quality_score_updated_at: scoring.quality_score_updated_at,
           pipeline_stage: finalStage,
           notes: mergedNotes,
           // Backfill commonly-missing fields when the new row has them

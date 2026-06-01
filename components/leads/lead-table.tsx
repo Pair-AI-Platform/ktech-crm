@@ -115,6 +115,16 @@ export function LeadTable({
   const [editingOrientationStatus, setEditingOrientationStatus] = useState<string | null>(null)
   const [viewingAppointment, setViewingAppointment] = useState<import("@/types").Appointment | null>(null)
 
+  // PSP is a PUC-only flow. If something tries to open the PSP wizard for a
+  // self-funded lead, open the lead profile instead (never the wizard).
+  const openPspWizard = useCallback((lead: Lead | null) => {
+    if (lead && lead.funding_type === 'self_funded') {
+      onLeadClick?.(lead)
+      return
+    }
+    setPspWizardLead(lead)
+  }, [onLeadClick])
+
   // Check if we're viewing submission stage
   // Auto-enable PUC view when viewing PUC-specific stages (even without funding type filter)
   const isPucSrjView = fundingTypeFilter === 'puc' || currentStageFilter === 'puc_document_submission' || currentStageFilter === 'puc_application_submission'
@@ -581,7 +591,7 @@ export function LeadTable({
           return
         case "puc_document_requirements":
           window.alert(`Complete ${guard.missingFields.join(", ")} before moving this lead to Documents.`)
-          setPspWizardLead(guard.lead)
+          openPspWizard(guard.lead)
           return
         case "allow":
           break
@@ -628,7 +638,7 @@ export function LeadTable({
     if (newStage === 'puc_document_submission' && !result.error && isPucSrjView) {
       const lead = leads.find(l => l.id === leadId)
       if (lead) {
-        setPspWizardLead({ ...lead, pipeline_stage: newStage })
+        openPspWizard({ ...lead, pipeline_stage: newStage })
       }
     }
 
@@ -1317,7 +1327,7 @@ export function LeadTable({
       setFileFeeDialogLead={setFileFeeDialogLead}
       handleFileFeeSuccess={handleFileFeeSuccess}
       setPaymentDialogLead={setPaymentDialogLead}
-      setPspWizardLead={setPspWizardLead}
+      setPspWizardLead={openPspWizard}
       setViewingAppointment={setViewingAppointment}
       handleLostConfirm={handleLostConfirm}
       handleAssignLostReason={handleAssignLostReason}

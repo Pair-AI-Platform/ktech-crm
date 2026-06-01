@@ -41,18 +41,14 @@ interface SFDocumentManagerProps {
 }
 
 export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManagerProps) {
-  const [selectedType, setSelectedType] = useState<GraduateType | null>(
-    educationToGraduateType(lead.education_type)
-  )
+  // Graduate type is auto-derived from the lead's school (education_type) and locked here.
+  const selectedType = educationToGraduateType(lead.education_type)
   const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedDocFile>>({})
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
   const [sentToRegistration, setSentToRegistration] = useState(false)
   const [sendingRegistration, setSendingRegistration] = useState(false)
   const [includePreferences, setIncludePreferences] = useState(false)
-  const [isTransfer, setIsTransfer] = useState(!!lead.is_transfer_student)
-  const [isSpecialNeeds, setIsSpecialNeeds] = useState(!!lead.is_special_needs)
-  const { updateLead } = useLeadMutations()
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const [extractedData, setExtractedData] = useState<ExtractedCivilIdData | null>(null)
   const [showExtractionDialog, setShowExtractionDialog] = useState(false)
