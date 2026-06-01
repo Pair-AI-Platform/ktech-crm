@@ -1545,6 +1545,7 @@ export const PREFERRED_COLLEGES: { value: string; label: string }[] = [
 
 export const NATIONALITIES: { value: string; label: string; labelAr: string }[] = [
   { value: 'Kuwaiti', label: 'Kuwaiti', labelAr: 'كويتي' },
+  { value: 'Son of Kuwaiti', label: 'Son of Kuwaiti', labelAr: 'ابن كويتية' },
   { value: 'None', label: 'None', labelAr: 'بدون' },
   { value: 'Saudi', label: 'Saudi', labelAr: 'سعودي' },
   { value: 'Emirati', label: 'Emirati', labelAr: 'إماراتي' },
