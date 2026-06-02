@@ -2,118 +2,84 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { readFileSync } from "node:fs"
 import path from "node:path"
 
-// The phone matcher is the security-critical core of the PSP self-service
-// flow. The previous implementation accepted ANY input whose last 8
-// digits matched the stored lead phone, which made the per-request
-// "phone password" brute-forceable in ~10^7 attempts. P1-4 in the
-// security audit. These tests pin down the new behaviour:
+// The Civil ID matcher is the security-critical core of the PSP self-service
+// flow. It gates every public endpoint: the token alone is not enough — the
+// student must also prove knowledge of the registered 12-digit Civil ID.
+// These tests pin down its behaviour:
 //
-//   1. Full-digit equality after stripping non-digit noise.
-//   2. Kuwaiti `965` country code normalised away when present so the
-//      common shapes (`+965 5000 1234`, `+96550001234`, `50001234`,
-//      `0096550001234`) all map to the same canonical value.
-//   3. A trailing 8-digit suffix is NOT enough — that was the bug.
-//   4. Empty / missing inputs never match.
-//   5. Comparison must not short-circuit on the first mismatched
-//      character (timing side-channel). We assert this by reading the
-//      source and confirming it does not use `===` to compare the
-//      normalised digit strings.
+//   1. Full-digit equality after stripping non-digit noise (spaces, dashes).
+//   2. A trailing-suffix match is NOT enough — the whole number must match.
+//   3. Empty / missing inputs never match.
+//   4. Comparison must not short-circuit on the first mismatched character
+//      (timing side-channel). We assert this by reading the source and
+//      confirming it does not use `===` to compare the normalised strings.
 
-import { phoneMatches } from "@/lib/auth/psp-self-service-token"
+import { civilIdMatches } from "@/lib/auth/psp-self-service-token"
 
-describe("phoneMatches — full-digit Kuwaiti phone match", () => {
-  describe("happy path: equivalent representations of the same number", () => {
-    it("matches identical E.164 strings", () => {
-      expect(phoneMatches("+96550001234", "+96550001234")).toBe(true)
+describe("civilIdMatches — full-digit Civil ID match", () => {
+  describe("happy path: equivalent representations of the same Civil ID", () => {
+    it("matches identical 12-digit strings", () => {
+      expect(civilIdMatches("300010100123", "300010100123")).toBe(true)
     })
 
-    it("matches E.164 with spaces against bare E.164", () => {
-      expect(phoneMatches("+965 5000 1234", "+96550001234")).toBe(true)
+    it("ignores spaces in the supplied Civil ID", () => {
+      expect(civilIdMatches("3000 1010 0123", "300010100123")).toBe(true)
     })
 
-    it("matches local 8-digit input against E.164 stored value", () => {
-      expect(phoneMatches("50001234", "+965 5000 1234")).toBe(true)
+    it("ignores dashes in the supplied Civil ID", () => {
+      expect(civilIdMatches("3-0001-0100-123", "300010100123")).toBe(true)
     })
 
-    it("matches local 8-digit input against digits-only country-coded value", () => {
-      expect(phoneMatches("50001234", "96550001234")).toBe(true)
-    })
-
-    it("matches international dial-out form (00965…)", () => {
-      expect(phoneMatches("0096550001234", "+96550001234")).toBe(true)
-    })
-
-    it("ignores dashes, brackets, and spaces in supplied phone", () => {
-      expect(phoneMatches("(+965) 5000-1234", "+96550001234")).toBe(true)
-    })
-
-    it("matches when stored value has odd punctuation too", () => {
-      expect(phoneMatches("+96550001234", "+965-5000-1234")).toBe(true)
+    it("matches when the stored value has odd punctuation too", () => {
+      expect(civilIdMatches("300010100123", "300-010-100-123")).toBe(true)
     })
   })
 
-  describe("security: rejects suffix-only matches (the P1-4 fix)", () => {
-    it("rejects a different number that shares the same last 8 digits", () => {
-      // Old implementation: last 8 digits of "+44 7000 1234" and
-      // "+965 7000 1234" both end in `70001234`, so it would have
-      // returned true. New implementation: the UK number canonicalises
-      // to `447xxxxxxxx` (no `965` to strip), the Kuwaiti to
-      // `70001234`, so they no longer collide.
-      expect(phoneMatches("+447000123470001234", "+965 7000 1234")).toBe(false)
+  describe("security: rejects partial / suffix-only matches", () => {
+    it("rejects a Civil ID that shares the same last 8 digits", () => {
+      expect(civilIdMatches("399910100123", "300010100123")).toBe(false)
     })
 
-    it("rejects the bare last 8 digits when stored is a foreign country code", () => {
-      // Stored row was someone's UK number, attacker only knows the
-      // last 8 digits. Must NOT authenticate.
-      expect(phoneMatches("12345678", "+447123412345678")).toBe(false)
+    it("rejects the bare last 8 digits of the correct Civil ID", () => {
+      expect(civilIdMatches("10100123", "300010100123")).toBe(false)
     })
 
-    it("rejects a partial prefix of the correct number", () => {
-      expect(phoneMatches("5000", "+96550001234")).toBe(false)
+    it("rejects a prefix of the correct Civil ID", () => {
+      expect(civilIdMatches("3000", "300010100123")).toBe(false)
     })
 
-    it("rejects a number that shares the trailing 7 digits but differs in the 8th", () => {
-      expect(phoneMatches("50001234", "+96560001234")).toBe(false)
+    it("rejects a Civil ID differing in a single digit", () => {
+      expect(civilIdMatches("300010100124", "300010100123")).toBe(false)
     })
   })
 
   describe("edge cases", () => {
     it("rejects empty candidate", () => {
-      expect(phoneMatches("", "+96550001234")).toBe(false)
+      expect(civilIdMatches("", "300010100123")).toBe(false)
     })
 
     it("rejects empty expected", () => {
-      expect(phoneMatches("+96550001234", "")).toBe(false)
+      expect(civilIdMatches("300010100123", "")).toBe(false)
     })
 
     it("rejects null candidate", () => {
-      expect(phoneMatches(null, "+96550001234")).toBe(false)
+      expect(civilIdMatches(null, "300010100123")).toBe(false)
     })
 
     it("rejects undefined candidate", () => {
-      expect(phoneMatches(undefined, "+96550001234")).toBe(false)
+      expect(civilIdMatches(undefined, "300010100123")).toBe(false)
     })
 
     it("rejects null expected", () => {
-      expect(phoneMatches("+96550001234", null)).toBe(false)
+      expect(civilIdMatches("300010100123", null)).toBe(false)
     })
 
     it("rejects when both are empty", () => {
-      expect(phoneMatches("", "")).toBe(false)
+      expect(civilIdMatches("", "")).toBe(false)
     })
 
     it("rejects a candidate that is only punctuation", () => {
-      expect(phoneMatches("+-() ", "+96550001234")).toBe(false)
-    })
-
-    it("rejects a completely different Kuwaiti number", () => {
-      expect(phoneMatches("+96599999999", "+96550001234")).toBe(false)
-    })
-
-    it("does not strip 965 from a string that is not 11 digits total", () => {
-      // A 14-digit string beginning with 965 must NOT be treated as
-      // Kuwaiti+local; otherwise we re-introduce a suffix-match risk.
-      expect(phoneMatches("96512345678901", "+96512345678")).toBe(false)
+      expect(civilIdMatches("-- ()", "300010100123")).toBe(false)
     })
   })
 
@@ -134,14 +100,14 @@ describe("phoneMatches — full-digit Kuwaiti phone match", () => {
       )
       const source = readFileSync(sourcePath, "utf8")
 
-      // Pull out the phoneMatches function body. Lazy regex grab —
+      // Pull out the civilIdMatches function body. Lazy regex grab —
       // good enough to fail loud if the function is rewritten.
-      const fn = source.match(/export function phoneMatches[\s\S]+?^}/m)
-      expect(fn, "phoneMatches function not found in source").toBeTruthy()
+      const fn = source.match(/export function civilIdMatches[\s\S]+?^}/m)
+      expect(fn, "civilIdMatches function not found in source").toBeTruthy()
       const body = fn![0]
 
       // Forbid `a === b` or `b === a` style comparisons of the
-      // canonicalised digit strings inside phoneMatches itself.
+      // normalised digit strings inside civilIdMatches itself.
       expect(body).not.toMatch(/\ba\s*===\s*b\b/)
       expect(body).not.toMatch(/\bb\s*===\s*a\b/)
 
@@ -152,11 +118,11 @@ describe("phoneMatches — full-digit Kuwaiti phone match", () => {
   })
 })
 
-describe("validatePspTokenWithPhone — integration with phone gate", () => {
+describe("validatePspTokenWithCivilId — integration with Civil ID gate", () => {
   // We mock the supabase service-role client so we can drive the
   // token + lead lookup deterministically. We're specifically
-  // exercising the phone gate, not the token plumbing (covered by
-  // the phoneMatches block above plus the route-level tests).
+  // exercising the Civil ID gate, not the token plumbing (covered by
+  // the civilIdMatches block above plus the route-level tests).
 
   const tokenRow = {
     id: "tok-1",
@@ -165,7 +131,7 @@ describe("validatePspTokenWithPhone — integration with phone gate", () => {
     submitted_at: null,
   }
 
-  function buildMockClient(leadPhone: string | null) {
+  function buildMockClient(leadCivilId: string | null) {
     // Each `.from(table)` call returns a chainable object whose
     // terminal method (`.maybeSingle` / `.single`) returns a Promise
     // of `{ data, error }`. We don't care about the update call —
@@ -184,8 +150,8 @@ describe("validatePspTokenWithPhone — integration with phone gate", () => {
       eq: () => leadChain,
       single: () =>
         Promise.resolve({
-          data: leadPhone === null ? null : { phone: leadPhone },
-          error: leadPhone === null ? { message: "not found" } : null,
+          data: leadCivilId === null ? null : { civil_id: leadCivilId },
+          error: leadCivilId === null ? { message: "not found" } : null,
         }),
     }
 
@@ -210,65 +176,65 @@ describe("validatePspTokenWithPhone — integration with phone gate", () => {
     vi.resetModules()
   })
 
-  async function loadWithMock(leadPhone: string | null) {
-    const mockClient = buildMockClient(leadPhone)
+  async function loadWithMock(leadCivilId: string | null) {
+    const mockClient = buildMockClient(leadCivilId)
     vi.doMock("@/lib/supabase/server", () => ({
       createServiceRoleClient: () => mockClient,
     }))
     return await import("@/lib/auth/psp-self-service-token")
   }
 
-  it("accepts a matching full E.164 phone", async () => {
-    const { validatePspTokenWithPhone } = await loadWithMock("+965 5000 1234")
-    const res = await validatePspTokenWithPhone(
+  it("accepts a matching Civil ID", async () => {
+    const { validatePspTokenWithCivilId } = await loadWithMock("300010100123")
+    const res = await validatePspTokenWithCivilId(
       "this-is-a-long-token-string-abcdef",
-      "+96550001234",
+      "300010100123",
     )
     expect(res.ok).toBe(true)
   })
 
-  it("accepts a local 8-digit phone against a stored E.164 row", async () => {
-    const { validatePspTokenWithPhone } = await loadWithMock("+965 5000 1234")
-    const res = await validatePspTokenWithPhone(
+  it("accepts a Civil ID with punctuation against a clean stored row", async () => {
+    const { validatePspTokenWithCivilId } = await loadWithMock("300010100123")
+    const res = await validatePspTokenWithCivilId(
       "this-is-a-long-token-string-abcdef",
-      "50001234",
+      "3000 1010 0123",
     )
     expect(res.ok).toBe(true)
   })
 
-  it("rejects when only the last 8 digits of a foreign number are supplied (P1-4 regression)", async () => {
-    const { validatePspTokenWithPhone } = await loadWithMock("+447123412345678")
-    const res = await validatePspTokenWithPhone(
+  it("rejects when only the last 8 digits are supplied", async () => {
+    const { validatePspTokenWithCivilId } = await loadWithMock("300010100123")
+    const res = await validatePspTokenWithCivilId(
       "this-is-a-long-token-string-abcdef",
-      "12345678",
+      "10100123",
     )
-    expect(res).toEqual({ ok: false, reason: "phone_mismatch" })
+    expect(res).toEqual({ ok: false, reason: "civil_id_mismatch" })
   })
 
-  it("rejects a wrong number", async () => {
-    const { validatePspTokenWithPhone } = await loadWithMock("+96550001234")
-    const res = await validatePspTokenWithPhone(
+  it("rejects a wrong Civil ID", async () => {
+    const { validatePspTokenWithCivilId } = await loadWithMock("300010100123")
+    const res = await validatePspTokenWithCivilId(
       "this-is-a-long-token-string-abcdef",
-      "+96599999999",
+      "299999999999",
     )
-    expect(res).toEqual({ ok: false, reason: "phone_mismatch" })
+    expect(res).toEqual({ ok: false, reason: "civil_id_mismatch" })
   })
 
-  it("rejects an empty phone", async () => {
-    const { validatePspTokenWithPhone } = await loadWithMock("+96550001234")
-    const res = await validatePspTokenWithPhone(
+  it("rejects an empty Civil ID", async () => {
+    const { validatePspTokenWithCivilId } = await loadWithMock("300010100123")
+    const res = await validatePspTokenWithCivilId(
       "this-is-a-long-token-string-abcdef",
       "",
     )
-    expect(res).toEqual({ ok: false, reason: "phone_mismatch" })
+    expect(res).toEqual({ ok: false, reason: "civil_id_mismatch" })
   })
 
-  it("rejects null phone supplied by the caller", async () => {
-    const { validatePspTokenWithPhone } = await loadWithMock("+96550001234")
-    const res = await validatePspTokenWithPhone(
+  it("rejects null Civil ID supplied by the caller", async () => {
+    const { validatePspTokenWithCivilId } = await loadWithMock("300010100123")
+    const res = await validatePspTokenWithCivilId(
       "this-is-a-long-token-string-abcdef",
       null,
     )
-    expect(res).toEqual({ ok: false, reason: "phone_mismatch" })
+    expect(res).toEqual({ ok: false, reason: "civil_id_mismatch" })
   })
 })

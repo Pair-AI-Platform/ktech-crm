@@ -2,54 +2,11 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
 
 export type TokenValidationResult =
   | { ok: true; tokenId: string; leadId: string; submittedAt: string | null }
-  | { ok: false; reason: "not_found" | "expired" | "phone_mismatch" }
+  | { ok: false; reason: "not_found" | "expired" | "civil_id_mismatch" }
 
 /** Strip everything that isn't a digit. */
-function normalizePhone(input: string | null | undefined): string {
+function normalizeDigits(input: string | null | undefined): string {
   return (input ?? "").replace(/\D+/g, "")
-}
-
-/**
- * Canonicalise a Kuwaiti phone number to its bare 8-digit local form
- * whenever possible. We strip a leading `965` country code if present
- * (the Kuwait dialling code is +965, so a digits-only `9655...` row in
- * the DB is the country-coded form of the same number a student types
- * in as `5...`). This lets us treat the following as equivalent without
- * falling back to the dangerous "last-8-digits" suffix match that the
- * previous implementation used:
- *
- *   `+965 5000 1234`      stored on the lead row
- *   `+96550001234`        what a student might paste
- *   `96550001234`         what a student might type
- *   `0096550001234`       international dial-out form
- *   `50001234`            bare local form
- *
- * Anything else — wrong country code, fewer or more digits than
- * expected — is left as the raw digit string so a non-Kuwaiti number
- * never silently collides with a Kuwaiti one of the same tail.
- *
- * Why this is safer than the previous `slice(-8)` matcher:
- *   - The old code compared only the last 8 digits, so `+447123412345678`
- *     would match a lead row of `+96512345678`. Now both get canonicalised
- *     to *different* values (the UK number does not start with `965`,
- *     so it keeps all its digits) and won't collide.
- *   - The old code also let an attacker brute-force just 8 digits of a
- *     Kuwait mobile (~10^7 mobiles in practice) against a leaked or
- *     guessed token. Forcing the full digit string back into the
- *     comparison restores the country-code dimension to the search space.
- */
-function canonicaliseKuwaitiPhone(digits: string): string {
-  if (!digits) return ""
-  // Strip a leading international-prefix `00` first.
-  let d = digits.startsWith("00") ? digits.slice(2) : digits
-  // Strip the +965 country code if present and the remainder still
-  // looks like a Kuwaiti local number (8 digits). Don't blindly strip
-  // any number starting with 965 — a 13-digit string starting with
-  // 965 is almost certainly not Kuwaiti.
-  if (d.startsWith("965") && d.length === 11) {
-    d = d.slice(3)
-  }
-  return d
 }
 
 /**
@@ -73,21 +30,19 @@ function constantTimeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Returns true if `candidate` matches `expected` as a phone number.
+ * Returns true if `candidate` matches `expected` as a Kuwaiti Civil ID.
  *
- * The match is now a *full-digit* comparison after canonicalising both
- * sides — no more "last 8 digits" suffix shortcut, which was the P1-4
- * audit finding. Both inputs are stripped of non-digit noise (spaces,
- * `+`, dashes, brackets) and, if they begin with `965` and look like a
- * Kuwaiti 11-digit string, the `965` country code is dropped. The
- * resulting digit strings are then compared in constant time so the
- * endpoint does not leak which prefix matched via response timing.
+ * Both inputs are stripped of non-digit noise (spaces, dashes) and the
+ * resulting digit strings are compared in full, in constant time so the
+ * endpoint does not leak which prefix matched via response timing. A
+ * Kuwaiti Civil ID is a fixed 12-digit number, so there is no country-code
+ * canonicalisation to do — it is a straight whole-string comparison.
  *
  * Empty inputs never match.
  */
-export function phoneMatches(candidate: string | null | undefined, expected: string | null | undefined): boolean {
-  const a = canonicaliseKuwaitiPhone(normalizePhone(candidate))
-  const b = canonicaliseKuwaitiPhone(normalizePhone(expected))
+export function civilIdMatches(candidate: string | null | undefined, expected: string | null | undefined): boolean {
+  const a = normalizeDigits(candidate)
+  const b = normalizeDigits(expected)
   if (!a || !b) return false
   return constantTimeEqual(a, b)
 }
@@ -140,26 +95,25 @@ export async function validatePspToken(token: string): Promise<TokenValidationRe
 }
 
 /**
- * Same as validatePspToken, but ALSO requires `phone` to match the
- * lead row's `phone`. Used by the public self-service endpoints so the
+ * Same as validatePspToken, but ALSO requires `civilId` to match the
+ * lead row's `civil_id`. Used by the public self-service endpoints so the
  * token alone is not enough to read or mutate the lead — the student
- * proves possession of the link AND knowledge of the registered phone
- * number. The token still expires after 7 days; the phone check is
- * a per-request gate, not a session.
+ * proves possession of the link AND knowledge of the registered Civil ID.
+ * The token still expires after 7 days; the Civil ID check is a
+ * per-request gate, not a session.
  *
- * The phone match is now full-digit (see `phoneMatches`) so a student
- * who only knows the last 8 digits of a country-coded entry can no
- * longer authenticate — they must supply the bare local mobile or the
- * full international form. This closes the brute-force gap flagged as
- * P1-4 in the security audit.
+ * The match is a full-digit comparison (see `civilIdMatches`): the student
+ * must supply the complete 12-digit Civil ID. Comparison runs in constant
+ * time so the endpoint does not leak which prefix matched via response
+ * timing, keeping it resistant to digit-by-digit brute force.
  *
- * Returns `phone_mismatch` (suggested HTTP 401) when phone is missing
- * or wrong. Falls through to the same `not_found` / `expired`
+ * Returns `civil_id_mismatch` (suggested HTTP 401) when the Civil ID is
+ * missing or wrong. Falls through to the same `not_found` / `expired`
  * responses as `validatePspToken` for the token itself.
  */
-export async function validatePspTokenWithPhone(
+export async function validatePspTokenWithCivilId(
   token: string,
-  phone: string | null | undefined,
+  civilId: string | null | undefined,
 ): Promise<TokenValidationResult> {
   const tokenResult = await validatePspToken(token)
   if (!tokenResult.ok) return tokenResult
@@ -167,7 +121,7 @@ export async function validatePspTokenWithPhone(
   const supabase = createServiceRoleClient()
   const { data: lead, error } = await supabase
     .from("leads")
-    .select("phone")
+    .select("civil_id")
     .eq("id", tokenResult.leadId)
     .single()
 
@@ -175,8 +129,8 @@ export async function validatePspTokenWithPhone(
     return { ok: false, reason: "not_found" }
   }
 
-  if (!phoneMatches(phone, lead.phone)) {
-    return { ok: false, reason: "phone_mismatch" }
+  if (!civilIdMatches(civilId, lead.civil_id)) {
+    return { ok: false, reason: "civil_id_mismatch" }
   }
 
   return tokenResult

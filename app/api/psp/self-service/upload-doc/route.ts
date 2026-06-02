@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createLogger, errorResponse } from "@/lib/logger"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
-import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
+import { validatePspTokenWithCivilId } from "@/lib/auth/psp-self-service-token"
 import { validateUpload, sanitizeFilename } from "@/lib/upload-validation"
 import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   }
 
   const token = formData.get("token") as string | null
-  const phone = formData.get("phone") as string | null
+  const civilId = formData.get("civilId") as string | null
   const file = formData.get("file") as File | null
   const documentType = formData.get("document_type") as string | null
   // `graduate_type` is intentionally ignored if present in the form data.
@@ -76,11 +76,11 @@ export async function POST(request: NextRequest) {
     return errorResponse(validation.reason, validation.status, logger)
   }
 
-  const result = await validatePspTokenWithPhone(token, phone)
+  const result = await validatePspTokenWithCivilId(token, civilId)
   if (!result.ok) {
     const status =
       result.reason === "expired" ? 410 :
-      result.reason === "phone_mismatch" ? 401 :
+      result.reason === "civil_id_mismatch" ? 401 :
       404
     return errorResponse(result.reason, status, logger)
   }

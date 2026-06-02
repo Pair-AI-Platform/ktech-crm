@@ -2,21 +2,21 @@ import { NextRequest, NextResponse } from "next/server"
 import { createLogger } from "@/lib/logger"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
-import { validatePspTokenWithPhone } from "@/lib/auth/psp-self-service-token"
+import { validatePspTokenWithCivilId } from "@/lib/auth/psp-self-service-token"
 
 /**
  * Public endpoint: returns the editable PSP form state for a token holder.
- * Requires the lead's phone number as a per-request password.
+ * Requires the lead's Civil ID as a per-request password.
  *
  * 400 — token missing
- * 401 — phone missing or doesn't match the lead's phone
+ * 401 — Civil ID missing or doesn't match the lead's Civil ID
  * 404 — token unknown or tampered
  * 410 — token expired
  */
 export async function GET(request: NextRequest) {
   const logger = createLogger("psp-self-service-details")
   const token = request.nextUrl.searchParams.get("token")
-  const phone = request.nextUrl.searchParams.get("phone")
+  const civilId = request.nextUrl.searchParams.get("civilId")
 
   if (!token) {
     return NextResponse.json({ error: "Token is required" }, { status: 400 })
@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const result = await validatePspTokenWithPhone(token, phone)
+  const result = await validatePspTokenWithCivilId(token, civilId)
   if (!result.ok) {
     const status =
       result.reason === "expired" ? 410 :
-      result.reason === "phone_mismatch" ? 401 :
+      result.reason === "civil_id_mismatch" ? 401 :
       404
     return NextResponse.json({ error: result.reason }, { status })
   }

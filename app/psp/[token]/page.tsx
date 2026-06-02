@@ -75,12 +75,12 @@ export default function PspSelfServicePage() {
   const [savedFlash, setSavedFlash] = useState(false)
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null)
 
-  // Phone-as-password: held in memory only, never persisted. Sent with every
+  // Civil-ID-as-password: held in memory only, never persisted. Sent with every
   // API call so the server can verify the holder of the link is the lead.
-  const [phone, setPhone] = useState("")
+  const [civilId, setCivilId] = useState("")
   const [verifyError, setVerifyError] = useState("")
 
-  // Editable form state (phone intentionally omitted — it is the auth secret)
+  // Editable form state (civil_id intentionally read-only — it is the auth secret)
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -98,18 +98,22 @@ export default function PspSelfServicePage() {
     is_special_needs: false,
   })
 
-  async function verifyAndLoad(rawPhone: string) {
+  async function verifyAndLoad(rawCivilId: string) {
     if (!token) return
-    const trimmed = rawPhone.trim()
+    const trimmed = rawCivilId.trim()
     if (!trimmed) {
-      setVerifyError("Phone number is required")
+      setVerifyError("Civil ID is required")
+      return
+    }
+    if (!/^\d{12}$/.test(trimmed.replace(/\D+/g, ""))) {
+      setVerifyError("Civil ID must be 12 digits")
       return
     }
     setVerifyError("")
     setState("verifying")
 
     // Demo-preview short-circuit: lets agents see the student-facing form
-    // without minting a real token. Any phone is accepted.
+    // without minting a real token. Any Civil ID is accepted.
     if (token === "demo-preview") {
       const demoLead: LeadView = {
         id: "demo",
@@ -117,8 +121,8 @@ export default function PspSelfServicePage() {
         last_name: "Ali",
         first_name_ar: "الدانة",
         last_name_ar: "علي",
-        civil_id: "300010100123",
-        phone: trimmed,
+        civil_id: trimmed,
+        phone: "51234567",
         phone_secondary: null,
         email: "aldana@example.com",
         date_of_birth: "2006-03-14",
@@ -133,7 +137,7 @@ export default function PspSelfServicePage() {
       }
       setLead(demoLead)
       setDocs([])
-      setPhone(trimmed)
+      setCivilId(trimmed)
       setForm({
         first_name: demoLead.first_name ?? "",
         last_name: demoLead.last_name ?? "",
@@ -156,14 +160,14 @@ export default function PspSelfServicePage() {
 
     try {
       const res = await fetch(
-        `/api/psp/self-service/details?token=${token}&phone=${encodeURIComponent(trimmed)}`,
+        `/api/psp/self-service/details?token=${token}&civilId=${encodeURIComponent(trimmed)}`,
       )
       if (res.status === 410) {
         setState("expired")
         return
       }
       if (res.status === 401) {
-        setVerifyError("That phone number doesn't match the one on file.")
+        setVerifyError("That Civil ID doesn't match the one on file.")
         setState("verify")
         return
       }
@@ -176,7 +180,7 @@ export default function PspSelfServicePage() {
       const json = (await res.json()) as { lead: LeadView; documents: UploadedDoc[]; submitted_at: string | null }
       setLead(json.lead)
       setDocs(json.documents || [])
-      setPhone(trimmed)
+      setCivilId(trimmed)
       const { firstName, lastName } = getArabicLeadNameParts(json.lead)
       setForm({
         first_name: firstName,
@@ -202,9 +206,9 @@ export default function PspSelfServicePage() {
   }
 
   async function reloadDocs() {
-    if (!token || !phone) return
+    if (!token || !civilId) return
     const res = await fetch(
-      `/api/psp/self-service/details?token=${token}&phone=${encodeURIComponent(phone)}`,
+      `/api/psp/self-service/details?token=${token}&civilId=${encodeURIComponent(civilId)}`,
     )
     if (!res.ok) return
     const json = (await res.json()) as { documents: UploadedDoc[] }
@@ -232,7 +236,7 @@ export default function PspSelfServicePage() {
   }, [docs, form.education_type])
 
   async function saveInfo() {
-    if (!token || !phone) return
+    if (!token || !civilId) return
     if (token === "demo-preview") {
       setSaving(true)
       await new Promise(r => setTimeout(r, 300))
@@ -248,7 +252,6 @@ export default function PspSelfServicePage() {
         last_name: form.last_name || null,
         first_name_ar: form.first_name_ar || null,
         last_name_ar: form.last_name_ar || null,
-        civil_id: form.civil_id || null,
         phone_secondary: form.phone_secondary || null,
         email: form.email || null,
         date_of_birth: form.date_of_birth || null,
@@ -260,7 +263,7 @@ export default function PspSelfServicePage() {
       const res = await fetch("/api/psp/self-service/save-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, phone, updates }),
+        body: JSON.stringify({ token, civilId, updates }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -269,8 +272,8 @@ export default function PspSelfServicePage() {
           return
         }
         if (res.status === 401) {
-          setVerifyError("Session expired — please verify your phone again.")
-          setPhone("")
+          setVerifyError("Session expired — please verify your Civil ID again.")
+          setCivilId("")
           setState("verify")
           return
         }
@@ -285,7 +288,7 @@ export default function PspSelfServicePage() {
   }
 
   async function uploadDoc(rule: DocumentRule, file: File) {
-    if (!token || !phone) return
+    if (!token || !civilId) return
     const gradType = form.education_type
     if (!gradType) return
     if (token === "demo-preview") {
@@ -311,7 +314,7 @@ export default function PspSelfServicePage() {
     try {
       const fd = new FormData()
       fd.append("token", token)
-      fd.append("phone", phone)
+      fd.append("civilId", civilId)
       fd.append("file", file)
       fd.append("document_type", rule.id)
       fd.append("graduate_type", gradType)
@@ -323,8 +326,8 @@ export default function PspSelfServicePage() {
           return
         }
         if (res.status === 401) {
-          setVerifyError("Session expired — please verify your phone again.")
-          setPhone("")
+          setVerifyError("Session expired — please verify your Civil ID again.")
+          setCivilId("")
           setState("verify")
           return
         }
@@ -338,7 +341,7 @@ export default function PspSelfServicePage() {
   }
 
   async function submit() {
-    if (!token || !phone) return
+    if (!token || !civilId) return
     if (token === "demo-preview") {
       setSubmitting(true)
       await new Promise(r => setTimeout(r, 500))
@@ -353,7 +356,7 @@ export default function PspSelfServicePage() {
       const res = await fetch("/api/psp/self-service/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, phone }),
+        body: JSON.stringify({ token, civilId }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -362,8 +365,8 @@ export default function PspSelfServicePage() {
           return
         }
         if (res.status === 401) {
-          setVerifyError("Session expired — please verify your phone again.")
-          setPhone("")
+          setVerifyError("Session expired — please verify your Civil ID again.")
+          setCivilId("")
           setState("verify")
           return
         }
@@ -448,7 +451,7 @@ export default function PspSelfServicePage() {
               <Input value={form.last_name_ar} onChange={(v) => setForm({ ...form, last_name_ar: v })} dir="rtl" />
             </Field>
             <Field label="Civil ID" labelAr="الرقم المدني">
-              <Input value={form.civil_id} onChange={(v) => setForm({ ...form, civil_id: v })} inputMode="numeric" />
+              <Input value={form.civil_id} onChange={() => {}} inputMode="numeric" readOnly />
             </Field>
             <Field label="Phone (Secondary)" labelAr="رقم هاتف إضافي">
               <Input value={form.phone_secondary} onChange={(v) => setForm({ ...form, phone_secondary: v })} inputMode="tel" />
@@ -568,7 +571,7 @@ function VerifyForm({
 }: {
   loading: boolean
   error: string
-  onSubmit: (phone: string) => void
+  onSubmit: (civilId: string) => void
 }) {
   const [value, setValue] = useState("")
   return (
@@ -576,10 +579,10 @@ function VerifyForm({
       <h2 className="text-xl font-bold text-slate-900 text-center">Verify your identity</h2>
       <p className="text-sm text-slate-500 text-center mt-1">تأكيد الهوية</p>
       <p className="text-xs text-slate-500 text-center mt-3">
-        Enter the phone number registered with KTECH to open your application.
+        Enter the Civil ID registered with KTECH to open your application.
       </p>
       <p className="text-xs text-slate-500 text-center mt-1" dir="rtl">
-        أدخل رقم الهاتف المسجل لدى KTECH لفتح طلبك.
+        أدخل الرقم المدني المسجل لدى KTECH لفتح طلبك.
       </p>
       <form
         onSubmit={(e) => {
@@ -589,12 +592,13 @@ function VerifyForm({
         className="mt-5 space-y-3"
       >
         <input
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={12}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="e.g. 51234567"
+          placeholder="e.g. 300010100123"
           className="w-full px-4 py-3 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center tracking-wider"
           autoFocus
         />
@@ -666,6 +670,7 @@ function Input(props: {
   type?: string
   inputMode?: "text" | "numeric" | "tel" | "email" | "decimal"
   dir?: "ltr" | "rtl"
+  readOnly?: boolean
 }) {
   return (
     <input
@@ -673,8 +678,11 @@ function Input(props: {
       inputMode={props.inputMode}
       dir={props.dir}
       value={props.value}
+      readOnly={props.readOnly}
       onChange={(e) => props.onChange(e.target.value)}
-      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      className={`w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent${
+        props.readOnly ? " bg-slate-100 text-slate-500 cursor-not-allowed" : ""
+      }`}
     />
   )
 }
