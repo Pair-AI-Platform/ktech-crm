@@ -412,6 +412,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
     // Personal
     first_name: initialArabicName.firstName,
     last_name: initialArabicName.lastName,
+    full_name_ar: lead.full_name_ar || "",
     gender: lead.gender || "",
     nationality: lead.nationality || "",
     address: lead.address || "",
@@ -797,6 +798,17 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   error={errors.last_name}
                 />
                 {errors.last_name && <p className="text-xs text-[var(--error)]">{errors.last_name}</p>}
+              </div>
+              {/* Full Name in Arabic (optional) */}
+              <div className="space-y-2">
+                <Label htmlFor="full_name_ar">الاسم الكامل <span className="text-xs text-[var(--text-secondary)]">(اختياري)</span></Label>
+                <Input
+                  id="full_name_ar"
+                  value={formData.full_name_ar}
+                  onChange={(e) => handleChange("full_name_ar", e.target.value)}
+                  placeholder="الاسم الكامل بالعربي"
+                  dir="rtl"
+                />
               </div>
               {/* Address */}
               <div className="space-y-2">
