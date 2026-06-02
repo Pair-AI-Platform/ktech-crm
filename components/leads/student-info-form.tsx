@@ -557,6 +557,23 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
       return
     }
 
+    if (field === "full_name_ar") {
+      // Full Arabic name is required and Arabic-only — validate inline and block the save on invalid input.
+      setFormData(prev => ({ ...prev, full_name_ar: value }))
+      const trimmed = value.trim()
+      if (!trimmed) {
+        setErrors(prev => ({ ...prev, full_name_ar: "Full name is required" }))
+        return
+      }
+      if (!isArabicText(trimmed)) {
+        setErrors(prev => ({ ...prev, full_name_ar: "Name must be in Arabic" }))
+        return
+      }
+      if (errors.full_name_ar) setErrors(prev => ({ ...prev, full_name_ar: "" }))
+      queueField(field, value)
+      return
+    }
+
     if (field === "gender") {
       // Gender is required — clearing it flags an error and blocks the save.
       if (!value) {
@@ -676,6 +693,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
   const requiredFields = [
     { label: "First name", complete: Boolean(formData.first_name.trim()) },
     { label: "Last name", complete: Boolean(formData.last_name.trim()) },
+    { label: "Full name (Arabic)", complete: Boolean(formData.full_name_ar.trim()) },
     { label: "Phone", complete: Boolean(formData.phone.trim()) },
     { label: "Civil ID", complete: Boolean(formData.civil_id.trim()) },
     { label: "Education type", complete: Boolean(formData.education_type) },
@@ -799,16 +817,18 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                 />
                 {errors.last_name && <p className="text-xs text-[var(--error)]">{errors.last_name}</p>}
               </div>
-              {/* Full Name in Arabic (optional) */}
+              {/* Full Name in Arabic (required) */}
               <div className="space-y-2">
-                <Label htmlFor="full_name_ar">الاسم الكامل <span className="text-xs text-[var(--text-secondary)]">(اختياري)</span></Label>
+                <Label htmlFor="full_name_ar">الاسم الكامل *</Label>
                 <Input
                   id="full_name_ar"
                   value={formData.full_name_ar}
                   onChange={(e) => handleChange("full_name_ar", e.target.value)}
                   placeholder="الاسم الكامل بالعربي"
                   dir="rtl"
+                  error={errors.full_name_ar}
                 />
+                {errors.full_name_ar && <p className="text-xs text-[var(--error)]">{errors.full_name_ar}</p>}
               </div>
               {/* Address */}
               <div className="space-y-2">
