@@ -50,27 +50,26 @@ async function runMigration() {
     ssl: { rejectUnauthorized: false }
   })
 
+  // Migration filename can be passed as the first CLI argument, e.g.
+  //   node scripts/run-migration.js 197_realtime_puc_doc_status.sql
+  // Falls back to the legacy default for backwards compatibility.
+  const migrationFile = process.argv[2] || '021_payment_transactions.sql'
+
   try {
     console.log('Connecting to database...')
     const client = await pool.connect()
 
-    console.log('Reading migration file...')
-    const migrationPath = path.join(__dirname, '..', 'supabase', 'migrations', '021_payment_transactions.sql')
+    console.log(`Reading migration file: ${migrationFile}`)
+    const migrationPath = path.join(__dirname, '..', 'supabase', 'migrations', migrationFile)
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8')
 
-    console.log('Running migration: 021_payment_transactions.sql')
+    console.log(`Running migration: ${migrationFile}`)
     console.log('---')
 
     await client.query(migrationSQL)
 
     console.log('---')
     console.log('✓ Migration completed successfully!')
-    console.log('')
-    console.log('Created:')
-    console.log('  - Type: payment_method')
-    console.log('  - Type: enrollment_payment_status')
-    console.log('  - Table: payment_transactions')
-    console.log('  - Indexes and RLS policies')
 
     client.release()
   } catch (error) {
