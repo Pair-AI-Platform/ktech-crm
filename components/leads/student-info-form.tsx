@@ -556,6 +556,12 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
     }
 
     if (field === "gender") {
+      // Gender is required — clearing it flags an error and blocks the save.
+      if (!value) {
+        setFormData(prev => ({ ...prev, gender: "" }))
+        setErrors(prev => ({ ...prev, gender: "Gender is required" }))
+        return
+      }
       setFormData(prev => {
         const currentSchool = schoolSource.find(s => s.id === prev.school)
         const gender = currentSchool?.gender
@@ -569,6 +575,9 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
         }
         return { ...prev, gender: value, school: genderMismatch ? "" : prev.school, education_type: genderMismatch ? "" : prev.education_type }
       })
+      if (errors.gender) setErrors(prev => ({ ...prev, gender: "" }))
+      queueField(field, value)
+      return
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
@@ -804,11 +813,15 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Gender */}
             <div className="space-y-2">
-              <Label>Gender</Label>
+              <Label>Gender *</Label>
               <div
                 role="radiogroup"
                 aria-label="Gender"
-                className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] p-1"
+                aria-required="true"
+                className={cn(
+                  "grid grid-cols-2 gap-1 rounded-lg border bg-[var(--bg-sunken)] p-1",
+                  errors.gender ? "border-[var(--error)]" : "border-[var(--border)]"
+                )}
               >
                 {[
                   { value: "male", label: "Male" },
@@ -835,6 +848,7 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   )
                 })}
               </div>
+              {errors.gender && <p className="text-xs text-[var(--error)]">{errors.gender}</p>}
             </div>
 
             {/* Nationality */}
