@@ -383,7 +383,11 @@ export function LeadTable({
       const result: Record<string, { uploaded: number; required: number }> = {}
       for (const lead of pucLeads) {
         const uploadedTypes = uploadedMap[lead.id]?.types ?? new Set<string>()
-        const gradType = uploadedMap[lead.id]?.gradType || lead.education_type?.toUpperCase() || ''
+        // Default to GOV (Government School Graduate) baseline so the required
+        // count is always shown — even before a graduate type is determined.
+        const VALID_GRAD_TYPES = ['GOV', 'US', 'UK', 'KSA', 'OTHER']
+        const resolvedGradType = uploadedMap[lead.id]?.gradType || lead.education_type?.toUpperCase() || ''
+        const gradType = VALID_GRAD_TYPES.includes(resolvedGradType) ? resolvedGradType : 'GOV'
 
         let requiredIds: string[] = []
         if (gradType) {
