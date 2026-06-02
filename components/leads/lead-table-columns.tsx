@@ -137,6 +137,7 @@ export function LeadTableHeader({
                 </th>
               </>
             )}
+            {!isPucContactedView && (
             <th className="px-3 py-1.5 text-left w-[75px]">
               <button
                 onClick={() => handleSort("actual_gpa")}
@@ -146,6 +147,7 @@ export function LeadTableHeader({
                 <span className="group-hover:scale-110 transition-transform">{getSortIcon("actual_gpa")}</span>
               </button>
             </th>
+            )}
             {!isPucContactedView && (
             <th className="px-3 py-1.5 text-left w-[180px] min-w-[160px]">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">

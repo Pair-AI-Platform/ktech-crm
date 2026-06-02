@@ -792,6 +792,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
             </>
           )}
           {/* Actual GPA column for submission view */}
+          {!isPucContactedView && (
           <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
             {editingGpa?.leadId === lead.id && editingGpa.field === 'actual_gpa' ? (
               <input
@@ -827,6 +828,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 )
               })()}
           </td>
+          )}
           {/* Agent column - hidden in PUC Contacted view */}
           {!isPucContactedView && (
           <td className="px-3 py-3">
