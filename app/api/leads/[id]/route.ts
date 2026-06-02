@@ -16,7 +16,7 @@ export const GET = withApiHandler(
       .from('leads')
       .select(`
         *,
-        school:schools(id, name_en, name_ar),
+        school:schools(id, name_en, name_ar, school_type),
         assigned_agent:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
         lost_reason:lost_reasons!leads_lost_reason_id_fkey(id, reason_en, reason_ar, category),
         semester:semesters(id, name, is_active)

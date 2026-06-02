@@ -32,6 +32,19 @@ export function checkStageTransition({
   if (newStage === "withdraw") return { kind: "withdraw", lead }
   if (newStage === "contacted") return { kind: "contacted", lead }
 
+  // Self-funded leads pay the 35 KWD file fee (application + test fee) when they
+  // first move INTO the Test stage. The fee is one-time and can be exempted, so
+  // once file_fee_status is paid/exempt the lead passes straight through.
+  if (newStage === "test" && lead.pipeline_stage !== "test") {
+    if (
+      lead.funding_type === "self_funded" &&
+      lead.file_fee_status !== "paid" &&
+      lead.file_fee_status !== "exempt"
+    ) {
+      return { kind: "file_fee", lead }
+    }
+  }
+
   if (newStage === "application" && lead.pipeline_stage !== "application") {
     const missingFields = getMissingPspSelfServiceFields(lead)
     if (missingFields.length > 0) {

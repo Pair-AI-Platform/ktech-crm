@@ -21,8 +21,20 @@ export function useAutoSaveLead(leadId: string | undefined) {
   const flushNow = useCallback(async () => {
     if (!leadId) return
     if (inFlightRef.current) return
-    const payload = pendingRef.current
-    if (!payload || Object.keys(payload).length === 0) return
+    // Drop `undefined` values: JSON.stringify strips them, so a payload that is
+    // all-undefined (e.g. a user clearing a single field) would PATCH with an
+    // empty body — which PostgREST rejects, surfacing a bogus "Failed — retry".
+    const payload = Object.fromEntries(
+      Object.entries(pendingRef.current).filter(([, v]) => v !== undefined),
+    ) as Partial<Lead>
+    if (Object.keys(payload).length === 0) {
+      pendingRef.current = {}
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      return
+    }
 
     pendingRef.current = {}
     if (timerRef.current) {
@@ -44,6 +56,8 @@ export function useAutoSaveLead(leadId: string | undefined) {
         scheduleFlush()
       }
     } catch (err) {
+      // Surface the real reason so a failed auto-save is never a black box.
+      console.error("[useAutoSaveLead] save failed", { leadId, payload, error: err })
       // Re-queue the failed payload so a manual retry can pick it up
       pendingRef.current = { ...payload, ...pendingRef.current }
       setStatus("error")

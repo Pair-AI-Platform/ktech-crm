@@ -6,7 +6,12 @@ import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requireme
 
 export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
-  const { leadId, invoiceNumber, testFeeAmount, notes } = body
+  const { leadId, invoiceNumber, testFeeAmount, notes, targetStage: rawTargetStage } = body
+
+  // Which stage to land the lead on once the fee is settled. The file fee now
+  // gates entry to the Test stage; 'application' is kept for legacy / reactivation.
+  const targetStage: 'test' | 'application' = rawTargetStage === 'test' ? 'test' : 'application'
+  const targetStageLabel = targetStage === 'test' ? 'Test' : 'File'
 
   if (!leadId) {
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
@@ -37,12 +42,16 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
     return NextResponse.json({ error: 'File fees have already been handled for this lead' }, { status: 409 })
   }
 
-  const missingFields = getMissingPspSelfServiceFields(lead)
-  if (missingFields.length > 0) {
-    return NextResponse.json(
-      { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
-      { status: 400 }
-    )
+  // File-stage academic requirements are only enforced when the fee is taken to
+  // unlock the File stage. The Test-entry fee does not require them.
+  if (targetStage === 'application') {
+    const missingFields = getMissingPspSelfServiceFields(lead)
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
+        { status: 400 }
+      )
+    }
   }
 
   // Create payment transaction record
@@ -71,13 +80,13 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
     return NextResponse.json({ error: 'Failed to create payment transaction' }, { status: 500 })
   }
 
-  // Move lead to application (file) stage and update fee status
-  await supabase.rpc("shift_stage_positions", { target_stage: "application" })
+  // Move lead to the target stage and update fee status
+  await supabase.rpc("shift_stage_positions", { target_stage: targetStage })
 
   const { error: updateError } = await supabase
     .from('leads')
     .update({
-      pipeline_stage: 'application',
+      pipeline_stage: targetStage,
       position_in_stage: 0,
       status: null,
       last_contacted_at: new Date().toISOString(),
@@ -88,8 +97,8 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
     .eq('id', leadId)
 
   if (updateError) {
-    logger.error('Failed to move lead to file stage', { leadId, error: updateError.message })
-    return NextResponse.json({ error: 'Payment recorded but failed to move lead to File stage' }, { status: 500 })
+    logger.error('Failed to move lead to target stage', { leadId, targetStage, error: updateError.message })
+    return NextResponse.json({ error: `Payment recorded but failed to move lead to ${targetStageLabel} stage` }, { status: 500 })
   }
 
   // Log activity
@@ -110,14 +119,15 @@ export const POST = withApiHandler({ context: 'file-fee-cash' }, async ({ req, s
     created_by: user.id,
   })
 
-  logger.info('File fee cash payment processed, lead moved to file stage', {
+  logger.info('File fee cash payment processed, lead moved to target stage', {
     leadId,
+    targetStage,
     transactionId: transaction.id,
   })
 
   return NextResponse.json({
     success: true,
     transactionId: transaction.id,
-    message: 'File fee payment recorded — lead moved to File stage',
+    message: `File fee payment recorded — lead moved to ${targetStageLabel} stage`,
   })
 })

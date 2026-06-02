@@ -6,7 +6,12 @@ import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requireme
 
 export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'] }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
-  const { leadId } = body
+  const { leadId, targetStage: rawTargetStage } = body
+
+  // The file fee gates entry to the Test stage; 'application' is kept for
+  // legacy / reactivation flows.
+  const targetStage: 'test' | 'application' = rawTargetStage === 'test' ? 'test' : 'application'
+  const targetStageLabel = targetStage === 'test' ? 'Test' : 'File'
 
   if (!leadId) {
     return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
@@ -38,22 +43,26 @@ export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'
     return NextResponse.json({ error: 'Lead has already been exempted from file fees' }, { status: 409 })
   }
 
-  const missingFields = getMissingPspSelfServiceFields(lead)
-  if (missingFields.length > 0) {
-    return NextResponse.json(
-      { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
-      { status: 400 }
-    )
+  // File-stage academic requirements are only enforced when unlocking the File
+  // stage. Exempting the Test-entry fee does not require them.
+  if (targetStage === 'application') {
+    const missingFields = getMissingPspSelfServiceFields(lead)
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Complete ${missingFields.join(', ')} before moving this lead to File.` },
+        { status: 400 }
+      )
+    }
   }
 
-  // Update lead: exempt from fees and move to file stage
+  // Update lead: exempt from fees and move to the target stage
   const now = new Date().toISOString()
-  await serviceClient.rpc('shift_stage_positions', { target_stage: 'application' })
+  await serviceClient.rpc('shift_stage_positions', { target_stage: targetStage })
 
   const { error: updateError } = await serviceClient
     .from('leads')
     .update({
-      pipeline_stage: 'application',
+      pipeline_stage: targetStage,
       position_in_stage: 0,
       last_contacted_at: now,
       file_fee_status: 'exempt',
@@ -73,18 +82,19 @@ export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'
     lead_id: leadId,
     activity_type: 'fee_exemption',
     title: 'File Fee Exemption',
-    description: `${lead.first_name} ${lead.last_name} was exempted from file stage fees`,
+    description: `${lead.first_name} ${lead.last_name} was exempted from file stage fees and moved to ${targetStageLabel} stage`,
     metadata: {
       payment_purpose: 'file_fee',
       exempted_by: user.id,
+      target_stage: targetStage,
     },
     created_by: user.id,
   })
 
-  logger.info('Lead exempted from file fees, moved to file stage', { leadId })
+  logger.info('Lead exempted from file fees, moved to target stage', { leadId, targetStage })
 
   return NextResponse.json({
     success: true,
-    message: 'Lead exempted from file fees and moved to File stage',
+    message: `Lead exempted from file fees and moved to ${targetStageLabel} stage`,
   })
 })

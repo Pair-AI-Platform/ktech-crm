@@ -887,10 +887,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <button
                     onClick={autosave.retry}
                     title={autosave.error ?? 'Save failed'}
-                    className="inline-flex items-center gap-1 rounded-full bg-[var(--error-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--error)] hover:brightness-110"
+                    className="inline-flex max-w-[420px] items-center gap-1 rounded-full bg-[var(--error-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--error)] hover:brightness-110"
                   >
-                    <XCircle className="h-3 w-3" />
-                    Failed — retry
+                    <XCircle className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {autosave.error ? `Save failed: ${autosave.error} — retry` : 'Failed — retry'}
+                    </span>
                   </button>
                 )}
               </div>

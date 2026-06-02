@@ -24,6 +24,21 @@ function educationToGraduateType(educationType?: EducationType): GraduateType | 
   return educationType as GraduateType
 }
 
+// The school's school_type is the source of truth for the graduate type. Most
+// imported leads never had the denormalized education_type column populated, so
+// fall back to the linked school's type when education_type is missing.
+const SCHOOL_TYPE_TO_GRADUATE: Record<string, GraduateType> = {
+  gov: 'GOV', us: 'US', uk: 'UK', ksa: 'KSA', others: 'OTHER',
+}
+
+function resolveGraduateType(lead: Lead): GraduateType | null {
+  const fromEducation = educationToGraduateType(lead.education_type)
+  if (fromEducation) return fromEducation
+  // lead.school is the joined schools row at runtime (id, name_en, name_ar, school_type).
+  const schoolType = (lead.school as unknown as { school_type?: string } | undefined)?.school_type
+  return schoolType ? (SCHOOL_TYPE_TO_GRADUATE[schoolType] ?? null) : null
+}
+
 interface UploadedDocFile {
   name: string
   size: number
@@ -40,8 +55,9 @@ interface SFDocumentManagerProps {
 }
 
 export function SFDocumentManager({ lead, onUpdate, className }: SFDocumentManagerProps) {
-  // Graduate type is auto-derived from the lead's school (education_type) and locked here.
-  const selectedType = educationToGraduateType(lead.education_type)
+  // Graduate type is auto-derived from the lead's school and locked here. Prefer the
+  // persisted education_type, falling back to the linked school's school_type.
+  const selectedType = resolveGraduateType(lead)
   const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedDocFile>>({})
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
