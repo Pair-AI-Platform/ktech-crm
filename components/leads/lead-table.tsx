@@ -133,6 +133,7 @@ export function LeadTable({
   const isSubmissionView = !isWithdrawView && (currentStageFilter === 'applicant' || isPucSrjView)
   const isLostView = currentStageFilter === 'lost'
   const isEnrolledView = currentStageFilter === 'enrolled'
+  const isSelfFundedView = fundingTypeFilter === 'self_funded'
   // SF applicant view: show orientation status column
   const isApplicantSFView = currentStageFilter === 'applicant' && !isPucSrjView
   // PUC Applicant view: show orientation instead of status
@@ -429,28 +430,40 @@ export function LeadTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadIdsKey])
 
-  // Live-update the PUC doc-status badge: re-derive counts/payment whenever a
-  // document or fee payment row changes for any visible PUC lead — including
-  // student self-service uploads happening in another session.
+  // Live-update the PUC doc-status badge: re-derive counts/payment so the badge
+  // flips within seconds of any upload (including student self-service uploads
+  // in another session) or fee payment, without a page reload.
+  //
+  // This uses a lightweight poll + refresh-on-focus instead of Postgres
+  // realtime, so it needs no `supabase_realtime` publication / DB migration —
+  // it works on a stock Supabase project out of the box.
   useEffect(() => {
     if (!isPucSrjView || leadIdsKey === "") return
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`puc-doc-status-${leadIdsKey.length}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "psp_documents" },
-        () => { refreshPucDocCounts() },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payment_transactions" },
-        () => { refreshPucPaymentStatus() },
-      )
-      .subscribe()
+
+    const refresh = () => {
+      refreshPucDocCounts()
+      refreshPucPaymentStatus()
+    }
+
+    // Poll while the PUC view is open and the tab is visible.
+    const POLL_MS = 8000
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") refresh()
+    }, POLL_MS)
+
+    // Refresh immediately when the user returns to the tab/window so the badge
+    // is current the moment they look at it.
+    const onFocus = () => refresh()
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh()
+    }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onVisible)
 
     return () => {
-      supabase.removeChannel(channel)
+      clearInterval(interval)
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onVisible)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadIdsKey, isPucSrjView])
@@ -1198,6 +1211,7 @@ export function LeadTable({
             isPucDocSubmissionView={isPucDocSubmissionView}
             isPucContactedView={isPucContactedView}
             isPucAppSubmissionView={isPucAppSubmissionView}
+            isSelfFundedView={isSelfFundedView}
             showSubstageColumn={showSubstageColumn}
             selectedLeads={selectedLeads}
             leads={leads}
