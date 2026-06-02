@@ -54,11 +54,13 @@ function AdminTargetSettings() {
 
   const [direction, setDirection] = useState<1 | -1>(1)
 
-  const currentMonth = (() => {
+  // Allow planning targets up to 12 months into the future
+  const maxMonth = (() => {
     const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const d = new Date(now.getFullYear(), now.getMonth() + 12, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })()
-  const canGoNext = month < currentMonth
+  const canGoNext = month < maxMonth
 
   const handlePrevMonth = () => {
     setDirection(-1)
