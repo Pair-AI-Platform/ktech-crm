@@ -443,7 +443,8 @@ export function InlineTagSelect({
   }, [forceOpen])
 
   const handleSelect = (optionValue: string) => {
-    onChange(optionValue)
+    // Clicking the already-selected option clears it (no status)
+    onChange(optionValue === value ? "" : optionValue)
     setIsOpen(false)
     setSearch("")
     setHighlightedIndex(-1)

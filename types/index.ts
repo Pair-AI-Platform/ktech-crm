@@ -1677,8 +1677,6 @@ export const APPOINTMENT_TYPES: {
   { value: 'puc_application', label: 'PUC Application Submission', labelAr: 'تقديم طلب PUC', duration: 30, capacity: 10, location: 'Admissions Office' },
   { value: 'retest', label: 'Retest', labelAr: 'إعادة الاختبار', duration: 60, capacity: 20, location: 'Test Center' },
   { value: 'sf_appointment', label: 'Payment', labelAr: 'دفع', duration: 30, capacity: 10, location: 'Admissions Office' },
-  { value: 'sf_retest', label: 'Payment + Retest', labelAr: 'دفع + إعادة الاختبار', duration: 60, capacity: 10, location: 'Test Center' },
-  { value: 'puc_document_submission', label: 'PUC Document Submission', labelAr: 'تسليم مستندات PUC', duration: 30, capacity: 10, location: 'Admissions Office' },
 ]
 
 export const APPOINTMENT_MODALITIES: {

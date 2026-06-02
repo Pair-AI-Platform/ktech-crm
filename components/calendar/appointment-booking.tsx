@@ -17,6 +17,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu"
+import {
   Calendar,
   Clock,
   User,
@@ -24,6 +30,7 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Search,
   Building2,
   FileText,
@@ -582,33 +589,45 @@ export function AppointmentBooking({
                     <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                       Type <span className="font-normal normal-case">(select one or more)</span>
                     </label>
-                    <div className="flex flex-wrap gap-2">
-                      {availableAppointmentTypes.map((type) => {
-                        const isSelected = selectedTypes.includes(type.value)
-                        return (
-                          <button
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] px-3 text-sm transition-colors hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                        >
+                          <span className={cn("truncate", selectedTypes.length === 0 && "text-[var(--text-muted)]")}>
+                            {selectedTypes.length === 0
+                              ? "Select type(s)..."
+                              : availableAppointmentTypes
+                                  .filter(t => selectedTypes.includes(t.value))
+                                  .map(t => t.label)
+                                  .join(", ")}
+                          </span>
+                          <ChevronDown className="w-4 h-4 shrink-0 text-[var(--text-muted)]" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[12rem]"
+                      >
+                        {availableAppointmentTypes.map((type) => (
+                          <DropdownMenuCheckboxItem
                             key={type.value}
-                            type="button"
-                            onClick={() => {
+                            checked={selectedTypes.includes(type.value)}
+                            onSelect={(e) => e.preventDefault()}
+                            onCheckedChange={(checked) => {
                               setSelectedTypes(prev =>
-                                prev.includes(type.value)
-                                  ? prev.filter(t => t !== type.value)
-                                  : [...prev, type.value]
+                                checked
+                                  ? [...prev, type.value]
+                                  : prev.filter(t => t !== type.value)
                               )
                             }}
-                            className={cn(
-                              "px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                              isSelected
-                                ? "bg-[var(--primary)] text-white shadow-sm"
-                                : "bg-[var(--bg-sunken)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border)]"
-                            )}
                           >
-                            {isSelected && <Check className="w-3.5 h-3.5" />}
                             {type.label}
-                          </button>
-                        )
-                      })}
-                    </div>
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )}
 
