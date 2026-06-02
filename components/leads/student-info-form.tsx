@@ -47,6 +47,7 @@ import {
   Eye,
   Trash2,
   Image as ImageIcon,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -1638,11 +1639,23 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
 
             {/* Subject Scores \u2014 one compact row per subject */}
             <div className="space-y-2">
-              <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-2">
+              <Label className="text-xs text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-2 flex-wrap">
                 Subject Scores
                 <span className="text-[11px] text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full flex items-center gap-1 normal-case font-normal tracking-normal">
                   <RefreshCw className="w-3 h-3" /> From LMS
                 </span>
+                {lead.civil_id ? (
+                  <a
+                    href={`/api/lms/student-link?civilId=${encodeURIComponent(lead.civil_id)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Find this student in the LMS by Civil ID (${lead.civil_id})`}
+                    className="ml-auto inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] font-normal normal-case tracking-normal text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
+                  >
+                    <GraduationCap className="w-3 h-3" /> Open in LMS
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : null}
               </Label>
 
               {([

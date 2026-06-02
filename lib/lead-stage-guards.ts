@@ -38,7 +38,12 @@ export function checkStageTransition({
       return { kind: "file_requirements", lead, missingFields }
     }
 
-    if (lead.file_fee_status !== "paid" && lead.file_fee_status !== "exempt") {
+    // PUC leads never pay File-stage fees — skip the fee gate entirely.
+    if (
+      lead.funding_type !== "puc" &&
+      lead.file_fee_status !== "paid" &&
+      lead.file_fee_status !== "exempt"
+    ) {
       return { kind: "file_fee", lead }
     }
   }
