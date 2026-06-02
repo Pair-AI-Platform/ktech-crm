@@ -1,4 +1,5 @@
 import type { Lead, PipelineStage } from "@/types"
+import { SF_DOCUMENTS } from "@/types"
 import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT } from "@/lib/config/constants"
@@ -11,7 +12,20 @@ export type StageGuardResult =
   | { kind: "file_requirements"; lead: Lead; missingFields: string[] }
   | { kind: "file_fee"; lead: Lead }
   | { kind: "sf_payment"; lead: Lead; required: number; paid: number; targetStage: PipelineStage }
+  | { kind: "sf_documents"; lead: Lead; missingDocs: { key: string; label: string }[]; targetStage: PipelineStage }
   | { kind: "puc_document_requirements"; lead: Lead; missingFields: string[] }
+
+/**
+ * The self-funded documents (all of SF_DOCUMENTS) that are still missing for
+ * this lead. An SF lead must have every document submitted before it can enter
+ * the Applicant or Enrolled stage.
+ */
+export function getMissingSfDocuments(lead: Lead): { key: string; label: string }[] {
+  return SF_DOCUMENTS.filter((doc) => lead[doc.key as keyof Lead] !== true).map((doc) => ({
+    key: doc.key,
+    label: doc.label,
+  }))
+}
 
 export interface StageGuardInput {
   lead: Lead
@@ -96,6 +110,22 @@ export function checkStageTransition({
       amountPaid < FULL_TUITION_AMOUNT
     ) {
       return { kind: "sf_payment", lead, required: FULL_TUITION_AMOUNT, paid: amountPaid, targetStage: newStage }
+    }
+  }
+
+  // --- Self-funded document completion ---
+  // An SF lead cannot enter Applicant (or Enrolled) until every SF document has
+  // been submitted. This is independent of the payment gate above, so it also
+  // applies to leads with a tuition-payment exemption — the docs are still
+  // required. Runs after the payment check so payment is resolved first.
+  if (
+    lead.funding_type === "self_funded" &&
+    !isPucSrjView &&
+    (newStage === "applicant" || newStage === "enrolled")
+  ) {
+    const missingDocs = getMissingSfDocuments(lead)
+    if (missingDocs.length > 0) {
+      return { kind: "sf_documents", lead, missingDocs, targetStage: newStage }
     }
   }
 

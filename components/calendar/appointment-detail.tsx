@@ -433,6 +433,10 @@ export function AppointmentDetail({ appointment, isOpen, onClose, onUpdate }: Ap
           setPaymentDialogLead(guard.lead)
           return
         }
+        if (guard.kind === "sf_documents") {
+          window.alert(`Complete all documents (${guard.missingDocs.map(d => d.label).join(", ")}) before moving this lead to ${guard.targetStage === "enrolled" ? "Enrolled" : "Applicant"}.`)
+          return
+        }
         if (guard.kind === "puc_document_requirements") {
           window.alert(`Complete ${guard.missingFields.join(", ")} before moving this lead to Documents.`)
           return

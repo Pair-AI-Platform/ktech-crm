@@ -35,6 +35,7 @@ import { LeadTableHeader } from "./lead-table-columns"
 import { LeadTableRow } from "./lead-table-row"
 import { LeadTableDialogs } from "./lead-table-dialogs"
 import { PaymentGateDialog } from "./payment-gate-dialog"
+import { SfDocumentsRequirementsDialog } from "./sf-documents-requirements-dialog"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import { checkStageTransition } from "@/lib/lead-stage-guards"
 
@@ -108,6 +109,7 @@ export function LeadTable({
   const [editWithdrawReasonLead, setEditWithdrawReasonLead] = useState<Lead | null>(null)
   const [paymentDialogLead, setPaymentDialogLead] = useState<Lead | null>(null)
   const [sfPaymentGate, setSfPaymentGate] = useState<{ lead: Lead; required: number; paid: number; targetStage: PipelineStage } | null>(null)
+  const [sfDocumentsGate, setSfDocumentsGate] = useState<{ lead: Lead; missingDocs: { key: string; label: string }[]; targetStage: PipelineStage } | null>(null)
   const [fileRequirementsDialog, setFileRequirementsDialog] = useState<{ lead: Lead; missingFields: string[] } | null>(null)
   const [fileFeeDialogLead, setFileFeeDialogLead] = useState<Lead | null>(null)
   const [pspWizardLead, setPspWizardLead] = useState<Lead | null>(null)
@@ -635,6 +637,13 @@ export function LeadTable({
             lead: guard.lead,
             required: guard.required,
             paid: guard.paid,
+            targetStage: guard.targetStage,
+          })
+          return
+        case "sf_documents":
+          setSfDocumentsGate({
+            lead: guard.lead,
+            missingDocs: guard.missingDocs,
             targetStage: guard.targetStage,
           })
           return
@@ -1399,6 +1408,21 @@ export function LeadTable({
           }))
           notifyStageChanged(lead.id, targetStage, null, lead)
           refreshSfGreenStatus()
+        }}
+      />
+    )}
+
+    {sfDocumentsGate && (
+      <SfDocumentsRequirementsDialog
+        open={!!sfDocumentsGate}
+        onOpenChange={(open) => { if (!open) setSfDocumentsGate(null) }}
+        lead={sfDocumentsGate.lead}
+        missingDocs={sfDocumentsGate.missingDocs}
+        targetStage={sfDocumentsGate.targetStage}
+        onOpenDocuments={() => {
+          const lead = sfDocumentsGate.lead
+          setSfDocumentsGate(null)
+          onLeadClick?.(lead)
         }}
       />
     )}

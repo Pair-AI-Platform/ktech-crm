@@ -59,7 +59,7 @@ import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
-import { checkStageTransition } from "@/lib/lead-stage-guards"
+import { checkStageTransition, getMissingSfDocuments } from "@/lib/lead-stage-guards"
 import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 
 const LeadForm = dynamic(
@@ -568,6 +568,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (currentIndex < applicationIndex && targetIndex > applicationIndex) {
       console.log('[Stage Click] Cannot skip application stage - must go through application first')
       return
+    }
+
+    // SF leads must have every document submitted before entering Applicant/Enrolled.
+    if ((stage === 'applicant' || stage === 'enrolled') && lead.funding_type === 'self_funded') {
+      const missingDocs = getMissingSfDocuments(lead)
+      if (missingDocs.length > 0) {
+        window.alert(`Complete all documents (${missingDocs.map(d => d.label).join(', ')}) before moving this lead to ${stage === 'enrolled' ? 'Enrolled' : 'Applicant'}.`)
+        return
+      }
     }
 
     setUpdatingStage(true)
