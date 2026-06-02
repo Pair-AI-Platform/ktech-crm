@@ -1803,10 +1803,10 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                   </div>
                 </div>
 
-                {/* Withdrawal Form — required while a lead is Ministry Blocked */}
+                {/* Withdrawal Form — optional */}
                 <div className="space-y-2">
                   <Label>
-                    Withdrawal Form <span className="text-red-500">*</span>
+                    Withdrawal Form <span className="text-[var(--text-muted)] font-normal">(optional)</span>
                   </Label>
                   <input
                     ref={withdrawalFormInputRef}
@@ -1857,9 +1857,6 @@ export function StudentInfoForm({ lead, autosave }: StudentInfoFormProps) {
                         <><Upload className="w-4 h-4" /> Upload withdrawal form (PDF or image)</>
                       )}
                     </button>
-                  )}
-                  {!withdrawalForm && !withdrawalFormUploading && (
-                    <p className="text-xs text-red-500">A withdrawal form is required while this lead is Ministry Blocked.</p>
                   )}
                 </div>
               </motion.div>
