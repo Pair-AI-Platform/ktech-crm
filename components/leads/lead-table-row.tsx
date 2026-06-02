@@ -42,10 +42,9 @@ import {
   type LeadStatus,
   type SubmissionSubstage,
   type SubmissionStatus,
-  type PUCDocumentStatus,
   type OrientationStatus,
 } from "@/types"
-import { computePUCDocumentStatus } from "@/lib/psp/document-status"
+import { computePUCDocumentStatus, STATUS_BADGE_STYLES } from "@/lib/psp/document-status"
 import { formatKuwaitPhone, getInitials } from "@/lib/utils"
 import { LeadAppointmentsPopover } from "@/components/leads/lead-appointments-popover"
 import { ALL_REASON_LABELS } from "@/lib/config/withdrawal-reasons"
@@ -92,8 +91,6 @@ export interface LeadTableRowProps {
   handleSubmissionSubstageChange: (leadId: string, newSubstage: SubmissionSubstage) => void
   handleSubmissionStatusChange: (leadId: string, newStatus: SubmissionStatus) => void
   handleOrientationStatusChange: (leadId: string, newStatus: OrientationStatus | '') => void
-  handleDocStatusOverrideChange: (leadId: string, newStatus: PUCDocumentStatus | '') => void
-  editingDocStatus: string | null
   handleGpaEdit: (leadId: string, field: 'expected_gpa' | 'actual_gpa', currentValue?: number) => void
   handleGpaSave: () => void
   setEditingGpa: (val: { leadId: string; field: 'expected_gpa' | 'actual_gpa' } | null) => void
@@ -152,8 +149,6 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   handleSubmissionSubstageChange,
   handleSubmissionStatusChange,
   handleOrientationStatusChange,
-  handleDocStatusOverrideChange,
-  editingDocStatus,
   handleGpaEdit,
   handleGpaSave,
   setEditingGpa,
@@ -587,8 +582,11 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   )
                 }
 
-                const displayStatus = getEffectiveValue(lead.id, 'puc_document_status_override', lead.puc_document_status_override) as PUCDocumentStatus | null | undefined
-                  || computePUCDocumentStatus(lead.submission_substage, (() => { const d = pucDocCounts[lead.id]; return d ? (d.required > 0 && d.uploaded >= d.required) : false })(), pucPaymentLeads.has(lead.id))
+                // Always auto-computed from uploaded documents + fee payment —
+                // read-only, no manual override.
+                const docCounts = pucDocCounts[lead.id]
+                const allDocsComplete = docCounts ? (docCounts.required > 0 && docCounts.uploaded >= docCounts.required) : false
+                const displayStatus = computePUCDocumentStatus(lead.submission_substage, allDocsComplete, pucPaymentLeads.has(lead.id))
 
                 if (!displayStatus) {
                   return (
@@ -598,25 +596,13 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                   )
                 }
 
-                const statusColorMap: Record<string, string> = {
-                  missing_document: 'red',
-                  pending_payment: 'orange',
-                  ready_to_apply: 'green',
-                  blocked: 'warning',
-                }
+                const badge = STATUS_BADGE_STYLES[displayStatus]
+                const label = PUC_DOCUMENT_STATUSES.find(s => s.value === displayStatus)?.label ?? displayStatus
 
                 return (
-                  <InlineTagSelect
-                    value={displayStatus}
-                    options={PUC_DOCUMENT_STATUSES.map(s => ({
-                      value: s.value,
-                      label: s.label,
-                      color: statusColorMap[s.value] || 'gray',
-                    }))}
-                    onChange={(value) => handleDocStatusOverrideChange(lead.id, value as PUCDocumentStatus | '')}
-                    disabled={editingDocStatus === lead.id}
-                    loading={editingDocStatus === lead.id}
-                  />
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold whitespace-nowrap ${badge.bg} ${badge.text} ${badge.border}`}>
+                    {label}
+                  </span>
                 )
               })()}
             </td>

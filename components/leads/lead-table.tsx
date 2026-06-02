@@ -21,7 +21,7 @@ import {
   Send,
   MessageSquare,
 } from "lucide-react"
-import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES, SF_DOCUMENTS, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus, type OrientationStatus, type PUCDocumentStatus } from "@/types"
+import { PIPELINE_STAGES, LEAD_STATUSES, LOCKED_STAGES, SF_DOCUMENTS, type Lead, type PipelineStage, type LeadStatus, type SubmissionSubstage, type SubmissionStatus, type OrientationStatus } from "@/types"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { useLeadMutations } from "@/lib/hooks/use-leads"
 import { useStageSettings } from "@/lib/hooks/use-stage-settings"
@@ -90,7 +90,6 @@ export function LeadTable({
   const [openPreferenceForLead, setOpenPreferenceForLead] = useState<string | null>(null)
   const [editingSubmissionSubstage, setEditingSubmissionSubstage] = useState<string | null>(null)
   const [editingSubmissionStatus, setEditingSubmissionStatus] = useState<string | null>(null)
-  const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null)
   const [bookingLead, setBookingLead] = useState<Lead | null>(null)
   const [, setBookingSimpleMode] = useState(false)
   const [bookingCallbackMode, setBookingCallbackMode] = useState(false)
@@ -429,6 +428,32 @@ export function LeadTable({
     refreshPucDocCounts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadIdsKey])
+
+  // Live-update the PUC doc-status badge: re-derive counts/payment whenever a
+  // document or fee payment row changes for any visible PUC lead — including
+  // student self-service uploads happening in another session.
+  useEffect(() => {
+    if (!isPucSrjView || leadIdsKey === "") return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`puc-doc-status-${leadIdsKey.length}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "psp_documents" },
+        () => { refreshPucDocCounts() },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_transactions" },
+        () => { refreshPucPaymentStatus() },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIdsKey, isPucSrjView])
 
   // Check which SF leads have been sent to registration (localStorage flag)
   const refreshRegistrationStatus = useCallback(() => {
@@ -1060,29 +1085,6 @@ export function LeadTable({
     }
   }
 
-  const handleDocStatusOverrideChange = async (leadId: string, newStatus: PUCDocumentStatus | '') => {
-    const value = newStatus === '' ? null : newStatus
-    pinLeadToTop(leadId)
-    setPendingUpdates(prev => ({ ...prev, [leadId]: { ...prev[leadId], puc_document_status_override: value ?? undefined } }))
-    setEditingDocStatus(leadId)
-
-    const result = await updateLead(leadId, { puc_document_status_override: value } as Partial<Lead>)
-
-    setEditingDocStatus(null)
-    if (result.error) {
-      setPendingUpdates(prev => {
-        const updated = { ...prev }
-        if (updated[leadId]) {
-          delete updated[leadId].puc_document_status_override
-          if (Object.keys(updated[leadId]).length === 0) {
-            delete updated[leadId]
-          }
-        }
-        return updated
-      })
-    }
-  }
-
   // Helper to get effective value with pending updates
   const getEffectiveValue = <K extends keyof Lead>(leadId: string, field: K, originalValue: Lead[K]): Lead[K] => {
     const pending = pendingUpdates[leadId]
@@ -1243,8 +1245,6 @@ export function LeadTable({
                 handleSubmissionSubstageChange={handleSubmissionSubstageChange}
                 handleSubmissionStatusChange={handleSubmissionStatusChange}
                 handleOrientationStatusChange={handleOrientationStatusChange}
-                handleDocStatusOverrideChange={handleDocStatusOverrideChange}
-                editingDocStatus={editingDocStatus}
                 handleGpaEdit={handleGpaEdit}
                 handleGpaSave={handleGpaSave}
                 setEditingGpa={setEditingGpa}
