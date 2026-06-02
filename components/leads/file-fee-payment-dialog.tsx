@@ -37,6 +37,12 @@ interface FileFeePaymentDialogProps {
   onOpenChange: (open: boolean) => void
   lead: Lead
   onSuccess?: (action: 'paid' | 'sent' | 'exempt') => Promise<void>
+  /**
+   * Stage the lead lands on once the fee is settled. The file fee now gates
+   * entry to the Test stage; 'application' is kept for legacy / reactivation.
+   * Defaults to 'application'.
+   */
+  targetStage?: 'test' | 'application'
 }
 
 export function FileFeePaymentDialog({
@@ -44,7 +50,10 @@ export function FileFeePaymentDialog({
   onOpenChange,
   lead,
   onSuccess,
+  targetStage = 'application',
 }: FileFeePaymentDialogProps) {
+  const isTestGate = targetStage === 'test'
+  const stageLabel = isTestGate ? 'Test' : 'File'
   const [step, setStep] = useState<Step>("select")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -167,6 +176,7 @@ export function FileFeePaymentDialog({
           invoiceNumber: invoiceNumber.trim(),
           testFeeAmount: testFee,
           notes: notes.trim() || undefined,
+          targetStage,
         }),
       })
 
@@ -203,6 +213,7 @@ export function FileFeePaymentDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId: lead.id,
+          targetStage,
         }),
       })
 
@@ -245,14 +256,14 @@ export function FileFeePaymentDialog({
             </div>
             <div>
               <DialogTitle>
-                {step === "success" ? "File Fees Paid!" : step === "exempt-done" ? "Fees Exempted" : "File Stage Fees"}
+                {step === "success" ? "File Fees Paid!" : step === "exempt-done" ? "Fees Exempted" : `${stageLabel} Stage Fees`}
               </DialogTitle>
               <DialogDescription>
                 {step === "success"
-                  ? `${getLeadDisplayName(lead)} has been moved to File stage`
+                  ? `${getLeadDisplayName(lead)} has been moved to ${stageLabel} stage`
                   : step === "exempt-done"
                   ? `${getLeadDisplayName(lead)} has been exempted from file fees`
-                  : `Complete fee payment for ${getLeadDisplayName(lead)} to move to File stage`}
+                  : `Complete fee payment for ${getLeadDisplayName(lead)} to move to ${stageLabel} stage`}
               </DialogDescription>
             </div>
           </div>
@@ -291,17 +302,19 @@ export function FileFeePaymentDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setStep("finance")}
-                  className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-blue-300 hover:bg-blue-50 transition-all text-left"
-                >
-                  <CreditCard className="w-8 h-8 text-blue-500 mb-2" />
-                  <h3 className="font-medium text-[var(--text-primary)]">Online Payment</h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1">
-                    Send payment link via WhatsApp
-                  </p>
-                </button>
+              <div className={cn("grid gap-3", isTestGate ? "grid-cols-1" : "grid-cols-2")}>
+                {!isTestGate && (
+                  <button
+                    onClick={() => setStep("finance")}
+                    className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-sunken)] hover:border-blue-300 hover:bg-blue-50 transition-all text-left"
+                  >
+                    <CreditCard className="w-8 h-8 text-blue-500 mb-2" />
+                    <h3 className="font-medium text-[var(--text-primary)]">Online Payment</h3>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">
+                      Send payment link via WhatsApp
+                    </p>
+                  </button>
+                )}
 
                 <button
                   onClick={() => setStep("cash")}
@@ -471,7 +484,7 @@ export function FileFeePaymentDialog({
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <p className="text-sm text-emerald-700">
                   Recording cash/KNET payment of <strong>{totalFee} KWD</strong>.
-                  The lead will be moved to File stage.
+                  The lead will be moved to {stageLabel} stage.
                 </p>
               </div>
             </div>
@@ -487,7 +500,7 @@ export function FileFeePaymentDialog({
               <div>
                 <h3 className="font-medium text-[var(--text-primary)]">Exempt from File Fees?</h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  This will skip the {totalFee} KWD fee requirement and move {getLeadDisplayName(lead)} directly to the File stage.
+                  This will skip the {totalFee} KWD fee requirement and move {getLeadDisplayName(lead)} directly to the {stageLabel} stage.
                 </p>
               </div>
 
@@ -516,7 +529,7 @@ export function FileFeePaymentDialog({
               <div>
                 <h3 className="font-medium text-[var(--text-primary)]">Fees Exempted</h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  {getLeadDisplayName(lead)} has been exempted from file fees and moved to File stage.
+                  {getLeadDisplayName(lead)} has been exempted from file fees and moved to {stageLabel} stage.
                 </p>
               </div>
             </div>
@@ -532,7 +545,7 @@ export function FileFeePaymentDialog({
               <div>
                 <h3 className="font-medium text-[var(--text-primary)]">File Fees Paid!</h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  {getLeadDisplayName(lead)} has been moved to the File stage.
+                  {getLeadDisplayName(lead)} has been moved to the {stageLabel} stage.
                 </p>
               </div>
 
