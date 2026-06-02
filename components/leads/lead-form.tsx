@@ -55,9 +55,19 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const formScrollRef = useRef<HTMLDivElement>(null)
   const isEditing = !!lead
   const initialArabicName = getArabicLeadNameParts(lead ?? {})
+  // Second/third Arabic name parts are stored inside full_name_ar (composed as
+  // "first second third last"); recover them here as the tokens between the
+  // first and last name so they round-trip on edit.
+  const initialMiddleNames = (() => {
+    const tokens = (lead?.full_name_ar || "").trim().replace(/\s+/g, " ").split(" ").filter(Boolean)
+    const middle = tokens.length > 2 ? tokens.slice(1, -1) : []
+    return { second: middle[0] || "", third: middle.slice(1).join(" ") }
+  })()
 
   const [formData, setFormData] = useState<LeadFormData>({
     first_name: initialArabicName.firstName,
+    second_name: initialMiddleNames.second,
+    third_name: initialMiddleNames.third,
     last_name: initialArabicName.lastName,
     full_name_ar: lead?.full_name_ar || "",
     gender: lead?.gender || "",
@@ -302,6 +312,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     } else if (!isArabicText(formData.last_name)) {
       newErrors.last_name = "Name must be in Arabic"
     }
+    // Second/third names are optional, but must be Arabic when provided
+    if (formData.second_name.trim() && !isArabicText(formData.second_name)) {
+      newErrors.second_name = "Name must be in Arabic"
+    }
+    if (formData.third_name.trim() && !isArabicText(formData.third_name)) {
+      newErrors.third_name = "Name must be in Arabic"
+    }
 
     // Contact validation
     if (!formData.phone.trim()) {
@@ -342,7 +359,10 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     const leadData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
-      full_name_ar: formData.full_name_ar.trim() || undefined,
+      full_name_ar: [formData.first_name, formData.second_name, formData.third_name, formData.last_name]
+        .map(s => s.trim())
+        .filter(Boolean)
+        .join(" ") || undefined,
       phone: formData.phone.replace(/\D/g, ""),
       phone_secondary: formData.phone_secondary.trim() ? formData.phone_secondary.replace(/\D/g, "") : undefined,
       email: formData.email,

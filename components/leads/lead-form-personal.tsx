@@ -172,7 +172,8 @@ export function LeadFormPersonal({
       )}
 
       <div className="space-y-4 pl-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Arabic name — First / Second / Third / Last */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-2">
             <Label htmlFor="first_name">First Name * <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
             <Input
@@ -185,6 +186,34 @@ export function LeadFormPersonal({
             />
             {errors.first_name && (
               <p className="text-xs text-[var(--error)]">{errors.first_name}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="second_name">Second Name <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
+            <Input
+              id="second_name"
+              value={formData.second_name}
+              onChange={(e) => handleChange("second_name", e.target.value)}
+              placeholder="الاسم الثاني"
+              dir="rtl"
+              error={errors.second_name}
+            />
+            {errors.second_name && (
+              <p className="text-xs text-[var(--error)]">{errors.second_name}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="third_name">Third Name <span className="text-xs text-[var(--text-secondary)]">(Arabic)</span></Label>
+            <Input
+              id="third_name"
+              value={formData.third_name}
+              onChange={(e) => handleChange("third_name", e.target.value)}
+              placeholder="الاسم الثالث"
+              dir="rtl"
+              error={errors.third_name}
+            />
+            {errors.third_name && (
+              <p className="text-xs text-[var(--error)]">{errors.third_name}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -201,18 +230,6 @@ export function LeadFormPersonal({
               <p className="text-xs text-[var(--error)]">{errors.last_name}</p>
             )}
           </div>
-        </div>
-
-        {/* Full Name in Arabic (Optional) */}
-        <div className="space-y-2">
-          <Label htmlFor="full_name_ar">الاسم الكامل <span className="text-xs text-[var(--text-secondary)]">(اختياري)</span></Label>
-          <Input
-            id="full_name_ar"
-            value={formData.full_name_ar}
-            onChange={(e) => handleChange("full_name_ar", e.target.value)}
-            placeholder="الاسم الكامل بالعربي"
-            dir="rtl"
-          />
         </div>
 
         {/* Gender */}

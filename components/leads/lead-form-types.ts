@@ -2,6 +2,8 @@ import type { MinistryBlockReason } from "@/types"
 
 export interface LeadFormData {
   first_name: string
+  second_name: string
+  third_name: string
   last_name: string
   full_name_ar: string
   gender: string
