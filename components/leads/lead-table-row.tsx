@@ -66,6 +66,7 @@ export interface LeadTableRowProps {
   isPucDocSubmissionView: boolean
   isPucContactedView: boolean
   isPucAppSubmissionView: boolean
+  isSelfFundedView: boolean
   showSubstageColumn: boolean
   currentStageFilter?: PipelineStage | "all"
   documentCompleteLeads: Set<string>
@@ -124,6 +125,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
   isPucDocSubmissionView,
   isPucContactedView,
   isPucAppSubmissionView,
+  isSelfFundedView,
   showSubstageColumn,
   currentStageFilter,
   documentCompleteLeads,
@@ -1104,9 +1106,12 @@ export const LeadTableRow = React.memo(function LeadTableRow({
                 : LEAD_STATUSES.filter(s => (stageConfig as LeadStatus[]).includes(s.value))
               ).filter(s => s.value !== 'pay_later' || isSelfFunded)
 
+              // Self-funded File (application) stage: never offer the "Online" status
+              const hideOnline = isSelfFundedView && effectiveStage === 'application'
+
               // Include the lead's current status in options even if it's not in the stage's default list
               const strictStages: PipelineStage[] = ['test']
-              if (leadStatus && !availableStatuses.find(s => s.value === leadStatus) && !strictStages.includes(effectiveStage as PipelineStage)) {
+              if (leadStatus && !(hideOnline && leadStatus === 'online') && !availableStatuses.find(s => s.value === leadStatus) && !strictStages.includes(effectiveStage as PipelineStage)) {
                 const currentStatusDef = LEAD_STATUSES.find(s => s.value === leadStatus)
                 if (currentStatusDef) {
                   availableStatuses.unshift(currentStatusDef)
@@ -1132,7 +1137,7 @@ export const LeadTableRow = React.memo(function LeadTableRow({
               )
             })()}
           </td>
-          {currentStageFilter !== 'enrolled' && (
+          {currentStageFilter !== 'enrolled' && !isSelfFundedView && (
           <td className="px-3 py-3">
             <InlineTagSelect
               value={getEffectiveValue(lead.id, 'school', lead.school) || ""}
