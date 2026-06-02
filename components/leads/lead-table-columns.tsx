@@ -15,6 +15,7 @@ interface LeadTableHeaderProps {
   isPucDocSubmissionView: boolean
   isPucContactedView: boolean
   isPucAppSubmissionView: boolean
+  isSelfFundedView: boolean
   showSubstageColumn: boolean
   selectedLeads: string[]
   leads: Lead[]
@@ -33,6 +34,7 @@ export function LeadTableHeader({
   isPucDocSubmissionView,
   isPucContactedView,
   isPucAppSubmissionView,
+  isSelfFundedView,
   showSubstageColumn,
   selectedLeads,
   leads,
@@ -235,7 +237,7 @@ export function LeadTableHeader({
                 Status
               </span>
             </th>
-            {!isEnrolledView && (
+            {!isEnrolledView && !isSelfFundedView && (
             <th className="px-3 py-1.5 text-left w-[150px] min-w-[150px]">
               <button
                 onClick={() => handleSort("school")}

@@ -1234,6 +1234,7 @@ export function LeadTable({
                 isPucDocSubmissionView={isPucDocSubmissionView}
                 isPucContactedView={isPucContactedView}
                 isPucAppSubmissionView={isPucAppSubmissionView}
+                isSelfFundedView={isSelfFundedView}
                 showSubstageColumn={showSubstageColumn}
                 currentStageFilter={currentStageFilter}
                 documentCompleteLeads={documentCompleteLeads}
