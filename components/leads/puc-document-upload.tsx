@@ -38,8 +38,20 @@ function educationToGraduateType(educationType?: EducationType): GraduateType | 
   return educationType as GraduateType
 }
 
-function getProfileDocuments(educationType?: EducationType, flags?: ConditionalDocumentFlags): { id: string; name: string; nameAr: string; required?: boolean }[] {
-  const graduateType = educationToGraduateType(educationType)
+// The school's school_type is the source of truth; fall back to it when the
+// denormalized education_type column was never populated (most imported leads).
+const SCHOOL_TYPE_TO_GRADUATE: Record<string, GraduateType> = {
+  gov: 'GOV', us: 'US', uk: 'UK', ksa: 'KSA', others: 'OTHER',
+}
+
+function resolveGraduateType(lead?: Lead): GraduateType | null {
+  const fromEducation = educationToGraduateType(lead?.education_type)
+  if (fromEducation) return fromEducation
+  const schoolType = (lead?.school as unknown as { school_type?: string } | undefined)?.school_type
+  return schoolType ? (SCHOOL_TYPE_TO_GRADUATE[schoolType] ?? null) : null
+}
+
+function getProfileDocuments(graduateType: GraduateType | null, flags?: ConditionalDocumentFlags): { id: string; name: string; nameAr: string; required?: boolean }[] {
   if (!graduateType) {
     return [
       ...DEFAULT_PROFILE_DOCUMENTS,
@@ -94,7 +106,8 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
     isSpecialNeeds: lead?.is_special_needs,
     isDiplomatic: lead?.is_diplomatic,
   }), [lead?.is_transfer_student, lead?.is_special_needs, lead?.is_diplomatic])
-  const profileDocuments = useMemo(() => getProfileDocuments(lead?.education_type, conditionalFlags), [lead?.education_type, conditionalFlags])
+  const graduateType = useMemo(() => resolveGraduateType(lead), [lead])
+  const profileDocuments = useMemo(() => getProfileDocuments(graduateType, conditionalFlags), [graduateType, conditionalFlags])
   const [documents, setDocuments] = useState<Record<string, StoredDocument | null>>({})
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
@@ -108,7 +121,7 @@ export function PUCDocumentUpload({ leadId, lead, onLeadUpdate, className }: PUC
   // Load existing documents from the psp_documents table
   useEffect(() => {
     loadDocuments()
-  }, [leadId, lead?.education_type, lead?.is_transfer_student, lead?.is_special_needs, lead?.is_diplomatic]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leadId, graduateType, lead?.is_transfer_student, lead?.is_special_needs, lead?.is_diplomatic]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDocuments = async () => {
     setLoading(true)

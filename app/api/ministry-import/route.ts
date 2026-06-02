@@ -10,7 +10,10 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 import { assertArabicLeadNameFields, getArabicLeadDisplayName } from "@/lib/lead-name-policy"
 
-type SchoolRow = { id: string; name_en: string | null; name_ar: string | null }
+type SchoolRow = { id: string; name_en: string | null; name_ar: string | null; school_type: string | null }
+
+// The school's school_type is the source of truth for a lead's education_type.
+const SCHOOL_TYPE_TO_EDUCATION: Record<string, string> = { gov: 'GOV', us: 'US', uk: 'UK', ksa: 'KSA', others: 'other' }
 
 type ExistingLeadRow = {
   id: string
@@ -76,10 +79,15 @@ export async function POST(request: NextRequest) {
     // Fetch all schools for fuzzy matching
     const { data: allSchools } = await supabase
       .from("schools")
-      .select("id, name_en, name_ar")
+      .select("id, name_en, name_ar, school_type")
       .eq("is_active", true)
 
     const schools: SchoolRow[] = allSchools || []
+    const educationTypeBySchool = new Map<string, string>()
+    for (const s of schools) {
+      const eduType = s.school_type ? SCHOOL_TYPE_TO_EDUCATION[s.school_type] : undefined
+      if (eduType) educationTypeBySchool.set(s.id, eduType)
+    }
 
     const matchSchool = (schoolName?: string): string | undefined => {
       if (!schoolName || schools.length === 0) return undefined
@@ -261,6 +269,11 @@ export async function POST(request: NextRequest) {
         const matchedSchoolId = recordSchoolIds.get(record)
         if (matchedSchoolId) {
           updatePayload.school_id = matchedSchoolId
+          // Derive education_type from the matched school when not already set.
+          const eduType = educationTypeBySchool.get(matchedSchoolId)
+          if (eduType && !existingLead.education_type && !updatePayload.education_type) {
+            updatePayload.education_type = eduType
+          }
         } else {
           updatePayload.school_name_custom = record.school_name
         }
@@ -424,7 +437,9 @@ export async function POST(request: NextRequest) {
             actual_lead: true,
             ...(record.seat_number && { seat_number: record.seat_number }),
             ...(record.academic_track && { academic_track: record.academic_track }),
-            ...(record.education_type && { education_type: record.education_type }),
+            ...((record.education_type || (matchedSchoolId && educationTypeBySchool.get(matchedSchoolId)))
+              ? { education_type: record.education_type || educationTypeBySchool.get(matchedSchoolId!) }
+              : {}),
             ...(record.graduation_year && { graduation_year: record.graduation_year }),
             ...(activeSemester && { semester_id: activeSemester.id }),
           })
