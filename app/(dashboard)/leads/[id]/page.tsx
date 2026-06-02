@@ -52,6 +52,7 @@ import { useUser } from "@/lib/hooks/use-user"
 
 import { useLeadShortcuts } from "@/lib/hooks/use-lead-shortcuts"
 import { StudentInfoForm } from "@/components/leads/student-info-form"
+import { StudentPhotoAvatar } from "@/components/leads/student-photo-avatar"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { InlineTagSelect } from "@/components/ui/notion-tag-select"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
@@ -284,39 +285,6 @@ function groupNotesByDate(notes: ParsedNote[]): { label: string; notes: ParsedNo
   })
 
   return groups.filter(g => g.notes.length > 0)
-}
-
-function StickFigureAvatar({ gender }: { gender?: string | null }) {
-  const isFemale = gender?.toLowerCase() === 'female'
-
-  return (
-    <svg
-      viewBox="0 0 80 80"
-      className="h-12 w-12"
-      fill="none"
-      aria-hidden="true"
-    >
-      {isFemale ? (
-        <>
-          <path d="M27 28c0-10 6.5-18 13-18s13 8 13 18" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-          <circle cx="40" cy="27" r="10" stroke="currentColor" strokeWidth="4.5" />
-          <path d="M23 64c0-13 7.5-21 17-21s17 8 17 21" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-          <path d="M30 45c4 3.5 16 3.5 20 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          {/* short hair on top */}
-          <path d="M29 20c2-6 20-6 22 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-          {/* head */}
-          <circle cx="40" cy="27" r="11" stroke="currentColor" strokeWidth="4.5" />
-          {/* broad shoulders */}
-          <path d="M19 65c0-12 9.5-19 21-19s21 7 21 19" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-          {/* collar */}
-          <path d="M31 47c5 4 13 4 18 0" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-        </>
-      )}
-    </svg>
-  )
 }
 
 // Stage gradient colors
@@ -867,19 +835,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.02 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
             >
-              <div
-                data-lead-avatar-version="profile-bust-v6"
-                role="img"
-                aria-label={`${lead.gender?.toLowerCase() === 'female' ? 'Female' : lead.gender?.toLowerCase() === 'male' ? 'Male' : 'Lead'} profile`}
-                className={cn(
-                  "relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border shadow-sm",
-                  lead.gender?.toLowerCase() === 'female'
-                    ? "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/25 dark:text-fuchsia-300"
-                    : "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/25 dark:text-blue-300"
-                )}
-              >
-                <StickFigureAvatar gender={lead.gender} />
-              </div>
+              <StudentPhotoAvatar leadId={lead.id} gender={lead.gender} />
             </motion.div>
 
             <div className="min-w-0 flex-1">
