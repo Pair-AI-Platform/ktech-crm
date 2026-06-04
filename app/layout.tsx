@@ -1,9 +1,21 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
   title: "ADL",
   description: "Kuwait Technical College ADL - Manage leads, students, and appointments",
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Allow pinch-zoom for accessibility; cover the notch so safe-area insets apply.
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1f1d1a" },
+  ],
 }
 
 export default function RootLayout({

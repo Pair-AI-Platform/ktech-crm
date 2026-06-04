@@ -110,7 +110,7 @@ export default function WorkspacesPage() {
     <div className="px-3 py-4 sm:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 sm:mb-8 gap-3 flex-wrap">
-        <div>
+        <div className="pl-16 lg:pl-0">
           <h1 className="text-3xl font-bold text-[var(--text-primary)]">Workspaces</h1>
           <p className="text-[var(--text-secondary)] mt-1">
             Manage and collaborate on AI agent changes
@@ -134,7 +134,7 @@ export default function WorkspacesPage() {
               key={workspace.id}
               className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-5 hover:border-[var(--border)] transition-colors"
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold text-[var(--text-primary)]">
@@ -153,7 +153,7 @@ export default function WorkspacesPage() {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-2 sm:ml-4 flex-wrap">
                   <button className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-colors text-sm font-medium">
                     Open
                   </button>
@@ -183,7 +183,7 @@ export default function WorkspacesPage() {
               key={workspace.id}
               className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-5 hover:border-[var(--border)] transition-colors"
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold text-[var(--text-primary)]">
@@ -206,7 +206,7 @@ export default function WorkspacesPage() {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-2 sm:ml-4 flex-wrap">
                   <button className="px-4 py-2 border border-[var(--border)] text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-sm font-medium flex items-center gap-1.5">
                     <Eye className="w-4 h-4" />
                     Review
@@ -242,7 +242,7 @@ export default function WorkspacesPage() {
                   : "border-[var(--border)] hover:border-[var(--border)]"
               } transition-colors`}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold text-[var(--text-primary)]">
@@ -264,7 +264,7 @@ export default function WorkspacesPage() {
                     <span className="font-medium">Changes:</span> {snapshot.changes}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-2 sm:ml-4 flex-wrap">
                   <button className="px-4 py-2 border border-[var(--border)] text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-sm font-medium flex items-center gap-1.5">
                     <Eye className="w-4 h-4" />
                     View Changes

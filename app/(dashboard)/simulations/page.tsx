@@ -188,9 +188,9 @@ export default function SimulationsPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2 pl-16 lg:pl-0">
             <h1 className="text-3xl font-bold text-gray-900">Simulations</h1>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
                 <Play className="w-4 h-4" />
                 <span>Run All</span>

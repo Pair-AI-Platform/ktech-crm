@@ -187,16 +187,7 @@ export default function InsightsPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-sunken)] pb-32">
       {/* AI Query Header */}
-      <div
-        className="bg-[var(--bg-surface)] border-b"
-        style={{
-          fontSize: "18px",
-          fontWeight: 500,
-          padding: "24px",
-          borderBottomWidth: "1px",
-          borderBottomColor: "rgb(var(--gray-200))",
-        }}
-      >
+      <div className="bg-[var(--bg-surface)] border-b border-[var(--border)] py-6 pr-6 pl-16 lg:px-6 text-[18px] font-medium">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-[var(--text-primary)]">
             What are the main reasons for higher customer satisfaction scores?
@@ -427,42 +418,35 @@ export default function InsightsPage() {
         </div>
       </div>
 
-      {/* Follow-Up Input Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[var(--bg-surface)] border-t border-[var(--border)] px-6 py-4">
+      {/* Follow-Up Input Bar — sits above the mobile bottom nav on phones */}
+      <div className="fixed bottom-20 lg:bottom-0 left-0 right-0 z-30 bg-[var(--bg-surface)] border-t border-[var(--border)] px-3 sm:px-6 py-3 sm:py-4">
         <div className="max-w-7xl mx-auto">
-          <div
-            className="bg-[var(--bg-surface)] rounded-xl flex items-center gap-3"
-            style={{
-              border: "1px solid rgb(var(--gray-200))",
-              borderRadius: "12px",
-              padding: "12px 16px",
-            }}
-          >
+          <div className="bg-[var(--bg-surface)] rounded-xl flex items-center gap-2 sm:gap-3 border border-[var(--border)] px-3 py-2 sm:py-3">
             <input
               type="text"
               placeholder="Ask a follow-up question..."
-              className="flex-1 outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+              className="flex-1 min-w-0 outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] bg-transparent"
             />
-            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
                 <Clock className="w-4 h-4" />
                 <span>7d</span>
               </button>
-              <button className="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
+              <button className="hidden sm:block p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
                 <Tag className="w-4 h-4" />
               </button>
-              <button className="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
+              <button className="hidden sm:block p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
                 <BarChart2 className="w-4 h-4" />
               </button>
-              <button className="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
+              <button className="hidden sm:block p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
                 <Flag className="w-4 h-4" />
               </button>
               <button className="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
                 <Mic className="w-4 h-4" />
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
+              <button className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors shrink-0">
                 <Send className="w-4 h-4" />
-                Ask
+                <span>Ask</span>
               </button>
             </div>
           </div>

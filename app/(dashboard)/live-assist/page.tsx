@@ -88,7 +88,7 @@ export default function LiveAssistPage() {
   return (
     <div className="px-3 py-4 sm:p-8">
       {/* Page Header */}
-      <div className="mb-6">
+      <div className="mb-6 pl-16 lg:pl-0">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
           <Headphones className="w-8 h-8" />
           Live Assist

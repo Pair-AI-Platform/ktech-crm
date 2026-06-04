@@ -1248,13 +1248,13 @@ export default function CampaignsPage() {
     <div className="min-h-screen bg-[var(--bg-base)]">
       {/* Header */}
       <header className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-[var(--border)] bg-[var(--bg-surface)]">
-        <div className="flex items-center justify-between mb-4 sm:mb-6 pl-10 lg:pl-0 gap-2 flex-wrap">
+        <div className="flex items-center justify-between mb-4 sm:mb-6 pl-16 lg:pl-0 gap-2 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Campaigns</h1>
             <p className="text-sm text-[var(--text-muted)]">Outreach automation</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
             {activeCampaigns > 0 && (
               <Badge variant="success" className="animate-pulse">
                 {activeCampaigns} active
@@ -1318,7 +1318,7 @@ export default function CampaignsPage() {
             animate={{ opacity: 1, y: 0 }}
           >
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
               <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border)] p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm text-[var(--text-muted)]">Total Campaigns</span>

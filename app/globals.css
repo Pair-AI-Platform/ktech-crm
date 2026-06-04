@@ -501,48 +501,56 @@ body {
   letter-spacing: 0;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Geist', system-ui, sans-serif;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0;
-  line-height: 1.2;
-}
+/* Base heading typography lives in @layer base so Tailwind text-* utilities
+   (e.g. text-lg, text-xl) can override per-element sizing. Without the layer,
+   these bare element rules are unlayered and beat every utility class, which
+   forced oversized titles on mobile. Headings WITHOUT a text utility keep these
+   defaults; headings that opt into a size now honor it. */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
 
-h1 {
-  font-size: 1.875rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.1;
-}
+  h1 {
+    /* Scales down on small screens so untyped page titles fit phone widths. */
+    font-size: clamp(1.5rem, 1.25rem + 1.2vw, 1.875rem);
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.1;
+  }
 
-h2 {
-  font-size: 1.5rem;
-  letter-spacing: 0;
-  line-height: 1.2;
-}
+  h2 {
+    font-size: clamp(1.25rem, 1.1rem + 0.8vw, 1.5rem);
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
 
-h3 {
-  font-size: 1.25rem;
-  letter-spacing: 0;
-  line-height: 1.3;
-}
+  h3 {
+    font-size: 1.25rem;
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
 
-h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.4;
-}
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.4;
+  }
 
-h5 {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
+  h5 {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
 
-h6 {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  h6 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
 }
 
 .stat-number {

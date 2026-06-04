@@ -116,7 +116,7 @@ export default function IntegrationsPage() {
     <div className="px-3 py-4 sm:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 sm:mb-8 gap-3 flex-wrap">
-        <div>
+        <div className="pl-16 lg:pl-0">
           <h1 className="text-3xl font-bold text-gray-900">Integrations</h1>
           <p className="text-gray-600 mt-1">
             Connect your tools and expand AI capabilities
@@ -142,13 +142,13 @@ export default function IntegrationsPage() {
                 key={integration.id}
                 className="bg-white border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors"
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-4 flex-wrap">
                   <div
                     className={`${integration.iconColor} p-3 rounded-lg text-white`}
                   >
                     <Icon className="w-6 h-6" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-[180px]">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">
                         {integration.name}
@@ -182,7 +182,7 @@ export default function IntegrationsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-1.5">
                       <Settings className="w-4 h-4" />
                       Configure
@@ -206,7 +206,7 @@ export default function IntegrationsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Available Integrations
         </h2>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {availableIntegrations.map((integration) => {
             const Icon = integration.icon;
             return (

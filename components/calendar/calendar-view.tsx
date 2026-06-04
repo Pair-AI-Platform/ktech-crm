@@ -743,7 +743,7 @@ export function CalendarView({
           </div>
         ) : timeRange === "day" ? (
           /* Day View */
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             {/* Day header summary */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--border)]/50">
               <div className="flex items-center gap-3">
@@ -791,10 +791,10 @@ export function CalendarView({
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    className="flex gap-5 group"
+                    className="flex gap-3 sm:gap-5 group"
                   >
                     {/* Time label */}
-                    <div className="w-16 flex-shrink-0 pt-3">
+                    <div className="w-12 sm:w-16 flex-shrink-0 pt-3">
                       <div className={cn(
                         "text-right pr-3 transition-colors",
                         hasAppointments ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"

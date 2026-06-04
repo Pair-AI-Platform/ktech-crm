@@ -66,6 +66,14 @@ export default function CalendarPage() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar")
   const [currentDate, setCurrentDate] = useState<Date>(() => parseUrlDate(searchParams.get('date')) ?? new Date())
 
+  // On phones the week/month grids are too dense to be usable, so default to the
+  // day view on first load. Runs once on mount; users can still switch views.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setTimeRange("day")
+    }
+  }, [])
+
   // Keep the calendar in sync when the date query param changes.
   useEffect(() => {
     const nextDate = parseUrlDate(searchParams.get('date'))

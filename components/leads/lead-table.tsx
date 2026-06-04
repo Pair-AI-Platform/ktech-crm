@@ -1295,7 +1295,7 @@ export function LeadTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="flex items-center justify-between p-4 border-t border-[var(--border)] bg-[var(--bg-canvas)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border-t border-[var(--border)] bg-[var(--bg-canvas)]">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
             <span className="text-2xl font-bold text-[var(--primary)]">{totalCount ?? leads.length}</span>
@@ -1307,7 +1307,7 @@ export function LeadTable({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
           <Button
             variant="outline"
             size="sm"
@@ -1318,7 +1318,7 @@ export function LeadTable({
             <ChevronLeft className="w-4 h-4 mr-1" />
             Previous
           </Button>
-          <div className="px-3 py-1.5 rounded-lg bg-[var(--primary-muted)] text-[var(--primary)] text-sm font-medium">
+          <div className="px-3 py-1.5 rounded-lg bg-[var(--primary-muted)] text-[var(--primary)] text-sm font-medium whitespace-nowrap">
             Page {currentPage} of {totalPages}
           </div>
           <Button

@@ -46,7 +46,7 @@ export default function ConfigurationPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-3 py-4 sm:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-8 pl-16 lg:pl-0">
           <h1 className="text-3xl font-bold text-gray-900">Configuration</h1>
           <p className="text-gray-600 mt-2">
             Customize your AI assistant&apos;s behavior and appearance
@@ -56,12 +56,12 @@ export default function ConfigurationPage() {
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
-            <div className="flex space-x-8 px-6">
+            <div className="flex space-x-6 sm:space-x-8 px-4 sm:px-6 overflow-x-auto hide-scrollbar">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  className={`shrink-0 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? "border-green-500 text-green-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
