@@ -168,7 +168,7 @@ CREATE TABLE leads (
   has_bank_account BOOLEAN DEFAULT false,
 
   -- Lead Tracking
-  source_category lead_source_category NOT NULL,
+  source_category lead_source_category NOT NULL DEFAULT 'direct',
   source lead_source NOT NULL,
   source_detail VARCHAR(255),
   referral_code VARCHAR(50),
