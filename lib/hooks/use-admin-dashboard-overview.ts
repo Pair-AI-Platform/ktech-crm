@@ -3,9 +3,10 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
-import { isDemoMode, getDemoLeads } from "@/lib/demo-data"
+import { isDemoMode, getDemoLeads, getDemoAppointments, DEMO_AGENTS } from "@/lib/demo-data"
 import { queryKeys } from "@/lib/hooks/query-keys"
 import { measureClientAsync } from "@/lib/performance"
+import { toDateString } from "@/lib/utils"
 import type { DashboardLead } from "@/lib/hooks/use-dashboard-stats"
 
 export interface AdminPipelineCountRow {
@@ -322,6 +323,37 @@ function getDemoOverview(): AdminDashboardOverviewData {
       urgency: "low",
     })),
     birthdayLeads: [],
+  }
+}
+
+// Full overview (data + funnels + per-agent activity map) for demo mode, shared
+// by the admin dashboard bootstrap so its charts and Team grid are populated.
+export function buildDemoAdminOverview(): AdminDashboardOverview {
+  const data = getDemoOverview()
+  const leads = getDemoLeads()
+  const appointments = getDemoAppointments()
+  const today = toDateString(new Date())
+
+  const agentActivity: AdminAgentActivityStats[] = DEMO_AGENTS
+    .filter((a) => a.role === "agent")
+    .map((agent) => {
+      const mine = leads.filter((l) => l.assigned_to === agent.id)
+      return {
+        agentId: agent.id,
+        todayChanges: mine.filter((l) => (l.updated_at ?? "").slice(0, 10) === today).length,
+        todayAppointments: appointments.filter(
+          (a) => a.assigned_agent === agent.id && a.scheduled_date === today
+        ).length,
+        lastMonthFiles: mine.filter((l) => l.pipeline_stage === "application").length,
+      }
+    })
+
+  return {
+    ...data,
+    agentActivity,
+    sfFunnelData: buildFunnelData(data.pipelineCounts, "self_funded", SF_STAGES),
+    pucFunnelData: buildFunnelData(data.pipelineCounts, "puc", PUC_STAGES),
+    agentActivityByAgent: new Map(agentActivity.map((s) => [s.agentId, s])),
   }
 }
 

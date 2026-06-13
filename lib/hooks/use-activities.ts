@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { isDemoMode } from "@/lib/demo-data"
+import { isDemoMode, getDemoLeadActivities } from "@/lib/demo-data"
 import type { Activity } from "@/types"
 
 export function useLeadActivities(leadId: string) {
@@ -19,9 +19,9 @@ export function useLeadActivities(leadId: string) {
     setLoading(true)
     setError(null)
 
-    // Demo mode - return empty array
+    // Demo mode - synthesize a populated timeline so leads never open blank
     if (isDemoMode()) {
-      setActivities([])
+      setActivities(getDemoLeadActivities(leadId))
       setLoading(false)
       return
     }

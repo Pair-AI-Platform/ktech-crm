@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { isDemoMode } from '@/lib/demo-data'
+import { isDemoMode, getDemoAgentWorkload } from '@/lib/demo-data'
 import { measureClientAsync } from '@/lib/performance'
 import { queryKeys } from './query-keys'
 
@@ -42,7 +42,7 @@ export function useAgentWorkloadStats(options: { enabled?: boolean } = {}) {
     gcTime: 5 * 60_000,
     queryFn: async () => {
       const result = new Map<string, AgentWorkloadStats>()
-      if (isDemoMode()) return result
+      if (isDemoMode()) return getDemoAgentWorkload() as Map<string, AgentWorkloadStats>
 
       const supabase = createClient()
       const { data, error } = await measureClientAsync(

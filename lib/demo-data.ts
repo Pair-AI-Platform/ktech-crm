@@ -1,4 +1,4 @@
-import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType, LostReason } from "@/types"
+import type { Lead, Student, Appointment, Profile, PipelineStage, AppointmentType, LostReason, Activity } from "@/types"
 import { toDateString } from "@/lib/utils"
 
 // Check if we're in demo mode
@@ -919,6 +919,209 @@ export function getDemoAppointmentStats() {
     attended: appointments.filter(a => a.status === "completed").length,
     noShow: appointments.filter(a => a.status === "no_answer" || a.status === "cant_reach").length,
   }
+}
+
+// =============================================
+// LEAD ACTIVITY TIMELINE (demo)
+// =============================================
+
+// Ordered funnel used to synthesize a believable stage history for a lead.
+const DEMO_STAGE_FLOW: { stage: PipelineStage; label: string }[] = [
+  { stage: "new", label: "New" },
+  { stage: "contacted", label: "Contacted" },
+  { stage: "visit", label: "Visit" },
+  { stage: "test", label: "Test" },
+  { stage: "application", label: "File" },
+  { stage: "puc_document_submission", label: "Documents" },
+  { stage: "puc_application_submission", label: "Submission" },
+  { stage: "applicant", label: "Applicant" },
+  { stage: "enrolled", label: "Enrolled" },
+]
+
+const DEMO_TIMELINE_NOTES = [
+  "Called and discussed program details",
+  "Parent is supportive, wants regular updates",
+  "Sent WhatsApp with brochure and fees",
+  "Confirmed interest in Cyber Security track",
+  "Followed up after no answer earlier",
+  "Reviewed required documents checklist",
+  "Discussed scholarship and discount options",
+  "Student prefers morning sessions",
+]
+
+// Generate a realistic per-lead activity timeline (newest first). Empty in the
+// real app means the lead has no logged activities yet; in demo mode we want
+// every lead to open with a populated history so the timeline is never blank.
+export function getDemoLeadActivities(leadId: string): Activity[] {
+  const lead = getDemoLeadById(leadId)
+  if (!lead) return []
+
+  const agent = (lead.assigned_agent
+    ?? DEMO_AGENTS.find(a => a.id === lead.assigned_to)
+    ?? DEMO_AGENTS[2]) as Profile
+  const name = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim() || "Lead"
+
+  const currentIdx = DEMO_STAGE_FLOW.findIndex(s => s.stage === lead.pipeline_stage)
+  const reached = currentIdx >= 0 ? DEMO_STAGE_FLOW.slice(0, currentIdx + 1) : [DEMO_STAGE_FLOW[0]]
+
+  // Build oldest-first, then assign descending timestamps so the newest entry
+  // is the most recent action.
+  const built: Omit<Activity, "created_at">[] = []
+
+  built.push({
+    id: `${leadId}-act-created`,
+    lead_id: leadId,
+    activity_type: "lead_created",
+    title: "Lead Created",
+    description: `${name} added to the pipeline`,
+    metadata: { source: lead.source },
+    created_by: agent.id,
+    created_by_profile: agent,
+  })
+
+  for (let i = 1; i < reached.length; i++) {
+    built.push({
+      id: `${leadId}-act-stage-${i}`,
+      lead_id: leadId,
+      activity_type: "stage_change",
+      title: "Stage Changed",
+      description: `${name}: ${reached[i - 1].label} → ${reached[i].label}`,
+      metadata: { old_stage: reached[i - 1].stage, new_stage: reached[i].stage },
+      created_by: agent.id,
+      created_by_profile: agent,
+    })
+  }
+
+  if (currentIdx >= 1) {
+    built.push({
+      id: `${leadId}-act-status`,
+      lead_id: leadId,
+      activity_type: "status_change",
+      title: "Status Changed",
+      description: `${name}: None → Interested`,
+      metadata: { old_status: null, new_status: "interested" },
+      created_by: agent.id,
+      created_by_profile: agent,
+    })
+    built.push({
+      id: `${leadId}-act-call`,
+      lead_id: leadId,
+      activity_type: "call",
+      title: "Call Logged",
+      description: `Spoke with ${name} about next steps`,
+      metadata: {},
+      created_by: agent.id,
+      created_by_profile: agent,
+    })
+  }
+
+  const noteCount = 2 + Math.floor(Math.random() * 3)
+  for (let i = 0; i < noteCount; i++) {
+    built.push({
+      id: `${leadId}-act-note-${i}`,
+      lead_id: leadId,
+      activity_type: "note",
+      title: "Note Added",
+      description: randomItem(DEMO_TIMELINE_NOTES),
+      metadata: {},
+      created_by: agent.id,
+      created_by_profile: agent,
+    })
+  }
+
+  if (currentIdx >= 4) {
+    built.push({
+      id: `${leadId}-act-whatsapp`,
+      lead_id: leadId,
+      activity_type: "whatsapp_sent",
+      title: "WhatsApp Sent",
+      description: `Sent document reminder to ${name}`,
+      metadata: {},
+      created_by: agent.id,
+      created_by_profile: agent,
+    })
+  }
+
+  // Newest first with decreasing timestamps (a few hours to a couple days apart).
+  const ordered = built.reverse()
+  let clock = Date.now()
+  return ordered.map(a => {
+    clock -= (2 + Math.floor(Math.random() * 30)) * 60 * 60 * 1000
+    return { ...a, created_at: new Date(clock).toISOString() } as Activity
+  })
+}
+
+// =============================================
+// DASHBOARD STATS (demo)
+// =============================================
+
+const DEMO_INACTIVE_STAGES = new Set<PipelineStage>(["lost", "withdraw", "enrolled"])
+
+export interface DemoCriticalStats {
+  activeLeads: number
+  totalFiles: number
+  pucFiles: number
+  sfFiles: number
+  todayAppointments: number
+  todayCallbacks: number
+}
+
+// Critical stat cards for the dashboard. For agents, scope to their own
+// assigned leads/appointments; admins see the whole demo dataset.
+export function getDemoCriticalStats(opts: { isAdmin: boolean; profileId?: string | null }): DemoCriticalStats {
+  const { isAdmin, profileId } = opts
+  const today = toDateString(new Date())
+
+  const leads = getDemoLeads().filter(l => isAdmin || l.assigned_to === profileId)
+  const appointments = getDemoAppointments().filter(a => isAdmin || a.assigned_agent === profileId)
+
+  const activeLeads = leads.filter(l => !DEMO_INACTIVE_STAGES.has(l.pipeline_stage)).length
+  const fileLeads = leads.filter(l => l.pipeline_stage === "application")
+  const todayAppts = appointments.filter(a => a.scheduled_date === today)
+
+  return {
+    activeLeads,
+    totalFiles: fileLeads.length,
+    pucFiles: fileLeads.filter(l => l.funding_type === "puc").length,
+    sfFiles: fileLeads.filter(l => l.funding_type === "self_funded").length,
+    todayAppointments: todayAppts.length,
+    todayCallbacks: todayAppts.filter(a => a.is_callback).length,
+  }
+}
+
+export interface DemoAgentWorkload {
+  activeLeads: number
+  enrolled: number
+  totalAssigned: number
+  newThisMonth: number
+  overdueFollowUps: number
+}
+
+// Per-agent workload aggregates for the admin Team Status grid.
+export function getDemoAgentWorkload(): Map<string, DemoAgentWorkload> {
+  const result = new Map<string, DemoAgentWorkload>()
+  const leads = getDemoLeads()
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const overdueCutoff = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)
+
+  for (const agent of DEMO_AGENTS) {
+    if (agent.role !== "agent") continue
+    const mine = leads.filter(l => l.assigned_to === agent.id)
+    result.set(agent.id, {
+      activeLeads: mine.filter(l => !DEMO_INACTIVE_STAGES.has(l.pipeline_stage)).length,
+      enrolled: mine.filter(l => l.pipeline_stage === "enrolled").length,
+      totalAssigned: mine.length,
+      newThisMonth: mine.filter(l => new Date(l.created_at) >= startOfMonth).length,
+      overdueFollowUps: mine.filter(l =>
+        !DEMO_INACTIVE_STAGES.has(l.pipeline_stage) &&
+        l.last_contacted_at != null &&
+        new Date(l.last_contacted_at) < overdueCutoff
+      ).length,
+    })
+  }
+
+  return result
 }
 
 export function getTodayAppointments(): Appointment[] {

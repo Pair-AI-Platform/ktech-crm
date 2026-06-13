@@ -2,14 +2,23 @@
 
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { isDemoMode } from "@/lib/demo-data"
+import {
+  isDemoMode,
+  getDemoAppointments,
+  getDemoAgentWorkload,
+  getDemoCriticalStats,
+  getTodayAppointments,
+  DEMO_AGENTS,
+} from "@/lib/demo-data"
 import { queryKeys } from "@/lib/hooks/query-keys"
 import { measureClientAsync } from "@/lib/performance"
+import { toDateString } from "@/lib/utils"
 import {
   EMPTY_ADMIN_DASHBOARD_OVERVIEW_DATA,
   PUC_STAGES,
   SF_STAGES,
   buildFunnelData,
+  buildDemoAdminOverview,
   normalizeOverview,
   type AdminDashboardOverview,
 } from "@/lib/hooks/use-admin-dashboard-overview"
@@ -299,6 +308,59 @@ function buildBootstrap(payload: AdminDashboardBootstrapPayload): AdminDashboard
   }
 }
 
+// Stable status spread so the Team Status grid shows a realistic mix in demo mode.
+const DEMO_AGENT_STATUS_CYCLE: AgentStatus[] = [
+  "online", "online", "meeting", "online", "break",
+  "online", "meeting", "offline", "online", "break",
+]
+
+// Fully-populated bootstrap for demo mode so the admin dashboard renders charts,
+// today's appointments, the no-update queue and the Team Status grid with data.
+function getDemoBootstrap(): AdminDashboardBootstrap {
+  const overview = buildDemoAdminOverview()
+  const workload = getDemoAgentWorkload()
+  const appointments = getDemoAppointments()
+  const now = new Date()
+
+  const agentHeatmapData: AdminDashboardAgentCard[] = DEMO_AGENTS
+    .filter((a) => a.role === "agent")
+    .map((agent, i) => {
+      const w = workload.get(agent.id) ?? EMPTY_AGENT_STATS
+      const activity = overview.agentActivityByAgent.get(agent.id)
+      return {
+        id: agent.id,
+        name: agent.full_name ?? "Agent",
+        status: DEMO_AGENT_STATUS_CYCLE[i % DEMO_AGENT_STATUS_CYCLE.length],
+        activeLeadCount: w.activeLeads,
+        filesOpenedThisMonth: activity?.lastMonthFiles ?? 0,
+        todayChanges: activity?.todayChanges ?? 0,
+        conversionRate: w.totalAssigned > 0 ? Math.round((w.enrolled / w.totalAssigned) * 100) : 0,
+        todayAppointments: activity?.todayAppointments ?? 0,
+        lastMonthFiles: activity?.lastMonthFiles ?? 0,
+        overdueFollowUps: w.overdueFollowUps,
+        totalAssigned: w.totalAssigned,
+      }
+    })
+
+  const noUpdatedAppointments = appointments
+    .filter((a) => {
+      if (a.status !== "scheduled") return false
+      const dt = new Date(`${a.scheduled_date}T${a.scheduled_time || "23:59:59"}`)
+      return dt < now
+    })
+    .slice(0, 25)
+
+  return {
+    criticalStats: getDemoCriticalStats({ isAdmin: true }),
+    overview,
+    todayAppointments: getTodayAppointments(),
+    noUpdatedAppointments,
+    agentHeatmapData,
+    errors: [],
+    generatedAt: toDateString(now),
+  }
+}
+
 export function useAdminDashboardBootstrap(options: { enabled?: boolean } = {}) {
   const enabled = options.enabled ?? true
 
@@ -310,7 +372,7 @@ export function useAdminDashboardBootstrap(options: { enabled?: boolean } = {}) 
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
     queryFn: async (): Promise<AdminDashboardBootstrap> => {
-      if (isDemoMode()) return EMPTY_BOOTSTRAP
+      if (isDemoMode()) return getDemoBootstrap()
 
       const response = await measureClientAsync(
         "api.dashboard.admin-bootstrap",

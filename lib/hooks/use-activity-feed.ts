@@ -81,7 +81,11 @@ export function useActivityFeed(options: {
           },
         ]
 
-        return isAdmin ? demoActivities : demoActivities.filter((a) => a.created_by === userId)
+        // Agents see the same illustrative feed re-attributed to themselves so
+        // the "recent activity" panel is never empty in demo mode.
+        return isAdmin
+          ? demoActivities
+          : demoActivities.map((a) => ({ ...a, created_by: userId ?? a.created_by }))
       }
 
       const supabase = createClient()

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
-import { isDemoMode } from "@/lib/demo-data"
+import { isDemoMode, getDemoCriticalStats } from "@/lib/demo-data"
 import { measureClientAsync } from "@/lib/performance"
 import { toDateString } from "@/lib/utils"
 
@@ -58,7 +58,7 @@ export function useDashboardCriticalStats({
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     queryFn: async (): Promise<DashboardCriticalStats> => {
-      if (isDemoMode()) return EMPTY_STATS
+      if (isDemoMode()) return getDemoCriticalStats({ isAdmin, profileId })
 
       const supabase = createClient()
       const today = toDateString(new Date())
