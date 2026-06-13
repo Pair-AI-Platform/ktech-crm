@@ -203,6 +203,8 @@ export function AppointmentBooking({
         last_name: quickLastName.trim(),
         phone: quickPhone.trim().replace(/\D/g, ""),
         pipeline_stage: "new",
+        source_category: "direct",
+        source: "walk_in",
         nationality: "Kuwaiti",
         is_kuwaiti: true,
         is_transfer_student: false,
