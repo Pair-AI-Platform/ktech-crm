@@ -215,6 +215,22 @@ export const DEMO_AGENTS: Profile[] = [
   },
 ]
 
+// The persona the "agent" easy-login demo button signs in as (see DEMO_AGENT_PROFILE
+// in lib/hooks/use-user.ts). Generated demo data is filtered to this id in the
+// agent dashboard, so we bias a healthy share of records to it — otherwise the
+// agent view only sees a random ~1/12 sliver and looks empty next to the admin view.
+const PRIMARY_DEMO_AGENT_ID = "agent-1"
+const PRIMARY_DEMO_AGENT = DEMO_AGENTS.find(a => a.id === PRIMARY_DEMO_AGENT_ID) || DEMO_AGENTS[0]
+const OTHER_DEMO_AGENTS = DEMO_AGENTS.filter(a => a.id !== PRIMARY_DEMO_AGENT_ID)
+
+// Deterministically assign ~40% of generated records (2 out of every 5) to the
+// primary demo agent so its view is fully populated across every stage, while the
+// rest spread across the team to keep admin/team views realistic.
+function pickDemoAgent(index: number): Profile {
+  if (index % 5 < 2) return PRIMARY_DEMO_AGENT
+  return randomItem(OTHER_DEMO_AGENTS)
+}
+
 // Kuwaiti names for realistic data (Arabic)
 const firstNamesM = ["أحمد", "محمد", "عبدالله", "خالد", "فيصل", "عمر", "سالم", "يوسف", "حسن", "علي", "ناصر", "بدر", "فهد", "حمد", "صالح"]
 const firstNamesF = ["فاطمة", "مريم", "سارة", "نورة", "هيا", "دانة", "لولوة", "دلال", "ريم", "أسيل", "شيخة", "لطيفة", "مها", "أمل", "حصة"]
@@ -337,7 +353,7 @@ export function generateDemoLeads(count: number = 50): Lead[] {
     // Distribute evenly across stages
     const stageIndex = i % stages.length
     const stage = stages[stageIndex]
-    const agent = randomItem(DEMO_AGENTS)
+    const agent = pickDemoAgent(i)
 
     const statuses: Lead["status"][] = ["no_answer", "callback", "not_interested", "switched_off", "busy", "confirmed", "wrong_number", "will_see", "postponed", "by_mistake", "disconnected", "hanged_up"]
 
@@ -435,7 +451,7 @@ export function generateDemoStudents(count: number = 20): Student[] {
     const isMale = Math.random() > 0.5
     const firstName = randomItem(isMale ? firstNamesM : firstNamesF)
     const lastName = randomItem(lastNames)
-    const agent = randomItem(DEMO_AGENTS)
+    const agent = pickDemoAgent(i)
     const fundingType = randomItem(fundingTypes) as Student["funding_type"]
     const amountPaid = Math.floor(Math.random() * 600) * 10
 
@@ -695,7 +711,7 @@ export function generateDemoAppointments(count: number = 200): Appointment[] {
     const isMale = Math.random() > 0.5
     const firstName = randomItem(isMale ? firstNamesM : firstNamesF)
     const lastName = randomItem(lastNames)
-    const agent = randomItem(DEMO_AGENTS)
+    const agent = pickDemoAgent(i)
     const appointmentTypes = pickTypes()
     const primaryType = appointmentTypes[0]
     const isNoUpdated = i < 10
