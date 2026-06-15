@@ -27,44 +27,43 @@ function createMockSupabase(rules: AutomationRule[] = [], runawayCount = 0) {
   // via the returned `setRunawayCount` helper after construction.
   const runawayState = { count: runawayCount }
 
-  // Chain for isRunawayLoop: .select('id', { count, head }).eq().gte().filter()
-  // The terminal .filter() call awaits to { count, error }.
-  const runawayCountChain = () => {
-    const terminal = {
-      // .filter() is awaited — return a thenable-like object via Promise resolve
-      filter: vi.fn().mockImplementation(() =>
-        Promise.resolve({ count: runawayState.count, error: null })
-      ),
-    }
-    const gteChain = { gte: vi.fn().mockReturnValue(terminal) }
-    const eqChain = { eq: vi.fn().mockReturnValue(gteChain) }
-    return { select: vi.fn().mockReturnValue(eqChain) }
-  }
-
   return {
     client: {
       from: vi.fn().mockImplementation((table: string) => {
         if (table === 'automation_rules') {
+          // Two callers:
+          //   1) loadActiveRules: .select().eq().eq().order() -> { data: rules }
+          //   2) isRunawayLoop:   .select('id').eq('trigger_type', t) (awaited) -> { data: rules }
+          // The object returned after the first .eq() is therefore both
+          // chainable (has .eq().order()) and thenable (awaits to { data }).
+          const afterSecondEq = {
+            order: vi.fn().mockResolvedValue({ data: rules, error: null }),
+          }
+          const afterFirstEq: Record<string, unknown> = {
+            eq: vi.fn().mockReturnValue(afterSecondEq),
+            then: (resolve: (v: { data: AutomationRule[]; error: null }) => void) =>
+              resolve({ data: rules, error: null }),
+          }
           return {
             select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({
-                    data: rules,
-                    error: null,
-                  }),
-                }),
-              }),
+              eq: vi.fn().mockReturnValue(afterFirstEq),
             }),
           }
         }
         if (table === 'automation_executions') {
-          // This table is used for two distinct operations:
-          //   1) isRunawayLoop count query: select().eq().gte().filter()
+          // Two distinct operations:
+          //   1) isRunawayLoop count query: select().eq().gte().in() -> { count, error }
           //   2) Execution log insert: insert()
-          // Returning an object that supports both keeps the mock single-shot.
           return {
-            ...runawayCountChain(),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                gte: vi.fn().mockReturnValue({
+                  in: vi.fn().mockImplementation(() =>
+                    Promise.resolve({ count: runawayState.count, error: null })
+                  ),
+                }),
+              }),
+            }),
             insert: insertFn,
           }
         }

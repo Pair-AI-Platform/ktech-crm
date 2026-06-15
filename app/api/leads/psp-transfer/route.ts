@@ -1,35 +1,10 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
+import { withApiHandler } from "@/lib/api-handler"
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(_request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient()
-
-    // Get current user and verify admin role
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      )
-    }
-
-    // Count eligible PUC leads (not in submission, enrolled, or lost stages)
+// GET: count eligible PUC leads (admin only).
+export const GET = withApiHandler(
+  { context: 'psp-transfer-count', roles: ['admin'] },
+  async ({ supabase, logger }) => {
     const { count, error: countError } = await supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
@@ -37,52 +12,21 @@ export async function GET(_request: NextRequest) {
       .not("pipeline_stage", "in", '("enrolled","lost")')
 
     if (countError) {
-      console.error("[PSP Transfer] Count error:", countError)
-      return NextResponse.json(
-        { error: "Failed to count eligible leads" },
-        { status: 500 }
-      )
+      logger.error("Failed to count eligible PUC leads", { error: countError.message })
+      return NextResponse.json({ error: "Failed to count eligible leads" }, { status: 500 })
     }
 
     return NextResponse.json({ count: count || 0 })
-  } catch (err) {
-    console.error("[PSP Transfer] Error:", err)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
   }
-}
+)
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function POST(_request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient()
-
-    // Get current user and verify admin role
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      )
-    }
-
-    // Fetch all eligible PUC leads (not in submission, enrolled, or lost stages)
+// POST: bulk-move eligible PUC leads to the 'applicant' stage (admin only).
+// Routed through withApiHandler so the same-origin/CSRF check applies, matching
+// the rest of the API.
+export const POST = withApiHandler(
+  { context: 'psp-transfer', roles: ['admin'] },
+  async ({ user, supabase, logger }) => {
+    // Fetch all eligible PUC leads (not enrolled or lost).
     const { data: eligibleLeads, error: leadsError } = await supabase
       .from("leads")
       .select("id, first_name, last_name, first_name_ar, last_name_ar, pipeline_stage")
@@ -90,11 +34,8 @@ export async function POST(_request: NextRequest) {
       .not("pipeline_stage", "in", '("enrolled","lost")')
 
     if (leadsError) {
-      console.error("[PSP Transfer] Failed to fetch leads:", leadsError)
-      return NextResponse.json(
-        { error: "Failed to fetch eligible leads" },
-        { status: 500 }
-      )
+      logger.error("Failed to fetch eligible PUC leads", { error: leadsError.message })
+      return NextResponse.json({ error: "Failed to fetch eligible leads" }, { status: 500 })
     }
 
     if (!eligibleLeads || eligibleLeads.length === 0) {
@@ -103,51 +44,49 @@ export async function POST(_request: NextRequest) {
         transferred: 0,
         skipped: 0,
         total: 0,
-        message: "No eligible PUC leads to transfer"
+        message: "No eligible PUC leads to transfer",
       })
     }
 
-    const leadIds = eligibleLeads.map(l => l.id)
-
-    // Get current max position in submission stage
+    // Current max position in the applicant stage (maybeSingle: empty stage is
+    // a normal null result, not an error).
     const { data: maxPosRow } = await supabase
       .from("leads")
       .select("position_in_stage")
       .eq("pipeline_stage", "applicant")
       .order("position_in_stage", { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
     let nextPos = (maxPosRow?.position_in_stage ?? 0) + 1
 
-    // Update each lead individually with sequential positions
+    // Update each lead with a sequential position; track real successes.
+    const transferredLeads: typeof eligibleLeads = []
     const updateErrors: string[] = []
-    for (const id of leadIds) {
+    for (const lead of eligibleLeads) {
       const { error } = await supabase
         .from("leads")
         .update({
           pipeline_stage: "applicant",
           position_in_stage: nextPos,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
+        .eq("id", lead.id)
 
       if (error) {
         updateErrors.push(error.message)
       } else {
+        transferredLeads.push(lead)
         nextPos++
       }
     }
 
-    if (updateErrors.length === leadIds.length) {
-      console.error("[PSP Transfer] Update errors:", updateErrors)
-      return NextResponse.json(
-        { error: "Failed to update leads" },
-        { status: 500 }
-      )
+    if (transferredLeads.length === 0) {
+      logger.error("PSP transfer: all updates failed", { count: updateErrors.length })
+      return NextResponse.json({ error: "Failed to update leads" }, { status: 500 })
     }
 
-    // Log activity for each transferred lead
-    const activities = eligibleLeads.map(lead => ({
+    // Log activity for each lead that actually moved.
+    const activities = transferredLeads.map((lead) => ({
       lead_id: lead.id,
       activity_type: "stage_change",
       title: "PSP Transfer",
@@ -160,24 +99,19 @@ export async function POST(_request: NextRequest) {
       created_by: user.id,
     }))
 
-    // Insert activities in batches to avoid potential limits
     const batchSize = 100
     for (let i = 0; i < activities.length; i += batchSize) {
       const batch = activities.slice(i, i + batchSize)
-      await supabase.from("activities").insert(batch)
+      const { error: actError } = await supabase.from("activities").insert(batch)
+      if (actError) logger.warn("PSP transfer: activity batch insert failed", { error: actError.message })
     }
 
     return NextResponse.json({
       success: true,
-      transferred: eligibleLeads.length,
+      transferred: transferredLeads.length,
+      skipped: eligibleLeads.length - transferredLeads.length,
       total: eligibleLeads.length,
-      message: `Successfully transferred ${eligibleLeads.length} PUC leads to submission stage`
+      message: `Successfully transferred ${transferredLeads.length} PUC lead(s) to the applicant stage`,
     })
-  } catch (err) {
-    console.error("[PSP Transfer] Error:", err)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
   }
-}
+)
