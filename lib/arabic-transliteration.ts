@@ -78,7 +78,7 @@ const SINGLES: Record<string, string> = {
 }
 
 function phonetic(token: string): string {
-  let s = token.toLowerCase().replace(/[^a-z]/g, "")
+  const s = token.toLowerCase().replace(/[^a-z]/g, "")
   if (!s) return ""
   let out = ""
   let firstLetter = true
