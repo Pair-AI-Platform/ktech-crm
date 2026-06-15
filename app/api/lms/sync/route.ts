@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { syncFromMoodle, checkMoodleConnection } from '@/lib/lms/moodle'
 
 /**
@@ -7,6 +8,15 @@ import { syncFromMoodle, checkMoodleConnection } from '@/lib/lms/moodle'
  * Sync grades and test scores from Moodle LMS for a lead
  */
 export const POST = withApiHandler({ context: 'lms-sync' }, async ({ req, supabase, user, logger }) => {
+  // Each sync fans out into many outbound Moodle calls — throttle per user.
+  const rl = await rateLimit(`lms-sync:${user.id}`, RATE_LIMITS['lms-sync'])
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: 'Too many requests', retryAfterMs: rl.resetIn },
+      { status: 429 }
+    )
+  }
+
   const body = await req.json()
   const { leadId } = body
 

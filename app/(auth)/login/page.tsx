@@ -48,11 +48,18 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      // Check role for redirect
+      // Check role + active status for redirect
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, is_active")
         .single()
+      if (profile?.is_active === false) {
+        // Deactivated account: sign out and block access.
+        await supabase.auth.signOut()
+        setError("Your account has been deactivated. Please contact IT support.")
+        setLoading(false)
+        return
+      }
       if (profile?.role === "marketing") {
         router.push("/marketing")
       } else {
@@ -305,44 +312,47 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Quick sign-in for development — fills real credentials and submits */}
-              <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                <p className="text-xs text-[var(--text-muted)] mb-3 text-center">Quick sign-in (real data)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 text-sm group"
-                    disabled={loading}
-                    onClick={() => {
-                      setEmail("admin@ktech.edu.kw")
-                      setPassword("KtechAdmin2026!")
-                      setTimeout(() => {
-                        document.querySelector<HTMLFormElement>("form")?.requestSubmit()
-                      }, 0)
-                    }}
-                  >
-                    <ShieldCheck className="w-4 h-4 mr-2" />
-                    Admin
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 text-sm group"
-                    disabled={loading}
-                    onClick={() => {
-                      setEmail("agent@ktech.edu.kw")
-                      setPassword("KtechAgent2026!")
-                      setTimeout(() => {
-                        document.querySelector<HTMLFormElement>("form")?.requestSubmit()
-                      }, 0)
-                    }}
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Agent
-                  </Button>
+              {/* Quick sign-in for local development only — gated behind the dev
+                  demo flag so the credentials are stripped from production builds. */}
+              {isDemoAllowed && (
+                <div className="mt-6 pt-6 border-t border-[var(--border)]">
+                  <p className="text-xs text-[var(--text-muted)] mb-3 text-center">Quick sign-in (dev only)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 text-sm group"
+                      disabled={loading}
+                      onClick={() => {
+                        setEmail("admin@ktech.edu.kw")
+                        setPassword("KtechAdmin2026!")
+                        setTimeout(() => {
+                          document.querySelector<HTMLFormElement>("form")?.requestSubmit()
+                        }, 0)
+                      }}
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Admin
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 text-sm group"
+                      disabled={loading}
+                      onClick={() => {
+                        setEmail("agent@ktech.edu.kw")
+                        setPassword("KtechAgent2026!")
+                        setTimeout(() => {
+                          document.querySelector<HTMLFormElement>("form")?.requestSubmit()
+                        }, 0)
+                      }}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Agent
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Demo Mode — gated behind NEXT_PUBLIC_ALLOW_DEMO_MODE; uses synthetic data */}
               {isDemoAllowed && (

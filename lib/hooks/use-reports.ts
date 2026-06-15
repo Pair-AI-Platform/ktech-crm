@@ -3128,22 +3128,17 @@ export function useAgents() {
       if (isDemoMode()) {
         return DEMO_AGENTS.filter(a => a.role === 'agent') as Profile[]
       }
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("is_active", true)
-          .order("full_name")
+      // Outside demo mode, never substitute synthetic agents — an empty or
+      // failing team query must surface honestly, not render fabricated agents.
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("is_active", true)
+        .order("full_name")
 
-        if (error) throw new Error(error.message)
-        if (!data || data.length === 0) {
-          return DEMO_AGENTS.filter(a => a.role === 'agent') as Profile[]
-        }
-        return (data || []) as Profile[]
-      } catch {
-        return DEMO_AGENTS.filter(a => a.role === 'agent') as Profile[]
-      }
+      if (error) throw new Error(error.message)
+      return (data || []) as Profile[]
     },
     staleTime: 60_000,
   })

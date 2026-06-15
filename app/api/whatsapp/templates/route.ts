@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 // Twilio Content API for WhatsApp Templates
 const TWILIO_CONTENT_API = "https://content.twilio.com/v1/Content"
 
 export const POST = withApiHandler(
-  { context: 'whatsapp-templates-create' },
-  async ({ req, supabase, logger }) => {
+  { context: 'whatsapp-templates-create', roles: ['admin'] },
+  async ({ req, supabase, user, logger }) => {
+    // Template creation mutates the shared Twilio account — throttle it.
+    const rl = await rateLimit(`whatsapp-templates:${user.id}`, RATE_LIMITS.whatsapp)
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Too many requests', retryAfterMs: rl.resetIn },
+        { status: 429 }
+      )
+    }
+
     const body = await req.json()
 
     const { name, category, language, body: templateBody } = body

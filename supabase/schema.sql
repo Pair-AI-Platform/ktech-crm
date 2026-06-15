@@ -2,6 +2,13 @@
 -- KTECH ENROLLMENT CRM - DATABASE SCHEMA
 -- Run this in your Supabase SQL Editor
 -- =============================================
+--
+-- NOTE: supabase/migrations/ is the SOURCE OF TRUTH for the live schema and
+-- RLS policies. This consolidated file is a convenience snapshot for fresh
+-- provisioning and may lag the migrations (e.g. the RLS lockdown in 168/174
+-- and the students/appointments WITH CHECK fixes in 200). When in doubt, read
+-- the latest migrations, not this file.
+-- =============================================
 
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -434,15 +441,21 @@ CREATE POLICY students_select_policy ON students
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
+-- Direct client INSERT is blocked (migration 200): student rows are only ever
+-- created by the SECURITY DEFINER enrollment RPCs, which bypass RLS.
 CREATE POLICY students_insert_policy ON students
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (false);
 
 CREATE POLICY students_update_policy ON students
   FOR UPDATE
   TO authenticated
   USING (
+    assigned_to = auth.uid() OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+  )
+  WITH CHECK (
     assigned_to = auth.uid() OR
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );

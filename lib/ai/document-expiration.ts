@@ -1,6 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { generateObject } from "ai"
 import { z } from "zod"
+import { DOCUMENT_AI_MODEL } from "@/lib/ai/model"
 
 const ExpirationExtractionSchema = z.object({
   expiration_date: z.string().nullable().describe("Document expiration date in YYYY-MM-DD format, or null when no expiration date is visible."),
@@ -89,7 +90,7 @@ export async function extractDocumentExpirationDate({
         }
 
     const result = await generateObject({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: anthropic(DOCUMENT_AI_MODEL),
       temperature: 0,
       schema: ExpirationExtractionSchema,
       messages: [

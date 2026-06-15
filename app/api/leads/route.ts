@@ -11,9 +11,13 @@ export const GET = withApiHandler(
     const stage = url.searchParams.get('stage') || 'all'
     const fundingType = url.searchParams.get('fundingType') || 'all'
     const searchQuery = url.searchParams.get('search') || ''
-    const limit = parseInt(url.searchParams.get('limit') || '50', 10)
+    // Clamp page sizes so a caller can't request the entire table in one shot.
+    const MAX_PAGE_SIZE = 500
+    const rawLimit = parseInt(url.searchParams.get('limit') || '50', 10)
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), MAX_PAGE_SIZE) : 50
     const page = url.searchParams.get('page') ? parseInt(url.searchParams.get('page')!, 10) : undefined
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '25', 10)
+    const rawPageSize = parseInt(url.searchParams.get('pageSize') || '25', 10)
+    const pageSize = Number.isFinite(rawPageSize) ? Math.min(Math.max(rawPageSize, 1), MAX_PAGE_SIZE) : 25
     const includeCount = url.searchParams.get('includeCount') !== 'false'
     const view = url.searchParams.get('view') === 'compact' ? 'compact' : 'full'
     const includeNonActual = profile.role === 'admin' && url.searchParams.get('includeNonActual') === 'true'
@@ -147,7 +151,12 @@ export const GET = withApiHandler(
       }
 
       if (searchQuery) {
-        q = q.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,civil_id.ilike.%${searchQuery}%`)
+        // Strip PostgREST filter-string delimiters so the term can't inject
+        // extra OR conditions or break the filter parser.
+        const safeSearch = searchQuery.replace(/[,()\\]/g, ' ').trim()
+        if (safeSearch) {
+          q = q.or(`first_name.ilike.%${safeSearch}%,last_name.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%,civil_id.ilike.%${safeSearch}%`)
+        }
       }
 
       // Advanced filters
@@ -170,10 +179,17 @@ export const GET = withApiHandler(
         q = q.eq('is_kuwaiti', advancedFilters.isKuwaiti)
       }
       if (advancedFilters.gpaMin !== null && advancedFilters.gpaMin !== undefined) {
-        q = q.or(`gpa_grade_12_expected.gte.${advancedFilters.gpaMin},gpa_grade_11.gte.${advancedFilters.gpaMin},gpa_grade_10.gte.${advancedFilters.gpaMin}`)
+        // Coerce to a number before interpolating into the filter string.
+        const gpaMin = Number(advancedFilters.gpaMin)
+        if (Number.isFinite(gpaMin)) {
+          q = q.or(`gpa_grade_12_expected.gte.${gpaMin},gpa_grade_11.gte.${gpaMin},gpa_grade_10.gte.${gpaMin}`)
+        }
       }
       if (advancedFilters.gpaMax !== null && advancedFilters.gpaMax !== undefined) {
-        q = q.or(`gpa_grade_12_expected.lte.${advancedFilters.gpaMax},gpa_grade_11.lte.${advancedFilters.gpaMax},gpa_grade_10.lte.${advancedFilters.gpaMax}`)
+        const gpaMax = Number(advancedFilters.gpaMax)
+        if (Number.isFinite(gpaMax)) {
+          q = q.or(`gpa_grade_12_expected.lte.${gpaMax},gpa_grade_11.lte.${gpaMax},gpa_grade_10.lte.${gpaMax}`)
+        }
       }
       if (advancedFilters.ministryAssigned === 'assigned') {
         q = q.eq('ministry_assigned', true)

@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError || !rsvp) {
-      logger.error('RSVP token not found', { token })
+      // Do not log the raw token — it is the only credential gating confirmation.
+      logger.warn('RSVP token not found')
       return NextResponse.json({ error: 'Invalid RSVP link' }, { status: 404 })
     }
 

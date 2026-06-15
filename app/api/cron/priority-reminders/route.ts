@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { tryClaimCronRun } from "@/lib/cron-lock"
+import { safeEqual } from "@/lib/safe-compare"
 
 // In-memory fallback guard — only useful within a single instance.
 // Distributed dedup happens via tryClaimCronRun() (Upstash SETNX EX).
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
     }
 
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!safeEqual(bearer, cronSecret)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

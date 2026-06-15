@@ -46,10 +46,15 @@ function getLimiter(config: RateLimitConfig): Ratelimit | null {
 export async function rateLimit(key: string, config: RateLimitConfig): Promise<{ success: boolean; remaining: number; resetIn: number }> {
   const limiter = getLimiter(config)
 
-  // Graceful fallback: if no Upstash config, allow all requests
+  // No Upstash config: allow all requests in development (convenience), but in
+  // production fail CLOSED so a misconfiguration can't silently disable
+  // throttling on public/webhook endpoints (e.g. PSP self-service civil-ID
+  // brute force). Upstash is configured in production, so this only triggers on
+  // a genuine misconfiguration — where denying is the correct default.
   if (!limiter) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[Rate Limit] Upstash not configured in production — all requests allowed')
+      console.error('[Rate Limit] Upstash not configured in production — denying request (fail closed)')
+      return { success: false, remaining: 0, resetIn: config.interval }
     }
     return { success: true, remaining: config.limit, resetIn: 0 }
   }
@@ -76,4 +81,5 @@ export const RATE_LIMITS = {
   api: { interval: 60_000, limit: 60 },          // 60 general API calls per minute
   'civil-id-extract': { interval: 60_000, limit: 10 }, // 10 civil ID extractions per minute
   'psp-self-service': { interval: 60_000, limit: 30 }, // 30 calls/min from a public PSP self-service token
+  'lms-sync': { interval: 60_000, limit: 10 }, // 10 Moodle syncs/min per user (each fans out to many Moodle calls)
 } as const

@@ -10,7 +10,7 @@ export interface AuthenticatedContext {
   req: NextRequest
   supabase: SupabaseClient
   user: User
-  profile: { role: UserRole }
+  profile: { role: UserRole; is_active: boolean | null }
   logger: Logger
 }
 
@@ -178,14 +178,24 @@ export function withApiHandler(
         return errorResponse('Unauthorized', 401, logger)
       }
 
-      // Fetch user profile for role information
+      // Fetch user profile for role + active status
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_active')
         .eq('id', user.id)
         .single()
 
-      const userProfile: { role: UserRole } = { role: profile?.role ?? 'agent' }
+      // Deactivated accounts keep a valid session JWT until it expires; deny
+      // them here so disabling a user actually revokes API access.
+      if (profile?.is_active === false) {
+        logger.warn('Forbidden: deactivated account', { userId: user.id })
+        return errorResponse('Account deactivated', 403, logger)
+      }
+
+      const userProfile: { role: UserRole; is_active: boolean | null } = {
+        role: profile?.role ?? 'agent',
+        is_active: profile?.is_active ?? null,
+      }
 
       // Role-based authorization check
       if ('roles' in options && options.roles && options.roles.length > 0) {

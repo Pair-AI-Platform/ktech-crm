@@ -509,15 +509,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const handleStageClick = async (stage: string) => {
-    console.log('[Stage Click] Clicked stage:', stage, 'Current stage:', lead?.pipeline_stage)
 
     if (!lead || updatingStage || lead.pipeline_stage === 'lost' || !canChangeStage) {
-      console.log('[Stage Click] Early return - lead:', !!lead, 'updating:', updatingStage, 'isLost:', lead?.pipeline_stage === 'lost', 'canChange:', canChangeStage)
       return
     }
 
     if (stage === lead.pipeline_stage) {
-      console.log('[Stage Click] Same stage, skipping')
       return
     }
 
@@ -529,7 +526,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         return
       }
       if (guard.kind === "file_fee") {
-        console.log('[Stage Click] Intercepting file stage click - showing file fee dialog')
         setShowFileFeeDialog(true)
         return
       }
@@ -547,7 +543,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
     // Intercept "enrolled" stage - require payment first
     if (stage === 'enrolled' && lead.pipeline_stage === 'application') {
-      console.log('[Stage Click] Intercepting enrolled click - showing payment dialog')
       setShowEnrollmentDialog(true)
       return
     }
@@ -566,7 +561,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     const targetIndex = STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number])
 
     if (currentIndex < applicationIndex && targetIndex > applicationIndex) {
-      console.log('[Stage Click] Cannot skip application stage - must go through application first')
       return
     }
 
@@ -583,7 +577,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     try {
       const stageIndex = STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number])
       const currentIndex = STAGE_ORDER.indexOf(lead.pipeline_stage as typeof STAGE_ORDER[number])
-      console.log('[Stage Click] Moving from index', currentIndex, 'to', stageIndex)
 
       if (stageIndex > currentIndex) {
         const stagesToComplete: PipelineStage[] = []
@@ -595,14 +588,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         }
         const existingCompleted = lead.completed_stages || []
         const newCompletedStages = [...new Set([...existingCompleted, ...stagesToComplete])]
-        console.log('[Stage Click] Completing stages:', newCompletedStages)
 
-        const result = await updateLead(lead.id, {
+        await updateLead(lead.id, {
           pipeline_stage: stage as PipelineStage,
           completed_stages: newCompletedStages,
           last_contacted_at: new Date().toISOString(),
         })
-        console.log('[Stage Click] Update result:', result)
       } else {
         // Moving backward - only keep completed stages up to the new stage
         const existingCompleted = lead.completed_stages || []
@@ -610,18 +601,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           const sIndex = STAGE_ORDER.indexOf(s)
           return sIndex <= stageIndex
         })
-        console.log('[Stage Click] Moving backward, keeping stages:', newCompletedStages)
 
-        const result = await updateLead(lead.id, {
+        await updateLead(lead.id, {
           pipeline_stage: stage as PipelineStage,
           completed_stages: newCompletedStages,
           last_contacted_at: new Date().toISOString(),
         })
-        console.log('[Stage Click] Update result:', result)
       }
 
       await refetchLead()
-      console.log('[Stage Click] Refetch complete')
     } catch (error) {
       console.error("Error updating stage:", error)
     } finally {
@@ -1377,7 +1365,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       onChange={(e) => setNewNote(e.target.value)}
                       className="flex-1 min-h-[80px] resize-none"
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        // Guard against double-fire while a save is in flight
+                        // (matches the Submit button's disabled state).
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !mutationLoading) {
                           handleAddNote()
                         }
                       }}

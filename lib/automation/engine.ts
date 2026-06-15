@@ -54,12 +54,26 @@ async function isRunawayLoop(
   trigger: TriggerType,
 ): Promise<boolean> {
   const since = new Date(Date.now() - REENTRY_WINDOW_SECONDS * 1000).toISOString()
+
+  // Resolve the rule ids for this trigger first. PostgREST's `in` filter only
+  // accepts a literal value list — it does NOT execute SQL subqueries, so the
+  // previous `(SELECT id FROM ...)` string matched nothing and this guard never
+  // fired. Resolve the ids, then pass the real array to `.in()`.
+  const { data: ruleRows, error: ruleError } = await supabase
+    .from("automation_rules")
+    .select("id")
+    .eq("trigger_type", trigger)
+
+  if (ruleError) return false
+  const ruleIds = (ruleRows ?? []).map((r) => r.id)
+  if (ruleIds.length === 0) return false
+
   const { count, error } = await supabase
     .from("automation_executions")
     .select("id", { count: "exact", head: true })
     .eq("lead_id", leadId)
     .gte("created_at", since)
-    .filter("rule_id", "in", `(SELECT id FROM automation_rules WHERE trigger_type = '${trigger}')`)
+    .in("rule_id", ruleIds)
 
   if (error) {
     // Best-effort check — don't block automation if this query errors.

@@ -168,19 +168,21 @@ export const POST = withApiHandler(
 
       if (contactsError) {
         logger.error('Error adding uploaded contacts', { error: contactsError.message })
+      } else {
+        // Only record the count once the contacts actually persisted, so the
+        // campaign can't claim N contacts while campaign_contacts has none.
+        await supabase
+          .from('campaigns')
+          .update({ total_contacts: contacts.length })
+          .eq('id', campaign.id)
       }
-
-      // Update total contacts count
-      await supabase
-        .from('campaigns')
-        .update({ total_contacts: contacts.length })
-        .eq('id', campaign.id)
     }
 
     // If using filter, resolve leads and insert into campaign_contacts
     if (body.audienceSource === 'filter' && body.audienceFilter) {
       const audienceContacts = await resolveFilterAudience(supabase, body.audienceFilter)
 
+      let insertedCount = 0
       if (audienceContacts.length > 0) {
         const contacts = audienceContacts.map(contact => ({
           campaign_id: campaign.id,
@@ -198,12 +200,16 @@ export const POST = withApiHandler(
 
         if (contactsError) {
           logger.error('Error adding filter contacts', { error: contactsError.message })
+        } else {
+          insertedCount = audienceContacts.length
         }
       }
 
+      // Record the count actually persisted (0 on empty or failed insert) so the
+      // campaign total never diverges from the campaign_contacts rows.
       await supabase
         .from('campaigns')
-        .update({ total_contacts: audienceContacts.length })
+        .update({ total_contacts: insertedCount })
         .eq('id', campaign.id)
     }
 

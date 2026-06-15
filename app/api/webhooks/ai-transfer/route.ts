@@ -5,6 +5,7 @@ import { createNotification } from '@/lib/notifications/create'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 import { assertArabicLeadNameFields } from '@/lib/lead-name-policy'
+import { safeEqual } from '@/lib/safe-compare'
 import crypto from 'crypto'
 
 interface AITransferBody {
@@ -28,11 +29,11 @@ function normalizePhone(phone: string): string {
 export const POST = withApiHandler(
   { context: 'ai-transfer-webhook', requireAuth: false, skipOriginCheck: true },
   async ({ req, logger }) => {
-    // 1. Validate API key
+    // 1. Validate API key (constant-time compare)
     const apiKey = req.headers.get('x-api-key')
     const secret = process.env.AI_TRANSFER_WEBHOOK_SECRET
 
-    if (!secret || apiKey !== secret) {
+    if (!secret || !safeEqual(apiKey, secret)) {
       logger.warn('Unauthorized AI transfer attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

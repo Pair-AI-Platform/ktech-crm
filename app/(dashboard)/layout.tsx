@@ -56,6 +56,12 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
+  // Deactivated accounts are bounced out of the dashboard shell. (Demo profiles
+  // are always active; this only affects real signed-in users.)
+  if (!isDemoMode && profile?.is_active === false) {
+    redirect("/login?reason=deactivated")
+  }
+
   // Marketing users should use the marketing portal
   if (profile?.role === "marketing") {
     redirect("/marketing")

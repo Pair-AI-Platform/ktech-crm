@@ -3,6 +3,7 @@ import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { generateObject } from 'ai'
 import { z } from 'zod'
+import { DOCUMENT_AI_MODEL } from '@/lib/ai/model'
 
 export const maxDuration = 30
 
@@ -46,6 +47,18 @@ export const POST = withApiHandler(
       return Response.json({ error: 'Image base64 data is required' }, { status: 400 })
     }
 
+    // Validate MIME against an allowlist and cap the decoded size before sending
+    // the image to the model (avoids arbitrary content-types and cost abuse).
+    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
+    const resolvedMime = mimeType || 'image/jpeg'
+    if (!ALLOWED_MIME.includes(resolvedMime)) {
+      return Response.json({ error: 'Unsupported image type. Use JPEG, PNG, or WebP.' }, { status: 400 })
+    }
+    // base64 expands ~4:3, so decoded bytes ≈ length * 0.75. Cap at ~8 MB.
+    if (imageBase64.length * 0.75 > 8 * 1024 * 1024) {
+      return Response.json({ error: 'Image is too large (max 8 MB).' }, { status: 413 })
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       logger.error('ANTHROPIC_API_KEY not configured')
@@ -58,14 +71,14 @@ export const POST = withApiHandler(
     const anthropic = createAnthropic({ apiKey })
 
     const result = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic(DOCUMENT_AI_MODEL),
       messages: [
         {
           role: 'user',
           content: [
             {
               type: 'image',
-              image: `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`,
+              image: `data:${resolvedMime};base64,${imageBase64}`,
             },
             {
               type: 'text',

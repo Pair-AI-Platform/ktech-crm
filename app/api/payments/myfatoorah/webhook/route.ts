@@ -130,6 +130,26 @@ async function processEnrollmentInvoice(
 
     // Handle based on payment status
     if (statusResult.invoiceStatus === 'Paid') {
+      // Defense-in-depth: MyFatoorah only reports 'Paid' once the full invoice
+      // value is settled, but verify the settled amount against what we requested
+      // so any future divergence (partial settlement, currency mismatch) is
+      // surfaced. The gateway status stays the authoritative gate, so we flag
+      // and log a shortfall rather than block a legitimate enrollment.
+      const expectedAmount = Number(transaction.amount)
+      const paidAmount = statusResult.paidAmount
+      if (
+        typeof paidAmount === 'number' &&
+        Number.isFinite(expectedAmount) &&
+        paidAmount + 0.001 < expectedAmount
+      ) {
+        logger.error('Paid amount is less than expected — review required', {
+          transactionId: transaction.id,
+          leadId: transaction.lead_id,
+          expectedAmount,
+          paidAmount,
+        })
+      }
+
       // Handle test fee payments — move lead to test stage
       if (transaction.payment_purpose === 'test_fee') {
         const { error: updateError } = await supabase

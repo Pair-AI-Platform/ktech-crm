@@ -65,7 +65,10 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'No leads found' }, { status: 404 })
     }
 
-    // Check for existing leads with same civil_id to avoid unique constraint violations
+    // Check for civil_ids that ALREADY exist in the target semester. civil_id
+    // repeats across cycles by design (re_registered_from links old→new), so the
+    // duplicate check must be scoped to the destination term — otherwise every
+    // lead that exists in any prior cycle is wrongly skipped.
     const civilIds = sourceLeads.map((l) => l.civil_id).filter(Boolean)
     let existingCivilIds = new Set<string>()
     if (civilIds.length > 0) {
@@ -73,6 +76,7 @@ export const POST = withApiHandler(
         .from('leads')
         .select('civil_id')
         .in('civil_id', civilIds)
+        .eq('semester_id', activeSemester.id)
       existingCivilIds = new Set((existing || []).map((e) => e.civil_id))
     }
 
