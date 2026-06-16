@@ -9,8 +9,9 @@ let lastRunTimestamp = 0
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret
-    const cronSecret = process.env.CRON_SECRET
+    // Verify cron secret. Trim to be robust against stray whitespace/newlines
+    // accidentally stored in the env value.
+    const cronSecret = process.env.CRON_SECRET?.trim()
     if (!cronSecret) {
       console.error('[Priority Reminders] CRON_SECRET is not configured')
       return NextResponse.json(
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     }
 
     const authHeader = request.headers.get('authorization')
-    const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
     if (!safeEqual(bearer, cronSecret)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
