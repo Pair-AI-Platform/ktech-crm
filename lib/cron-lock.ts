@@ -15,8 +15,10 @@ let cachedRedis: Redis | null | undefined
 
 function getRedis(): Redis | null {
   if (cachedRedis !== undefined) return cachedRedis
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  // Trim: a trailing newline in the env value makes the Upstash client throw
+  // UrlError on construction.
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
   if (!url || !token) {
     cachedRedis = null
     return null

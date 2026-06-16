@@ -110,7 +110,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, triggered })
   } catch (err) {
     console.error('[Priority Reminders] Unhandled error:', err)
-    // TEMP DIAGNOSTIC: surface the real error to find the cron 500 root cause. REVERT.
-    return NextResponse.json({ error: 'Internal server error', _debug: err instanceof Error ? `${err.name}: ${err.message}` : String(err) }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
