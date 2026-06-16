@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       .from('follow_up_reminders')
       .select('id, lead_id, assigned_to, recurrence_interval_hours, last_triggered_at, title')
       .eq('is_recurring', true)
-      .eq('status', 'pending')
+      .eq('is_completed', false)
 
     if (error) {
       console.error('[Priority Reminders] Failed to fetch reminders:', error.message)
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
         // Mark reminder as completed since priority was reset
         await supabase
           .from('follow_up_reminders')
-          .update({ status: 'completed' })
+          .update({ is_completed: true })
           .eq('id', reminder.id)
         continue
       }

@@ -400,10 +400,10 @@ export async function handlePriorityChange(
     // Mark any existing recurring reminders for this lead as completed
     await supabase
       .from("follow_up_reminders")
-      .update({ status: "completed" })
+      .update({ is_completed: true })
       .eq("lead_id", leadId)
       .eq("is_recurring", true)
-      .eq("status", "pending")
+      .eq("is_completed", false)
 
     logger.info("Cleared recurring reminders for lead", { leadId })
     return
@@ -418,7 +418,7 @@ export async function handlePriorityChange(
     .select("id, recurrence_interval_hours")
     .eq("lead_id", leadId)
     .eq("is_recurring", true)
-    .eq("status", "pending")
+    .eq("is_completed", false)
     .limit(1)
 
   if (existing && existing.length > 0) {
