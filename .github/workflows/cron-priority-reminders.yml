@@ -11,10 +11,11 @@ name: Cron — priority reminders
 
 on:
   schedule:
-    # Every 5 minutes. The in-route lock TTL is 50 s, so per-minute firing
-    # would be safe but wastes Actions minutes. 5-minute cadence keeps
-    # reminders timely without burning the free-tier budget.
-    - cron: "*/5 * * * *"
+    # Hourly. The reminders this drives fire on 24h (critical) / 48h (high)
+    # cadences, so a check that's up to an hour late is immaterial — hourly
+    # keeps them timely while cutting Actions-minute usage and failure noise
+    # ~12x vs the old */5. Bump back up only if sub-hour latency is needed.
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
