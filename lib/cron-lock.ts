@@ -35,9 +35,16 @@ export async function tryClaimCronRun(jobName: string, windowSeconds: number): P
   const redis = getRedis()
   if (!redis) return true
 
-  const result = await redis.set(PREFIX + jobName, Date.now(), {
-    nx: true,
-    ex: windowSeconds,
-  })
-  return result === 'OK'
+  try {
+    const result = await redis.set(PREFIX + jobName, Date.now(), {
+      nx: true,
+      ex: windowSeconds,
+    })
+    return result === 'OK'
+  } catch (err) {
+    // Fail open: a transient Upstash error must not 500 the cron run. The
+    // caller's in-memory guard still mitigates duplicate firings.
+    console.error('[cron-lock] Upstash error, allowing run:', err instanceof Error ? err.message : err)
+    return true
+  }
 }
