@@ -110,8 +110,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, triggered })
   } catch (err) {
     console.error('[Priority Reminders] Unhandled error:', err)
-    // TEMP DIAGNOSTIC (revert): surface the real error + first stack frame.
-    const _debug = err instanceof Error ? `${err.name}: ${err.message} @ ${(err.stack || '').split('\n')[1]?.trim()}` : String(err)
-    return NextResponse.json({ error: 'Internal server error', _debug }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
