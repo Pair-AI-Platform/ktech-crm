@@ -76,11 +76,16 @@ Production deploys via Vercel's GitHub integration on push to `main`. The Vercel
 
 ---
 
-## 6. ⚠️ Required operational actions (cannot be done from code)
+## 6. ⚠️ Operational actions
 
-1. **Rotate the Supabase `service_role` key.** A live `service_role` JWT was previously committed (now removed from the working tree, but it remains in git history). Treat it as compromised: Supabase → Project Settings → API → regenerate, then update `SUPABASE_SERVICE_ROLE_KEY` in Vercel. If the repo is or may become public, scrub history with `git filter-repo`/BFG.
-2. **Apply the latest migration.** `supabase/migrations/200_students_appointments_rls_with_check.sql` locks down `students`/`appointments` RLS. It is idempotent and safe, but a code deploy does **not** run it — apply it to the database.
-3. Recommended: add a secret scanner (gitleaks/trufflehog) to CI to block future credential commits.
+**Outstanding (the one thing left — needs dashboard access):**
+1. **Rotate the Supabase `service_role` key.** A live `service_role` JWT was previously committed (removed from the working tree, but it remains in git history). Treat it as compromised: Supabase → Project Settings → API → regenerate, then update `SUPABASE_SERVICE_ROLE_KEY` in Vercel and redeploy. If the repo is or may become public, scrub history with `git filter-repo`/BFG.
+
+**Done in this iteration:**
+2. ✅ **Migration applied.** `supabase/migrations/200_students_appointments_rls_with_check.sql` (students/appointments RLS lockdown) has been applied to the production database via `supabase db push`. NOTE: prod migration history has pre-existing drift — migration **198** (a data cleanup) is committed but not applied, and a **197** exists on remote with no repo file. Reconcile separately (`supabase migration list --linked`).
+3. ✅ **Scheduled cron fixed.** The `cron-priority-reminders` GitHub Action was 401ing for two reasons, both fixed: `PRODUCTION_APP_URL` pointed at an SSO-protected deployment URL (repointed to the clean alias `https://ktech-adl.vercel.app`), and the stored `CRON_SECRET` had a trailing-newline artifact (the route now `.trim()`s it, and the GitHub Actions secret was synced to the cleaned value).
+
+**Recommended:** add a secret scanner (gitleaks/trufflehog) to CI to block future credential commits.
 
 ---
 
