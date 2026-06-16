@@ -52,9 +52,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
 
 3. Set up the database:
-   - Go to your Supabase project
-   - Navigate to SQL Editor
-   - Run the contents of `supabase/schema.sql`
+   - Go to your Supabase project → SQL Editor
+   - Run the migrations in `supabase/migrations/` **in numeric order** — these are
+     authoritative and include the RLS lockdowns. (`supabase/schema.sql` is a
+     convenience snapshot that lags the migrations; see HANDOFF.md §4/§7.)
 
 4. Run the development server:
 ```bash

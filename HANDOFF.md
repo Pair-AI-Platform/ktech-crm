@@ -35,7 +35,7 @@ Enrollment CRM for Kuwait Technical College (ktech). Next.js 16 (App Router) + S
 
 ## 3. Environment variables
 
-`lib/env.ts` is the source of truth. Copy `.env.local.example` → `.env.local`.
+`lib/env.ts` validates the security-critical secrets at boot (the source of truth for those); a few optional vars (e.g. `ANTHROPIC_API_KEY`, `ALLOWED_ORIGIN_HOSTS`, demo flags) are read directly from `process.env`. Copy `.env.local.example` → `.env.local`.
 
 **Required (all environments):**
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`

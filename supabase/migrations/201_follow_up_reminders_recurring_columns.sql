@@ -24,3 +24,8 @@ ALTER TABLE follow_up_reminders ADD COLUMN IF NOT EXISTS last_triggered_at TIMES
 CREATE INDEX IF NOT EXISTS idx_follow_up_reminders_recurring
   ON follow_up_reminders (is_recurring, is_completed)
   WHERE is_recurring = true;
+
+-- Force PostgREST to reload its schema cache so the new columns are queryable
+-- immediately (the priority-reminders cron queries them via PostgREST). Matches
+-- the pattern in migrations 141/162.
+NOTIFY pgrst, 'reload schema';
