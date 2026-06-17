@@ -14,8 +14,7 @@ The codebase is **production-grade and the CI gate is real**. Before handover th
 
 1. **Unjam Vercel.** Production deploys are queued (`UNKNOWN`) — no platform incident, so it's an account-level build-queue/quota state. In the Vercel dashboard: cancel the stuck deploys, check **Settings → Usage** for a Hobby deployment cap, then **Redeploy** the latest `main` commit from the UI (server-side; doesn't depend on any local machine).
 2. **Confirm the app is healthy** on the new deployment (log in, open a data-backed page). This also confirms the **rotated service-role key works** (see Security).
-3. **Verify the cron:** trigger the `cron-priority-reminders` GitHub Action → expect **HTTP 200** (it currently 500s only because the fixed code isn't deployed yet).
-4. **Finish the key rotation:** once the app is confirmed healthy, **disable the old legacy `service_role` key** in Supabase → API keys. That neutralizes the leaked credential.
+3. **Finish the key rotation:** once the app is confirmed healthy, **disable the old legacy `service_role` key** in Supabase → API keys. That neutralizes the leaked credential.
 
 ---
 
@@ -26,9 +25,8 @@ A live `service_role` JWT was committed in throwaway scripts (`add-column.mjs`, 
 - ✅ Done: new Supabase **secret key** (`sb_secret_…`) created and set as `SUPABASE_SERVICE_ROLE_KEY` in Vercel (works with supabase-js `^2.89`).
 - ⏳ Remaining: after the new deploy is verified, **disable the old legacy key**, then **scrub history** (`git filter-repo`/BFG) or hand over a **squashed snapshot** — working-tree deletion is not enough if the repo is ever shared.
 
-### 🟠 2. Priority-reminders cron is a no-op (product decision)
-This session fixed the cron's **consumer** (queried a non-existent `status` column → switched to `is_completed`; migration `201` adds the columns migration `098` never landed in prod). CI is green and the cron will return 200 once deployed. **However, the _producer_ — `handlePriorityChange()` in `lib/automation/engine.ts:390` — has zero callers**, so no recurring reminders are ever created and the cron processes nothing.
-- **Decision needed:** either **wire it up** (call `handlePriorityChange` from the lead-priority mutation path so important/critical leads generate reminders) **or remove the feature** (the cron workflow + route + the unused producer). It is in-app-notification-only either way. Don't present it as a working feature until the producer is wired.
+### 🟢 2. Priority-reminders cron — REMOVED
+This feature was half-built — the consumer (cron) errored on a schema mismatch and the producer (`handlePriorityChange`) was never wired into the app, so it created no reminders. Per product decision it has been **removed entirely**: the cron route, its GitHub Action, the `cron-lock` helper, and the unused producer are deleted. The `follow_up_reminders` table and the regular (non-recurring) automation reminders are untouched. Migration 201's columns (`is_recurring`/`recurrence_interval_hours`/`last_triggered_at`) are now orphaned but harmless (additive, already applied) — drop them later if you want them gone.
 
 ### 🟡 Recommended (non-blocking)
 - Add a **secret scanner** (gitleaks/trufflehog) to CI — _after_ the history scrub, so it stays green.
@@ -50,7 +48,7 @@ This session fixed the cron's **consumer** (queried a non-existent `status` colu
 ---
 
 ## Also done this session
-- Fixed the cron 500 (schema drift + phantom column) — code on `main`, CI green; migration `201` applied to prod.
+- Removed the half-built priority-reminders cron feature entirely (route, workflow, `cron-lock`, unused producer) per product decision.
 - Cleaned **9 production env vars** that were stored with trailing newlines.
 - Dialed the cron schedule from every-5-min → hourly (12× less Actions usage/noise).
 - Repo hygiene: untracked `supabase/.temp/`, fixed the smoke-test domain, pointed README DB setup at `migrations/`, added a `NOTIFY pgrst` to migration 201.
