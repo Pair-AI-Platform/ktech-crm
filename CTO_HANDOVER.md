@@ -6,13 +6,13 @@ _Last updated: 2026-06-16. Companion to `HANDOFF.md` (full engineering detail) a
 
 ## TL;DR
 
-The codebase is **production-grade and the CI gate is real**. Before handover there are **two items to close** (one security, one product decision) and **one ops blocker that is not a code problem** (a stalled Vercel build queue on the account). Everything else is polish.
+The codebase is **production-grade and the CI gate is real** — it builds, typechecks, and passes all tests on `main`. The one thing keeping it off the live URL is **not a code problem**: the Vercel account hit its Hobby usage/spend cap, so Vercel is **blocking new deploys**. Lift the cap (or upgrade) and the current `main` ships as-is. The only true to-do is finishing the leaked-key cleanup. Everything else is polish.
 
 ---
 
 ## How to deploy & verify (run in order)
 
-1. **Unjam Vercel.** Production deploys are queued (`UNKNOWN`) — no platform incident, so it's an account-level build-queue/quota state. In the Vercel dashboard: cancel the stuck deploys, check **Settings → Usage** for a Hobby deployment cap, then **Redeploy** the latest `main` commit from the UI (server-side; doesn't depend on any local machine).
+1. **Lift the Vercel deploy block.** The latest deploy reports `failure: "Deployment was blocked"` — this is a Vercel **Hobby usage/spend cap on the account, not a build failure** (CI runs the same `next build` and is green). In the Vercel dashboard → **Settings → Billing / Spend Management** (and **Usage**): raise the spend limit or upgrade the plan, then **Redeploy** the latest `main` commit. The code is deploy-ready as-is.
 2. **Confirm the app is healthy** on the new deployment (log in, open a data-backed page). This also confirms the **rotated service-role key works** (see Security).
 3. **Finish the key rotation:** once the app is confirmed healthy, **disable the old legacy `service_role` key** in Supabase → API keys. That neutralizes the leaked credential.
 
