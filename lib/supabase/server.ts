@@ -97,11 +97,8 @@ export async function getUserProfile() {
  * that don't have a user context.
  */
 export function createServiceRoleClient() {
-  // Trim to guard against stray whitespace/newlines in the env values — a
-  // newline in the key produces an invalid HTTP header and throws on the first
-  // request (which surfaces as an opaque 500).
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Missing Supabase service role configuration')
   }

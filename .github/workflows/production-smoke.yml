@@ -26,5 +26,5 @@ jobs:
 
       - name: Smoke production
         env:
-          SMOKE_BASE_URL: https://ktech-adl.vercel.app
+          SMOKE_BASE_URL: https://ktech-crm.vercel.app
         run: npm run smoke:production

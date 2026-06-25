@@ -381,3 +381,76 @@ export async function executeAutomations(
     await releaseAutomationLock(executionKey)
   }
 }
+
+/**
+ * Handles priority change for a lead.
+ * When priority is set to important/critical: creates a recurring follow-up reminder.
+ * When priority is reset to normal: marks existing recurring reminders as completed.
+ */
+export async function handlePriorityChange(
+  leadId: string,
+  priority: "normal" | "important" | "critical",
+  assignedTo: string | null,
+  userId: string,
+  supabaseClient?: SupabaseClient
+) {
+  const supabase = supabaseClient || createClient()
+
+  if (priority === "normal") {
+    // Mark any existing recurring reminders for this lead as completed
+    await supabase
+      .from("follow_up_reminders")
+      .update({ status: "completed" })
+      .eq("lead_id", leadId)
+      .eq("is_recurring", true)
+      .eq("status", "pending")
+
+    logger.info("Cleared recurring reminders for lead", { leadId })
+    return
+  }
+
+  const intervalHours = priority === "critical" ? 24 : 48
+  const targetUserId = assignedTo || userId
+
+  // Check if a recurring reminder already exists
+  const { data: existing } = await supabase
+    .from("follow_up_reminders")
+    .select("id, recurrence_interval_hours")
+    .eq("lead_id", leadId)
+    .eq("is_recurring", true)
+    .eq("status", "pending")
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    // Update existing reminder interval if priority changed
+    if (existing[0].recurrence_interval_hours !== intervalHours) {
+      await supabase
+        .from("follow_up_reminders")
+        .update({ recurrence_interval_hours: intervalHours })
+        .eq("id", existing[0].id)
+    }
+    return
+  }
+
+  // Create new recurring reminder
+  const dueAt = new Date()
+  dueAt.setHours(dueAt.getHours() + intervalHours)
+
+  const { error } = await supabase.from("follow_up_reminders").insert({
+    lead_id: leadId,
+    assigned_to: targetUserId,
+    title: `Priority follow-up (${priority})`,
+    notes: `Auto-created: lead marked as ${priority} priority`,
+    due_at: dueAt.toISOString(),
+    is_recurring: true,
+    recurrence_interval_hours: intervalHours,
+    last_triggered_at: new Date().toISOString(),
+    created_by: userId,
+  })
+
+  if (error) {
+    logger.error("Failed to create recurring reminder", { leadId, error: error.message })
+  } else {
+    logger.info(`Created recurring reminder for ${priority} lead`, { leadId, intervalHours })
+  }
+}

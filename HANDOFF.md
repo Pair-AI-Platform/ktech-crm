@@ -35,7 +35,7 @@ Enrollment CRM for Kuwait Technical College (ktech). Next.js 16 (App Router) + S
 
 ## 3. Environment variables
 
-`lib/env.ts` validates the security-critical secrets at boot (the source of truth for those); a few optional vars (e.g. `ANTHROPIC_API_KEY`, `ALLOWED_ORIGIN_HOSTS`, demo flags) are read directly from `process.env`. Copy `.env.local.example` → `.env.local`.
+`lib/env.ts` is the source of truth. Copy `.env.local.example` → `.env.local`.
 
 **Required (all environments):**
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -76,17 +76,11 @@ Production deploys via Vercel's GitHub integration on push to `main`. The Vercel
 
 ---
 
-## 6. ⚠️ Operational actions
+## 6. ⚠️ Required operational actions (cannot be done from code)
 
-**Outstanding (need dashboard / DB access):**
-1. **Finish rotating the Supabase `service_role` key.** A live `service_role` JWT was previously committed (removed from the working tree, but it remains in git history). A new Supabase **secret key** (`sb_secret_…`) has been generated and set as `SUPABASE_SERVICE_ROLE_KEY` in Vercel (works with supabase-js `^2.89`). Remaining: after the next deploy confirms the app is healthy, **disable the old legacy key** in Supabase → API keys, then **scrub git history** (`git filter-repo`/BFG) or hand over a squashed snapshot — working-tree deletion is not sufficient.
-
-**Done in this iteration:**
-2. ✅ **Migration 200 applied.** `supabase/migrations/200_students_appointments_rls_with_check.sql` (students/appointments RLS lockdown) has been applied to the production database via `supabase db push`. NOTE: prod migration history has pre-existing drift — migration **198** (a data cleanup) is committed but not applied, and a **197** exists on remote with no repo file. Reconcile separately (`supabase migration list --linked`).
-3. ✅ **Migration 201 applied**, then feature removed. `201_follow_up_reminders_recurring_columns.sql` re-added the recurring columns that migration 098 never landed in prod — but the priority-reminders feature it supported has since been **removed** (see #4), so `is_recurring`/`recurrence_interval_hours`/`last_triggered_at` are now orphaned-but-harmless (drop later if desired).
-4. ✅ **Priority-reminders cron removed.** The feature was half-built — a cron consumer plus an `handlePriorityChange` producer that was never wired into the app (zero callers), so it created no reminders. Per product decision the cron route, its GitHub Action, the `cron-lock` helper, and the producer were deleted. (Its earlier 401/500 issues are moot.) Separately, **all 9 user-defined production env vars** (`CRON_SECRET`, `UPSTASH_REDIS_REST_URL/TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SENTRY_DSN`, `AI_TRANSFER_WEBHOOK_SECRET`) were saved with trailing newlines — re-entered cleanly via `vercel env rm/add`.
-
-**Recommended:** add a secret scanner (gitleaks/trufflehog) to CI to block future credential commits.
+1. **Rotate the Supabase `service_role` key.** A live `service_role` JWT was previously committed (now removed from the working tree, but it remains in git history). Treat it as compromised: Supabase → Project Settings → API → regenerate, then update `SUPABASE_SERVICE_ROLE_KEY` in Vercel. If the repo is or may become public, scrub history with `git filter-repo`/BFG.
+2. **Apply the latest migration.** `supabase/migrations/200_students_appointments_rls_with_check.sql` locks down `students`/`appointments` RLS. It is idempotent and safe, but a code deploy does **not** run it — apply it to the database.
+3. Recommended: add a secret scanner (gitleaks/trufflehog) to CI to block future credential commits.
 
 ---
 

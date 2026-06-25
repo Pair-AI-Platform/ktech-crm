@@ -11,10 +11,8 @@ interface RateLimitConfig {
  * Falls back to allowing all requests if Upstash env vars are missing (dev mode).
  */
 function createRateLimiter(config: RateLimitConfig): Ratelimit | null {
-  // Trim: a trailing newline in the env value makes the Upstash client throw
-  // UrlError on construction, which would 500 every rate-limited route.
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
 
   if (!url || !token) {
     return null
