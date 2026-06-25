@@ -3,22 +3,19 @@
 import { useEffect, useState, useCallback, startTransition } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Skeleton } from "@/components/ui/skeleton"
-
-interface FieldChange {
-  field: string
-  old: unknown
-  new: unknown
-}
+import { UserCircle } from "lucide-react"
 
 interface AuditEntry {
   id: string
   table_name: string
   record_id: string
+  lead_id: string | null
   user_id: string | null
+  user_email: string | null
   action: "INSERT" | "UPDATE" | "DELETE"
-  field_changes: FieldChange[]
-  old_values: Record<string, unknown>
-  new_values: Record<string, unknown>
+  changed_fields: string[] | null
+  old_values: Record<string, unknown> | null
+  new_values: Record<string, unknown> | null
   created_at: string
 }
 
@@ -26,40 +23,53 @@ interface LeadAuditLogProps {
   leadId: string
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffSecs = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffSecs / 60)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
+// Fields that are noise in a human-facing change history.
+const HIDDEN_FIELDS = new Set(["updated_at", "created_at", "id", "lead_id"])
 
-  if (diffSecs < 60) return "just now"
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+function formatDateTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+  return `${date} · ${time}`
 }
 
 function formatFieldName(field: string): string {
-  return field
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, c => c.toUpperCase())
+  return field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return "—"
+  if (value === null || value === undefined || value === "") return "—"
   if (typeof value === "boolean") return value ? "Yes" : "No"
   if (typeof value === "object") return JSON.stringify(value)
   return String(value)
 }
 
-function getActionLabel(action: string): string {
+function entityLabel(tableName: string): string {
+  switch (tableName) {
+    case "leads": return "Lead record"
+    case "psp_documents": return "Document"
+    case "students": return "Enrollment record"
+    case "appointments": return "Appointment"
+    default: return formatFieldName(tableName)
+  }
+}
+
+// For document rows, describe which document it was.
+function documentDescriptor(entry: AuditEntry): string | null {
+  if (entry.table_name !== "psp_documents") return null
+  const vals = (entry.new_values || entry.old_values) as Record<string, unknown> | null
+  if (!vals) return null
+  const type = vals.document_type ? formatFieldName(String(vals.document_type)) : "Document"
+  const grad = vals.graduate_type ? ` (${vals.graduate_type})` : ""
+  return `${type}${grad}`
+}
+
+function getActionLabel(action: string, tableName: string): string {
+  const isDoc = tableName === "psp_documents"
   switch (action) {
-    case "INSERT": return "Created"
+    case "INSERT": return isDoc ? "Uploaded" : "Created"
     case "UPDATE": return "Updated"
-    case "DELETE": return "Deleted"
+    case "DELETE": return isDoc ? "Removed" : "Deleted"
     default: return action
   }
 }
@@ -80,10 +90,9 @@ export function LeadAuditLog({ leadId }: LeadAuditLogProps) {
   const fetchAuditLog = useCallback(async () => {
     const supabase = createClient()
     const { data, error } = await supabase
-      .from("audit_log")
+      .from("audit_logs")
       .select("*")
-      .eq("table_name", "leads")
-      .eq("record_id", leadId)
+      .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
 
     if (!error && data) {
@@ -115,7 +124,7 @@ export function LeadAuditLog({ leadId }: LeadAuditLogProps) {
   if (entries.length === 0) {
     return (
       <div className="p-6 text-center" style={{ color: "var(--text-secondary)" }}>
-        <p className="text-sm">No audit history found for this lead.</p>
+        <p className="text-sm">No change history found for this lead.</p>
       </div>
     )
   }
@@ -129,75 +138,88 @@ export function LeadAuditLog({ leadId }: LeadAuditLogProps) {
       />
 
       <div className="space-y-6">
-        {entries.map((entry) => (
-          <div key={entry.id} className="relative flex gap-3">
-            {/* Timeline dot */}
-            <div
-              className="absolute -left-6 top-1.5 w-[10px] h-[10px] rounded-full border-2 shrink-0"
-              style={{
-                borderColor: getActionColor(entry.action),
-                backgroundColor: "var(--bg-primary, #fff)",
-              }}
-            />
+        {entries.map((entry) => {
+          const docDesc = documentDescriptor(entry)
+          const changed = (entry.changed_fields || []).filter((f) => !HIDDEN_FIELDS.has(f))
+          return (
+            <div key={entry.id} className="relative flex gap-3">
+              {/* Timeline dot */}
+              <div
+                className="absolute -left-6 top-1.5 w-[10px] h-[10px] rounded-full border-2 shrink-0"
+                style={{
+                  borderColor: getActionColor(entry.action),
+                  backgroundColor: "var(--bg-primary, #fff)",
+                }}
+              />
 
-            <div className="flex-1 min-w-0">
-              {/* Header */}
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className="text-xs font-semibold px-1.5 py-0.5 rounded"
-                  style={{
-                    color: getActionColor(entry.action),
-                    backgroundColor: `color-mix(in srgb, ${getActionColor(entry.action)} 10%, transparent)`,
-                  }}
-                >
-                  {getActionLabel(entry.action)}
-                </span>
-                <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                  {formatRelativeTime(entry.created_at)}
-                </span>
-              </div>
-
-              {/* Field changes for UPDATE */}
-              {entry.action === "UPDATE" && entry.field_changes.length > 0 && (
-                <div className="space-y-1 mt-2">
-                  {entry.field_changes.map((change, idx) => (
-                    <div
-                      key={idx}
-                      className="text-xs rounded-lg px-3 py-2"
-                      style={{
-                        backgroundColor: "var(--bg-sunken, #f9fafb)",
-                        color: "var(--text-primary)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      <span className="font-medium">{formatFieldName(change.field)}</span>
-                      {": "}
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        {formatValue(change.old)}
-                      </span>
-                      <span style={{ color: "var(--text-secondary)" }}>{" → "}</span>
-                      <span className="font-medium">{formatValue(change.new)}</span>
-                    </div>
-                  ))}
+              <div className="flex-1 min-w-0">
+                {/* Header: action + entity + date/time + user */}
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span
+                    className="text-xs font-semibold px-1.5 py-0.5 rounded"
+                    style={{
+                      color: getActionColor(entry.action),
+                      backgroundColor: `color-mix(in srgb, ${getActionColor(entry.action)} 10%, transparent)`,
+                    }}
+                  >
+                    {getActionLabel(entry.action, entry.table_name)}
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                    {docDesc || entityLabel(entry.table_name)}
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    {formatDateTime(entry.created_at)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+                    <UserCircle className="w-3 h-3" />
+                    {entry.user_email || "System"}
+                  </span>
                 </div>
-              )}
 
-              {/* INSERT action - show that the record was created */}
-              {entry.action === "INSERT" && (
-                <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-                  Lead record was created.
-                </p>
-              )}
+                {/* Field changes for UPDATE */}
+                {entry.action === "UPDATE" && changed.length > 0 && (
+                  <div className="space-y-1 mt-2">
+                    {changed.map((field) => (
+                      <div
+                        key={field}
+                        className="text-xs rounded-lg px-3 py-2"
+                        style={{
+                          backgroundColor: "var(--bg-sunken, #f9fafb)",
+                          color: "var(--text-primary)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        <span className="font-medium">{formatFieldName(field)}</span>
+                        {": "}
+                        <span style={{ color: "var(--text-secondary)" }}>
+                          {formatValue(entry.old_values?.[field])}
+                        </span>
+                        <span style={{ color: "var(--text-secondary)" }}>{" → "}</span>
+                        <span className="font-medium">{formatValue(entry.new_values?.[field])}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              {/* DELETE action */}
-              {entry.action === "DELETE" && (
-                <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-                  Lead record was deleted.
-                </p>
-              )}
+                {entry.action === "INSERT" && (
+                  <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+                    {entry.table_name === "psp_documents"
+                      ? "Document was uploaded."
+                      : `${entityLabel(entry.table_name)} was created.`}
+                  </p>
+                )}
+
+                {entry.action === "DELETE" && (
+                  <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+                    {entry.table_name === "psp_documents"
+                      ? "Document was removed."
+                      : `${entityLabel(entry.table_name)} was deleted.`}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

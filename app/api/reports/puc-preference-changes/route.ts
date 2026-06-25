@@ -15,11 +15,11 @@ export const GET = withApiHandler(
 
     const supabase = createServiceRoleClient()
 
-    // Query audit_log for leads with intended_major or preferred_major changes
-    // field_changes is a JSONB array: [{ field, old, new }, ...]
+    // Query audit_logs for leads with intended_major or preferred_major changes.
+    // changed_fields is a TEXT[]; old/new live in old_values / new_values JSONB.
     const { data: auditLogs, error } = await supabase
-      .from('audit_log')
-      .select('id, record_id, user_id, field_changes, created_at')
+      .from('audit_logs')
+      .select('id, record_id, user_id, changed_fields, old_values, new_values, created_at')
       .eq('table_name', 'leads')
       .eq('action', 'UPDATE')
       .gte('created_at', `${startDate}T00:00:00`)
@@ -41,17 +41,21 @@ export const GET = withApiHandler(
     }> = []
 
     for (const log of auditLogs || []) {
-      const fieldChanges = log.field_changes as Array<{ field: string; old: unknown; new: unknown }> | null
-      if (!fieldChanges || !Array.isArray(fieldChanges)) continue
+      const changedFields = log.changed_fields as string[] | null
+      if (!changedFields || !Array.isArray(changedFields)) continue
+      const oldValues = (log.old_values || {}) as Record<string, unknown>
+      const newValues = (log.new_values || {}) as Record<string, unknown>
 
-      for (const fc of fieldChanges) {
-        if (preferenceFields.includes(fc.field)) {
+      for (const field of changedFields) {
+        if (preferenceFields.includes(field)) {
+          const oldVal = oldValues[field]
+          const newVal = newValues[field]
           changes.push({
             id: log.id,
             leadId: log.record_id,
-            field: fc.field,
-            oldValue: fc.old != null ? String(fc.old).replace(/^"|"$/g, '') : null,
-            newValue: fc.new != null ? String(fc.new).replace(/^"|"$/g, '') : null,
+            field,
+            oldValue: oldVal != null ? String(oldVal).replace(/^"|"$/g, '') : null,
+            newValue: newVal != null ? String(newVal).replace(/^"|"$/g, '') : null,
             changedAt: log.created_at,
             changedBy: log.user_id,
           })

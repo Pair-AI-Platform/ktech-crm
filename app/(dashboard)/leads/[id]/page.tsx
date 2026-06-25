@@ -56,6 +56,8 @@ import { StudentPhotoAvatar } from "@/components/leads/student-photo-avatar"
 import { SimpleTooltip } from "@/components/ui/tooltip"
 import { InlineTagSelect } from "@/components/ui/notion-tag-select"
 import { PSPTrackingSection } from "@/components/leads/psp-tracking-section"
+import { AuditorChecklist } from "@/components/leads/auditor-checklist"
+import { LeadAuditLog } from "@/components/leads/lead-audit-log"
 import { useLeadActivities } from "@/lib/hooks/use-activities"
 import { getDocumentsForGraduateType, type GraduateType } from "@/lib/psp/document-rules"
 import { getMissingPucDocumentStageRequirements, type PucDocumentCount } from "@/lib/psp/document-stage-requirements"
@@ -1250,8 +1252,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
-                className="p-4"
+                className="p-4 space-y-4"
               >
+                {isAdmin && <AuditorChecklist leadId={lead.id} />}
                 {lead.funding_type === 'self_funded' ? (
                   <SFDocumentManager lead={lead} onUpdate={() => refetchLead()} />
                 ) : lead.funding_type === 'puc' ? (
@@ -1380,6 +1383,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       {mutationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUpRight className="w-4 h-4" />}
                     </Button>
                   </div>
+                </div>
+
+                {/* Change history — record & document audit trail (user · date · time) */}
+                <div className="mt-6 pt-4 border-t border-[var(--border)]">
+                  <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                    Change History
+                  </p>
+                  <LeadAuditLog leadId={lead.id} />
                 </div>
               </motion.div>
             )}

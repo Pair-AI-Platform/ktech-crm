@@ -991,6 +991,7 @@ export interface AuditLog {
   id: string
   table_name: string
   record_id: string
+  lead_id?: string | null
   action: 'INSERT' | 'UPDATE' | 'DELETE'
   old_values?: Record<string, unknown>
   new_values?: Record<string, unknown>
