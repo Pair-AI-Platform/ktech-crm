@@ -3,8 +3,10 @@ import { createClient } from "@supabase/supabase-js"
 import { withApiHandler } from "@/lib/api-handler"
 import { escapeHtml } from "@/lib/utils"
 import { PUC_FEE_AMOUNT } from "@/types"
-import crypto from "crypto"
+import { verifyHmacSignature } from "@/lib/crypto-utils"
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from "@/lib/webhook-events"
+
+export const runtime = 'edge'
 
 /**
  * Finance Department Webhook
@@ -28,24 +30,13 @@ function createServiceClient() {
   )
 }
 
-function verifyFinanceSignature(
+async function verifyFinanceSignature(
   payload: string,
   signature: string | null,
   secret: string | undefined
-): boolean {
+): Promise<boolean> {
   if (!signature || !secret) return false
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex")
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(signature, "hex"),
-      Buffer.from(expected, "hex")
-    )
-  } catch {
-    return false
-  }
+  return verifyHmacSignature(secret, payload, signature)
 }
 
 function generateFinanceReceiptHtml(data: {
@@ -112,7 +103,7 @@ export const POST = withApiHandler(
     const signature = req.headers.get("x-finance-signature")
     const webhookSecret = process.env.FINANCE_WEBHOOK_SECRET
 
-    if (!verifyFinanceSignature(rawBody, signature, webhookSecret)) {
+    if (!(await verifyFinanceSignature(rawBody, signature, webhookSecret))) {
       logger.error("Invalid finance webhook signature")
       return NextResponse.json(
         { error: "Invalid signature" },
@@ -171,7 +162,7 @@ export const POST = withApiHandler(
 
     // Idempotency / replay protection: record this delivery before doing any work.
     const eventId = `finance:${receipt_number}`
-    const dedup = await recordWebhookEvent(supabase, "finance", eventId, hashPayload(rawBody), null)
+    const dedup = await recordWebhookEvent(supabase, "finance", eventId, await hashPayload(rawBody), null)
     if (!dedup.ok) {
       logger.info("Finance webhook deduplicated", { reason: dedup.reason, eventId })
       return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })

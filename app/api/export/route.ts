@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { generatePDFHTML, type ExportData } from '@/lib/export/pdf-generator'
-import { generateCSV, generateExcelXML } from '@/lib/export/excel-generator'
+import { generateCSV } from '@/lib/export/excel-generator'
 import { PIPELINE_STAGES, LEAD_STATUSES } from '@/types'
 import type { Lead } from '@/types'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
+export const runtime = 'edge'
+
 interface ExportRequest {
-  type: 'pdf' | 'csv' | 'excel'
+  type: 'pdf' | 'csv'
   entity: 'leads' | 'reports'
   filters?: {
     pipeline_stage?: string
@@ -76,8 +78,8 @@ export const POST = withApiHandler(
     const body = (await req.json()) as ExportRequest
     const { type, entity, filters } = body
 
-    if (!type || !['pdf', 'csv', 'excel'].includes(type)) {
-      return NextResponse.json({ error: 'Invalid export type' }, { status: 400 })
+    if (!type || !['pdf', 'csv'].includes(type)) {
+      return NextResponse.json({ error: 'Invalid export type. Only PDF and CSV are supported.' }, { status: 400 })
     }
 
     if (!entity || !['leads', 'reports'].includes(entity)) {
@@ -188,15 +190,8 @@ export const POST = withApiHandler(
         })
       }
 
-      case 'excel': {
-        const xml = generateExcelXML(exportData)
-        return new Response(xml, {
-          headers: {
-            'Content-Type': 'application/vnd.ms-excel',
-            'Content-Disposition': `attachment; filename="${entity}-export.xls"`,
-          },
-        })
-      }
+      default:
+        return NextResponse.json({ error: 'Unsupported export type' }, { status: 400 })
     }
   }
 )

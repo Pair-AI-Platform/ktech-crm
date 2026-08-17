@@ -1,7 +1,7 @@
 // MyFatoorah Payment Gateway Client
 // Documentation: https://myfatoorah.readme.io/
 
-import crypto from 'crypto'
+import { verifyHmacSignature } from '@/lib/crypto-utils'
 
 export interface MyFatoorahConfig {
   apiKey: string
@@ -202,11 +202,11 @@ export async function getPaymentStatus(
 }
 
 // Verify webhook signature using HMAC-SHA256
-export function verifyWebhookSignature(
+export async function verifyWebhookSignature(
   payload: string,
   signature: string | null,
   secret: string | undefined
-): boolean {
+): Promise<boolean> {
   if (!secret) {
     console.error('[MyFatoorah] MYFATOORAH_WEBHOOK_SECRET is not configured — rejecting webhook')
     return false
@@ -217,22 +217,5 @@ export function verifyWebhookSignature(
     return false
   }
 
-  try {
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(payload)
-      .digest('hex')
-
-    // Use timing-safe comparison to prevent timing attacks
-    const sigBuffer = Buffer.from(signature, 'hex')
-    const expectedBuffer = Buffer.from(expectedSignature, 'hex')
-
-    if (sigBuffer.length !== expectedBuffer.length) {
-      return false
-    }
-
-    return crypto.timingSafeEqual(sigBuffer, expectedBuffer)
-  } catch {
-    return false
-  }
+  return verifyHmacSignature(secret, payload, signature)
 }

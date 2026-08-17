@@ -1,5 +1,7 @@
 "use client"
 
+export const runtime = 'edge'
+
 import { useState, useCallback, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { consumeCampaignPrefill, type CampaignPrefillContact } from "@/lib/campaigns/prefill"

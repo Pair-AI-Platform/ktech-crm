@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createLogger, errorResponse } from "@/lib/logger"
 import { validateUpload, sanitizeFilename } from "@/lib/upload-validation"
 
+export const runtime = 'edge'
+
 const MAX_SIZE = 2 * 1024 * 1024 // 2 MB
 // Avatars: photo formats only. GIF dropped intentionally — Supabase Storage
 // will render it, but animated GIFs in profile chrome are a poor UX and a

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 
+export const runtime = 'edge'
+
 interface RouteParams {
   params: Promise<{ id: string }>
 }

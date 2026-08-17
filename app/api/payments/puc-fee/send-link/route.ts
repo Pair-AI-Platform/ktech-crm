@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import twilio from "twilio"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { PUC_FEE_AMOUNT } from "@/types"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createLogger } from "@/lib/logger"
+import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
+
+export const runtime = 'edge'
 
 const logger = createLogger("PUC Fee Link")
-
-// Lazy-initialize Twilio client
-function getTwilioClient() {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (!sid || !token) throw new Error('Twilio credentials not configured')
-  return twilio(sid, token)
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -104,7 +98,7 @@ ${transaction.myfatoorah_invoice_url}
 شكراً لكم / Thank you`
 
     // Send WhatsApp message
-    const twilioMessage = await getTwilioClient().messages.create({
+    const twilioMessage = await sendWhatsAppMessage({
       body: message,
       from: whatsappFrom,
       to: whatsappTo,

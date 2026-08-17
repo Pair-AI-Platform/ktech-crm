@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
+export const runtime = 'edge'
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm']

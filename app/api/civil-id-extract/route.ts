@@ -5,6 +5,8 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { DOCUMENT_AI_MODEL } from '@/lib/ai/model'
 
+export const runtime = 'edge'
+
 export const maxDuration = 30
 
 const CivilIdSchema = z.object({

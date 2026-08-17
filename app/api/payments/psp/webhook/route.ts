@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import twilio from "twilio"
 import { getPaymentStatus, verifyWebhookSignature } from "@/lib/myfatoorah/client"
 import { escapeHtml } from "@/lib/utils"
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from "@/lib/webhook-events"
 import { createLogger } from "@/lib/logger"
+import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
+
+export const runtime = 'edge'
 
 const logger = createLogger("PSP Payment Webhook")
-
-// Lazy-initialize Twilio client for sending receipts
-function getTwilioClient() {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (!sid || !token) throw new Error('Twilio credentials not configured')
-  return twilio(sid, token)
-}
 
 // Use service role for webhook (no user session)
 function createServiceClient() {
@@ -204,7 +198,7 @@ export async function POST(request: NextRequest) {
 
     // Idempotency / replay protection: record this delivery before doing any work.
     const eventId = `psp:${invoiceId}`
-    const dedup = await recordWebhookEvent(supabase, "myfatoorah", eventId, hashPayload(rawBody), null)
+    const dedup = await recordWebhookEvent(supabase, "myfatoorah", eventId, await hashPayload(rawBody), null)
     if (!dedup.ok) {
       logger.info("Deduplicated", { reason: dedup.reason, eventId })
       return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })
@@ -414,7 +408,7 @@ ${urlData?.publicUrl ? `Receipt Link: ${urlData.publicUrl}` : ""}
 شكراً لكم / Thank you
 Kuwait Technical College`
 
-        const twilioMessage = await getTwilioClient().messages.create({
+        const twilioMessage = await sendWhatsAppMessage({
           body: receiptMessage,
           from: whatsappFrom,
           to: whatsappTo,

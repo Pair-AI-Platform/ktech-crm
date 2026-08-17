@@ -1,6 +1,8 @@
 import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+
 export const GET = withApiHandler(
   { context: 'get-exhibitions' },
   async ({ supabase }) => {

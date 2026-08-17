@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 
+export const runtime = 'edge'
+
 export const dynamic = 'force-dynamic'
 
 // The three manual auditor checklist items. Each maps to a boolean column plus

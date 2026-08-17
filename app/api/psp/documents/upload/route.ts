@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
 
+export const runtime = 'edge'
+
 export const maxDuration = 30
 
 // POST - Upload file to storage and create document record

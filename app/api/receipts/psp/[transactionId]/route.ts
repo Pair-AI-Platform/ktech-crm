@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { escapeHtml } from "@/lib/utils"
 
+export const runtime = 'edge'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ transactionId: string }> }

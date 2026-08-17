@@ -57,14 +57,14 @@ function createMockSupabase(insertBehavior: 'success' | 'unique_violation' | 'ot
 }
 
 describe('hashPayload', () => {
-  it('produces stable sha256 of input', () => {
-    expect(hashPayload('hello')).toBe(
+  it('produces stable sha256 of input', async () => {
+    expect(await hashPayload('hello')).toBe(
       '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
     )
   })
 
-  it('different bodies produce different hashes', () => {
-    expect(hashPayload('a')).not.toBe(hashPayload('b'))
+  it('different bodies produce different hashes', async () => {
+    expect(await hashPayload('a')).not.toBe(await hashPayload('b'))
   })
 })
 
@@ -79,7 +79,7 @@ describe('recordWebhookEvent', () => {
       mock.client as never,
       'myfatoorah',
       'evt-1',
-      hashPayload('body'),
+      await hashPayload('body'),
       null
     )
 
@@ -98,95 +98,100 @@ describe('recordWebhookEvent', () => {
       mock.client as never,
       'twilio_whatsapp',
       'SM123:delivered',
-      hashPayload('body'),
+      await hashPayload('body'),
       null
     )
 
     expect(result).toEqual({ ok: false, reason: 'replay', eventId: 'SM123:delivered' })
   })
 
-  it('rethrows on non-uniqueness error', async () => {
+  it('throws on other DB errors', async () => {
     const mock = createMockSupabase('other_error')
     await expect(
-      recordWebhookEvent(mock.client as never, 'myfatoorah', 'evt-2', hashPayload('body'), null)
+      recordWebhookEvent(mock.client as never, 'myfatoorah', 'evt-2', await hashPayload('body'), null)
     ).rejects.toMatchObject({ code: 'XX000' })
   })
 
-  it('rejects events older than 1 hour as stale', async () => {
+  it('rejects stale events (older than 1 hour)', async () => {
     const mock = createMockSupabase('success')
-    const oneHourAndOneSecondAgo = Date.now() - (60 * 60 * 1000 + 1000)
+    const oneHourAndOneSecondAgo = Date.now() - (60 * 60 + 1) * 1000
 
     const result = await recordWebhookEvent(
       mock.client as never,
-      'myfatoorah',
+      'finance',
       'evt-stale',
-      hashPayload('body'),
+      await hashPayload('body'),
       oneHourAndOneSecondAgo
     )
 
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.reason).toBe('stale')
-    }
-    // Stale rejection still records the event for audit, with rejected_stale status.
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'stale',
+      eventId: 'evt-stale',
+    })
     expect(mock.insertCalls).toHaveLength(1)
-    expect(mock.insertCalls[0].status).toBe('rejected_stale')
+    expect(mock.insertCalls[0]).toMatchObject({
+      status: 'rejected_stale',
+    })
   })
 
-  it('rejects far-future events as stale (clock skew defense)', async () => {
+  it('rejects future events (more than 1 hour ahead)', async () => {
     const mock = createMockSupabase('success')
-    const oneHourFromNow = Date.now() + (60 * 60 * 1000 + 1000)
+    const oneHourFromNow = Date.now() + (60 * 60 + 1) * 1000
 
     const result = await recordWebhookEvent(
       mock.client as never,
-      'myfatoorah',
+      'ai_transfer',
       'evt-future',
-      hashPayload('body'),
+      await hashPayload('body'),
       oneHourFromNow
     )
 
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.reason).toBe('stale')
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'stale',
+      eventId: 'evt-future',
+    })
   })
 
-  it('accepts events within tolerance', async () => {
+  it('accepts events within tolerance window', async () => {
     const mock = createMockSupabase('success')
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
 
     const result = await recordWebhookEvent(
       mock.client as never,
-      'myfatoorah',
+      'twilio_voice',
       'evt-fresh',
-      hashPayload('body'),
+      await hashPayload('body'),
       fiveMinutesAgo
     )
 
-    expect(result.ok).toBe(true)
-    expect(mock.insertCalls[0].status).toBe('received')
+    expect(result).toEqual({ ok: true, eventId: 'evt-fresh', isReplay: false })
   })
 })
 
-describe('markWebhookProcessed / markWebhookFailed', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('markWebhookProcessed updates the row to processed', async () => {
+describe('markWebhookProcessed', () => {
+  it('updates status to processed', async () => {
     const mock = createMockSupabase('success')
-    await markWebhookProcessed(mock.client as never, 'myfatoorah', 'evt-x')
-    expect(mock.updateCalls).toEqual([{ status: 'processed', eventId: 'evt-x' }])
-  })
+    await markWebhookProcessed(mock.client as never, 'myfatoorah', 'evt-123')
 
-  it('markWebhookFailed truncates long error messages', async () => {
-    const mock = createMockSupabase('success')
-    const long = 'X'.repeat(1000)
-    await markWebhookFailed(mock.client as never, 'twilio_whatsapp', 'SM-x', long)
-    // We rely on update being called; the actual truncation happens in the
-    // payload to the .update() call. This test exists primarily so future
-    // refactors don't regress the truncation guard.
     expect(mock.updateCalls).toHaveLength(1)
-    expect(mock.updateCalls[0].status).toBe('failed')
+    expect(mock.updateCalls[0]).toMatchObject({
+      status: 'processed',
+      eventId: 'evt-123',
+    })
+  })
+})
+
+describe('markWebhookFailed', () => {
+  it('updates status to failed with error message', async () => {
+    const mock = createMockSupabase('success')
+    await markWebhookFailed(mock.client as never, 'finance', 'evt-456', 'Something went wrong')
+
+    expect(mock.updateCalls).toHaveLength(1)
+    expect(mock.updateCalls[0]).toMatchObject({
+      status: 'failed',
+      eventId: 'evt-456',
+    })
   })
 })

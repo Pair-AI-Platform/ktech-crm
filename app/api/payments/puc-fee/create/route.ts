@@ -4,6 +4,8 @@ import { createPaymentLink, validateCivilId } from "@/lib/myfatoorah/client"
 import { PUC_FEE_AMOUNT } from "@/types"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
+export const runtime = 'edge'
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()

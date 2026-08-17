@@ -3,6 +3,8 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
 import { tryClaimCronRun } from "@/lib/cron-lock"
 import { safeEqual } from "@/lib/safe-compare"
 
+export const runtime = 'edge'
+
 // In-memory fallback guard — only useful within a single instance.
 // Distributed dedup happens via tryClaimCronRun() (Upstash SETNX EX).
 let lastRunTimestamp = 0

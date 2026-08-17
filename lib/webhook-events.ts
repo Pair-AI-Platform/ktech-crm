@@ -1,5 +1,5 @@
-import crypto from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { hashSha256 } from '@/lib/crypto-utils'
 
 export type WebhookSource =
   | 'myfatoorah'
@@ -15,8 +15,8 @@ export type WebhookCheckResult =
 
 const STALE_TOLERANCE_SECONDS = 60 * 60 // 1 hour
 
-export function hashPayload(body: string): string {
-  return crypto.createHash('sha256').update(body).digest('hex')
+export async function hashPayload(body: string): Promise<string> {
+  return hashSha256(body)
 }
 
 /**

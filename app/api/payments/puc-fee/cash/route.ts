@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { PUC_FEE_AMOUNT } from "@/types"
 
+export const runtime = 'edge'
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()

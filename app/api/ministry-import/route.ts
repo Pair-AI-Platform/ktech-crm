@@ -10,6 +10,8 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 import { assertArabicLeadNameFields, getArabicLeadDisplayName } from "@/lib/lead-name-policy"
 
+export const runtime = 'edge'
+
 type SchoolRow = { id: string; name_en: string | null; name_ar: string | null; school_type: string | null }
 
 // The school's school_type is the source of truth for a lead's education_type.

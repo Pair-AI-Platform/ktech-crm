@@ -7,6 +7,8 @@ import { createLogger } from '@/lib/logger'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
+export const runtime = 'edge'
+
 // Use service role for webhook (no user session)
 function createServiceClient() {
   return createClient(
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Idempotency / replay protection: record this delivery before doing any work.
     const eventId = `enroll:${invoiceId}`
-    const dedup = await recordWebhookEvent(supabase, 'myfatoorah', eventId, hashPayload(rawBody), null)
+    const dedup = await recordWebhookEvent(supabase, 'myfatoorah', eventId, await hashPayload(rawBody), null)
     if (!dedup.ok) {
       logger.info('Webhook deduplicated', { reason: dedup.reason, eventId })
       return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })

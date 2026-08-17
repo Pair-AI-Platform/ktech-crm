@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server"
-import crypto from "crypto"
-import twilio from "twilio"
+import { generateRandomHex } from "@/lib/crypto-utils"
 import { withApiHandler } from "@/lib/api-handler"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
+import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
+
+export const runtime = 'edge'
 
 const TOKEN_TTL_DAYS = 7
-
-function getTwilioClient() {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (!sid || !token) throw new Error("Twilio credentials not configured")
-  return twilio(sid, token)
-}
 
 /**
  * Generates a fresh PSP self-service token (rotates any existing) and
@@ -72,7 +67,7 @@ export const POST = withApiHandler(
       .eq("lead_id", leadId)
       .gt("expires_at", nowIso)
 
-    const token = crypto.randomBytes(32).toString("hex")
+    const token = generateRandomHex(32)
     const expiresAt = new Date(Date.now() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
     const { error: insertErr } = await service.from("psp_self_service_tokens").insert({
@@ -122,7 +117,7 @@ This link is valid for 7 days.
     let twilioMessageSid: string | undefined
     let twilioStatus: string | undefined
     try {
-      const twilioMessage = await getTwilioClient().messages.create({
+      const twilioMessage = await sendWhatsAppMessage({
         body: message,
         from: whatsappFrom,
         to: whatsappTo,

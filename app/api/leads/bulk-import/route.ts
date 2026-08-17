@@ -3,6 +3,8 @@ import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supab
 import { calculateLeadQuality } from "@/lib/lead-scoring"
 import { assertArabicLeadNameFields } from "@/lib/lead-name-policy"
 
+export const runtime = 'edge'
+
 type IncomingLead = Record<string, unknown> & {
   civil_id?: string | null
   phone?: string | null

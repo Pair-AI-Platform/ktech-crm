@@ -1,5 +1,7 @@
 "use client"
 
+export const runtime = 'edge'
+
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"

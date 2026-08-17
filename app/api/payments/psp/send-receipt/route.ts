@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import twilio from "twilio"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-// Lazy-initialize Twilio client
-function getTwilioClient() {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (!sid || !token) throw new Error('Twilio credentials not configured')
-  return twilio(sid, token)
-}
+export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {
@@ -122,7 +116,7 @@ ${receiptDoc?.public_url ? `Receipt Link: ${receiptDoc.public_url}` : ""}
 شكراً لكم / Thank you
 Kuwait Technical College`
 
-    const twilioMessage = await getTwilioClient().messages.create({
+    const twilioMessage = await sendWhatsAppMessage({
       body: receiptMessage,
       from: whatsappFrom,
       to: whatsappTo,

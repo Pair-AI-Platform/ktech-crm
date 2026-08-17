@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
+export const runtime = 'edge'
+
 const MAX_IDS = 5000
 
 const normalizeCivilId = (raw: unknown): string =>

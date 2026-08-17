@@ -4,6 +4,8 @@ import { escapeHtml } from "@/lib/utils"
 import { PSP_FEE_AMOUNT } from "@/lib/config/constants"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
+export const runtime = 'edge'
+
 function generateCashReceiptHtml(data: {
   receiptNumber: string
   leadName: string

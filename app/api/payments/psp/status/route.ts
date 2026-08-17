@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
+export const runtime = 'edge'
+
 type ReceiptDocument = {
   id: string
   public_url: string

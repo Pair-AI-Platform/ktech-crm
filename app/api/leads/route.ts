@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { SCHOOLS, GOVERNORATES } from '@/types'
 
+export const runtime = 'edge'
+
 export const dynamic = 'force-dynamic'
 
 export const GET = withApiHandler(

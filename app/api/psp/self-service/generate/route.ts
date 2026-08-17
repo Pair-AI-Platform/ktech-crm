@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
-import crypto from "crypto"
 import { withApiHandler } from "@/lib/api-handler"
+import { generateRandomHex } from "@/lib/crypto-utils"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { createServiceRoleClient } from "@/lib/supabase/server"
+
+export const runtime = 'edge'
 
 const TOKEN_TTL_DAYS = 7
 
@@ -64,7 +66,7 @@ export const POST = withApiHandler(
       .eq("lead_id", leadId)
       .gt("expires_at", nowIso)
 
-    const token = crypto.randomBytes(32).toString("hex")
+    const token = generateRandomHex(32)
     const expiresAt = new Date(Date.now() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
     const { error: insertErr } = await service

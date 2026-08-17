@@ -4,6 +4,8 @@ import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { getCrmTools } from '@/lib/ai/tools'
 import type { UserRole } from '@/types'
 
+export const runtime = 'edge'
+
 export const maxDuration = 30
 
 // Mock mode: when no OPENAI_API_KEY, return fake streaming responses with real CRM data

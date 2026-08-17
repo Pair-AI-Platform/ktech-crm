@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 import { requireDemoMode } from "@/lib/demo-mode"
 
+export const runtime = 'edge'
+
 // Common lead fields
 const baseLead = {
   nationality: "Kuwaiti",

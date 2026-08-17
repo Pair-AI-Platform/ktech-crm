@@ -1,4 +1,3 @@
-import crypto from 'crypto'
 import { redactLogData } from '@/lib/redact'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'

@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server"
-import twilio from "twilio"
 import { withApiHandler } from "@/lib/api-handler"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-// Lazy-initialize Twilio client
-function getTwilioClient() {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (!sid || !token) throw new Error('Twilio credentials not configured')
-  return twilio(sid, token)
-}
+export const runtime = 'edge'
 
 export const POST = withApiHandler(
   { context: 'whatsapp-send' },
@@ -43,7 +37,7 @@ export const POST = withApiHandler(
     const whatsappFrom = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`
 
     // Send WhatsApp message via Twilio
-    const twilioMessage = await getTwilioClient().messages.create({
+    const twilioMessage = await sendWhatsAppMessage({
       body: message,
       from: whatsappFrom,
       to: whatsappTo,

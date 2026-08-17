@@ -29,7 +29,7 @@ import {
   Download,
   List,
 } from "lucide-react"
-import { generateExcelXML } from "@/lib/export/excel-generator"
+import { generateCSV } from "@/lib/export/excel-generator"
 import type { ChannelReportData, DemographicReportData } from "@/lib/hooks/use-reports"
 
 interface SchoolReportsProps {
@@ -117,7 +117,7 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
     })
   }, [])
 
-  const handleExportExcel = useCallback(() => {
+  const handleExportCSV = useCallback(() => {
     const exportData = {
       title: 'School Breakdown',
       columns: [
@@ -148,12 +148,12 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
       })),
     }
 
-    const xml = generateExcelXML(exportData)
-    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
+    const csv = generateCSV(exportData)
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv; charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `school-breakdown-${new Date().toISOString().split('T')[0]}.xls`
+    a.download = `school-breakdown-${new Date().toISOString().split('T')[0]}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -492,12 +492,12 @@ export function SchoolReports({ data, demographicData }: SchoolReportsProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleExportExcel}
+                  onClick={handleExportCSV}
                   className="gap-1.5"
                   disabled={allSchools.length === 0}
                 >
                   <Download className="w-4 h-4" />
-                  Export Excel
+                  Export CSV
                 </Button>
               </div>
             </div>

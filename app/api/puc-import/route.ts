@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { PucImportRecord, PucImportResult } from "@/lib/puc-import"
 import { getArabicLeadDisplayName, splitArabicFullName } from "@/lib/lead-name-policy"
 
+export const runtime = 'edge'
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()

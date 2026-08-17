@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/auth-provider";
 
+export const runtime = 'edge'
+
 export const metadata: Metadata = {
   title: "ADL",
   description:

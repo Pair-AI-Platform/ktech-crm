@@ -4,6 +4,8 @@ import { createServiceRoleClient } from '@/lib/supabase/server'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
+export const runtime = 'edge'
+
 export const POST = withApiHandler({ context: 'file-fee-exempt', roles: ['admin'] }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()
   const { leadId, targetStage: rawTargetStage } = body

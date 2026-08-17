@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 
+export const runtime = 'edge'
+
 export const POST = withApiHandler(
   { context: 'announcements', roles: ['admin'] },
   async ({ req, user, logger }) => {

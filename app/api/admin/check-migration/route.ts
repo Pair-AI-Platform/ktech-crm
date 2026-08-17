@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 
+export const runtime = 'edge'
+
 // Check if the payment_transactions migration has been applied
 export const GET = withApiHandler(
   { context: 'check-migration', roles: ['admin'] },

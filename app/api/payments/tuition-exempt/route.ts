@@ -3,6 +3,8 @@ import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
+export const runtime = 'edge'
+
 const ALLOWED_TARGET_STAGES = ['application', 'applicant', 'enrolled'] as const
 type AllowedTargetStage = (typeof ALLOWED_TARGET_STAGES)[number]
 

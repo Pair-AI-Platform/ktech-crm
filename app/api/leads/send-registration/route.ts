@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
-import * as nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
+
+export const runtime = 'edge'
 
 const FORMS_BUCKET = 'registration-forms'
 
@@ -53,29 +55,16 @@ export const POST = withApiHandler(
       )
     }
 
-    const smtpHost = process.env.SMTP_HOST
-    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10)
-    const smtpUser = process.env.SMTP_USER
-    const smtpPass = process.env.SMTP_PASS
-    const smtpFrom = process.env.SMTP_FROM || smtpUser
-
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      logger.error('SMTP configuration incomplete')
+    const resendApiKey = process.env.RESEND_API_KEY
+    if (!resendApiKey) {
+      logger.error('RESEND_API_KEY env variable not set')
       return NextResponse.json(
-        { error: 'Email service not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS.' },
+        { error: 'Email service not configured. Please set RESEND_API_KEY in environment variables.' },
         { status: 500 }
       )
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    })
+    const resend = new Resend(resendApiKey)
 
     const educationTypeLabel = lead.education_type
       ? lead.education_type === 'other' ? 'Other' : lead.education_type.toUpperCase()
@@ -160,12 +149,15 @@ export const POST = withApiHandler(
     }
 
     try {
-      await transporter.sendMail({
-        from: `"ADL" <${smtpFrom}>`,
+      await resend.emails.send({
+        from: 'ADL <onboarding@resend.dev>',
         to: registrationEmail,
         subject: `New Registration: ${studentName} — Civil ID: ${lead.civil_id}`,
         html: emailHtml,
-        attachments,
+        attachments: attachments.map((att) => ({
+          filename: att.filename,
+          content: att.content,
+        })),
       })
 
       logger.info('Registration email sent', {

@@ -6,7 +6,7 @@ import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 import { assertArabicLeadNameFields } from '@/lib/lead-name-policy'
 import { safeEqual } from '@/lib/safe-compare'
-import crypto from 'crypto'
+import { hashSha256 } from '@/lib/crypto-utils'
 
 interface AITransferBody {
   phone: string
@@ -17,6 +17,8 @@ interface AITransferBody {
   notes?: string
   email?: string
 }
+
+export const runtime = 'edge'
 
 function normalizePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-()]/g, '')
@@ -33,7 +35,7 @@ export const POST = withApiHandler(
     const apiKey = req.headers.get('x-api-key')
     const secret = process.env.AI_TRANSFER_WEBHOOK_SECRET
 
-    if (!secret || !safeEqual(apiKey, secret)) {
+    if (!secret || !(await safeEqual(apiKey, secret))) {
       logger.warn('Unauthorized AI transfer attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -94,8 +96,8 @@ export const POST = withApiHandler(
     // the same lead doesn't get blocked.
     const eventId = body.conversation_id
       ? `conv:${body.conversation_id}`
-      : `body:${crypto.createHash('sha256').update(rawBody).digest('hex').slice(0, 32)}`
-    const dedup = await recordWebhookEvent(supabase, 'ai_transfer', eventId, hashPayload(rawBody), null)
+      : `body:${(await hashSha256(rawBody)).slice(0, 32)}`
+    const dedup = await recordWebhookEvent(supabase, 'ai_transfer', eventId, await hashPayload(rawBody), null)
     if (!dedup.ok) {
       logger.info('AI transfer webhook deduplicated', { reason: dedup.reason, eventId })
       return NextResponse.json({ success: true, message: `Webhook ${dedup.reason}` })

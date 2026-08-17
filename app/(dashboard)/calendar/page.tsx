@@ -1,5 +1,7 @@
 "use client"
 
+export const runtime = 'edge'
+
 import { useState, useMemo, useEffect } from "react"
 import { getLeadDisplayName } from "@/lib/lead-utils"
 import { motion, AnimatePresence } from "framer-motion"

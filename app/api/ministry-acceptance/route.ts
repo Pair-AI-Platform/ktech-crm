@@ -4,6 +4,8 @@ import type { MinistryAcceptanceRecord, MinistryAcceptanceResult } from "@/lib/m
 import { GPA_SELF_FUNDED_THRESHOLD } from "@/lib/config/constants"
 import { getArabicLeadDisplayName, splitArabicFullName } from "@/lib/lead-name-policy"
 
+export const runtime = 'edge'
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()

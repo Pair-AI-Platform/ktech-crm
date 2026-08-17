@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { resolveFilterAudience } from '@/lib/campaigns/audience-resolver'
 
+export const runtime = 'edge'
+
 // Types
 type CampaignType = 'voice' | 'whatsapp' | 'email'
 type CampaignStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'completed'

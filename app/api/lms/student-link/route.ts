@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 
+export const runtime = 'edge'
+
 /**
  * GET /api/lms/student-link?civilId=XXXXXXXXXX
  *
