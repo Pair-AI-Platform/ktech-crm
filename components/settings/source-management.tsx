@@ -33,6 +33,7 @@ import {
   useToggleSourceActive,
   type LeadSource,
 } from "@/lib/hooks/use-sources"
+import type { LeadSourceCategory } from "@/lib/lead-sources/types"
 
 const CATEGORIES = [
   { value: "direct", label: "Direct" },
@@ -116,7 +117,7 @@ function SourceRow({
               className="h-8 text-sm w-48"
               placeholder="Source label"
             />
-            <Select value={editCategory} onValueChange={setEditCategory}>
+            <Select value={editCategory} onValueChange={(value) => setEditCategory(value as LeadSourceCategory)}>
               <SelectTrigger className="h-8 w-36 text-xs">
                 <SelectValue />
               </SelectTrigger>

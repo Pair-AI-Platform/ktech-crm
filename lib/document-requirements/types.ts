@@ -47,7 +47,7 @@ export interface MoveDocumentRequirementRequest {
   toPosition: number;
 }
 
-export interface DocumentRequirementsFilters {
+export interface DocumentRequirementsFilters extends Record<string, unknown> {
   graduateType: GraduateType;
   search?: string;
   required?: boolean;

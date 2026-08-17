@@ -459,13 +459,13 @@ export default function ReportsPage() {
         setFilters(prev => ({
           ...prev,
           dateRange: {
-            start: period.start_date,
-            end: period.end_date,
+            start: period.startDate,
+            end: period.endDate,
             preset: 'all',
           },
         }))
-        setDateFrom(period.start_date)
-        setDateTo(period.end_date)
+        setDateFrom(period.startDate)
+        setDateTo(period.endDate)
         setDatePreset('all')
       }, 0)
       return () => window.clearTimeout(timer)
@@ -982,7 +982,7 @@ export default function ReportsPage() {
                           <SelectItem value="all">All Cycles</SelectItem>
                           {cycles.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
-                              {c.name}{c.is_active ? " (Active)" : ""}
+                              {c.name}{c.active ? " (Active)" : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1339,8 +1339,8 @@ export default function ReportsPage() {
               periodInfo={activePUCPeriod ? {
                 periodId: activePUCPeriod.id,
                 periodName: activePUCPeriod.name,
-                startDate: activePUCPeriod.start_date,
-                endDate: activePUCPeriod.end_date,
+                startDate: activePUCPeriod.startDate,
+                endDate: activePUCPeriod.endDate,
                 isFrozen: isPUCFrozen,
                 isArchived: activePUCPeriod.status === 'archived',
               } : null}

@@ -9,3 +9,6 @@
 //     NEXT_PUBLIC_AUTH_API_URL: process.env.NEXT_PUBLIC_AUTH_API_URL,
 //   },
 // });
+
+// Placeholder export to make this a valid module
+export {}

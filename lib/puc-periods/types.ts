@@ -50,7 +50,7 @@ export interface DeactivatePucPeriodResponse {
   period: PucPeriod;
 }
 
-export interface PucPeriodsFilters {
+export interface PucPeriodsFilters extends Record<string, unknown> {
   search?: string;
   status?: PucPeriodStatus;
 }

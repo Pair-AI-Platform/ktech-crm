@@ -1330,7 +1330,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                             {allSelected && <Check className="w-3 h-3 text-white" />}
                           </div>
                           <span>{cycle.name}</span>
-                          {cycle.is_active && <Badge variant="success" size="sm">Active</Badge>}
+                          {cycle.active && <Badge variant="success" size="sm">Active</Badge>}
                           {selectedCount > 0 && !allSelected && (
                             <span className="text-xs text-[var(--text-muted)] ml-auto">{selectedCount}/{semesters.length}</span>
                           )}
@@ -1363,7 +1363,7 @@ export function LeadFiltersPanel({ filters, onChange, onClose, isOpen }: LeadFil
                                   )}>
                                     {isSelected && <Check className="w-3 h-3 text-white" />}
                                   </div>
-                                  <span className="truncate">{semester.name}</span>
+                                  <span className="truncate">{semester.label}</span>
                                 </button>
                               )
                             })}
