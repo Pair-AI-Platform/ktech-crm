@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   DndContext,
@@ -35,7 +36,8 @@ import {
   Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useStageSettings, StageSettings as StageSettingsType } from "@/lib/hooks/use-stage-settings"
+import { usePipelineStages, useTogglePipelineStageActive, useReorderPipelineStages } from "@/lib/hooks/use-pipeline-stages"
+import { PipelineStageRow } from "@/lib/pipeline-stages/types"
 import { PIPELINE_STAGES, PipelineStage } from "@/types"
 
 const STAGE_COLORS: Record<PipelineStage, string> = {
@@ -77,14 +79,15 @@ function getStageInfo(stageValue: PipelineStage) {
 
 interface SortableStageItemProps {
   stage: PipelineStage
+  stageData: PipelineStageRow | undefined
   index: number
   isActive: boolean
   isUpdating: boolean
-  onToggle: (stage: PipelineStage, newValue: boolean) => void
+  onToggle: (stageId: string, stage: PipelineStage, newValue: boolean) => void
   trackId: string
 }
 
-function SortableStageItem({ stage, index, isActive, isUpdating, onToggle, trackId }: SortableStageItemProps) {
+function SortableStageItem({ stage, stageData, index, isActive, isUpdating, onToggle, trackId }: SortableStageItemProps) {
   const stageInfo = getStageInfo(stage)
   const isNewStage = stage === 'new'
   const sortableId = `${trackId}-${stage}`
@@ -167,8 +170,8 @@ function SortableStageItem({ stage, index, isActive, isUpdating, onToggle, track
         )}
         <Switch
           checked={isActive}
-          onCheckedChange={(checked) => onToggle(stage, checked)}
-          disabled={isNewStage || isUpdating}
+          onCheckedChange={(checked) => stageData && onToggle(stageData.id, stage, checked)}
+          disabled={isNewStage || isUpdating || !stageData}
           className={cn(
             isNewStage && "cursor-not-allowed opacity-50"
           )}
@@ -206,11 +209,11 @@ interface TrackSectionProps {
   iconBgClass: string
   iconTextClass: string
   trackStages: PipelineStage[]
-  orderedStages: PipelineStage[]
-  settings: StageSettingsType[]
+  orderedStages: PipelineStageRow[]
+  stagesMap: Map<string, PipelineStageRow>
   updatingStages: Set<string>
-  onToggle: (stage: PipelineStage, newValue: boolean) => void
-  onReorder: (reorderedStages: { stage: PipelineStage; display_order: number }[]) => Promise<boolean>
+  onToggle: (stageId: string, stage: PipelineStage, newValue: boolean) => void
+  onReorder: (orderedIds: string[]) => Promise<boolean>
 }
 
 function TrackSection({
@@ -223,7 +226,7 @@ function TrackSection({
   iconTextClass,
   trackStages,
   orderedStages,
-  settings,
+  stagesMap,
   updatingStages,
   onToggle,
   onReorder,
@@ -240,23 +243,23 @@ function TrackSection({
     })
   )
 
-  // Use the track's defined order (not DB order) to ensure correct flow
+  // Filter stages that exist in the database for this track
   const filteredStages = useMemo(() => {
-    const dbStageSet = new Set(orderedStages)
-    return trackStages.filter(s => dbStageSet.has(s))
+    const dbStageKeys = new Set(orderedStages.map(s => s.stageKey))
+    return trackStages.filter(s => dbStageKeys.has(s))
   }, [orderedStages, trackStages])
 
   const sortableIds = useMemo(() => {
     return filteredStages.map(s => `${trackId}-${s}`)
   }, [filteredStages, trackId])
 
-  const getStageSetting = (stage: PipelineStage) => {
-    return settings.find(s => s.stage === stage)
+  const getStageData = (stage: PipelineStage) => {
+    return orderedStages.find(s => s.stageKey === stage)
   }
 
   const activeCount = filteredStages.filter(s => {
-    const setting = getStageSetting(s)
-    return setting?.is_active ?? true
+    const stageData = getStageData(s)
+    return stageData?.active ?? true
   }).length
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -280,30 +283,12 @@ function TrackSection({
 
     const newOrder = arrayMove(filteredStages, oldIndex, newIndex)
 
-    // Build reorder data using global display_order positions
-    // We need to reassign display_order for ALL stages, not just this track's
-    const otherStages = orderedStages.filter(s => !trackStages.includes(s))
+    // Map the new order to stage IDs
+    const orderedIds = newOrder
+      .map(stageKey => getStageData(stageKey)?.id)
+      .filter((id): id is string => id !== undefined)
 
-    // Merge: keep other stages in their current positions, insert reordered track stages
-    // Simple approach: reassign all display_orders globally
-    const allReordered: PipelineStage[] = []
-    let trackIdx = 0
-    let otherIdx = 0
-
-    for (const stage of orderedStages) {
-      if (trackStages.includes(stage)) {
-        allReordered.push(newOrder[trackIdx++])
-      } else {
-        allReordered.push(otherStages[otherIdx++])
-      }
-    }
-
-    const reorderData = allReordered.map((stage, i) => ({
-      stage,
-      display_order: i + 1,
-    }))
-
-    const success = await onReorder(reorderData)
+    const success = await onReorder(orderedIds)
     if (!success) {
       setLocalError("Failed to reorder stages")
       setTimeout(() => setLocalError(null), 3000)
@@ -365,15 +350,16 @@ function TrackSection({
             strategy={verticalListSortingStrategy}
           >
             {filteredStages.map((stage, index) => {
-              const setting = getStageSetting(stage)
-              const isActive = setting?.is_active ?? true
-              const isUpdating = updatingStages.has(stage)
+              const stageData = getStageData(stage)
+              const isActive = stageData?.active ?? true
+              const isUpdating = stageData ? updatingStages.has(stageData.id) : false
 
               return (
                 <SortableStageItem
                   key={`${trackId}-${stage}`}
                   trackId={trackId}
                   stage={stage}
+                  stageData={stageData}
                   index={index}
                   isActive={isActive}
                   isUpdating={isUpdating}
@@ -395,41 +381,87 @@ function TrackSection({
 }
 
 export function StageSettings() {
-  const { settings, loading, error, toggleStage, reorderStages, refetch } = useStageSettings()
+  const queryClient = useQueryClient()
+  
+  // Fetch both PUC and SF stages
+  const { stages: pucStages, loading: pucLoading, error: pucError } = usePipelineStages("puc")
+  const { stages: sfStages, loading: sfLoading, error: sfError } = usePipelineStages("sf")
+  
+  const toggleMutation = useTogglePipelineStageActive()
+  const reorderMutation = useReorderPipelineStages()
+  
   const [updatingStages, setUpdatingStages] = useState<Set<string>>(new Set())
   const [globalError, setGlobalError] = useState<string | null>(null)
 
-  const handleToggle = async (stage: PipelineStage, newValue: boolean) => {
-    setGlobalError(null)
-    setUpdatingStages(prev => new Set(prev).add(stage))
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['pipelineStages'] })
+  }, [queryClient])
 
-    const success = await toggleStage(stage, newValue)
+  // Combine stages for display
+  const allStages = useMemo(() => [...pucStages, ...sfStages], [pucStages, sfStages])
+  const stagesMap = useMemo(() => {
+    const map = new Map<string, PipelineStageRow>()
+    allStages.forEach(stage => map.set(stage.stageKey, stage))
+    return map
+  }, [allStages])
 
-    if (!success) {
-      setGlobalError(`Failed to ${newValue ? 'activate' : 'deactivate'} the "${stage}" stage`)
+  const loading = pucLoading || sfLoading
+  const error = pucError || sfError
+
+  const handleToggle = async (stageId: string, stage: PipelineStage, newValue: boolean) => {
+    // Prevent deactivating 'new' stage
+    if (stage === 'new' && !newValue) {
+      setGlobalError("Cannot deactivate the 'New' stage - it's required as the initial stage")
+      return
     }
 
-    setUpdatingStages(prev => {
-      const newSet = new Set(prev)
-      newSet.delete(stage)
-      return newSet
-    })
+    setGlobalError(null)
+    setUpdatingStages(prev => new Set(prev).add(stageId))
+
+    try {
+      await toggleMutation.mutateAsync({ id: stageId, active: newValue })
+    } catch (err) {
+      setGlobalError(`Failed to ${newValue ? 'activate' : 'deactivate'} the "${stage}" stage`)
+    } finally {
+      setUpdatingStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(stageId)
+        return newSet
+      })
+    }
   }
 
-  const handleReorder = useCallback(async (reorderedStages: { stage: PipelineStage; display_order: number }[]) => {
-    const success = await reorderStages(reorderedStages)
-    return success
-  }, [reorderStages])
+  const handlePucReorder = useCallback(async (orderedIds: string[]) => {
+    try {
+      await reorderMutation.mutateAsync({ pipelineType: "puc", orderedIds })
+      return true
+    } catch {
+      return false
+    }
+  }, [reorderMutation])
 
-  const orderedStages = useMemo(() =>
-    [...settings]
-      .sort((a, b) => a.display_order - b.display_order)
-      .map(s => s.stage),
-    [settings]
+  const handleSfReorder = useCallback(async (orderedIds: string[]) => {
+    try {
+      await reorderMutation.mutateAsync({ pipelineType: "sf", orderedIds })
+      return true
+    } catch {
+      return false
+    }
+  }, [reorderMutation])
+
+  // Sort stages by position
+  const orderedPucStages = useMemo(() =>
+    [...pucStages].sort((a, b) => a.position - b.position),
+    [pucStages]
   )
 
-  const activeCount = settings.filter(s => s.is_active).length
-  const totalStages = settings.length
+  const orderedSfStages = useMemo(() =>
+    [...sfStages].sort((a, b) => a.position - b.position),
+    [sfStages]
+  )
+
+  const activeCount = allStages.filter(s => s.active).length
+  const totalStages = allStages.length
 
   if (loading) {
     return (
@@ -502,11 +534,11 @@ export function StageSettings() {
         iconBgClass="bg-cyan-500/20"
         iconTextClass="text-cyan-600 dark:text-cyan-400"
         trackStages={PUC_STAGES}
-        orderedStages={orderedStages}
-        settings={settings}
+        orderedStages={orderedPucStages}
+        stagesMap={stagesMap}
         updatingStages={updatingStages}
         onToggle={handleToggle}
-        onReorder={handleReorder}
+        onReorder={handlePucReorder}
       />
 
       {/* SF Stages */}
@@ -519,11 +551,11 @@ export function StageSettings() {
         iconBgClass="bg-violet-500/20"
         iconTextClass="text-violet-600 dark:text-violet-400"
         trackStages={SF_STAGES}
-        orderedStages={orderedStages}
-        settings={settings}
+        orderedStages={orderedSfStages}
+        stagesMap={stagesMap}
         updatingStages={updatingStages}
         onToggle={handleToggle}
-        onReorder={handleReorder}
+        onReorder={handleSfReorder}
       />
 
       {/* Help text */}

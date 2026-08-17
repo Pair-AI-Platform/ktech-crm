@@ -1,104 +1,122 @@
-"use client"
+/* eslint-disable @next/next/no-img-element */
+"use client";
 
-import { useState, useSyncExternalStore, type HTMLAttributes } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Mail, Lock, ArrowRight, Sparkles, Shield, Zap, Users, Play, ShieldCheck } from "lucide-react"
+import { useState, useSyncExternalStore, type HTMLAttributes } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth/auth-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  Sparkles,
+  Shield,
+  Zap,
+  Users,
+  Play,
+  ShieldCheck,
+} from "lucide-react";
 
-const emptySubscribe = () => () => {}
+const emptySubscribe = () => () => {};
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & {
-  animate?: unknown
-  initial?: unknown
-  transition?: unknown
-  whileHover?: unknown
+  animate?: unknown;
+  initial?: unknown;
+  transition?: unknown;
+  whileHover?: unknown;
+};
+
+function MotionDiv({
+  animate,
+  initial,
+  transition,
+  whileHover,
+  ...props
+}: MotionDivProps) {
+  return <div {...props} />;
 }
 
-function MotionDiv({ animate, initial, transition, whileHover, ...props }: MotionDivProps) {
-  return <div {...props} />
-}
-
-const motion = { div: MotionDiv }
+const motion = { div: MotionDiv };
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [demoLoading, setDemoLoading] = useState<"admin" | "agent" | null>(null)
-  const [error, setError] = useState("")
-  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<"admin" | "agent" | null>(
+    null,
+  );
+  const [error, setError] = useState("");
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
+  const { login } = useAuth();
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
+    e.preventDefault();
 
-    const { createClient } = await import("@/lib/supabase/client")
-    const supabase = createClient()
+    setLoading(true);
+    setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      await login({
+        email,
+        password,
+      });
+      router.push("/dashboard");
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      // Check role + active status for redirect
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, is_active")
-        .single()
-      if (profile?.is_active === false) {
-        // Deactivated account: sign out and block access.
-        await supabase.auth.signOut()
-        setError("Your account has been deactivated. Please contact IT support.")
-        setLoading(false)
-        return
-      }
-      if (profile?.role === "marketing") {
-        router.push("/marketing")
-      } else {
-        router.push("/dashboard")
-      }
-      router.refresh()
+      // if (profile.roleId === "marketing-role-id") {
+      //     router.push("/marketing");
+      //   } else {
+      //     router.push("/dashboard");
+      //   }
+
+      //   router.refresh();
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
-  }
-
+  };
   const isDemoAllowed =
     process.env.NODE_ENV !== "production" &&
-    process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true"
+    process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true";
 
   const handleDemoMode = (role: "admin" | "agent") => {
-    setDemoLoading(role)
-    setError("")
+    setDemoLoading(role);
+    setError("");
 
     // Demo mode is fully client-side: no Supabase auth required. The dashboard
     // layout checks the ktech-demo-mode cookie; client hooks read localStorage
     // to serve mock profiles + demo data.
-    localStorage.setItem("ktech-demo-mode", "true")
-    localStorage.setItem("ktech-demo-role", role)
-    document.cookie = "ktech-demo-mode=true; path=/; max-age=86400; samesite=lax"
-    document.cookie = `ktech-demo-role=${role}; path=/; max-age=86400; samesite=lax`
+    localStorage.setItem("ktech-demo-mode", "true");
+    localStorage.setItem("ktech-demo-role", role);
+    document.cookie =
+      "ktech-demo-mode=true; path=/; max-age=86400; samesite=lax";
+    document.cookie = `ktech-demo-role=${role}; path=/; max-age=86400; samesite=lax`;
 
-    window.location.href = "/dashboard"
-  }
+    window.location.href = "/dashboard";
+  };
 
   const features = [
-    { icon: Users, label: "Lead Management", description: "Track every prospect" },
+    {
+      icon: Users,
+      label: "Lead Management",
+      description: "Track every prospect",
+    },
     { icon: Zap, label: "Fast Enrollment", description: "Streamlined process" },
     { icon: Shield, label: "Secure Data", description: "Enterprise security" },
-  ]
+  ];
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-base)] relative overflow-hidden">
+    <div className="min-h-screen flex bg-background relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
-
         {/* Grid Pattern */}
         <div
           className="absolute inset-0 opacity-[0.008]"
@@ -153,8 +171,12 @@ export default function LoginPage() {
                   </motion.div>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">ADL</h1>
-                  <p className="text-[var(--text-secondary)] text-sm">Kuwait Technical College</p>
+                  <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
+                    ADL
+                  </h1>
+                  <p className="text-[var(--text-secondary)] text-sm">
+                    Kuwait Technical College
+                  </p>
                 </div>
               </div>
 
@@ -171,7 +193,8 @@ export default function LoginPage() {
                 </h2>
                 <p className="text-[var(--text-secondary)] text-lg mb-12 max-w-lg leading-relaxed">
                   Transform your enrollment process with our comprehensive CRM.
-                  Track leads, manage students, and boost conversions — all in one place.
+                  Track leads, manage students, and boost conversions — all in
+                  one place.
                 </p>
               </motion.div>
 
@@ -194,30 +217,40 @@ export default function LoginPage() {
                     <div className="w-10 h-10 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center mb-3 group-hover:bg-[var(--primary)] transition-colors">
                       <feature.icon className="w-5 h-5 text-[var(--primary)] group-hover:text-white transition-colors" />
                     </div>
-                    <h3 className="font-semibold text-[var(--text-primary)] text-sm mb-1">{feature.label}</h3>
-                    <p className="text-[var(--text-muted)] text-xs">{feature.description}</p>
+                    <h3 className="font-semibold text-[var(--text-primary)] text-sm mb-1">
+                      {feature.label}
+                    </h3>
+                    <p className="text-[var(--text-muted)] text-xs">
+                      {feature.description}
+                    </p>
                   </motion.div>
                 ))}
               </motion.div>
 
               {/* Stats */}
               <motion.div
-                className="flex gap-8 mt-12 pt-8 border-t border-[var(--border)]"
+                className="flex gap-8 mt-12 pt-8 border-t border-(--border)"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.8 }}
               >
                 <div>
-                  <div className="text-3xl font-bold text-[var(--primary)] stat-value">15+</div>
-                  <div className="text-[var(--text-secondary)] text-sm">Lead Sources</div>
+                  <div className="text-3xl font-bold text-primary stat-value">
+                    15+
+                  </div>
+                  <div className="text-secondary text-sm">Lead Sources</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-[var(--success)] stat-value">50%</div>
-                  <div className="text-[var(--text-secondary)] text-sm">Conversion Rate</div>
+                  <div className="text-3xl font-bold text-(--success) stat-value">
+                    50%
+                  </div>
+                  <div className="text-secondary text-sm">Conversion Rate</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-[var(--accent)] stat-value">&lt;5m</div>
-                  <div className="text-[var(--text-secondary)] text-sm">Response Time</div>
+                  <div className="text-3xl font-bold text-accent stat-value">
+                    &lt;5m
+                  </div>
+                  <div className="text-secondary text-sm">Response Time</div>
                 </div>
               </motion.div>
             </motion.div>
@@ -242,16 +275,22 @@ export default function LoginPage() {
                 className="w-12 h-12 rounded-xl shadow-sm"
               />
               <div>
-                <h1 className="text-xl font-bold text-[var(--text-primary)]">ADL</h1>
-                <p className="text-[var(--text-muted)] text-xs">Kuwait Technical College</p>
+                <h1 className="text-xl font-bold text-foreground">ADL</h1>
+                <p className="text-(--text-muted) text-xs">
+                  Kuwait Technical College
+                </p>
               </div>
             </div>
 
             {/* Login Card */}
             <div className="bg-[var(--bg-surface)] rounded-xl p-8 border border-[var(--border)]">
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h2>
-                <p className="text-[var(--text-secondary)]">Sign in to access your dashboard</p>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
+                  Welcome back
+                </h2>
+                <p className="text-[var(--text-secondary)]">
+                  Sign in to access your dashboard
+                </p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5">
@@ -266,7 +305,12 @@ export default function LoginPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-[var(--text-secondary)]">Email address</Label>
+                  <Label
+                    htmlFor="email"
+                    className="text-[var(--text-secondary)]"
+                  >
+                    Email address
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -281,8 +325,16 @@ export default function LoginPage() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-[var(--text-secondary)]">Password</Label>
-                    <a href="#" className="text-xs text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors">
+                    <Label
+                      htmlFor="password"
+                      className="text-[var(--text-secondary)]"
+                    >
+                      Password
+                    </Label>
+                    <a
+                      href="#"
+                      className="text-xs text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
+                    >
                       Forgot password?
                     </a>
                   </div>
@@ -311,12 +363,20 @@ export default function LoginPage() {
                   )}
                 </Button>
               </form>
+              {/* <div className="mt-4 text-center text-sm">
+                Do not have an account?{" "}
+                <Link href="/register" className="underline">
+                  Sign Up
+                </Link>
+              </div> */}
 
               {/* Quick sign-in for local development only — gated behind the dev
                   demo flag so the credentials are stripped from production builds. */}
               {isDemoAllowed && (
-                <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                  <p className="text-xs text-[var(--text-muted)] mb-3 text-center">Quick sign-in (dev only)</p>
+                <div className="mt-6 pt-6 border-t border-(--border)">
+                  <p className="text-xs text-(--text-muted) mb-3 text-center">
+                    Quick sign-in (dev only)
+                  </p>
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       type="button"
@@ -324,11 +384,13 @@ export default function LoginPage() {
                       className="h-11 text-sm group"
                       disabled={loading}
                       onClick={() => {
-                        setEmail("admin@ktech.edu.kw")
-                        setPassword("KtechAdmin2026!")
+                        setEmail("admin@ktech.edu.kw");
+                        setPassword("KtechAdmin2026!");
                         setTimeout(() => {
-                          document.querySelector<HTMLFormElement>("form")?.requestSubmit()
-                        }, 0)
+                          document
+                            .querySelector<HTMLFormElement>("form")
+                            ?.requestSubmit();
+                        }, 0);
                       }}
                     >
                       <ShieldCheck className="w-4 h-4 mr-2" />
@@ -340,11 +402,13 @@ export default function LoginPage() {
                       className="h-11 text-sm group"
                       disabled={loading}
                       onClick={() => {
-                        setEmail("agent@ktech.edu.kw")
-                        setPassword("KtechAgent2026!")
+                        setEmail("agent@ktech.edu.kw");
+                        setPassword("KtechAgent2026!");
                         setTimeout(() => {
-                          document.querySelector<HTMLFormElement>("form")?.requestSubmit()
-                        }, 0)
+                          document
+                            .querySelector<HTMLFormElement>("form")
+                            ?.requestSubmit();
+                        }, 0);
                       }}
                     >
                       <Users className="w-4 h-4 mr-2" />
@@ -391,10 +455,13 @@ export default function LoginPage() {
               )}
 
               {/* Help Link */}
-              <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                <p className="text-center text-sm text-[var(--text-muted)]">
+              <div className="mt-6 pt-6 border-t border-(--border)">
+                <p className="text-center text-sm text-(--text-muted)">
                   Need help?{" "}
-                  <a href="mailto:it@ktech.edu.kw" className="text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors">
+                  <a
+                    href="mailto:it@ktech.edu.kw"
+                    className="text-primary hover:text-(--primary-hover) transition-colors"
+                  >
                     Contact IT Support
                   </a>
                 </p>
@@ -403,7 +470,8 @@ export default function LoginPage() {
 
             {/* Footer */}
             <p className="text-center text-xs text-[var(--text-muted)] mt-8">
-              &copy; {new Date().getFullYear()} Kuwait Technical College. All rights reserved.
+              &copy; {new Date().getFullYear()} Kuwait Technical College. All
+              rights reserved.
             </p>
           </motion.div>
         )}
@@ -411,5 +479,5 @@ export default function LoginPage() {
 
       {/* Floating Elements */}
     </div>
-  )
+  );
 }

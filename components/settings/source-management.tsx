@@ -30,7 +30,8 @@ import {
   useCreateSource,
   useUpdateSource,
   useDeleteSource,
-  type LeadSourceRow,
+  useToggleSourceActive,
+  type LeadSource,
 } from "@/lib/hooks/use-sources"
 
 const CATEGORIES = [
@@ -54,12 +55,14 @@ function SourceRow({
   isLast,
   isSaving,
   onUpdate,
+  onToggleActive,
   onDelete,
 }: {
-  source: LeadSourceRow
+  source: LeadSource
   isLast: boolean
   isSaving: boolean
-  onUpdate: (updates: Partial<LeadSourceRow>) => Promise<void>
+  onUpdate: (updates: { label: string; category: string }) => Promise<void>
+  onToggleActive: (active: boolean) => Promise<void>
   onDelete: () => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
@@ -160,12 +163,12 @@ function SourceRow({
       </div>
 
       <div className="flex items-center gap-3">
-        {!source.is_active && (
+        {!source.active && (
           <Badge variant="secondary" size="sm">Inactive</Badge>
         )}
         <Switch
-          checked={source.is_active}
-          onCheckedChange={(checked) => onUpdate({ is_active: checked })}
+          checked={source.active}
+          onCheckedChange={(checked) => onToggleActive(checked)}
           disabled={isSaving}
         />
         {confirmDelete ? (
@@ -195,6 +198,7 @@ export function SourceManagement() {
   const { sources, loading } = useSources()
   const createMutation = useCreateSource()
   const updateMutation = useUpdateSource()
+  const toggleActiveMutation = useToggleSourceActive()
   const deleteMutation = useDeleteSource()
 
   const [showForm, setShowForm] = useState(false)
@@ -223,9 +227,10 @@ export function SourceManagement() {
 
     try {
       await createMutation.mutateAsync({
-        value: newValue,
         label: newLabel.trim(),
-        category: newCategory,
+        value: newValue,
+        category: newCategory as "direct" | "events" | "marketing" | "referrals" | "outreach",
+        active: true,
       })
       setShowForm(false)
       setNewLabel("")
@@ -236,7 +241,7 @@ export function SourceManagement() {
     }
   }
 
-  const handleUpdate = async (source: LeadSourceRow, updates: Partial<LeadSourceRow>) => {
+  const handleUpdate = async (source: LeadSource, updates: { label: string; category: string }) => {
     setError(null)
     try {
       await updateMutation.mutateAsync({ id: source.id, ...updates })
@@ -245,7 +250,16 @@ export function SourceManagement() {
     }
   }
 
-  const handleDelete = async (source: LeadSourceRow) => {
+  const handleToggleActive = async (source: LeadSource, active: boolean) => {
+    setError(null)
+    try {
+      await toggleActiveMutation.mutateAsync({ id: source.id, active })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle source status")
+    }
+  }
+
+  const handleDelete = async (source: LeadSource) => {
     setError(null)
     try {
       await deleteMutation.mutateAsync(source.id)
@@ -254,7 +268,7 @@ export function SourceManagement() {
     }
   }
 
-  const isSaving = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
+  const isSaving = createMutation.isPending || updateMutation.isPending || toggleActiveMutation.isPending || deleteMutation.isPending
 
   // Group sources by category
   const grouped = CATEGORIES.map((cat) => ({
@@ -343,6 +357,7 @@ export function SourceManagement() {
                         isLast={idx === group.sources.length - 1}
                         isSaving={isSaving}
                         onUpdate={(updates) => handleUpdate(source, updates)}
+                        onToggleActive={(active) => handleToggleActive(source, active)}
                         onDelete={() => handleDelete(source)}
                       />
                     ))

@@ -1,102 +1,182 @@
-"use client"
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { queryKeys } from "./query-keys"
-import type { PUCPeriod } from "@/types"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-export function usePUCPeriods() {
+import { queryKeys } from "./query-keys";
+
+import {
+  activatePucPeriod,
+  createPucPeriod,
+  deactivatePucPeriod,
+  deletePucPeriod,
+  getActivePucPeriod,
+  getPucPeriods,
+  updatePucPeriod,
+} from "@/services/pucPeriodsService";
+
+import type {
+  CreatePucPeriodRequest,
+  PucPeriodsFilters,
+  UpdatePucPeriodRequest,
+} from "@/lib/puc-periods/types";
+
+/**
+ * Get all PUC periods with optional filters.
+ */
+export function usePUCPeriods(filters?: PucPeriodsFilters) {
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.pucPeriods.all,
-    queryFn: async () => {
-      const res = await fetch("/api/settings/puc-periods")
-      if (!res.ok) throw new Error("Failed to fetch PUC periods")
-      return res.json() as Promise<PUCPeriod[]>
-    },
-  })
+    queryKey: queryKeys.pucPeriods.list(filters),
+    queryFn: () => getPucPeriods(filters),
+  });
 
   return {
-    periods: data || [],
+    periods: data?.data ?? [],
+    total: data?.total ?? 0,
     loading: isLoading,
-    error: error?.message || null,
-  }
+    error: error?.message ?? null,
+  };
 }
 
+/**
+ * Get the currently active PUC period.
+ *
+ * The API returns the period holding the active slot.
+ * It can have status "frozen" when its end date has passed.
+ */
 export function useActivePUCPeriod() {
-  const { periods, loading } = usePUCPeriods()
-  const active = periods.find((p) => p.status === "active") || null
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKeys.pucPeriods.active(),
+    queryFn: getActivePucPeriod,
+  });
 
-  const today = new Date().toISOString().split("T")[0]
-  const isFrozen = active ? active.end_date < today : false
+  const period = data?.period ?? null;
 
   return {
-    period: active,
-    isFrozen,
-    loading,
-  }
+    period,
+    isFrozen: period?.status === "frozen",
+    loading: isLoading,
+    error: error?.message ?? null,
+  };
 }
 
+/**
+ * Create a new PUC period.
+ *
+ * The newly created period automatically becomes active.
+ * The previously active period is archived.
+ */
 export function useCreatePUCPeriod() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name: string; start_date: string; end_date: string; set_active?: boolean }) => {
-      const res = await fetch("/api/settings/puc-periods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to create PUC period")
-      }
-      return res.json() as Promise<PUCPeriod>
-    },
+    mutationFn: (payload: CreatePucPeriodRequest) => createPucPeriod(payload),
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.pucPeriods.all })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.all,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.active(),
+      });
     },
-  })
+  });
 }
 
+/**
+ * Update an existing PUC period.
+ *
+ * Only active periods can be updated.
+ */
 export function useUpdatePUCPeriod() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { id: string; name?: string; start_date?: string; end_date?: string; status?: "active" | "archived" }) => {
-      const res = await fetch("/api/settings/puc-periods", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to update PUC period")
-      }
-      return res.json() as Promise<PUCPeriod>
-    },
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdatePucPeriodRequest;
+    }) => updatePucPeriod(id, payload),
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.pucPeriods.all })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.all,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.active(),
+      });
     },
-  })
+  });
 }
 
+/**
+ * Delete a frozen or archived PUC period.
+ *
+ * The API returns 204 No Content on success.
+ */
 export function useDeletePUCPeriod() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch("/api/settings/puc-periods", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to delete PUC period")
-      }
-      return res.json()
-    },
+    mutationFn: (id: string) => deletePucPeriod(id),
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.pucPeriods.all })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.all,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.active(),
+      });
     },
-  })
+  });
+}
+
+/**
+ * Activate a PUC period.
+ *
+ * The currently active period, if any, is archived.
+ */
+export function useActivatePUCPeriod() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => activatePucPeriod(id),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.all,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.active(),
+      });
+    },
+  });
+}
+
+/**
+ * Deactivate a PUC period.
+ *
+ * Leads created inside the period window are archived.
+ */
+export function useDeactivatePUCPeriod() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deactivatePucPeriod(id),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.all,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pucPeriods.active(),
+      });
+    },
+  });
 }

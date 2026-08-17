@@ -2,56 +2,65 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "./query-keys"
+import {
+  createExhibition,
+  getExhibitions,
+  updateExhibition,
+  deleteExhibition,
+  toggleExhibitionActive,
+} from "@/services/exhibitionsService"
+import type {
+  Exhibition,
+  CreateExhibitionRequest,
+  UpdateExhibitionRequest,
+  ExhibitionsFilters,
+} from "@/lib/exhibitions/types"
 
-export interface ExhibitionRow {
-  id: string
-  name: string
-  is_active: boolean
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
+// Export the Exhibition type for use in components
+export type { Exhibition }
 
-export function useExhibitions() {
+/**
+ * Hook to fetch all exhibitions with optional filters
+ */
+export function useExhibitions(filters?: ExhibitionsFilters) {
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.exhibitions.all,
+    queryKey: filters 
+      ? [...queryKeys.exhibitions.all, filters]
+      : queryKeys.exhibitions.all,
     queryFn: async () => {
-      const res = await fetch("/api/settings/exhibitions")
-      if (!res.ok) throw new Error("Failed to fetch exhibitions")
-      return res.json() as Promise<ExhibitionRow[]>
+      return await getExhibitions(filters)
     },
   })
 
   return {
-    exhibitions: data || [],
+    exhibitions: data?.data || [],
+    total: data?.total || 0,
     loading: isLoading,
     error: error?.message || null,
   }
 }
 
+/**
+ * Hook to fetch only active exhibitions
+ */
 export function useActiveExhibitions() {
-  const { exhibitions, loading } = useExhibitions()
+  const { exhibitions, loading } = useExhibitions({ active: true })
   return {
-    exhibitions: exhibitions.filter((e) => e.is_active),
+    exhibitions,
     loading,
   }
 }
 
+/**
+ * Hook to create a new exhibition
+ */
 export function useCreateExhibition() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: { name: string }) => {
-      const res = await fetch("/api/settings/exhibitions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to create exhibition")
-      }
-      return res.json() as Promise<ExhibitionRow>
+    mutationFn: async (params: CreateExhibitionRequest) => {
+      const response = await createExhibition(params)
+      return response.exhibition
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.exhibitions.all })
@@ -59,26 +68,20 @@ export function useCreateExhibition() {
   })
 }
 
+/**
+ * Hook to update an exhibition's name
+ */
 export function useUpdateExhibition() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (params: {
       id: string
-      name?: string
-      is_active?: boolean
-      sort_order?: number
+      name: string
     }) => {
-      const res = await fetch("/api/settings/exhibitions", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to update exhibition")
-      }
-      return res.json() as Promise<ExhibitionRow>
+      const { id, ...updateData } = params
+      const response = await updateExhibition(id, updateData as UpdateExhibitionRequest)
+      return response.exhibition
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.exhibitions.all })
@@ -86,21 +89,33 @@ export function useUpdateExhibition() {
   })
 }
 
+/**
+ * Hook to toggle an exhibition's active status
+ */
+export function useToggleExhibitionActive() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: { id: string; active: boolean }) => {
+      const { id, active } = params
+      const response = await toggleExhibitionActive(id, { active })
+      return response.exhibition
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.exhibitions.all })
+    },
+  })
+}
+
+/**
+ * Hook to delete an exhibition (soft delete)
+ */
 export function useDeleteExhibition() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch("/api/settings/exhibitions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to delete exhibition")
-      }
-      return res.json()
+      await deleteExhibition(id)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.exhibitions.all })

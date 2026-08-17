@@ -325,7 +325,7 @@ export default function ProfilePage() {
                       <p className="text-xs text-[var(--text-muted)]">Leads Assigned</p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-[var(--bg-sunken)] text-center">
+                    <div className="p-4 rounded-xl bg-(--bg-sunken) text-center">
                       <div className="w-10 h-10 mx-auto rounded-lg bg-[var(--success)]/10 flex items-center justify-center mb-2">
                         <GraduationCap className="w-5 h-5 text-[var(--success)]" />
                       </div>

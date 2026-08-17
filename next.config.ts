@@ -46,7 +46,8 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(self), geolocation=(), interest-cohort=()",
+            value:
+              "camera=(), microphone=(self), geolocation=(), interest-cohort=()",
           },
           {
             key: "X-DNS-Prefetch-Control",
@@ -67,7 +68,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.twilio.com https://*.twilio.com https://*.myfatoorah.com https://*.sentry.io https://*.ingest.sentry.io",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.twilio.com https://*.twilio.com https://*.myfatoorah.com https://*.sentry.io https://*.ingest.sentry.io https://adl.dev.k8s.trypair.ai",
               "frame-src 'self' https://*.myfatoorah.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
@@ -85,17 +86,18 @@ const nextConfig: NextConfig = {
 // and PR previews without Sentry creds don't fail.
 const sentryWrapped =
   process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-    ? (() => import("@sentry/nextjs").then(({ withSentryConfig }) =>
-        withSentryConfig(nextConfig, {
-          org: process.env.SENTRY_ORG,
-          project: process.env.SENTRY_PROJECT,
-          silent: !process.env.CI,
-          widenClientFileUpload: true,
-          tunnelRoute: "/monitoring",
-          disableLogger: true,
-          automaticVercelMonitors: true,
-        })
-      ))()
+    ? (() =>
+        import("@sentry/nextjs").then(({ withSentryConfig }) =>
+          withSentryConfig(nextConfig, {
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            silent: !process.env.CI,
+            widenClientFileUpload: true,
+            tunnelRoute: "/monitoring",
+            disableLogger: true,
+            automaticVercelMonitors: true,
+          }),
+        ))()
     : nextConfig;
 
 export default sentryWrapped;

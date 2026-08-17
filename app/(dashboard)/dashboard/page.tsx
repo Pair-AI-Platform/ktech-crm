@@ -8,7 +8,7 @@ import { SectionBoundary } from "@/components/dashboard/section-boundary"
 import { useAfterInitialPaint } from "@/lib/hooks/use-after-initial-paint"
 import { useAdminDashboardBootstrap } from "@/lib/hooks/use-admin-dashboard-bootstrap"
 import { useDashboardCriticalStats, type DashboardCriticalStats } from "@/lib/hooks/use-dashboard-critical-stats"
-import { useUser } from "@/lib/hooks/use-user"
+import { useProfile } from "@/lib/hooks/use-profile"
 import { cn } from "@/lib/utils"
 
 const GreetingHeader = dynamic(
@@ -29,7 +29,7 @@ const AgentDashboardContent = dynamic(
 type DashboardRole = "admin" | "agent"
 
 export default function DashboardPage() {
-  const { profile, isAdmin } = useUser()
+  const { profile, isAdmin } = useProfile()
   const dashboardReady = useAfterInitialPaint()
   const isAdminView = !!profile && isAdmin
   const isAgentView = !!profile && !isAdmin

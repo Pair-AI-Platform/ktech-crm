@@ -37,6 +37,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { createClient } from "@/lib/supabase/client"
 import { useSidebar } from "@/components/layout/dashboard-shell"
 import { useAgentStatus } from "@/components/layout/heartbeat-provider"
+import useAuth from "@/lib/hooks/useAuth"
 import { useUser } from "@/lib/hooks/use-user"
 import type { ManualStatus } from "@/lib/hooks/use-heartbeat"
 import type { Profile } from "@/types"
@@ -406,6 +407,7 @@ export function Sidebar({ user }: SidebarProps) {
   const supabase = createClient()
   const { collapsed, setCollapsed, openQuickFind } = useSidebar()
   const { profile: clientProfile } = useUser()
+  const { logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
   const demoProfile = mounted ? getDemoSidebarProfile() : null
@@ -416,18 +418,7 @@ export function Sidebar({ user }: SidebarProps) {
   const isCollapsed = collapsed && !mobileOpen
 
   const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut()
-    } catch {
-      // ignore — still clear local state and redirect
-    }
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("ktech-demo-mode")
-      localStorage.removeItem("ktech-demo-role")
-      document.cookie = "ktech-demo-mode=; path=/; max-age=0"
-      document.cookie = "ktech-demo-role=; path=/; max-age=0"
-      window.location.href = "/login"
-    }
+    await logout()
   }
 
   const handleNavigate = () => setMobileOpen(false)

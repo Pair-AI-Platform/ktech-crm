@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { GRADUATE_TYPE_CONFIGS } from "@/lib/psp/document-rules"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
@@ -21,26 +20,21 @@ import {
   AlertCircle,
   Check,
 } from "lucide-react"
-
-interface DocumentConfig {
-  id: string
-  graduate_type: string
-  document_id: string
-  name: string
-  name_ar: string
-  required: boolean
-  sort_order: number
-  is_active: boolean
-  has_expiration: boolean
-  description: string
-}
+import {
+  useDocumentRequirements,
+  useCreateDocumentRequirement,
+  useUpdateDocumentRequirement,
+  useDeleteDocumentRequirement,
+  useToggleDocumentRequirementRequired,
+} from "@/lib/hooks/use-document-requirements"
+import type { GraduateType, DocumentRequirement } from "@/lib/document-requirements/types"
 
 const GRADUATE_TYPES = [
-  { value: "GOV", label: "GOV", description: "Kuwait Government School" },
-  { value: "US", label: "US", description: "American Curriculum" },
-  { value: "UK", label: "UK", description: "British Curriculum" },
-  { value: "KSA", label: "KSA", description: "Saudi Arabian Curriculum" },
-  { value: "OTHER", label: "Others", description: "Other Curriculum" },
+  { value: "gov" as GraduateType, label: "GOV", description: "Kuwait Government School" },
+  { value: "us" as GraduateType, label: "US", description: "American Curriculum" },
+  { value: "uk" as GraduateType, label: "UK", description: "British Curriculum" },
+  { value: "ksa" as GraduateType, label: "KSA", description: "Saudi Arabian Curriculum" },
+  { value: "others" as GraduateType, label: "Others", description: "Other Curriculum" },
 ]
 
 const emptyForm = {
@@ -52,145 +46,27 @@ const emptyForm = {
   description: "",
 }
 
-/** Build fallback configs from the hardcoded document-rules.ts */
-function buildFallbackConfigs(): DocumentConfig[] {
-  const configs: DocumentConfig[] = []
-  for (const typeConfig of GRADUATE_TYPE_CONFIGS) {
-    for (let i = 0; i < typeConfig.documents.length; i++) {
-      const doc = typeConfig.documents[i]
-      configs.push({
-        id: `${typeConfig.type}_${doc.id}`,
-        graduate_type: typeConfig.type,
-        document_id: doc.id,
-        name: doc.name,
-        name_ar: doc.nameAr,
-        required: doc.required,
-        sort_order: i + 1,
-        is_active: true,
-        has_expiration: doc.hasExpiration,
-        description: doc.description || "",
-      })
-    }
-  }
-  return configs
-}
-
 export function DocumentConfigManagement() {
-  const [configs, setConfigs] = useState<DocumentConfig[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
-  const [successMessage, setSuccessMessage] = useState("")
-  const [selectedType, setSelectedType] = useState("GOV")
+  const [selectedType, setSelectedType] = useState<GraduateType>("gov")
   const [showAddModal, setShowAddModal] = useState(false)
-  const [editingDoc, setEditingDoc] = useState<DocumentConfig | null>(null)
+  const [editingDoc, setEditingDoc] = useState<DocumentRequirement | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [usingFallback, setUsingFallback] = useState(false)
+  const [error, setError] = useState("")
 
-  const fetchConfigs = useCallback(async () => {
-    setLoading(true)
-    setError("")
-
-    const applyFallbackConfigs = () => {
-      try {
-        setConfigs(buildFallbackConfigs())
-        setUsingFallback(true)
-      } catch {
-        // If even fallback data fails, show empty state
-        setConfigs([])
-        setUsingFallback(true)
-      }
-    }
-
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 5000)
-
-      const res = await fetch("/api/settings/document-configs", { signal: controller.signal })
-      clearTimeout(timeout)
-
-      if (!res.ok) {
-        console.warn("Failed to fetch from API, using fallback")
-        applyFallbackConfigs()
-        return
-      }
-
-      const data = await res.json()
-      if (data && Array.isArray(data) && data.length > 0) {
-        setConfigs(data)
-        setUsingFallback(false)
-        return
-      }
-
-      // DB table is empty — auto-seed from hardcoded rules
-      try {
-        const seedController = new AbortController()
-        const seedTimeout = setTimeout(() => seedController.abort(), 5000)
-        const seedRes = await fetch("/api/settings/document-configs/seed", { method: "POST", signal: seedController.signal })
-        clearTimeout(seedTimeout)
-
-        if (seedRes.ok) {
-          const refetchController = new AbortController()
-          const refetchTimeout = setTimeout(() => refetchController.abort(), 5000)
-          const refetchRes = await fetch("/api/settings/document-configs", { signal: refetchController.signal })
-          clearTimeout(refetchTimeout)
-
-          if (refetchRes.ok) {
-            const seededData = await refetchRes.json()
-            if (seededData && Array.isArray(seededData) && seededData.length > 0) {
-              setConfigs(seededData)
-              setUsingFallback(false)
-              return
-            }
-          }
-        }
-      } catch {
-        // Seed failed — continue with fallback
-      }
-      applyFallbackConfigs()
-    } catch {
-      applyFallbackConfigs()
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Use the API hooks
+  const { documents, summary, loading } = useDocumentRequirements({ graduateType: selectedType })
+  const createMutation = useCreateDocumentRequirement()
+  const updateMutation = useUpdateDocumentRequirement()
+  const deleteMutation = useDeleteDocumentRequirement()
+  const toggleRequiredMutation = useToggleDocumentRequirementRequired()
 
   useEffect(() => {
-    fetchConfigs()
-  }, [fetchConfigs])
-
-  useEffect(() => {
-    if (successMessage) {
-      const t = setTimeout(() => setSuccessMessage(""), 3000)
+    if (error) {
+      const t = setTimeout(() => setError(""), 3000)
       return () => clearTimeout(t)
     }
-  }, [successMessage])
-
-  const filteredDocs = configs
-    .filter(c => c.graduate_type === selectedType)
-    .sort((a, b) => a.sort_order - b.sort_order)
-
-  const requiredCount = filteredDocs.filter(d => d.required).length
-  const totalCount = filteredDocs.length
-
-  const handleSeedToDatabase = async () => {
-    setSaving(true)
-    setError("")
-    try {
-      const res = await fetch("/api/settings/document-configs/seed", { method: "POST" })
-      if (!res.ok) {
-        const data = await res.json()
-        setError("Failed to seed documents: " + (data.error || "Unknown error"))
-        return
-      }
-      setSuccessMessage("Documents synced to database successfully")
-      setUsingFallback(false)
-      fetchConfigs()
-    } finally {
-      setSaving(false)
-    }
-  }
+  }, [error])
 
   const handleAdd = async () => {
     if (!form.document_id.trim() || !form.name.trim()) {
@@ -198,59 +74,26 @@ export function DocumentConfigManagement() {
       return
     }
 
-    if (filteredDocs.some(d => d.document_id === form.document_id)) {
+    if (documents.some(d => d.documentKey === form.document_id)) {
       setError("A document with this ID already exists for this type")
       return
     }
 
-    if (usingFallback) {
-      // In fallback mode, add locally
-      setConfigs(prev => [...prev, {
-        id: `${selectedType}_${form.document_id}`,
-        graduate_type: selectedType,
-        document_id: form.document_id,
-        name: form.name,
-        name_ar: form.name_ar,
-        required: form.required,
-        sort_order: filteredDocs.length + 1,
-        is_active: true,
-        has_expiration: form.has_expiration,
-        description: form.description,
-      }])
-      setShowAddModal(false)
-      setForm(emptyForm)
-      setSuccessMessage("Document added successfully")
-      return
-    }
-
-    setSaving(true)
-    setError("")
     try {
-      const res = await fetch("/api/settings/document-configs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          graduate_type: selectedType,
-          document_id: form.document_id,
-          name: form.name,
-          name_ar: form.name_ar,
-          required: form.required,
-          sort_order: filteredDocs.length + 1,
-          has_expiration: form.has_expiration,
-          description: form.description,
-        }),
+      await createMutation.mutateAsync({
+        graduateType: selectedType,
+        documentKey: form.document_id,
+        nameEn: form.name,
+        nameAr: form.name_ar,
+        description: form.description,
+        required: form.required,
+        hasExpirationDate: form.has_expiration,
       })
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || "Failed to add document")
-        return
-      }
       setShowAddModal(false)
       setForm(emptyForm)
-      setSuccessMessage("Document added successfully")
-      fetchConfigs()
-    } finally {
-      setSaving(false)
+      setError("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add document")
     }
   }
 
@@ -261,103 +104,53 @@ export function DocumentConfigManagement() {
       return
     }
 
-    if (usingFallback) {
-      // In fallback mode, update locally
-      setConfigs(prev => prev.map(c => c.id === editingDoc.id ? {
-        ...c,
-        name: form.name,
-        name_ar: form.name_ar,
-        required: form.required,
-        has_expiration: form.has_expiration,
-        description: form.description,
-      } : c))
-      setEditingDoc(null)
-      setForm(emptyForm)
-      setSuccessMessage("Document updated successfully")
-      return
-    }
-
-    setSaving(true)
-    setError("")
     try {
-      const res = await fetch("/api/settings/document-configs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingDoc.id,
-          name: form.name,
-          name_ar: form.name_ar,
-          required: form.required,
-          has_expiration: form.has_expiration,
+      await updateMutation.mutateAsync({
+        id: editingDoc.id,
+        payload: {
+          nameEn: form.name,
+          nameAr: form.name_ar,
           description: form.description,
-        }),
+          required: form.required,
+          hasExpirationDate: form.has_expiration,
+        },
       })
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || "Failed to update document")
-        return
-      }
       setEditingDoc(null)
       setForm(emptyForm)
-      setSuccessMessage("Document updated successfully")
-      fetchConfigs()
-    } finally {
-      setSaving(false)
+      setError("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update document")
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (usingFallback) {
-      // In fallback mode, only update locally
-      setConfigs(prev => prev.filter(c => c.id !== id))
-      setSuccessMessage("Document removed")
+    try {
+      await deleteMutation.mutateAsync(id)
       setDeleteConfirm(null)
-      return
-    }
-
-    try {
-      const res = await fetch(`/api/settings/document-configs?id=${id}`, { method: "DELETE" })
-      if (res.ok) {
-        setSuccessMessage("Document removed")
-        setDeleteConfirm(null)
-        fetchConfigs()
-      }
-    } catch {
-      setError("Failed to delete document")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete document")
     }
   }
 
-  const handleToggleRequired = async (doc: DocumentConfig) => {
-    // Optimistic update
-    setConfigs(prev => prev.map(c => c.id === doc.id ? { ...c, required: !c.required } : c))
-
-    if (usingFallback) return // In fallback mode, only update locally
-
+  const handleToggleRequired = async (doc: DocumentRequirement) => {
     try {
-      const res = await fetch("/api/settings/document-configs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: doc.id, required: !doc.required }),
+      await toggleRequiredMutation.mutateAsync({
+        id: doc.id,
+        required: !doc.required,
       })
-      if (!res.ok) {
-        // Revert on failure
-        setConfigs(prev => prev.map(c => c.id === doc.id ? { ...c, required: doc.required } : c))
-        setError("Failed to update")
-      }
-    } catch {
-      setConfigs(prev => prev.map(c => c.id === doc.id ? { ...c, required: doc.required } : c))
-      setError("Failed to update")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update")
     }
   }
 
-  const openEdit = (doc: DocumentConfig) => {
+  const openEdit = (doc: DocumentRequirement) => {
     setEditingDoc(doc)
     setForm({
-      document_id: doc.document_id,
-      name: doc.name,
-      name_ar: doc.name_ar,
+      document_id: doc.documentKey,
+      name: doc.nameEn,
+      name_ar: doc.nameAr,
       required: doc.required,
-      has_expiration: doc.has_expiration,
+      has_expiration: doc.hasExpirationDate,
       description: doc.description,
     })
     setError("")
@@ -368,6 +161,8 @@ export function DocumentConfigManagement() {
     setError("")
     setShowAddModal(true)
   }
+
+  const isSaving = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
 
   return (
     <Card>
@@ -382,7 +177,7 @@ export function DocumentConfigManagement() {
               Configure required documents for each graduate type. Changes apply to all new submissions.
             </CardDescription>
           </div>
-          <Button size="sm" onClick={openAdd}>
+          <Button size="sm" onClick={openAdd} disabled={isSaving}>
             <Plus className="w-4 h-4 mr-1.5" />
             Add Document
           </Button>
@@ -398,36 +193,6 @@ export function DocumentConfigManagement() {
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
-            <Button size="sm" variant="ghost" className="ml-auto text-red-600 hover:text-red-700" onClick={() => { setError(""); fetchConfigs() }}>
-              Retry
-            </Button>
-          </motion.div>
-        )}
-
-        {/* Fallback notice */}
-        {usingFallback && !error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 text-sm"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            Showing default document rules. Sync to database to enable editing.
-            <Button size="sm" variant="ghost" className="ml-auto text-amber-600 hover:text-amber-700" onClick={handleSeedToDatabase} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sync to DB"}
-            </Button>
-          </motion.div>
-        )}
-
-        {/* Success message */}
-        {successMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 text-sm"
-          >
-            <Check className="w-4 h-4" />
-            {successMessage}
           </motion.div>
         )}
 
@@ -451,11 +216,11 @@ export function DocumentConfigManagement() {
 
         {/* Stats */}
         <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-          <span>{totalCount} documents</span>
+          <span>{summary.total} documents</span>
           <span className="w-1 h-1 rounded-full bg-[var(--border)]" />
-          <span>{requiredCount} required</span>
+          <span>{summary.required} required</span>
           <span className="w-1 h-1 rounded-full bg-[var(--border)]" />
-          <span>{totalCount - requiredCount} optional</span>
+          <span>{summary.optional} optional</span>
         </div>
 
         {/* Document List */}
@@ -463,10 +228,10 @@ export function DocumentConfigManagement() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
           </div>
-        ) : filteredDocs.length === 0 ? (
+        ) : documents.length === 0 ? (
           <div className="text-center py-12 text-[var(--text-muted)]">
             <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No documents configured for {selectedType}</p>
+            <p className="text-sm">No documents configured for {selectedType.toUpperCase()}</p>
             <Button size="sm" variant="outline" className="mt-3" onClick={openAdd}>
               <Plus className="w-4 h-4 mr-1" />
               Add First Document
@@ -474,7 +239,7 @@ export function DocumentConfigManagement() {
           </div>
         ) : (
           <div className="space-y-1.5">
-            {filteredDocs.map((doc, idx) => (
+            {documents.map((doc, idx) => (
               <motion.div
                 key={doc.id}
                 initial={{ opacity: 0 }}
@@ -490,19 +255,19 @@ export function DocumentConfigManagement() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm text-[var(--text-primary)] truncate">
-                      {doc.name}
+                      {doc.nameEn}
                     </span>
-                    {doc.name_ar && (
+                    {doc.nameAr && (
                       <span className="text-xs text-[var(--text-muted)] truncate" dir="rtl">
-                        {doc.name_ar}
+                        {doc.nameAr}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <code className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded">
-                      {doc.document_id}
+                      {doc.documentKey}
                     </code>
-                    {doc.has_expiration && (
+                    {doc.hasExpirationDate && (
                       <Badge variant="outline" size="xs">Expiration</Badge>
                     )}
                     {doc.description && (
@@ -519,6 +284,7 @@ export function DocumentConfigManagement() {
                   <Switch
                     checked={doc.required}
                     onCheckedChange={() => handleToggleRequired(doc)}
+                    disabled={toggleRequiredMutation.isPending}
                   />
                 </div>
 
@@ -528,6 +294,7 @@ export function DocumentConfigManagement() {
                     size="icon-sm"
                     variant="ghost"
                     onClick={() => openEdit(doc)}
+                    disabled={isSaving}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
@@ -538,6 +305,7 @@ export function DocumentConfigManagement() {
                         variant="ghost"
                         className="text-red-500 hover:text-red-600 hover:bg-red-50"
                         onClick={() => handleDelete(doc.id)}
+                        disabled={deleteMutation.isPending}
                       >
                         <Check className="w-3.5 h-3.5" />
                       </Button>
@@ -555,6 +323,7 @@ export function DocumentConfigManagement() {
                       variant="ghost"
                       className="text-[var(--text-muted)] hover:text-red-500"
                       onClick={() => setDeleteConfirm(doc.id)}
+                      disabled={isSaving}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -570,7 +339,7 @@ export function DocumentConfigManagement() {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Document to {selectedType}</DialogTitle>
+            <DialogTitle>Add Document to {selectedType.toUpperCase()}</DialogTitle>
           </DialogHeader>
           <DialogBody>
             <div className="space-y-4">
@@ -636,8 +405,8 @@ export function DocumentConfigManagement() {
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving}>
-              {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+            <Button onClick={handleAdd} disabled={createMutation.isPending}>
+              {createMutation.isPending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Add Document
             </Button>
           </DialogFooter>
@@ -704,8 +473,8 @@ export function DocumentConfigManagement() {
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingDoc(null)}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={saving}>
-              {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Save Changes
             </Button>
           </DialogFooter>

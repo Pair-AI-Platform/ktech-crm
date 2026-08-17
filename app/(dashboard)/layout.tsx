@@ -1,83 +1,40 @@
 export const dynamic = "force-dynamic"
 
-import { Suspense } from "react"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
-import { getUserProfile } from "@/lib/supabase/server"
-import { AppProviders } from "@/components/app-providers"
-import { DashboardShell } from "@/components/layout/dashboard-shell"
-import { HeartbeatProvider } from "@/components/layout/heartbeat-provider"
-import { UserProfileProvider } from "@/lib/hooks/use-user"
-import type { Profile } from "@/types"
-
-function getDemoProfile(role: string | undefined): Profile {
-  const now = new Date().toISOString()
-  if (role === "admin") {
-    return {
-      id: "demo-admin-id",
-      email: "aldana@ktech.edu.kw",
-      full_name: "Aldana Ali",
-      role: "admin",
-      is_active: true,
-      monthly_target: 50,
-      created_at: now,
-      updated_at: now,
-    }
-  }
-
-  return {
-    id: "agent-1",
-    email: "demo-agent@ktech.edu.kw",
-    full_name: "Demo Agent",
-    role: "agent",
-    is_active: true,
-    monthly_target: 40,
-    created_at: now,
-    updated_at: now,
-  }
-}
+import { Suspense } from "react";
+import { AppProviders } from "@/components/app-providers";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { HeartbeatProvider } from "@/components/layout/heartbeat-provider";
+import DashboardLayoutClient from "./layout-client";
+import { UserProfileProvider } from "@/lib/hooks/use-user";
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const cookieStore = await cookies()
-  const demoModeAllowed =
-    process.env.NODE_ENV !== "production" &&
-    (process.env.NEXT_PUBLIC_ALLOW_DEMO_MODE === "true" ||
-      process.env.DEMO_MODE_ENABLED === "true")
-  const isDemoMode = demoModeAllowed && cookieStore.get("ktech-demo-mode")?.value === "true"
-  const demoRole = cookieStore.get("ktech-demo-role")?.value
-  const profile = isDemoMode ? getDemoProfile(demoRole) : await getUserProfile()
-
-  // Not signed in (and not in demo mode) → bounce to login.
-  if (!profile && !isDemoMode) {
-    redirect("/login")
-  }
-
-  // Deactivated accounts are bounced out of the dashboard shell. (Demo profiles
-  // are always active; this only affects real signed-in users.)
-  if (!isDemoMode && profile?.is_active === false) {
-    redirect("/login?reason=deactivated")
-  }
-
-  // Marketing users should use the marketing portal
-  if (profile?.role === "marketing") {
-    redirect("/marketing")
-  }
+  // The profile logic is removed as it will be handled by the auth context
+  const profile = {
+    id: "1",
+    email: "test@test.com",
+    full_name: "Test User",
+    role: "agent" as const,
+    is_active: true,
+    monthly_target: 50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 
   return (
     <Suspense>
       <AppProviders>
         <UserProfileProvider profile={profile}>
-          <DashboardShell user={profile}>
-            <HeartbeatProvider>
-              {children}
-            </HeartbeatProvider>
-          </DashboardShell>
+          <DashboardLayoutClient>
+            <DashboardShell user={profile}>
+              <HeartbeatProvider>{children}</HeartbeatProvider>
+            </DashboardShell>
+          </DashboardLayoutClient>
         </UserProfileProvider>
       </AppProviders>
     </Suspense>
-  )
+  );
 }

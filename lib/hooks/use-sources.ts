@@ -2,58 +2,66 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "./query-keys"
+import {
+  createLeadSource,
+  getLeadSources,
+  updateLeadSource,
+  deleteLeadSource,
+  toggleLeadSourceActive,
+} from "@/services/leadSourcesService"
+import type {
+  LeadSource,
+  CreateLeadSourceRequest,
+  UpdateLeadSourceRequest,
+  LeadSourcesFilters,
+} from "@/lib/lead-sources/types"
 
-export interface LeadSourceRow {
-  id: string
-  value: string
-  label: string
-  category: string
-  is_active: boolean
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
+// Export the LeadSource type for use in components
+export type { LeadSource }
 
-export function useSources() {
+/**
+ * Hook to fetch all lead sources with optional filters
+ */
+export function useSources(filters?: LeadSourcesFilters) {
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.leadSources.all,
+    queryKey: filters 
+      ? queryKeys.leadSources.list(filters)
+      : queryKeys.leadSources.all,
     queryFn: async () => {
-      const res = await fetch("/api/settings/sources")
-      if (!res.ok) throw new Error("Failed to fetch sources")
-      return res.json() as Promise<LeadSourceRow[]>
+      return await getLeadSources(filters)
     },
   })
 
   return {
-    sources: data || [],
+    sources: data?.data || [],
+    countsByCategory: data?.countsByCategory,
+    total: data?.total || 0,
     loading: isLoading,
     error: error?.message || null,
   }
 }
 
+/**
+ * Hook to fetch only active lead sources
+ */
 export function useActiveSources() {
-  const { sources, loading } = useSources()
+  const { sources, loading } = useSources({ active: true })
   return {
-    sources: sources.filter((s) => s.is_active),
+    sources,
     loading,
   }
 }
 
+/**
+ * Hook to create a new lead source
+ */
 export function useCreateSource() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: { value: string; label: string; category: string }) => {
-      const res = await fetch("/api/settings/sources", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to create source")
-      }
-      return res.json() as Promise<LeadSourceRow>
+    mutationFn: async (params: CreateLeadSourceRequest) => {
+      const response = await createLeadSource(params)
+      return response.source
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.leadSources.all })
@@ -61,27 +69,21 @@ export function useCreateSource() {
   })
 }
 
+/**
+ * Hook to update a lead source's label and category
+ */
 export function useUpdateSource() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (params: {
       id: string
-      label?: string
-      category?: string
-      is_active?: boolean
-      sort_order?: number
+      label: string
+      category: string
     }) => {
-      const res = await fetch("/api/settings/sources", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to update source")
-      }
-      return res.json() as Promise<LeadSourceRow>
+      const { id, ...updateData } = params
+      const response = await updateLeadSource(id, updateData as UpdateLeadSourceRequest)
+      return response.source
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.leadSources.all })
@@ -89,21 +91,33 @@ export function useUpdateSource() {
   })
 }
 
+/**
+ * Hook to toggle a lead source's active status
+ */
+export function useToggleSourceActive() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: { id: string; active: boolean }) => {
+      const { id, active } = params
+      const response = await toggleLeadSourceActive(id, { active })
+      return response.source
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.leadSources.all })
+    },
+  })
+}
+
+/**
+ * Hook to delete a lead source (soft delete)
+ */
 export function useDeleteSource() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch("/api/settings/sources", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to delete source")
-      }
-      return res.json()
+      await deleteLeadSource(id)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.leadSources.all })

@@ -20,14 +20,16 @@ import {
   Save,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCycles, useCreateCycle, useUpdateCycle, useToggleTermOpen, useUpdateTerm } from "@/lib/hooks/use-cycles"
-import type { EducationCycle, Semester } from "@/types"
-
-const TERM_TYPE_LABELS: Record<string, string> = {
-  fall: "Fall",
-  spring: "Spring",
-  summer: "Summer",
-}
+import {
+  useEducationCycles,
+  useCreateEducationCycle,
+  useActivateEducationCycle,
+  useDeactivateEducationCycle,
+  useUpdateTermDates,
+  useToggleTermActive,
+  type EducationCycle,
+  type Term,
+} from "@/lib/hooks/use-cycles"
 
 function formatDate(date: string) {
   return new Date(date + "T00:00:00").toLocaleDateString("en-US", {
@@ -39,13 +41,15 @@ function formatDate(date: string) {
 
 function TermRow({
   term,
+  cycleId,
   isLast,
   isSaving,
   cycleActive,
   onToggle,
   onUpdateDates,
 }: {
-  term: Semester
+  term: Term
+  cycleId: string
   isLast: boolean
   isSaving: boolean
   cycleActive: boolean
@@ -53,8 +57,8 @@ function TermRow({
   onUpdateDates: (startDate: string, endDate: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
-  const [editStart, setEditStart] = useState(term.start_date)
-  const [editEnd, setEditEnd] = useState(term.end_date)
+  const [editStart, setEditStart] = useState(term.startDate)
+  const [editEnd, setEditEnd] = useState(term.endDate)
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
@@ -68,8 +72,8 @@ function TermRow({
   }
 
   const handleCancel = () => {
-    setEditStart(term.start_date)
-    setEditEnd(term.end_date)
+    setEditStart(term.startDate)
+    setEditEnd(term.endDate)
     setEditing(false)
   }
 
@@ -83,13 +87,11 @@ function TermRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm text-[var(--text-primary)]">
-            {term.name}
+            {term.label}
           </span>
-          {term.term_type && (
-            <Badge variant="secondary" size="sm" className="text-[10px]">
-              {TERM_TYPE_LABELS[term.term_type] || term.term_type}
-            </Badge>
-          )}
+          <Badge variant="secondary" size="sm" className="text-[10px]">
+            {term.semester === "fall" ? "Fall" : "Spring"}
+          </Badge>
         </div>
         {editing ? (
           <div className="flex items-center gap-2 mt-2">
@@ -116,7 +118,7 @@ function TermRow({
         ) : (
           <div className="flex items-center gap-1.5 mt-0.5">
             <p className="text-xs text-[var(--text-muted)]">
-              {formatDate(term.start_date)} – {formatDate(term.end_date)}
+              {formatDate(term.startDate)} – {formatDate(term.endDate)}
             </p>
             <button
               onClick={() => setEditing(true)}
@@ -129,7 +131,7 @@ function TermRow({
         )}
       </div>
       <div className="flex items-center gap-3">
-        {term.is_open ? (
+        {term.active ? (
           <Badge variant="success" size="sm">Open</Badge>
         ) : (
           <Badge variant="secondary" size="sm">Closed</Badge>
@@ -137,7 +139,7 @@ function TermRow({
         <div className="flex flex-col items-end">
           <span className="text-[10px] text-[var(--text-muted)] mb-0.5">Enrollment</span>
           <Switch
-            checked={term.is_open}
+            checked={term.active}
             onCheckedChange={onToggle}
             disabled={isSaving || !cycleActive}
           />
@@ -148,27 +150,32 @@ function TermRow({
 }
 
 export function CycleManagement() {
-  const { cycles, loading } = useCycles()
-  const createMutation = useCreateCycle()
-  const updateMutation = useUpdateCycle()
-  const toggleTermMutation = useToggleTermOpen()
-  const updateTermMutation = useUpdateTerm()
+  const { cycles, loading } = useEducationCycles()
+  const createMutation = useCreateEducationCycle()
+  const activateMutation = useActivateEducationCycle()
+  const deactivateMutation = useDeactivateEducationCycle()
+  const updateTermDatesMutation = useUpdateTermDates()
+  const toggleTermMutation = useToggleTermActive()
 
   const [showForm, setShowForm] = useState(false)
   const [startYear, setStartYear] = useState("")
   const [expandedCycleId, setExpandedCycleId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Custom term dates for creation
+  // Custom term dates and labels for creation
   const year = parseInt(startYear)
   const validYear = !isNaN(year) && year >= 2020 && year <= 2050
+  const [fallLabel, setFallLabel] = useState("")
+  const [springLabel, setSpringLabel] = useState("")
   const [fallStart, setFallStart] = useState("")
   const [fallEnd, setFallEnd] = useState("")
   const [springStart, setSpringStart] = useState("")
   const [springEnd, setSpringEnd] = useState("")
 
-  // Reset custom dates when year changes
-  const resetDates = (y: number) => {
+  // Reset form when year changes
+  const resetForm = (y: number) => {
+    setFallLabel(`Fall ${y}`)
+    setSpringLabel(`Spring ${y + 1}`)
     setFallStart(`${y}-09-01`)
     setFallEnd(`${y + 1}-01-31`)
     setSpringStart(`${y + 1}-02-01`)
@@ -179,12 +186,12 @@ export function CycleManagement() {
     setStartYear(val)
     const y = parseInt(val)
     if (!isNaN(y) && y >= 2020 && y <= 2050) {
-      resetDates(y)
+      resetForm(y)
     }
   }
 
   // Auto-expand active cycle
-  const activeCycle = cycles.find((c) => c.is_active)
+  const activeCycle = cycles.find((c) => c.active)
   const effectiveExpandedId = expandedCycleId ?? activeCycle?.id ?? null
 
   const handleCreate = async () => {
@@ -193,12 +200,14 @@ export function CycleManagement() {
 
     try {
       await createMutation.mutateAsync({
-        start_year: year,
-        end_year: year + 1,
-        fall_start_date: fallStart,
-        fall_end_date: fallEnd,
-        spring_start_date: springStart,
-        spring_end_date: springEnd,
+        name: `${year}-${year + 1}`,
+        fallLabel,
+        springLabel,
+        fallStartDate: fallStart,
+        fallEndDate: fallEnd,
+        springStartDate: springStart,
+        springEndDate: springEnd,
+        active: false,
       })
       setShowForm(false)
       setStartYear("")
@@ -207,35 +216,58 @@ export function CycleManagement() {
     }
   }
 
-  const handleActivate = async (cycle: EducationCycle) => {
+  const handleToggleActivation = async (cycle: EducationCycle) => {
     setError(null)
     try {
-      await updateMutation.mutateAsync({ id: cycle.id, is_active: !cycle.is_active })
+      if (cycle.active) {
+        await deactivateMutation.mutateAsync(cycle.id)
+      } else {
+        await activateMutation.mutateAsync(cycle.id)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update cycle")
     }
   }
 
-  const handleToggleTerm = async (term: Semester) => {
+  const handleToggleTerm = async (cycleId: string, term: Term) => {
     setError(null)
     try {
-      await toggleTermMutation.mutateAsync({ id: term.id, is_open: !term.is_open })
+      await toggleTermMutation.mutateAsync({
+        cycleId,
+        semester: term.semester,
+        active: !term.active,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle term")
     }
   }
 
-  const handleUpdateTermDates = async (term: Semester, startDate: string, endDate: string) => {
+  const handleUpdateTermDates = async (
+    cycleId: string,
+    term: Term,
+    startDate: string,
+    endDate: string
+  ) => {
     setError(null)
     try {
-      await updateTermMutation.mutateAsync({ id: term.id, start_date: startDate, end_date: endDate })
+      await updateTermDatesMutation.mutateAsync({
+        cycleId,
+        semester: term.semester,
+        startDate,
+        endDate,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update term dates")
       throw err
     }
   }
 
-  const isSaving = createMutation.isPending || updateMutation.isPending || toggleTermMutation.isPending
+  const isSaving =
+    createMutation.isPending ||
+    activateMutation.isPending ||
+    deactivateMutation.isPending ||
+    toggleTermMutation.isPending ||
+    updateTermDatesMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -288,7 +320,7 @@ export function CycleManagement() {
                     key={cycle.id}
                     className={cn(
                       "border rounded-xl overflow-hidden transition-colors",
-                      cycle.is_active
+                      cycle.active
                         ? "border-[var(--primary)]/30 bg-[var(--primary)]/[0.02]"
                         : "border-[var(--border)]"
                     )}
@@ -311,13 +343,13 @@ export function CycleManagement() {
                         ({cycle.terms?.length || 0} terms)
                       </span>
                       <div className="flex-1" />
-                      {cycle.is_active && (
+                      {cycle.active && (
                         <Badge variant="success" size="sm">Active</Badge>
                       )}
                       <div onClick={(e) => e.stopPropagation()}>
                         <Switch
-                          checked={cycle.is_active}
-                          onCheckedChange={() => handleActivate(cycle)}
+                          checked={cycle.active}
+                          onCheckedChange={() => handleToggleActivation(cycle)}
                           disabled={isSaving}
                         />
                       </div>
@@ -330,11 +362,12 @@ export function CycleManagement() {
                           <TermRow
                             key={term.id}
                             term={term}
+                            cycleId={cycle.id}
                             isLast={idx === (cycle.terms?.length ?? 0) - 1}
                             isSaving={isSaving}
-                            cycleActive={cycle.is_active}
-                            onToggle={() => handleToggleTerm(term)}
-                            onUpdateDates={(s, e) => handleUpdateTermDates(term, s, e)}
+                            cycleActive={cycle.active}
+                            onToggle={() => handleToggleTerm(cycle.id, term)}
+                            onUpdateDates={(s, e) => handleUpdateTermDates(cycle.id, term, s, e)}
                           />
                         ))}
                       </div>
@@ -358,7 +391,7 @@ export function CycleManagement() {
               Create Education Cycle
             </h3>
             <p className="text-sm text-[var(--text-muted)] mb-4">
-              Enter the start year and customize term dates.
+              Enter the start year and customize term labels and dates.
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -382,9 +415,18 @@ export function CycleManagement() {
                 <div className="space-y-3 p-3 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border)]">
                   {/* Fall Term */}
                   <div>
-                    <p className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Fall {year}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <p className="text-xs font-medium text-[var(--text-secondary)]">
+                        Fall Term
+                      </p>
+                      <Input
+                        type="text"
+                        value={fallLabel}
+                        onChange={(e) => setFallLabel(e.target.value)}
+                        placeholder="Fall 2026"
+                        className="h-7 text-xs flex-1"
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <Input
                         type="date"
@@ -404,9 +446,18 @@ export function CycleManagement() {
 
                   {/* Spring Term */}
                   <div>
-                    <p className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Spring {year + 1}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <p className="text-xs font-medium text-[var(--text-secondary)]">
+                        Spring Term
+                      </p>
+                      <Input
+                        type="text"
+                        value={springLabel}
+                        onChange={(e) => setSpringLabel(e.target.value)}
+                        placeholder="Spring 2027"
+                        className="h-7 text-xs flex-1"
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <Input
                         type="date"

@@ -1,32 +1,40 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
-import { Header } from "@/components/layout/header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
-import { TeamManagement } from "@/components/settings/team-management"
-import { LeadAssignmentRules } from "@/components/settings/lead-assignment-rules"
-import { StageSettings } from "@/components/settings/stage-settings"
-import { TargetSettings } from "@/components/settings/targets"
-import { SchoolManagement } from "@/components/settings/school-management"
-import { DocumentConfigManagement } from "@/components/settings/document-config-management"
-import { CycleManagement } from "@/components/settings/cycle-management"
-import { SourceManagement } from "@/components/settings/source-management"
-import { ExhibitionsManagement } from "@/components/settings/exhibitions-management"
-import { PUCPeriodManagement } from "@/components/settings/puc-period-management"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
+import { Header } from "@/components/layout/header";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { TeamManagement } from "@/components/settings/team-management";
+import { LeadAssignmentRules } from "@/components/settings/lead-assignment-rules";
+import { StageSettings } from "@/components/settings/stage-settings";
+import { TargetSettings } from "@/components/settings/targets";
+import { SchoolManagement } from "@/components/settings/school-management";
+import { DocumentConfigManagement } from "@/components/settings/document-config-management";
+import { CycleManagement } from "@/components/settings/cycle-management";
+import { SourceManagement } from "@/components/settings/source-management";
+import { ExhibitionsManagement } from "@/components/settings/exhibitions-management";
+import { PUCPeriodManagement } from "@/components/settings/puc-period-management";
+import { ChangePasswordDialog } from "@/components/settings/change-password-dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   User,
   Bell,
@@ -61,60 +69,142 @@ import {
   BellRing,
   Volume2,
   VolumeX,
-  LogOut
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { useUser } from "@/lib/hooks/use-user"
-import { usePreferences } from "@/lib/hooks/use-preferences"
-import { createClient } from "@/lib/supabase/client"
+  LogOut,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useProfile } from "@/lib/hooks/use-profile";
+import { usePreferences } from "@/lib/hooks/use-preferences";
+import { createClient } from "@/lib/supabase/client";
+import { updateProfile, uploadProfilePicture } from "@/services/profileService";
 
-type SettingsTab = "profile" | "notifications" | "appearance" | "security" | "team" | "pipeline" | "targets" | "sources" | "exhibitions" | "schools" | "documents" | "enrollment" | "puc-periods"
+type SettingsTab =
+  | "profile"
+  | "notifications"
+  | "appearance"
+  | "security"
+  | "team"
+  | "pipeline"
+  | "targets"
+  | "sources"
+  | "exhibitions"
+  | "schools"
+  | "documents"
+  | "enrollment"
+  | "puc-periods";
 
-const TABS: { id: SettingsTab; label: string; icon: typeof User; adminOnly?: boolean; roles?: ("admin" | "agent")[] }[] = [
+const TABS: {
+  id: SettingsTab;
+  label: string;
+  icon: typeof User;
+  // adminOnly?: boolean;
+  // roles?: ("admin" | "agent")[]
+}[] = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "notifications", label: "Notifications", icon: Bell, adminOnly: true },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    //     // adminOnly: true
+  },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "security", label: "Security", icon: Shield },
-  { id: "pipeline", label: "Stages", icon: GitBranch, adminOnly: true },
-  { id: "targets", label: "Targets", icon: Target, adminOnly: true },
-  { id: "sources", label: "Sources", icon: Radio, adminOnly: true },
-  { id: "exhibitions", label: "Exhibitions", icon: Landmark, adminOnly: true },
-  { id: "enrollment", label: "Enrollment Cycles", icon: CalendarClock, adminOnly: true },
-  { id: "puc-periods", label: "PUC Periods", icon: CalendarRange, adminOnly: true },
-  { id: "schools", label: "Schools", icon: School, adminOnly: true },
-  { id: "documents", label: "Documents", icon: FileText, adminOnly: true },
-  { id: "team", label: "Team", icon: Users, adminOnly: true },
-]
+  {
+    id: "pipeline",
+    label: "Stages",
+    icon: GitBranch,
+    // adminOnly: true
+  },
+  {
+    id: "targets",
+    label: "Targets",
+    icon: Target,
+    // adminOnly: true
+  },
+  {
+    id: "sources",
+    label: "Sources",
+    icon: Radio,
+    // adminOnly: true
+  },
+  {
+    id: "exhibitions",
+    label: "Exhibitions",
+    icon: Landmark,
+    // adminOnly: true
+  },
+  {
+    id: "enrollment",
+    label: "Enrollment Cycles",
+    icon: CalendarClock,
+    // adminOnly: true
+  },
+  {
+    id: "puc-periods",
+    label: "PUC Periods",
+    icon: CalendarRange,
+    // adminOnly: true
+  },
+  {
+    id: "schools",
+    label: "Schools",
+    icon: School, // adminOnly: true
+  },
+  {
+    id: "documents",
+    label: "Documents",
+    icon: FileText, // adminOnly: true
+  },
+  {
+    id: "team",
+    label: "Team",
+    icon: Users, // adminOnly: true
+  },
+];
 
 export default function SettingsPage() {
-  const router = useRouter()
-  const { profile, isAdmin } = useUser()
-  const { preferences, loading: prefsLoading, updatePreferences, saving: prefsSaving } = usePreferences()
-  const searchParams = useSearchParams()
-  const initialTab = (searchParams.get("tab") as SettingsTab) || "profile"
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { profile, isAdmin } = useProfile();
+  const {
+    preferences,
+    loading: prefsLoading,
+    updatePreferences,
+    saving: prefsSaving,
+  } = usePreferences();
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("tab") as SettingsTab) || "profile";
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Profile state
-  const [fullName, setFullName] = useState("")
-  const [phone, setPhone] = useState("")
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
 
   // Notification state (synced from backend preferences)
-  const [notificationsSaved, setNotificationsSaved] = useState(false)
+  const [notificationsSaved, setNotificationsSaved] = useState(false);
 
   // Appearance state
-  const [theme, setThemeState] = useState<"light" | "dark" | "system">("system")
+  const [theme, setThemeState] = useState<"light" | "dark" | "system">(
+    "system",
+  );
+
+  // Security state
+  const [changePasswordDialogOpen, setChangePasswordDialogOpen] = useState(false);
 
   // Sync theme with localStorage and DOM
   useEffect(() => {
-    const stored = localStorage.getItem("ktech-theme") as "light" | "dark" | "system" | null
+    const stored = localStorage.getItem("ktech-theme") as
+      | "light"
+      | "dark"
+      | "system"
+      | null;
     if (stored) {
-      setThemeState(stored)
+      setThemeState(stored);
     }
-  }, [])
+  }, []);
 
   const handleSaveNotifications = async () => {
     try {
@@ -124,119 +214,121 @@ export default function SettingsPage() {
         appointment_reminders: preferences.appointment_reminders,
         lead_updates: preferences.lead_updates,
         system_alerts: preferences.system_alerts,
-      })
-      setNotificationsSaved(true)
-      setTimeout(() => setNotificationsSaved(false), 2000)
+      });
+      setNotificationsSaved(true);
+      setTimeout(() => setNotificationsSaved(false), 2000);
     } catch (e) {
-      console.error("Failed to save notification preferences:", e)
+      console.error("Failed to save notification preferences:", e);
     }
-  }
+  };
 
   const setTheme = (newTheme: "light" | "dark" | "system") => {
-    setThemeState(newTheme)
-    localStorage.setItem("ktech-theme", newTheme)
+    setThemeState(newTheme);
+    localStorage.setItem("ktech-theme", newTheme);
 
     const getResolvedTheme = (): "light" | "dark" => {
       if (newTheme === "system") {
-        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        return window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
       }
-      return newTheme
-    }
+      return newTheme;
+    };
 
-    const resolved = getResolvedTheme()
-    document.documentElement.classList.remove("light", "dark")
-    document.documentElement.classList.add(resolved)
-    document.documentElement.style.colorScheme = resolved
+    const resolved = getResolvedTheme();
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(resolved);
+    document.documentElement.style.colorScheme = resolved;
 
     // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent("theme-change", { detail: { theme: newTheme, resolved } }))
-  }
+    window.dispatchEvent(
+      new CustomEvent("theme-change", {
+        detail: { theme: newTheme, resolved },
+      }),
+    );
+  };
 
-  const supabase = createClient()
+  const supabase = createClient();
 
   useEffect(() => {
     if (profile) {
-      setFullName(profile.full_name || "")
-      setPhone(profile.phone || "")
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
     }
-  }, [profile])
+  }, [profile]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+
+    if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("File too large. Max 2MB.")
-      return
+      alert("File too large. Max 2MB.");
+      return;
     }
 
-    setUploadingAvatar(true)
+    setUploadingAvatar(true);
+
     try {
-      const formData = new FormData()
-      formData.append("file", file)
+      await uploadProfilePicture(file);
 
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 30000)
-
-      const res = await fetch("/api/profile/avatar", {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeout)
-
-      const data = await res.json()
-      if (!res.ok) {
-        alert(data.error || "Failed to upload photo")
-        return
-      }
-
-      // Reload to reflect new avatar everywhere
-      window.location.reload()
+      await queryClient.invalidateQueries({
+        queryKey: ["current-profile"],
+      });
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        alert("Upload timed out. Please try again.")
-      } else {
-        alert("Failed to upload photo")
-      }
+      console.error("Failed to upload photo:", err);
+
+      alert(err instanceof Error ? err.message : "Failed to upload photo");
     } finally {
-      setUploadingAvatar(false)
-      if (avatarInputRef.current) avatarInputRef.current.value = ""
+      setUploadingAvatar(false);
+
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
     }
-  }
+  };
 
   const handleSaveProfile = async () => {
-    if (!profile) return
-    setIsSaving(true)
+    setIsSaving(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName,
-          phone: phone,
-        })
-        .eq("id", profile.id)
+      await updateProfile({
+        name: fullName,
+        phone,
+      });
 
-      if (!error) {
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 2000)
-      }
+      // await queryClient.invalidateQueries({
+      //   queryKey: ["current-profile"],
+      // });
+
+      setSaveSuccess(true);
+
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        fullError: error,
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  const userRole = profile?.role || "agent"
-  const visibleTabs = TABS.filter(tab => {
-    if (tab.adminOnly && !isAdmin) return false
-    if (tab.roles && !tab.roles.includes(userRole as "admin" | "agent")) return false
-    return true
-  })
+  // const userRole = profile?.role || "agent";
+  // const visibleTabs = TABS.filter((tab) => {
+  //   if (tab.adminOnly && !isAdmin) return false;
+  //   if (tab.roles && !tab.roles.includes(userRole as "admin" | "agent"))
+  //     return false;
+  //   return true;
+  // });
+  const visibleTabs = TABS;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)]">
+    <div className="min-h-screen bg-background">
+      {/* <pre>{JSON.stringify(profile, null, 2)}</pre> */}
       <Header
         user={profile}
         title="Settings"
@@ -256,8 +348,8 @@ export default function SettingsPage() {
                 <CardContent className="p-2">
                   <nav className="space-y-1" role="tablist">
                     {visibleTabs.map((tab) => {
-                      const Icon = tab.icon
-                      const isActive = activeTab === tab.id
+                      const Icon = tab.icon;
+                      const isActive = activeTab === tab.id;
                       return (
                         <motion.button
                           key={tab.id}
@@ -269,8 +361,8 @@ export default function SettingsPage() {
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all",
                             isActive
-                              ? "bg-[var(--primary)] text-white"
-                              : "hover:bg-[var(--bg-sunken)] text-[var(--text-secondary)]"
+                              ? "bg-primary text-white"
+                              : "hover:bg-[var(--bg-sunken)] text-[var(--text-secondary)]",
                           )}
                         >
                           <Icon className="w-5 h-5" />
@@ -279,7 +371,7 @@ export default function SettingsPage() {
                             <ChevronRight className="w-4 h-4 ml-auto" />
                           )}
                         </motion.button>
-                      )
+                      );
                     })}
                   </nav>
                 </CardContent>
@@ -347,7 +439,9 @@ export default function SettingsPage() {
                               onClick={() => avatarInputRef.current?.click()}
                             >
                               <Upload className="w-4 h-4 mr-2" />
-                              {uploadingAvatar ? "Uploading..." : "Upload Photo"}
+                              {uploadingAvatar
+                                ? "Uploading..."
+                                : "Upload Photo"}
                             </Button>
                             <p className="text-xs text-[var(--text-muted)] mt-2">
                               JPG, PNG or GIF. Max 2MB.
@@ -364,12 +458,14 @@ export default function SettingsPage() {
                           <User className="w-5 h-5 text-[var(--primary)]" />
                           Personal Information
                         </CardTitle>
-                        <CardDescription>Update your personal details</CardDescription>
+                        <CardDescription>
+                          Update your personal details
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-[var(--text-secondary)]">
+                            <label className="text-sm font-medium text-secondary">
                               Full Name
                             </label>
                             <Input
@@ -421,7 +517,10 @@ export default function SettingsPage() {
                         </div>
 
                         <div className="flex items-center gap-3 pt-4">
-                          <Button onClick={handleSaveProfile} disabled={isSaving}>
+                          <Button
+                            onClick={handleSaveProfile}
+                            disabled={isSaving}
+                          >
                             {isSaving ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                             ) : saveSuccess ? (
@@ -465,14 +564,18 @@ export default function SettingsPage() {
                             <div className="space-y-3">
                               <div className="flex items-center gap-2 mb-1">
                                 <Volume2 className="w-4 h-4 text-[var(--text-muted)]" />
-                                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Delivery Channels</h3>
+                                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                                  Delivery Channels
+                                </h3>
                               </div>
                               <NotificationToggle
                                 icon={Smartphone}
                                 title="Push Notifications"
                                 description="Browser push notifications for real-time alerts"
                                 checked={preferences.push_notifications}
-                                onCheckedChange={(val) => updatePreferences({ push_notifications: val })}
+                                onCheckedChange={(val) =>
+                                  updatePreferences({ push_notifications: val })
+                                }
                               />
                             </div>
 
@@ -480,35 +583,48 @@ export default function SettingsPage() {
                             <div className="space-y-3">
                               <div className="flex items-center gap-2 mb-1">
                                 <BellRing className="w-4 h-4 text-[var(--text-muted)]" />
-                                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Notification Types</h3>
+                                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                                  Notification Types
+                                </h3>
                               </div>
                               <NotificationToggle
                                 icon={CalendarClock}
                                 title="Appointment Reminders"
                                 description="Get reminded 1 hour before scheduled appointments"
                                 checked={preferences.appointment_reminders}
-                                onCheckedChange={(val) => updatePreferences({ appointment_reminders: val })}
+                                onCheckedChange={(val) =>
+                                  updatePreferences({
+                                    appointment_reminders: val,
+                                  })
+                                }
                               />
                               <NotificationToggle
                                 icon={Users}
                                 title="Lead Updates"
                                 description="Notify when leads are assigned, updated, or change stage"
                                 checked={preferences.lead_updates}
-                                onCheckedChange={(val) => updatePreferences({ lead_updates: val })}
+                                onCheckedChange={(val) =>
+                                  updatePreferences({ lead_updates: val })
+                                }
                               />
                               <NotificationToggle
                                 icon={AlertTriangle}
                                 title="System Alerts"
                                 description="Important system notifications, errors, and security alerts"
                                 checked={preferences.system_alerts}
-                                onCheckedChange={(val) => updatePreferences({ system_alerts: val })}
+                                onCheckedChange={(val) =>
+                                  updatePreferences({ system_alerts: val })
+                                }
                               />
                             </div>
                           </>
                         )}
 
                         <div className="flex items-center gap-3 pt-4 border-t border-[var(--border)]">
-                          <Button onClick={handleSaveNotifications} disabled={prefsSaving}>
+                          <Button
+                            onClick={handleSaveNotifications}
+                            disabled={prefsSaving}
+                          >
                             {prefsSaving ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                             ) : notificationsSaved ? (
@@ -567,7 +683,6 @@ export default function SettingsPage() {
                         </div>
                       </CardContent>
                     </Card>
-
                   </motion.div>
                 )}
 
@@ -597,24 +712,29 @@ export default function SettingsPage() {
                               <Key className="w-6 h-6 text-[var(--primary)]" />
                             </div>
                             <div>
-                              <p className="font-medium text-[var(--text-primary)]">
+                              <p className="font-medium text-foreground">
                                 Change Password
                               </p>
                               <p className="text-sm text-[var(--text-muted)]">
-                                Last changed 30 days ago
+                                Update your account password
                               </p>
                             </div>
                           </div>
-                          <Button variant="outline">Update</Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setChangePasswordDialogOpen(true)}
+                          >
+                            Update
+                          </Button>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-(--bg-sunken) border border-(--border) flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-[#5a71c4]/15 flex items-center justify-center">
                               <Lock className="w-6 h-6 text-[#5a71c4]" />
                             </div>
                             <div>
-                              <p className="font-medium text-[var(--text-primary)]">
+                              <p className="font-medium text-foreground">
                                 Two-Factor Authentication
                               </p>
                               <p className="text-sm text-[var(--text-muted)]">
@@ -641,9 +761,9 @@ export default function SettingsPage() {
                         <Button
                           variant="outline"
                           onClick={async () => {
-                            await supabase.auth.signOut()
-                            router.push("/login")
-                            router.refresh()
+                            await supabase.auth.signOut();
+                            router.push("/login");
+                            router.refresh();
                           }}
                         >
                           <LogOut className="w-4 h-4 mr-2" />
@@ -654,7 +774,9 @@ export default function SettingsPage() {
 
                     <Card className="border-rose-500/30 bg-rose-500/5">
                       <CardHeader>
-                        <CardTitle className="text-rose-500">Danger Zone</CardTitle>
+                        <CardTitle className="text-rose-500">
+                          Danger Zone
+                        </CardTitle>
                         <CardDescription>
                           Irreversible and destructive actions
                         </CardDescription>
@@ -663,6 +785,12 @@ export default function SettingsPage() {
                         <Button variant="destructive">Delete Account</Button>
                       </CardContent>
                     </Card>
+
+                    {/* Change Password Dialog */}
+                    <ChangePasswordDialog
+                      open={changePasswordDialogOpen}
+                      onOpenChange={setChangePasswordDialogOpen}
+                    />
                   </motion.div>
                 )}
 
@@ -789,7 +917,7 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // Helper Components
@@ -800,20 +928,24 @@ function NotificationToggle({
   checked,
   onCheckedChange,
 }: {
-  icon?: typeof Bell
-  title: string
-  description: string
-  checked: boolean
-  onCheckedChange: (checked: boolean) => void
+  icon?: typeof Bell;
+  title: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
 }) {
   return (
     <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-sunken)] border border-[var(--border)] transition-colors hover:border-[var(--border-hover)]">
       <div className="flex items-center gap-3">
         {Icon && (
-          <div className={cn(
-            "flex items-center justify-center w-9 h-9 rounded-lg shrink-0",
-            checked ? "bg-[var(--primary)]/10 text-[var(--primary)]" : "bg-[var(--bg-sunken)] text-[var(--text-muted)]"
-          )}>
+          <div
+            className={cn(
+              "flex items-center justify-center w-9 h-9 rounded-lg shrink-0",
+              checked
+                ? "bg-[var(--primary)]/10 text-[var(--primary)]"
+                : "bg-[var(--bg-sunken)] text-[var(--text-muted)]",
+            )}
+          >
             <Icon className="w-4.5 h-4.5" />
           </div>
         )}
@@ -824,7 +956,7 @@ function NotificationToggle({
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
-  )
+  );
 }
 
 function ThemeOption({
@@ -833,11 +965,11 @@ function ThemeOption({
   selected,
   onClick,
 }: {
-  icon: typeof Sun
-  label: string
-  value?: string
-  selected: boolean
-  onClick: () => void
+  icon: typeof Sun;
+  label: string;
+  value?: string;
+  selected: boolean;
+  onClick: () => void;
 }) {
   return (
     <motion.button
@@ -848,14 +980,16 @@ function ThemeOption({
         "p-4 rounded-xl border-2 transition-all",
         selected
           ? "border-[var(--primary)] bg-[var(--primary)]/5"
-          : "border-[var(--border)] hover:border-[var(--primary)]/50"
+          : "border-[var(--border)] hover:border-[var(--primary)]/50",
       )}
     >
       <div className="flex flex-col items-center gap-2">
         <div
           className={cn(
             "w-12 h-12 rounded-xl flex items-center justify-center",
-            selected ? "bg-[var(--primary)] text-white" : "bg-[var(--bg-sunken)]"
+            selected
+              ? "bg-[var(--primary)] text-white"
+              : "bg-[var(--bg-sunken)]",
           )}
         >
           <Icon className="w-6 h-6" />
@@ -863,7 +997,7 @@ function ThemeOption({
         <span
           className={cn(
             "text-sm font-medium",
-            selected ? "text-[var(--primary)]" : "text-[var(--text-secondary)]"
+            selected ? "text-[var(--primary)]" : "text-[var(--text-secondary)]",
           )}
         >
           {label}
@@ -879,5 +1013,5 @@ function ThemeOption({
         )}
       </div>
     </motion.button>
-  )
+  );
 }

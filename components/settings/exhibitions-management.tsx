@@ -23,20 +23,23 @@ import {
   useCreateExhibition,
   useUpdateExhibition,
   useDeleteExhibition,
-  type ExhibitionRow,
+  useToggleExhibitionActive,
+  type Exhibition,
 } from "@/lib/hooks/use-exhibitions"
 
-function ExhibitionRowItem({
+function ExhibitionRow({
   exhibition,
   isLast,
   isSaving,
   onUpdate,
+  onToggleActive,
   onDelete,
 }: {
-  exhibition: ExhibitionRow
+  exhibition: Exhibition
   isLast: boolean
   isSaving: boolean
-  onUpdate: (updates: Partial<ExhibitionRow>) => Promise<void>
+  onUpdate: (updates: { name: string }) => Promise<void>
+  onToggleActive: (active: boolean) => Promise<void>
   onDelete: () => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
@@ -102,7 +105,7 @@ function ExhibitionRowItem({
             </span>
             <button
               onClick={() => setEditing(true)}
-              className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors opacity-0 group-hover:opacity-100"
+              className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
               title="Edit exhibition"
             >
               <Pencil className="w-3 h-3" />
@@ -112,12 +115,12 @@ function ExhibitionRowItem({
       </div>
 
       <div className="flex items-center gap-3">
-        {!exhibition.is_active && (
+        {!exhibition.active && (
           <Badge variant="secondary" size="sm">Inactive</Badge>
         )}
         <Switch
-          checked={exhibition.is_active}
-          onCheckedChange={(checked) => onUpdate({ is_active: checked })}
+          checked={exhibition.active}
+          onCheckedChange={(checked) => onToggleActive(checked)}
           disabled={isSaving}
         />
         {confirmDelete ? (
@@ -132,7 +135,7 @@ function ExhibitionRowItem({
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="text-[var(--text-muted)] hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+            className="text-[var(--text-muted)] hover:text-rose-500 transition-colors"
             title="Delete exhibition"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -147,6 +150,7 @@ export function ExhibitionsManagement() {
   const { exhibitions, loading } = useExhibitions()
   const createMutation = useCreateExhibition()
   const updateMutation = useUpdateExhibition()
+  const toggleActiveMutation = useToggleExhibitionActive()
   const deleteMutation = useDeleteExhibition()
 
   const [showForm, setShowForm] = useState(false)
@@ -158,7 +162,10 @@ export function ExhibitionsManagement() {
     setError(null)
 
     try {
-      await createMutation.mutateAsync({ name: newName.trim() })
+      await createMutation.mutateAsync({
+        name: newName.trim(),
+        active: true,
+      })
       setShowForm(false)
       setNewName("")
     } catch (err) {
@@ -166,7 +173,7 @@ export function ExhibitionsManagement() {
     }
   }
 
-  const handleUpdate = async (exhibition: ExhibitionRow, updates: Partial<ExhibitionRow>) => {
+  const handleUpdate = async (exhibition: Exhibition, updates: { name: string }) => {
     setError(null)
     try {
       await updateMutation.mutateAsync({ id: exhibition.id, ...updates })
@@ -175,7 +182,16 @@ export function ExhibitionsManagement() {
     }
   }
 
-  const handleDelete = async (exhibition: ExhibitionRow) => {
+  const handleToggleActive = async (exhibition: Exhibition, active: boolean) => {
+    setError(null)
+    try {
+      await toggleActiveMutation.mutateAsync({ id: exhibition.id, active })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle exhibition status")
+    }
+  }
+
+  const handleDelete = async (exhibition: Exhibition) => {
     setError(null)
     try {
       await deleteMutation.mutateAsync(exhibition.id)
@@ -184,7 +200,7 @@ export function ExhibitionsManagement() {
     }
   }
 
-  const isSaving = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
+  const isSaving = createMutation.isPending || updateMutation.isPending || toggleActiveMutation.isPending || deleteMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -207,7 +223,7 @@ export function ExhibitionsManagement() {
                 Exhibitions
               </CardTitle>
               <CardDescription>
-                Manage exhibition names that appear in the lead form dropdown. Inactive exhibitions won&apos;t appear in forms.
+                Manage exhibitions where leads are sourced. Inactive exhibitions won&apos;t appear in lead forms.
               </CardDescription>
             </div>
             <Button onClick={() => setShowForm(true)} size="sm">
@@ -230,12 +246,13 @@ export function ExhibitionsManagement() {
           ) : (
             <div className="border rounded-xl overflow-hidden border-[var(--border)]">
               {exhibitions.map((exhibition, idx) => (
-                <ExhibitionRowItem
+                <ExhibitionRow
                   key={exhibition.id}
                   exhibition={exhibition}
                   isLast={idx === exhibitions.length - 1}
                   isSaving={isSaving}
                   onUpdate={(updates) => handleUpdate(exhibition, updates)}
+                  onToggleActive={(active) => handleToggleActive(exhibition, active)}
                   onDelete={() => handleDelete(exhibition)}
                 />
               ))}
@@ -255,19 +272,16 @@ export function ExhibitionsManagement() {
               Add Exhibition
             </h3>
             <p className="text-sm text-[var(--text-muted)] mb-4">
-              Create a new exhibition option for the lead form.
+              Create a new exhibition for tracking lead sources.
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--text-secondary)]">Exhibition Name</label>
+                <label className="text-sm font-medium text-[var(--text-secondary)]">Name</label>
                 <Input
-                  placeholder="e.g. Kuwait Education Fair 2026"
+                  placeholder="e.g. Education Fair 2024"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newName.trim()) handleCreate()
-                  }}
                 />
               </div>
             </div>

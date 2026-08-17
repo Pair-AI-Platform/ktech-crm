@@ -1,10 +1,12 @@
-import type { Metadata, Viewport } from "next"
-import "./globals.css"
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import { AuthProvider } from "@/lib/auth/auth-provider";
 
 export const metadata: Metadata = {
   title: "ADL",
-  description: "Kuwait Technical College ADL - Manage leads, students, and appointments",
-}
+  description:
+    "Kuwait Technical College ADL - Manage leads, students, and appointments",
+};
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -16,37 +18,30 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#1f1d1a" },
   ],
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const theme = localStorage.getItem('ktech-theme');
-                  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  const isDark = theme === 'dark' || (theme === 'system' && systemDark) || (!theme && systemDark);
-                  document.documentElement.classList.add(isDark ? 'dark' : 'light');
-                  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-                } catch (e) {}
-              })();
-            `,
-          }}
+        <link
+          rel="preconnect"
+          href="https://cdn.jsdelivr.net"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
         />
       </head>
       <body className="antialiased">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
-  )
+  );
 }

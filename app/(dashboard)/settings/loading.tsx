@@ -19,7 +19,7 @@ export default function SettingsLoading() {
         <div className="flex-1 space-y-6">
           {/* Profile Section */}
           <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] p-6">
-            <div className="h-5 w-20 bg-[var(--bg-hover)] rounded mb-6" />
+            <div className="h-5 w-20 bg-(--bg-hover) rounded mb-6" />
 
             <div className="flex items-start gap-6 mb-6">
               <div className="h-20 w-20 bg-[var(--bg-hover)] rounded-full" />

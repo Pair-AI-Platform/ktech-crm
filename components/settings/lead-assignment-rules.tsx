@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -32,9 +32,12 @@ import {
   Check,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
 import { SCHOOLS, LEAD_SOURCES, MAJORS } from "@/types"
+import type { UserRole } from "@/types"
 import { useActiveSources } from "@/lib/hooks/use-sources"
+import { useRules, useCreateRule, useUpdateRule, useDeleteRule, useToggleRuleActive, useReorderRules } from "@/lib/hooks/use-assignment-rules"
+import { useUsers } from "@/lib/hooks/use-users"
+import type { AssignmentRule as APIAssignmentRule, RuleCondition as APIRuleCondition } from "@/lib/assignment-rules/types"
 import type { Profile } from "@/types"
 
 interface AssignmentRule {
@@ -82,106 +85,140 @@ const RULE_TYPES = [
     icon: Shuffle,
   },
   {
-    value: "source_based",
+    value: "source",
     label: "Source-Based",
     description: "Assign leads based on their source",
     icon: Sparkles,
   },
   {
-    value: "school_based",
+    value: "school",
     label: "School-Based",
     description: "Assign leads based on their school",
     icon: GraduationCap,
   },
   {
-    value: "major_based",
+    value: "major",
     label: "Major Interest",
     description: "Assign leads based on intended major",
     icon: GraduationCap,
   },
 ]
 
+// Helper function to map API rule type to component rule type
+const mapApiRuleTypeToLocal = (apiType: string): AssignmentRule["rule_type"] => {
+  switch (apiType) {
+    case "source":
+      return "source_based"
+    case "school":
+      return "school_based"
+    case "major":
+      return "major_based"
+    default:
+      return "round_robin"
+  }
+}
+
+// Helper function to map component rule type to API rule type
+const mapLocalRuleTypeToApi = (localType: AssignmentRule["rule_type"]): string => {
+  switch (localType) {
+    case "source_based":
+      return "source"
+    case "school_based":
+      return "school"
+    case "major_based":
+      return "major"
+    default:
+      return "round_robin"
+  }
+}
+
+// Helper function to map API condition to component condition
+const mapApiConditionToLocal = (apiCondition: APIRuleCondition): RuleCondition => {
+  return {
+    field: apiCondition.field,
+    operator: apiCondition.operator as RuleCondition["operator"],
+    value: apiCondition.values.length === 1 ? apiCondition.values[0] : apiCondition.values,
+  }
+}
+
+// Helper function to map component condition to API condition
+const mapLocalConditionToApi = (localCondition: RuleCondition): APIRuleCondition => {
+  const values = Array.isArray(localCondition.value)
+    ? localCondition.value.map(String)
+    : [String(localCondition.value)]
+  
+  return {
+    field: localCondition.field,
+    operator: localCondition.operator === "contains" ? "in" : localCondition.operator as APIRuleCondition["operator"],
+    values,
+  }
+}
+
+// Helper function to map API rule to component rule
+const mapApiRuleToLocal = (apiRule: APIAssignmentRule): AssignmentRule => {
+  return {
+    id: apiRule.id,
+    name: apiRule.name,
+    description: apiRule.description,
+    rule_type: mapApiRuleTypeToLocal(apiRule.ruleType),
+    conditions: apiRule.conditions.map(mapApiConditionToLocal),
+    assigned_agents: apiRule.agentIds,
+    priority: apiRule.priority,
+    is_active: apiRule.active,
+    created_at: apiRule.createdAt,
+  }
+}
+
 interface LeadAssignmentRulesProps {
   currentUser: Profile | null
 }
 
 export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
-  const [rules, setRules] = useState<AssignmentRule[]>([])
-  const [agents, setAgents] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<AssignmentRule | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState<string | null>(null)
-  const supabase = createClient()
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      // Fetch agents
-      const { data: agentData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("is_active", true)
-        .order("full_name")
-
-      const activeAgents = (agentData ?? []) as Profile[]
-      if (activeAgents.length > 0) {
-        setAgents(activeAgents)
+  // Fetch rules from API
+  const { data: rulesData, isLoading: rulesLoading, error: rulesError } = useRules({ sortBy: "priority", sortOrder: "desc" })
+  
+  // Fetch users with agent role filter
+  const { users, loading: usersLoading } = useUsers({ role: "agent", active: true })
+  
+  // Map users to Profile format for compatibility
+  const agents = useMemo<Profile[]>(() => {
+    return users.map((user) => {
+      // Map role name to UserRole type
+      let role: UserRole = 'agent'
+      const roleName = user.roleName.toLowerCase()
+      if (roleName === 'admin') role = 'admin'
+      else if (roleName === 'marketing') role = 'marketing'
+      else role = 'agent'
+      
+      return {
+        id: user.id,
+        email: user.email,
+        full_name: user.name,
+        role,
+        is_active: user.active,
+        avatar_url: user.profilePic || undefined,
+        phone: user.phone || undefined,
+        monthly_target: user.monthlyTarget,
+        created_at: user.createdAt,
+        updated_at: user.updatedAt,
       }
+    })
+  }, [users])
+  
+  // Mutations
+  const createRuleMutation = useCreateRule()
+  const updateRuleMutation = useUpdateRule()
+  const deleteRuleMutation = useDeleteRule()
+  const toggleActiveMutation = useToggleRuleActive()
+  const reorderRulesMutation = useReorderRules()
 
-      // For now, use demo rules - would be replaced with real API
-      const demoRules: AssignmentRule[] = [
-        {
-          id: "1",
-          name: "Default Round Robin",
-          description: "Distribute new leads evenly among all active agents",
-          rule_type: "round_robin",
-          conditions: [],
-          assigned_agents: activeAgents.slice(0, 3).map((a) => a.id),
-          priority: 100,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          name: "Social Media Leads",
-          description: "Assign leads from social media to specialized team",
-          rule_type: "source_based",
-          conditions: [
-            { field: "source", operator: "in", value: ["instagram"] },
-          ],
-          assigned_agents: activeAgents.slice(0, 2).map((a) => a.id),
-          priority: 90,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "3",
-          name: "American Schools",
-          description: "Assign leads from American curriculum schools",
-          rule_type: "school_based",
-          conditions: [
-            { field: "school", operator: "equals", value: "american_international" },
-          ],
-          assigned_agents: activeAgents.slice(1, 3).map((a) => a.id),
-          priority: 80,
-          is_active: false,
-          created_at: new Date().toISOString(),
-        },
-      ]
-      setRules(demoRules)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch data")
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  // Map API rules to local format
+  const rules = rulesData?.data.map(mapApiRuleToLocal) || []
+  const loading = rulesLoading || usersLoading
+  const error = rulesError?.message || createRuleMutation.error?.message || updateRuleMutation.error?.message || deleteRuleMutation.error?.message || toggleActiveMutation.error?.message || reorderRulesMutation.error?.message || null
 
   const handleOpenModal = (rule?: AssignmentRule) => {
     setEditingRule(rule || null)
@@ -189,61 +226,77 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
   }
 
   const handleSaveRule = async (ruleData: Partial<AssignmentRule>) => {
-    setSaving(true)
-    setError(null)
-
     try {
       if (editingRule) {
         // Update existing rule
-        setRules((prev) =>
-          prev.map((r) =>
-            r.id === editingRule.id ? { ...r, ...ruleData } : r
-          )
-        )
+        const updateData: any = {}
+        if (ruleData.name !== undefined) updateData.name = ruleData.name
+        if (ruleData.description !== undefined) updateData.description = ruleData.description
+        if (ruleData.priority !== undefined) updateData.priority = ruleData.priority
+        if (ruleData.is_active !== undefined) updateData.active = ruleData.is_active
+        if (ruleData.conditions !== undefined) {
+          updateData.conditions = ruleData.conditions.map(mapLocalConditionToApi)
+        }
+        if (ruleData.assigned_agents !== undefined) updateData.agentIds = ruleData.assigned_agents
+
+        await updateRuleMutation.mutateAsync({
+          id: editingRule.id,
+          data: updateData,
+        })
       } else {
         // Create new rule
-        const newRule: AssignmentRule = {
-          id: Date.now().toString(),
+        const ruleType = mapLocalRuleTypeToApi(ruleData.rule_type || "round_robin")
+        const createData: any = {
           name: ruleData.name || "New Rule",
           description: ruleData.description,
-          rule_type: ruleData.rule_type || "round_robin",
-          conditions: ruleData.conditions || [],
-          assigned_agents: ruleData.assigned_agents || [],
           priority: ruleData.priority || 50,
-          is_active: ruleData.is_active ?? true,
-          created_at: new Date().toISOString(),
+          ruleType: ruleType as "round_robin" | "source" | "school" | "major",
+          active: ruleData.is_active ?? true,
+          agentIds: ruleData.assigned_agents || [],
         }
-        setRules((prev) => [newRule, ...prev])
+        
+        // Only add conditions for non-round-robin rules
+        if (ruleType !== "round_robin" && ruleData.conditions && ruleData.conditions.length > 0) {
+          createData.conditions = ruleData.conditions.map(mapLocalConditionToApi)
+        }
+        
+        await createRuleMutation.mutateAsync(createData)
       }
       setModalOpen(false)
       setEditingRule(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save rule")
-    } finally {
-      setSaving(false)
+      // Error is handled by the mutation error state
+      console.error("Failed to save rule:", err)
     }
   }
 
   const handleDeleteRule = async (id: string) => {
     if (!confirm("Are you sure you want to delete this rule?")) return
 
-    setDeleting(id)
     try {
-      setRules((prev) => prev.filter((r) => r.id !== id))
-    } finally {
-      setDeleting(null)
+      await deleteRuleMutation.mutateAsync(id)
+    } catch (err) {
+      // Error is handled by the mutation error state
+      console.error("Failed to delete rule:", err)
     }
   }
 
-  const handleToggleActive = (id: string) => {
-    setRules((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, is_active: !r.is_active } : r
-      )
-    )
+  const handleToggleActive = async (id: string) => {
+    const rule = rules.find((r) => r.id === id)
+    if (!rule) return
+
+    try {
+      await toggleActiveMutation.mutateAsync({
+        id,
+        data: { active: !rule.is_active },
+      })
+    } catch (err) {
+      // Error is handled by the mutation error state
+      console.error("Failed to toggle rule:", err)
+    }
   }
 
-  const handleReorder = (id: string, direction: "up" | "down") => {
+  const handleReorder = async (id: string, direction: "up" | "down") => {
     const index = rules.findIndex((r) => r.id === id)
     if (
       (direction === "up" && index === 0) ||
@@ -252,13 +305,20 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
       return
     }
 
+    // Create new order by swapping positions
     const newRules = [...rules]
     const swapIndex = direction === "up" ? index - 1 : index + 1
-    const temp = newRules[index].priority
-    newRules[index].priority = newRules[swapIndex].priority
-    newRules[swapIndex].priority = temp
     ;[newRules[index], newRules[swapIndex]] = [newRules[swapIndex], newRules[index]]
-    setRules(newRules)
+    
+    // Send the new order to the API
+    const orderedRuleIds = newRules.map((r) => r.id)
+    
+    try {
+      await reorderRulesMutation.mutateAsync({ orderedRuleIds })
+    } catch (err) {
+      // Error is handled by the mutation error state
+      console.error("Failed to reorder rules:", err)
+    }
   }
 
   const activeRulesCount = rules.filter((r) => r.is_active).length
@@ -394,13 +454,12 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
                                     <div
                                       key={agent.id}
                                       className="w-6 h-6 rounded-full bg-[var(--primary-muted)] border-2 border-[var(--bg-elevated)] flex items-center justify-center"
-                                      title={agent.full_name}
+                                      title={agent.full_name || agent.email}
                                     >
                                       <span className="text-[10px] font-medium text-[var(--primary)]">
                                         {agent.full_name
-                                          .split(" ")
-                                          .map((n) => n[0])
-                                          .join("")}
+                                          ? agent.full_name.split(" ").map((n) => n[0]).join("")
+                                          : agent.email.substring(0, 2).toUpperCase()}
                                       </span>
                                     </div>
                                   ))}
@@ -454,9 +513,9 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteRule(rule.id)}
-                            disabled={deleting === rule.id}
+                            disabled={deleteRuleMutation.isPending}
                           >
-                            {deleting === rule.id ? (
+                            {deleteRuleMutation.isPending ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <Trash2 className="w-4 h-4 text-[var(--error)]" />
@@ -483,7 +542,7 @@ export function LeadAssignmentRules({}: LeadAssignmentRulesProps) {
         onSave={handleSaveRule}
         rule={editingRule}
         agents={agents}
-        saving={saving}
+        saving={createRuleMutation.isPending || updateRuleMutation.isPending}
       />
     </>
   )
@@ -556,10 +615,15 @@ function RuleModal({
   }
 
   const handleAddCondition = () => {
+    let field = "major"
+    if (ruleType === "source_based") field = "source"
+    else if (ruleType === "school_based") field = "school"
+    else if (ruleType === "major_based") field = "major"
+    
     const newCondition: RuleCondition = {
-      field: ruleType === "source_based" ? "source" : ruleType === "school_based" ? "school" : "intended_major",
-      operator: "equals",
-      value: "",
+      field,
+      operator: "in",
+      value: [],
     }
     setConditions([...conditions, newCondition])
   }
@@ -841,25 +905,53 @@ function RuleModal({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="equals">equals</SelectItem>
                               <SelectItem value="in">is one of</SelectItem>
                             </SelectContent>
                           </Select>
-                          <Select
-                            value={Array.isArray(condition.value) ? condition.value[0] as string : condition.value as string}
-                            onValueChange={(v) => handleUpdateCondition(index, { value: v })}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Select value..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getConditionOptions().map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="flex-1">
+                            <Select
+                              value={Array.isArray(condition.value) && condition.value.length > 0 ? condition.value[0] as string : ""}
+                              onValueChange={(v) => {
+                                const currentValues = Array.isArray(condition.value) ? condition.value as string[] : []
+                                if (!currentValues.includes(v)) {
+                                  handleUpdateCondition(index, { value: [...currentValues, v] })
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select values..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getConditionOptions().map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {Array.isArray(condition.value) && condition.value.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {(condition.value as string[]).map((val) => {
+                                  const option = getConditionOptions().find(o => o.value === val)
+                                  return (
+                                    <Badge key={val} variant="secondary" className="text-xs">
+                                      {option?.label || val}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newValues = (condition.value as string[]).filter(v => v !== val)
+                                          handleUpdateCondition(index, { value: newValues })
+                                        }}
+                                        className="ml-1 hover:text-[var(--error)]"
+                                      >
+                                        ×
+                                      </button>
+                                    </Badge>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </>
                       )}
                       <Button
@@ -904,14 +996,13 @@ function RuleModal({
                       <Check className="w-4 h-4" />
                     ) : (
                       agent.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
+                        ? agent.full_name.split(" ").map((n) => n[0]).join("")
+                        : agent.email.substring(0, 2).toUpperCase()
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                      {agent.full_name}
+                      {agent.full_name || agent.email}
                     </p>
                     <p className="text-xs text-[var(--text-muted)] truncate">
                       {agent.role}

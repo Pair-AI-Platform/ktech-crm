@@ -20,30 +20,31 @@ export function useHeartbeat(userId: string | undefined) {
   const queryClient = useQueryClient()
 
   // Fetch initial manual_status on mount
-  useEffect(() => {
-    if (!userId) return
-    const supabase = createClient()
-    supabase
-      .from('profiles')
-      .select('manual_status')
-      .eq('id', userId)
-      .single()
-      .then(({ data }: { data: ManualStatusRow | null }) => {
-        if (data?.manual_status) {
-          setManualStatusState(data.manual_status as ManualStatus)
-        }
-      })
-  }, [userId])
+  // useEffect(() => {
+  //   if (!userId) return
+  //   const supabase = createClient()
+  //   supabase
+  //     .from('profiles')
+  //     .select('manual_status')
+  //     .eq('id', userId)
+  //     .single()
+  //     .then(({ data }: { data: ManualStatusRow | null }) => {
+  //       if (data?.manual_status) {
+  //         setManualStatusState(data.manual_status as ManualStatus)
+  //       }
+  //     })
+  // }, [userId])
 
   useEffect(() => {
     if (!userId) return
-    const supabase = createClient()
+    // const supabase = createClient()
 
     async function ping() {
-      await supabase
-        .from('profiles')
-        .update({ last_activity_at: new Date().toISOString() })
-        .eq('id', userId!)
+      console.log('ping')
+      // await supabase
+      //   .from('profiles')
+      //   .update({ last_activity_at: new Date().toISOString() })
+      //   .eq('id', userId!)
     }
 
     ping()

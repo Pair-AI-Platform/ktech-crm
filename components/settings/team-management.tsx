@@ -1,22 +1,28 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
-import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/modal"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Users,
   Search,
@@ -25,85 +31,75 @@ import {
   UserPlus,
   Target,
   Check,
-  User
-} from "lucide-react"
-import type { Profile } from "@/types"
-import { createClient } from "@/lib/supabase/client"
+  User,
+} from "lucide-react";
+import { toast } from "sonner";
+import type { Profile } from "@/types";
+import {
+  useUserAnalytics,
+  useUsers,
+  useUpdateUserActive,
+  useUpdateUserManagement,
+  type User as ApiUser,
+} from "@/lib/hooks/use-users";
+import { useSendInvitation } from "@/lib/hooks/use-invitations";
+import { useRoles } from "@/lib/hooks/use-roles";
+import type { CreateInvitationRequest } from "@/lib/invitations/types";
 
 interface TeamManagementProps {
-  currentUser: Profile | null
+  currentUser: Profile | null;
 }
 
 export function TeamManagement({ currentUser }: TeamManagementProps) {
-  const [teamMembers, setTeamMembers] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [selectedMember, setSelectedMember] = useState<Profile | null>(null)
-  const supabase = createClient()
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<ApiUser | null>(null);
 
-  useEffect(() => {
-    fetchTeamMembers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Fetch analytics
+  const { analytics, loading: analyticsLoading } = useUserAnalytics();
 
-  const fetchTeamMembers = async () => {
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false })
+  // Fetch users with search filter
+  const { users, loading: usersLoading } = useUsers(
+    searchQuery ? { search: searchQuery } : undefined,
+  );
 
-      if (!error && data) {
-        setTeamMembers(data)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Mutations
+  const updateActiveMutation = useUpdateUserActive();
+  const updateManagementMutation = useUpdateUserManagement();
 
-  const filteredMembers = teamMembers.filter(
-    (m) =>
-      m.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const loading = analyticsLoading || usersLoading;
 
-  const handleEditMember = (member: Profile) => {
-    setSelectedMember(member)
-    setShowEditModal(true)
-  }
+  const handleEditMember = (member: ApiUser) => {
+    setSelectedMember(member);
+    setShowEditModal(true);
+  };
 
-  const handleToggleActive = async (member: Profile) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_active: !member.is_active })
-      .eq("id", member.id)
-
-    if (!error) {
-      setTeamMembers(
-        teamMembers.map((m) =>
-          m.id === member.id ? { ...m, is_active: !m.is_active } : m
-        )
-      )
-    }
-  }
+  const handleToggleActive = async (member: ApiUser) => {
+    await updateActiveMutation.mutateAsync({
+      id: member.id,
+      active: !member.active,
+    });
+  };
 
   const stats = {
-    total: teamMembers.length,
-    active: teamMembers.filter((m) => m.is_active).length,
-    admins: teamMembers.filter((m) => m.role === "admin").length,
-    agents: teamMembers.filter((m) => m.role === "agent").length,
-  }
+    total: analytics?.totalMembers || 0,
+    active: analytics?.activeMembers || 0,
+    admins: analytics?.admins || 0,
+    agents: analytics?.agents || 0,
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Team Management</h2>
-          <p className="text-sm text-[var(--text-muted)]">Manage team members and permissions</p>
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+            Team Management
+          </h2>
+          <p className="text-sm text-[var(--text-muted)]">
+            Manage team members and permissions
+          </p>
         </div>
         <Button onClick={() => setShowInviteModal(true)}>
           <UserPlus className="w-4 h-4 mr-2" />
@@ -120,8 +116,12 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                 <Users className="w-5 h-5 text-[var(--primary)]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.total}</p>
-                <p className="text-xs text-[var(--text-muted)]">Total Members</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">
+                  {stats.total}
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Total Members
+                </p>
               </div>
             </div>
           </CardContent>
@@ -134,7 +134,9 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                 <Check className="w-5 h-5 text-[#5a71c4]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.active}</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">
+                  {stats.active}
+                </p>
                 <p className="text-xs text-[var(--text-muted)]">Active</p>
               </div>
             </div>
@@ -148,7 +150,9 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                 <ShieldCheck className="w-5 h-5 text-[#212e7f]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.admins}</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">
+                  {stats.admins}
+                </p>
                 <p className="text-xs text-[var(--text-muted)]">Admins</p>
               </div>
             </div>
@@ -162,7 +166,9 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                 <Users className="w-5 h-5 text-[#445eb7]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{stats.agents}</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">
+                  {stats.agents}
+                </p>
                 <p className="text-xs text-[var(--text-muted)]">Agents</p>
               </div>
             </div>
@@ -188,14 +194,14 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]" />
             </div>
-          ) : filteredMembers.length === 0 ? (
+          ) : users.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-4" />
               <p className="text-[var(--text-muted)]">No team members found</p>
             </div>
           ) : (
             <div className="divide-y divide-[var(--border)]">
-              {filteredMembers.map((member, index) => (
+              {users.map((member, index) => (
                 <motion.div
                   key={member.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -207,26 +213,28 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                     <div className="flex items-center gap-4">
                       <div className="relative">
                         <Avatar className="w-12 h-12">
-                          <AvatarImage src={member.avatar_url} />
+                          <AvatarImage src={member.profilePic || undefined} />
                           <AvatarFallback className="bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 text-[var(--primary)]">
-                            {member.full_name
-                              .split(" ")
+                            {member.name
+                              ?.split(" ")
                               .map((n) => n[0])
                               .join("")
-                              .toUpperCase()}
+                              .toUpperCase() || "??"}
                           </AvatarFallback>
                         </Avatar>
                         <div
                           className={cn(
                             "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[var(--bg-elevated)]",
-                            member.is_active ? "bg-[var(--success)]" : "bg-[#212e7f]"
+                            member.active
+                              ? "bg-[var(--success)]"
+                              : "bg-[#212e7f]",
                           )}
                         />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {member.full_name}
+                          <p className="font-medium text-foreground">
+                            {member.name || "Unknown User"}
                           </p>
                           {member.id === currentUser?.id && (
                             <Badge variant="secondary" className="text-[10px]">
@@ -234,23 +242,29 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-[var(--text-muted)]">{member.email}</p>
+                        <p className="text-sm text-(--text-muted)">
+                          {member.email || "No email"}
+                        </p>
                         <div className="flex items-center gap-3 mt-1">
                           <Badge
-                            variant={member.role === "admin" ? "info" : "secondary"}
+                            variant={
+                              member.roleName?.toLowerCase() === "admin"
+                                ? "info"
+                                : "secondary"
+                            }
                             className="text-[10px]"
                           >
-                            {member.role === "admin" ? (
+                            {member.roleName?.toLowerCase() === "admin" ? (
                               <ShieldCheck className="w-3 h-3 mr-1" />
                             ) : (
                               <Users className="w-3 h-3 mr-1" />
                             )}
-                            {member.role}
+                            {member.roleName || "No Role"}
                           </Badge>
-                          {member.monthly_target > 0 && (
+                          {member.monthlyTarget > 0 && (
                             <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                               <Target className="w-3 h-3" />
-                              {member.monthly_target}/month
+                              {member.monthlyTarget}/month
                             </span>
                           )}
                         </div>
@@ -259,11 +273,16 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
 
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-[var(--text-muted)]">Active</span>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          Active
+                        </span>
                         <Switch
-                          checked={member.is_active}
+                          checked={member.active}
                           onCheckedChange={() => handleToggleActive(member)}
-                          disabled={member.id === currentUser?.id}
+                          disabled={
+                            member.id === currentUser?.id ||
+                            updateActiveMutation.isPending
+                          }
                         />
                       </div>
                       <Button
@@ -286,7 +305,6 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
       <InviteMemberModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
-        onSuccess={fetchTeamMembers}
       />
 
       {/* Edit Modal */}
@@ -294,47 +312,69 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
         member={selectedMember}
         isOpen={showEditModal}
         onClose={() => {
-          setShowEditModal(false)
-          setSelectedMember(null)
+          setShowEditModal(false);
+          setSelectedMember(null);
         }}
-        onSuccess={fetchTeamMembers}
+        updateManagementMutation={updateManagementMutation}
       />
     </div>
-  )
+  );
 }
 
 // Invite Member Modal
 function InviteMemberModal({
   isOpen,
   onClose,
-  onSuccess,
 }: {
-  isOpen: boolean
-  onClose: () => void
-  onSuccess: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }) {
-  const [email, setEmail] = useState("")
-  const [fullName, setFullName] = useState("")
-  const [role, setRole] = useState<"admin" | "agent" | "marketing">("agent")
-  const [monthlyTarget, setMonthlyTarget] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [monthlyTarget, setMonthlyTarget] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch available roles
+  const { roles, loading: rolesLoading } = useRoles();
+  // Send invitation mutation
+  const sendInvitationMutation = useSendInvitation();
 
   const handleSubmit = async () => {
-    if (!email || !fullName) return
-    setIsSubmitting(true)
+    if (!email || !fullName || !roleId) return;
 
-    // In a real app, this would send an invitation email
-    // For now, we'll just show the UI
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    setError(null);
 
-    setIsSubmitting(false)
-    onSuccess()
-    onClose()
-    setEmail("")
-    setFullName("")
-    setRole("agent")
-    setMonthlyTarget("")
-  }
+    const invitationData: CreateInvitationRequest = {
+      email,
+      name: fullName,
+      roleId,
+      monthlyTarget: monthlyTarget ? parseInt(monthlyTarget, 10) : 0,
+    };
+
+    try {
+      await sendInvitationMutation.mutateAsync(invitationData);
+
+      // Success feedback
+      toast.success("Invitation sent successfully");
+
+      // Clear form and close modal
+      setEmail("");
+      setFullName("");
+      setRoleId("");
+      setMonthlyTarget("");
+      onClose();
+    } catch (err) {
+      // Error handling
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to send invitation";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    }
+  };
+
+  const isFormValid = email && fullName && roleId;
+  const isSubmitting = sendInvitationMutation.isPending;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -349,7 +389,13 @@ function InviteMemberModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 px-6">
+        <div className="space-y-4 px-6 pt-2">
+          {error && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
               Full Name
@@ -358,6 +404,7 @@ function InviteMemberModal({
               placeholder="Enter full name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -370,6 +417,7 @@ function InviteMemberModal({
               placeholder="name@ktech.edu.kw"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -377,36 +425,41 @@ function InviteMemberModal({
             <label className="text-sm font-medium text-[var(--text-secondary)]">
               Role
             </label>
-            <Select value={role} onValueChange={(v) => setRole(v as "admin" | "agent" | "marketing")}>
+            <Select
+              value={roleId}
+              onValueChange={setRoleId}
+              disabled={isSubmitting || rolesLoading}
+            >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue
+                  placeholder={
+                    rolesLoading ? "Loading roles..." : "Select a role"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="agent">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Agent
-                  </div>
-                </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4" />
-                    Admin
-                  </div>
-                </SelectItem>
-                <SelectItem value="marketing">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Marketing
-                  </div>
-                </SelectItem>
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    <div className="flex items-center gap-2">
+                      {role.name.toLowerCase() === "admin" ? (
+                        <ShieldCheck className="w-4 h-4" />
+                      ) : (
+                        <Users className="w-4 h-4" />
+                      )}
+                      {role.name}
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
-              Monthly Target <span className="text-xs font-normal text-[var(--text-muted)]">(optional)</span>
+              Monthly Target{" "}
+              <span className="text-xs font-normal text-[var(--text-muted)]">
+                (optional)
+              </span>
             </label>
             <Input
               type="number"
@@ -414,21 +467,25 @@ function InviteMemberModal({
               placeholder="Leave empty for trainees"
               value={monthlyTarget}
               onChange={(e) => setMonthlyTarget(e.target.value)}
+              disabled={isSubmitting}
             />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 pb-6 pt-2">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !email || !fullName}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !isFormValid}
+          >
             {isSubmitting ? "Sending..." : "Send Invitation"}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 // Edit Member Modal
@@ -436,48 +493,43 @@ function EditMemberModal({
   member,
   isOpen,
   onClose,
-  onSuccess,
+  updateManagementMutation,
 }: {
-  member: Profile | null
-  isOpen: boolean
-  onClose: () => void
-  onSuccess: () => void
+  member: ApiUser | null;
+  isOpen: boolean;
+  onClose: () => void;
+  updateManagementMutation: ReturnType<typeof useUpdateUserManagement>;
 }) {
-  const [role, setRole] = useState<"admin" | "agent" | "marketing">("agent")
-  const [monthlyTarget, setMonthlyTarget] = useState("20")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const supabase = createClient()
-
+  const [roleId, setRoleId] = useState("");
+  const [monthlyTarget, setMonthlyTarget] = useState("20");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { roles, loading: rolesLoading } = useRoles();
   useEffect(() => {
     if (member) {
-      setRole(member.role)
-      setMonthlyTarget(String(member.monthly_target))
+      setRoleId(member.roleId);
+      setMonthlyTarget(String(member.monthlyTarget));
     }
-  }, [member])
+  }, [member]);
 
   const handleSubmit = async () => {
-    if (!member) return
-    setIsSubmitting(true)
+    if (!member) return;
+    setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          role,
-          monthly_target: parseInt(monthlyTarget) || 0,
-        })
-        .eq("id", member.id)
-
-      if (!error) {
-        onSuccess()
-        onClose()
-      }
+      await updateManagementMutation.mutateAsync({
+        id: member.id,
+        payload: {
+          monthlyTarget: parseInt(monthlyTarget) || 0,
+          roleId,
+        },
+      });
+      onClose();
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
-  if (!member) return null
+  if (!member) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -488,62 +540,70 @@ function EditMemberModal({
             Edit Team Member
           </DialogTitle>
           <DialogDescription>
-            Update {member.full_name}&apos;s settings
+            Update {member.name || "user"}&apos;s settings
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-6">
           <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-sunken)]">
             <Avatar className="w-12 h-12">
-              <AvatarImage src={member.avatar_url} />
+              <AvatarImage src={member.profilePic || undefined} />
               <AvatarFallback className="bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 text-[var(--primary)]">
-                {member.full_name
-                  .split(" ")
+                {member.name
+                  ?.split(" ")
                   .map((n) => n[0])
                   .join("")
-                  .toUpperCase()}
+                  .toUpperCase() || "??"}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium text-[var(--text-primary)]">{member.full_name}</p>
-              <p className="text-sm text-[var(--text-muted)]">{member.email}</p>
+              <p className="font-medium text-[var(--text-primary)]">
+                {member.name || "Unknown User"}
+              </p>
+              <p className="text-sm text-(--text-muted)">
+                {member.email || "No email"}
+              </p>
             </div>
           </div>
-
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
               Role
             </label>
-            <Select value={role} onValueChange={(v) => setRole(v as "admin" | "agent" | "marketing")}>
+            <Select
+              value={roleId}
+              onValueChange={setRoleId}
+              disabled={isSubmitting || rolesLoading}
+            >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue
+                  placeholder={
+                    rolesLoading ? "Loading roles..." : "Select a role"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="agent">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Agent
-                  </div>
-                </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4" />
-                    Admin
-                  </div>
-                </SelectItem>
-                <SelectItem value="marketing">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Marketing
-                  </div>
-                </SelectItem>
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    <div className="flex items-center gap-2">
+                      {role.name.toLowerCase() === "admin" ? (
+                        <ShieldCheck className="w-4 h-4" />
+                      ) : (
+                        <Users className="w-4 h-4" />
+                      )}
+                      {role.name}
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--text-secondary)]">
-              Monthly Target <span className="text-xs font-normal text-[var(--text-muted)]">(optional)</span>
+              Monthly Target{" "}
+              <span className="text-xs font-normal text-[var(--text-muted)]">
+                (optional)
+              </span>
             </label>
             <Input
               type="number"
@@ -565,5 +625,5 @@ function EditMemberModal({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
