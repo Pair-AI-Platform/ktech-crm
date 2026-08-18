@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 import { isDocumentExpired } from "@/lib/ai/document-expiration"
 
-export const runtime = 'edge'
 
 export interface PSPDocument {
   id: string

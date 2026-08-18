@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 
-export const runtime = 'edge'
 
 // Use service role for public access (no user session)
 function createServiceClient() {

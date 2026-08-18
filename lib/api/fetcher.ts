@@ -1,16 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL;
-
-if (!AUTH_API_URL) {
-  throw new Error("Missing NEXT_PUBLIC_AUTH_API_URL environment variable");
-}
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "";
 
 async function fetcher<T = any>(
   url: string,
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
   data: any = null,
 ): Promise<T> {
+  if (!AUTH_API_URL) {
+    throw new Error("Missing NEXT_PUBLIC_AUTH_API_URL environment variable");
+  }
   const isFormData =
     typeof FormData !== "undefined" && data instanceof FormData;
 

@@ -1,6 +1,5 @@
 "use client"
 
-export const runtime = 'edge'
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"

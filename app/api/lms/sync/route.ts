@@ -3,7 +3,6 @@ import { withApiHandler } from '@/lib/api-handler'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { syncFromMoodle, checkMoodleConnection } from '@/lib/lms/moodle'
 
-export const runtime = 'edge'
 
 /**
  * POST /api/lms/sync

@@ -6,7 +6,6 @@ import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayloa
 import { createLogger } from "@/lib/logger"
 import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-export const runtime = 'edge'
 
 const logger = createLogger("PSP Payment Webhook")
 

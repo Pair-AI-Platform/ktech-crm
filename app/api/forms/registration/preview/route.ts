@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 
-export const runtime = 'edge'
 
 const BUCKET = 'registration-forms'
 const ALLOWED = new Set(['Application.pdf', 'Preferences.pdf'])

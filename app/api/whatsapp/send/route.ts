@@ -3,7 +3,6 @@ import { withApiHandler } from "@/lib/api-handler"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-export const runtime = 'edge'
 
 export const POST = withApiHandler(
   { context: 'whatsapp-send' },

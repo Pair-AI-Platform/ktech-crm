@@ -3,7 +3,6 @@ import { withApiHandler } from "@/lib/api-handler"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { GRADUATE_TYPE_CONFIGS } from "@/lib/psp/document-rules"
 
-export const runtime = 'edge'
 
 export const POST = withApiHandler(
   { context: 'document-configs-seed', roles: ['admin'] },

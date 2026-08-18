@@ -3,7 +3,6 @@ import { createServerSupabaseClient, createServiceRoleClient, getUserProfile } f
 import { toDateString } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
-export const runtime = 'edge'
 
 const CACHE_TTL_MS = 30_000
 

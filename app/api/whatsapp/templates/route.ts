@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
-export const runtime = 'edge'
 
 // Twilio Content API for WhatsApp Templates
 const TWILIO_CONTENT_API = "https://content.twilio.com/v1/Content"

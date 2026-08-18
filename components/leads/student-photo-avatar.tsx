@@ -123,7 +123,9 @@ export function StudentPhotoAvatar({ leadId, gender, canEdit = true }: StudentPh
       // 1. Remove the original background, then flatten onto white.
       setStatus("processing")
       const { removeBackground } = await import("@imgly/background-removal")
-      const cutout = await removeBackground(file)
+      const cutout = await removeBackground(file, {
+        publicPath: "https://staticimgly.com/@imgly/background-removal-data/1.4.5/dist/",
+      })
       const whiteBlob = await compositeOnWhite(cutout)
 
       // 2. Upload the white-background JPEG to shared document storage.

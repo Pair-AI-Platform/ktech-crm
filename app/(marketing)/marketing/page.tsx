@@ -1,6 +1,5 @@
 "use client"
 
-export const runtime = 'edge'
 
 import { MarketingLeadForm } from "@/components/marketing/marketing-lead-form"
 import { MarketingLeadsTable } from "@/components/marketing/marketing-leads-table"

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 import { requireDemoMode } from "@/lib/demo-mode"
 
-export const runtime = 'edge'
 
 const FIRST_NAMES = [
   "عبدالله", "مريم", "يوسف", "لطيفة", "فهد", "هيا", "بدر", "دانة", "عمر", "ريم",

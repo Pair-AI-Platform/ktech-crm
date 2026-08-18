@@ -2,7 +2,6 @@ import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { assertArabicLeadNameFields, getArabicLeadDisplayName } from '@/lib/lead-name-policy'
 
-export const runtime = 'edge'
 
 export const POST = withApiHandler(
   { context: 're-register-leads', roles: ['admin'] },

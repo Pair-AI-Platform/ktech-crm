@@ -6,7 +6,10 @@
     "dev": "bash dev.sh",
     "dev:once": "NODE_OPTIONS='--max-old-space-size=4096' next dev --turbopack",
     "dev:clean": "rm -rf .next && bash dev.sh",
-    "build": "next build",
+    "build": "next build --webpack",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare preview",
+    "deploy:cf": "opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "rm -rf .next/dev && tsc --noEmit --pretty false",
@@ -62,10 +65,12 @@
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
     "next": "^16.2.6",
+    "onnxruntime-web": "^1.27.0",
     "openai": "^6.15.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.69.0",
+    "react-is": "^19.2.8",
     "recharts": "^3.6.0",
     "resend": "^6.20.0",
     "sonner": "^2.0.7",
@@ -75,10 +80,14 @@
     "zod": "^4.3.4"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.2",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/d3-color": "^3.1.3",
+    "@types/d3-path": "^3.1.1",
+    "@types/deep-eql": "^4.0.2",
     "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -89,6 +98,7 @@
     "playwright": "^1.58.2",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.123.0"
   }
 }

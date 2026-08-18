@@ -5,7 +5,6 @@ import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { getMissingPspSelfServiceFields } from "@/lib/psp/self-service-requirements"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 
-export const runtime = 'edge'
 
 const TOKEN_TTL_DAYS = 7
 

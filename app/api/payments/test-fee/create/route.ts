@@ -4,7 +4,6 @@ import { createPaymentLink, validateCivilId } from '@/lib/myfatoorah/client'
 import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
-export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {

@@ -5,7 +5,6 @@ import { FILE_APPLICATION_FEE_AMOUNT, FILE_TEST_FEE_AMOUNT } from '@/lib/config/
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
-export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {

@@ -18,7 +18,6 @@ interface AITransferBody {
   email?: string
 }
 
-export const runtime = 'edge'
 
 function normalizePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-()]/g, '')

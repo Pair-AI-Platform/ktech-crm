@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 
-export const runtime = 'edge'
 
 // GET: count eligible PUC leads (admin only).
 export const GET = withApiHandler(

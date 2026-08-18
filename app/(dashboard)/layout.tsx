@@ -7,7 +7,6 @@ import { HeartbeatProvider } from "@/components/layout/heartbeat-provider";
 import DashboardLayoutClient from "./layout-client";
 import { UserProfileProvider } from "@/lib/hooks/use-user";
 
-export const runtime = 'edge'
 
 export default async function DashboardLayout({
   children,

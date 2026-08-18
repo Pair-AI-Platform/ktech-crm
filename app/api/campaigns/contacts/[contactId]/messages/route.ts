@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 
-export const runtime = 'edge'
 
 type RouteParams = { params: Promise<{ contactId: string }> }
 

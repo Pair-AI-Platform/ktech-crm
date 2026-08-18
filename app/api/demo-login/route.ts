@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { requireDemoMode, getDemoCredentials } from "@/lib/demo-mode"
 
-export const runtime = 'edge'
 
 export async function POST(request: Request) {
   const gateResponse = requireDemoMode()

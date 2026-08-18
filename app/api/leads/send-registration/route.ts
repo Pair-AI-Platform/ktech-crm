@@ -3,7 +3,6 @@ import { Resend } from 'resend'
 import { withApiHandler } from '@/lib/api-handler'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 
-export const runtime = 'edge'
 
 const FORMS_BUCKET = 'registration-forms'
 

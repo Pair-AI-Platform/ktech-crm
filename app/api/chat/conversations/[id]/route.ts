@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 
-export const runtime = 'edge'
 
 export const GET = withApiHandler(
   { context: 'ai-chat-conversation-detail' },

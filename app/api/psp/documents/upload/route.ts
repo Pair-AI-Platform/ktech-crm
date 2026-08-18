@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
 
-export const runtime = 'edge'
 
 export const maxDuration = 30
 

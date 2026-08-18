@@ -5,7 +5,6 @@ import { canEnrollLead } from "@/lib/enrollment/convert-lead"
 import { ENROLLMENT_PAYMENT_AMOUNT, FULL_TUITION_AMOUNT } from "@/lib/config/constants"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
-export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {

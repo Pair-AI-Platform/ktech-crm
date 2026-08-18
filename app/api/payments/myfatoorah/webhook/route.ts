@@ -7,7 +7,6 @@ import { createLogger } from '@/lib/logger'
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from '@/lib/webhook-events'
 import { getMissingPspSelfServiceFields } from '@/lib/psp/self-service-requirements'
 
-export const runtime = 'edge'
 
 // Use service role for webhook (no user session)
 function createServiceClient() {

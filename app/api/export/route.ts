@@ -6,7 +6,6 @@ import { PIPELINE_STAGES, LEAD_STATUSES } from '@/types'
 import type { Lead } from '@/types'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
-export const runtime = 'edge'
 
 interface ExportRequest {
   type: 'pdf' | 'csv'

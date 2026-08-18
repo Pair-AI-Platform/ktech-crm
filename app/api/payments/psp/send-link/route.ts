@@ -4,7 +4,6 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createLogger } from "@/lib/logger"
 import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-export const runtime = 'edge'
 
 const logger = createLogger("PSP Payment Link")
 

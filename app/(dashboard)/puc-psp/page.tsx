@@ -1,6 +1,5 @@
 "use client"
 
-export const runtime = 'edge'
 
 import { useState, useMemo, useEffect, useRef, startTransition, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { getFilterCounts, getFilterLabels } from '@/lib/campaigns/audience-resolver'
 
-export const runtime = 'edge'
 
 export const GET = withApiHandler(
   { context: 'campaign-audience-counts', roles: ['admin'] },

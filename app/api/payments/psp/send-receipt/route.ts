@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {

@@ -5,7 +5,6 @@ import { getUserProfile } from "@/lib/supabase/server"
 import { AppProviders } from "@/components/app-providers"
 import { MarketingShell } from "@/components/marketing/marketing-shell"
 
-export const runtime = 'edge'
 
 export default async function MarketingLayout({
   children,

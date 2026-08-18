@@ -4,7 +4,6 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { validatePspTokenWithCivilId } from "@/lib/auth/psp-self-service-token"
 
-export const runtime = 'edge'
 
 /**
  * Public endpoint: returns the editable PSP form state for a token holder.

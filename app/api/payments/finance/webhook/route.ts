@@ -6,7 +6,6 @@ import { PUC_FEE_AMOUNT } from "@/types"
 import { verifyHmacSignature } from "@/lib/crypto-utils"
 import { recordWebhookEvent, markWebhookProcessed, markWebhookFailed, hashPayload } from "@/lib/webhook-events"
 
-export const runtime = 'edge'
 
 /**
  * Finance Department Webhook

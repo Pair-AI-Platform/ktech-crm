@@ -4,7 +4,6 @@ import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 
-export const runtime = 'edge'
 
 export const maxDuration = 30
 

@@ -7,7 +7,6 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
 import { getArabicLeadNameParts } from "@/lib/lead-name-policy"
 import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-export const runtime = 'edge'
 
 const TOKEN_TTL_DAYS = 7
 

@@ -4,7 +4,6 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { createLogger } from "@/lib/logger"
 import { sendWhatsAppMessage } from "@/lib/twilio/edge-client"
 
-export const runtime = 'edge'
 
 // Transaction amount is read from the database (supports custom amounts)
 

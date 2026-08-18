@@ -3,7 +3,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { escapeHtml } from "@/lib/utils"
 import { PUC_FEE_AMOUNT } from "@/types"
 
-export const runtime = 'edge'
 
 export async function GET(
   request: NextRequest,

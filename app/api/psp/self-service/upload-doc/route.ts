@@ -6,7 +6,6 @@ import { validatePspTokenWithCivilId } from "@/lib/auth/psp-self-service-token"
 import { validateUpload, sanitizeFilename } from "@/lib/upload-validation"
 import { extractDocumentExpirationDate, isDocumentExpired } from "@/lib/ai/document-expiration"
 
-export const runtime = 'edge'
 
 export const maxDuration = 30
 

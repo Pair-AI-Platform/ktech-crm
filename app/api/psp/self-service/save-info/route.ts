@@ -5,7 +5,6 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
 import { validatePspTokenWithCivilId } from "@/lib/auth/psp-self-service-token"
 import { assertArabicLeadNameFields } from "@/lib/lead-name-policy"
 
-export const runtime = 'edge'
 
 // Strict allow-list of fields a student may change via the public flow.
 // Anything else in the payload is silently dropped so a malicious caller

@@ -2,7 +2,6 @@ import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 
-export const runtime = 'edge'
 
 export const GET = withApiHandler(
   { context: 'get-puc-preference-changes', roles: ['admin'] },

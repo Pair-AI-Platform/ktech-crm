@@ -3,7 +3,6 @@ import { withApiHandler } from '@/lib/api-handler'
 import { TEST_FEE_AMOUNT } from '@/lib/config/constants'
 import { requireLeadOwnership } from '@/lib/auth/lead-ownership'
 
-export const runtime = 'edge'
 
 export const POST = withApiHandler({ context: 'test-fee-cash' }, async ({ req, supabase, user, profile, logger }) => {
   const body = await req.json()

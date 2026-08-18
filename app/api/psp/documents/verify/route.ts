@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { withApiHandler } from "@/lib/api-handler"
 import { requireLeadOwnership } from "@/lib/auth/lead-ownership"
 
-export const runtime = 'edge'
 
 // POST - Verify or unverify a document (admin only)
 export const POST = withApiHandler(
