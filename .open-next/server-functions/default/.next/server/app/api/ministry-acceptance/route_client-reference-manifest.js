@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/ministry-acceptance/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"/home/taha/Desktop/ourprojects/frontend/app/api/ministry-acceptance/route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

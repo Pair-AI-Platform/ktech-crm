@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/seed-test-leads/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"/home/taha/Desktop/ourprojects/frontend/app/api/seed-test-leads/route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

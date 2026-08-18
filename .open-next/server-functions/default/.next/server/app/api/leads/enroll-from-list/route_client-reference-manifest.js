@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/leads/enroll-from-list/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"/home/taha/Desktop/ourprojects/frontend/app/api/leads/enroll-from-list/route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

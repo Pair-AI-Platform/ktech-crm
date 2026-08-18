@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/chat": {
+      "maxDuration": 30
+    },
+    "/api/civil-id-extract": {
+      "maxDuration": 30
+    },
+    "/api/psp/documents/extract-expiration": {
+      "maxDuration": 30
+    },
+    "/api/psp/documents/upload": {
+      "maxDuration": 30
+    },
+    "/api/psp/self-service/upload-doc": {
+      "maxDuration": 30
+    }
+  }
+}
