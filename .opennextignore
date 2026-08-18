@@ -1,0 +1,60 @@
+# Exclude from OpenNext bundle to reduce size
+
+# Build artifacts
+node_modules/@swc/**
+node_modules/@esbuild/**
+node_modules/webpack/**
+node_modules/rollup/**
+node_modules/terser/**
+.next/cache/**
+.next/trace
+
+# Source maps
+*.map
+
+# Documentation
+*.md
+*.txt
+README*
+CHANGELOG*
+LICENSE*
+
+# Tests
+test/**
+tests/**
+__tests__/**
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+*.test.js
+*.test.jsx
+*.spec.js
+*.spec.jsx
+
+# WASM files (heavy, load on-demand)
+**/*.wasm
+
+# Development files
+.git/**
+.github/**
+.vscode/**
+*.log
+*.lock
+
+# Platform-specific binaries (not needed for Cloudflare)
+node_modules/@swc/core-linux-x64-gnu/**
+node_modules/@swc/core-linux-x64-musl/**
+node_modules/@swc/core-darwin-x64/**
+node_modules/@swc/core-darwin-arm64/**
+node_modules/@swc/core-win32-x64-msvc/**
+
+# Heavy optional dependencies
+node_modules/@imgly/background-removal/dist/*.wasm
+node_modules/onnxruntime-web/**/*.wasm
+node_modules/sharp/**
+
+# Examples and demos
+**/examples/**
+**/demo/**
+**/docs/**

@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   },
 
   outputFileTracingRoot: process.cwd(),
+  outputFileTracingIncludes: {
+    '/api/**/*': [],
+  },
   outputFileTracingExcludes: {
     "/**": [
       "./thekstocks-automation/**",
@@ -21,12 +24,54 @@ const nextConfig: NextConfig = {
       "./*.pdf",
       "./*.xlsx",
       "./*.png",
+      "node_modules/@swc/core-linux-x64-gnu/**",
+      "node_modules/@swc/core-linux-x64-musl/**",
+      "node_modules/@swc/core-darwin-x64/**",
+      "node_modules/@swc/core-darwin-arm64/**",
+      "node_modules/@esbuild/**",
+      "node_modules/webpack/**",
+      "node_modules/rollup/**",
+      "node_modules/terser/**",
+      "node_modules/@imgly/background-removal/dist/*.wasm",
+      "node_modules/onnxruntime-web/**/*.wasm",
+      ".next/cache/**",
+      ".next/trace",
+      "**/*.map",
+      "**/*.md",
+      "**/*.txt",
+      "**/test/**",
+      "**/tests/**",
+      "**/__tests__/**",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
     ],
   },
 
   experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-icons',
+      'recharts',
+      'date-fns',
+      '@supabase/supabase-js',
+      '@tanstack/react-query',
+      '@tanstack/react-table',
+      'framer-motion',
+    ],
   },
+
+  serverExternalPackages: [
+    '@sentry/nextjs',
+    'twilio',
+    'openai',
+    '@ai-sdk/anthropic',
+    '@ai-sdk/openai',
+    '@imgly/background-removal',
+    'xlsx',
+    'resend',
+  ],
 
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {

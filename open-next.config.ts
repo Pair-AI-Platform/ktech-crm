@@ -23,6 +23,11 @@ const config: OpenNextConfig = {
       queue: 'dummy',
     },
   },
+  // CRITICAL: Minimize what gets bundled
+  dangerous: {
+    disableIncrementalCache: true,
+    disableTagCache: true,
+  },
 }
 
 export default config
