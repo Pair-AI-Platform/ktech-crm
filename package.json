@@ -3,15 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build": "next build",
+    "analyze": "cross-env ANALYZE=true npm run build",
     "dev": "bash dev.sh",
     "dev:once": "NODE_OPTIONS='--max-old-space-size=4096' next dev --turbopack",
     "dev:clean": "rm -rf .next && bash dev.sh",
-    "build": "next build",
+    "build:cloudflare": "next build && npx @opennextjs/cloudflare build",
+    "preview:cloudflare": "npm run build:cloudflare && wrangler pages dev .open-next/worker",
+    "deploy:staging": "npm run build:cloudflare && wrangler pages deploy .open-next/worker --project-name=ktech-crm-staging",
+    "deploy:production": "npm run build:cloudflare && wrangler pages deploy .open-next/worker --project-name=ktech-crm",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "rm -rf .next/dev && tsc --noEmit --pretty false",
     "verify": "npm run typecheck && npm run lint -- --quiet && npm test && npm run build",
     "verify:release": "npm run verify && node scripts/verify-production-env.mjs",
+    "verify:bundle": "node scripts/verify-optimizations.mjs && node scripts/final-verification.mjs",
+    "compare:sizes": "node scripts/compare-bundle-sizes.mjs",
+    "pre-deploy": "npm run verify:bundle && npm run build:cloudflare && npm run compare:sizes",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -20,7 +28,11 @@
     "env:check": "node --env-file-if-exists=.env.production.local --env-file-if-exists=.env.local scripts/verify-env.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "db:audit": "node --env-file-if-exists=.env.production.local --env-file-if-exists=.env.local scripts/audit-supabase-production.mjs",
-    "test:rls": "scripts/test-rls.sh"
+    "test:rls": "scripts/test-rls.sh",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
@@ -54,7 +66,7 @@
     "@twilio/voice-sdk": "^2.17.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.4",
-    "@xyflow/react": "^12.10.0",
+    "@xyflow/react": "^12.11.3",
     "ai": "^6.0.116",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -75,6 +87,8 @@
     "zod": "^4.3.4"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.3.1",
+    "@opennextjs/cloudflare": "^1.20.2",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
@@ -82,6 +96,7 @@
     "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "jsdom": "^27.4.0",
@@ -89,6 +104,7 @@
     "playwright": "^1.58.2",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.123.0"
   }
 }

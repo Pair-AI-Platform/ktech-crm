@@ -1,4 +1,11 @@
 import type { NextConfig } from "next";
+import type { Configuration } from "webpack";
+
+// Bundle analyzer configuration - using dynamic import to avoid ESLint issues
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -15,6 +22,80 @@ const nextConfig: NextConfig = {
       "./*.xlsx",
       "./*.png",
     ],
+  },
+
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+  },
+
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+
+  webpack: (config: Configuration, { isServer, dev }) => {
+    // Don't externalize in development
+    if (dev) return config;
+
+    // Externalize heavy dependencies in production
+    if (!isServer) {
+      config.externals = config.externals || [];
+      
+      // Add CDN externals for client-side bundles
+      if (Array.isArray(config.externals)) {
+        config.externals.push({
+          // These will be loaded from CDN
+          // 'recharts': 'Recharts',
+          // 'framer-motion': 'FramerMotion',
+        });
+      }
+    }
+
+    // Optimize bundle splitting
+    if (config.optimization) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          // Vendor chunk for shared dependencies
+          vendor: {
+            name: 'vendor',
+            chunks: 'all',
+            test: /node_modules/,
+            priority: 20,
+          },
+          // Common chunk for shared code
+          common: {
+            name: 'common',
+            minChunks: 2,
+            chunks: 'all',
+            priority: 10,
+            reuseExistingChunk: true,
+            enforce: true,
+          },
+          // Separate chunks for heavy libraries
+          recharts: {
+            name: 'recharts',
+            test: /[\\/]node_modules[\\/]recharts[\\/]/,
+            priority: 30,
+          },
+          supabase: {
+            name: 'supabase',
+            test: /[\\/]node_modules[\\/]@supabase[\\/]/,
+            priority: 30,
+          },
+          radix: {
+            name: 'radix',
+            test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
+            priority: 30,
+          },
+        },
+      };
+    }
+
+    return config;
   },
 
   async redirects() {
@@ -100,4 +181,7 @@ const sentryWrapped =
         ))()
     : nextConfig;
 
-export default sentryWrapped;
+// Wrap with bundle analyzer
+export default withBundleAnalyzer(sentryWrapped);
+
+import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());

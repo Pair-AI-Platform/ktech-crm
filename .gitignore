@@ -75,3 +75,8 @@ next-env.d.ts
 /thekstocks-automation/
 /domain-name-brainstormer/
 /domain-name-brainstormer.zip
+
+# Cloudflare
+.open-next/
+.wrangler/
+wrangler.toml.local
