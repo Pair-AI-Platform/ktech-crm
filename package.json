@@ -7,6 +7,8 @@
     "dev:once": "NODE_OPTIONS='--max-old-space-size=4096' next dev --turbopack",
     "dev:clean": "rm -rf .next && bash dev.sh",
     "build": "next build",
+    "build:cloudflare": "opennextjs-cloudflare build",
+    "deploy": "npm run build:cloudflare && wrangler deploy",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "rm -rf .next/dev && tsc --noEmit --pretty false",
@@ -75,6 +77,7 @@
     "zod": "^4.3.4"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.2",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
